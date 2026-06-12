@@ -17,6 +17,7 @@ import {
   LogOut,
   Volume2,
   VolumeX,
+  GripVertical,
 } from "lucide-react";
 
 import {
@@ -379,27 +380,172 @@ function LoginPage() {
 
 function Dashboard() {
   const [clients, setClients] = useState([]);
+  const [screensData, setScreensData] = useState([]);
+  const [playlistsData, setPlaylistsData] = useState([]);
+  const [now, setNow] = useState(Date.now());
 
   useEffect(() => {
-    const unsubscribe = onSnapshot(collection(db, "clients"), (snapshot) => {
-      const list = snapshot.docs.map((clientDoc) => ({
+    const interval = setInterval(() => {
+      setNow(Date.now());
+    }, 15000);
+
+    return () => clearInterval(interval);
+  }, []);
+
+  useEffect(() => {
+    const unsubscribeClients = onSnapshot(collection(db, "clients"), (snapshot) => {
+      const clientsList = snapshot.docs.map((clientDoc) => ({
         id: clientDoc.id,
         ...clientDoc.data(),
       }));
 
-      setClients(list);
+      setClients(clientsList);
+
+      const unsubScreens = [];
+      const unsubPlaylists = [];
+
+      clientsList.forEach((client) => {
+        const screensRef = collection(db, "clients", client.id, "screens");
+        const playlistsRef = collection(db, "clients", client.id, "playlists");
+
+        const screenUnsub = onSnapshot(screensRef, (screensSnapshot) => {
+          const clientScreens = screensSnapshot.docs.map((screenDoc) => ({
+            id: screenDoc.id,
+            clientId: client.id,
+            clientName: client.name,
+            ...screenDoc.data(),
+          }));
+
+          setScreensData((previous) => [
+            ...previous.filter((screen) => screen.clientId !== client.id),
+            ...clientScreens,
+          ]);
+        });
+
+        const playlistUnsub = onSnapshot(playlistsRef, (playlistsSnapshot) => {
+          const clientPlaylists = playlistsSnapshot.docs.map((playlistDoc) => ({
+            id: playlistDoc.id,
+            clientId: client.id,
+            clientName: client.name,
+            ...playlistDoc.data(),
+          }));
+
+          setPlaylistsData((previous) => [
+            ...previous.filter((playlist) => playlist.clientId !== client.id),
+            ...clientPlaylists,
+          ]);
+        });
+
+        unsubScreens.push(screenUnsub);
+        unsubPlaylists.push(playlistUnsub);
+      });
+
+      return () => {
+        unsubScreens.forEach((unsub) => unsub());
+        unsubPlaylists.forEach((unsub) => unsub());
+      };
     });
 
-    return () => unsubscribe();
+    return () => unsubscribeClients();
   }, []);
+
+  function getLastSeenDate(screen) {
+    if (screen.lastSeenAt?.toDate) {
+      return screen.lastSeenAt.toDate();
+    }
+
+    if (screen.lastSeenAt?.seconds) {
+      return new Date(screen.lastSeenAt.seconds * 1000);
+    }
+
+    return null;
+  }
+
+  function isScreenOnline(screen) {
+    const lastSeenDate = getLastSeenDate(screen);
+
+    if (!lastSeenDate) return false;
+
+    const diffInSeconds = (now - lastSeenDate.getTime()) / 1000;
+
+    return diffInSeconds <= 45;
+  }
+
+  function getDaysToDue(dueDate) {
+    if (!dueDate) return null;
+
+    const today = new Date();
+    const due = new Date(`${dueDate}T23:59:59`);
+
+    const diff = due.getTime() - today.getTime();
+
+    return Math.ceil(diff / (1000 * 60 * 60 * 24));
+  }
+
+  function getClientDueStatus(client) {
+    const days = getDaysToDue(client.dueDate);
+
+    if (days === null) {
+      return {
+        label: "Sem vencimento",
+        className: "neutral",
+      };
+    }
+
+    if (days < 0) {
+      return {
+        label: `Vencido há ${Math.abs(days)} dia(s)`,
+        className: "danger",
+      };
+    }
+
+    if (days <= 7) {
+      return {
+        label: `Vence em ${days} dia(s)`,
+        className: "warning",
+      };
+    }
+
+    return {
+      label: `Vence em ${days} dia(s)`,
+      className: "success",
+    };
+  }
+
+  const onlineScreens = screensData.filter(isScreenOnline);
+  const offlineScreens = screensData.filter((screen) => !isScreenOnline(screen));
+
+  const overdueClients = clients.filter((client) => {
+    const days = getDaysToDue(client.dueDate);
+    return days !== null && days < 0;
+  });
+
+  const soonDueClients = clients.filter((client) => {
+    const days = getDaysToDue(client.dueDate);
+    return days !== null && days >= 0 && days <= 7;
+  });
+
+  const scheduledPlaylists = playlistsData.filter((playlist) => playlist.scheduleEnabled);
+
+  const recentClients = [...clients].slice(-5).reverse();
+  const criticalClients = [...overdueClients, ...soonDueClients].slice(0, 5);
 
   return (
     <>
-      <header className="header">
+      <header className="header dashboard-hero">
         <div>
           <div className="kicker">Painel Administrativo</div>
-          <h1>Bem-vindo ao Totem Park</h1>
-          <p>Sistema profissional de digital signage.</p>
+          <h1>Dashboard do Totem Park</h1>
+          <p>
+            Visão geral dos clientes, telas online, vencimentos e programações
+            ativas da plataforma.
+          </p>
+        </div>
+
+        <div className="dashboard-hero-card">
+          <span>Status geral</span>
+          <strong>Operacional</strong>
+          <p>{onlineScreens.length} tela(s) online agora</p>
         </div>
       </header>
 
@@ -412,32 +558,167 @@ function Dashboard() {
         />
 
         <StatCard
-          title="Telas contratadas"
-          value={clients.reduce(
-            (total, client) => total + Number(client.screensLimit || 0),
-            0
-          )}
+          title="Telas online"
+          value={`${onlineScreens.length}/${screensData.length}`}
           icon={<Monitor />}
-          status="Limite total"
+          status="Agora"
         />
 
         <StatCard
-          title="Planos"
-          value="03"
+          title="Playlists"
+          value={playlistsData.length}
+          icon={<ListVideo />}
+          status={`${scheduledPlaylists.length} agendada(s)`}
+        />
+
+        <StatCard
+          title="Financeiro"
+          value={overdueClients.length}
           icon={<CreditCard />}
-          status="Básico, Pro e Enterprise"
+          status="Cliente(s) vencido(s)"
         />
+      </section>
 
-        <StatCard
-          title="Sistema"
-          value="Online"
-          icon={<Wifi />}
-          status="Funcionando"
-        />
+      <section className="dashboard-grid">
+        <div className="panel dashboard-panel-large">
+          <div className="panel-header">
+            <div>
+              <h2>Telas em tempo real</h2>
+              <p>Monitoramento rápido das TVs conectadas.</p>
+            </div>
+
+            <div className="screen-summary">
+              <span className="screen-summary-online">{onlineScreens.length} online</span>
+              <span className="screen-summary-offline">{offlineScreens.length} offline</span>
+            </div>
+          </div>
+
+          <div className="dashboard-screen-list">
+            {screensData.length === 0 ? (
+              <div className="empty-library">Nenhuma tela cadastrada ainda.</div>
+            ) : (
+              screensData.slice(0, 8).map((screen) => {
+                const online = isScreenOnline(screen);
+
+                return (
+                  <div className="dashboard-screen-row" key={`${screen.clientId}-${screen.id}`}>
+                    <div className={online ? "screen-pulse online" : "screen-pulse offline"}></div>
+
+                    <div>
+                      <strong>{screen.name}</strong>
+                      <span>{screen.clientName} • {screen.location}</span>
+                    </div>
+
+                    <div className={online ? "dashboard-status online" : "dashboard-status offline"}>
+                      {online ? "Online agora" : "Offline"}
+                    </div>
+                  </div>
+                );
+              })
+            )}
+          </div>
+        </div>
+
+        <div className="panel">
+          <div className="panel-header">
+            <div>
+              <h2>Vencimentos</h2>
+              <p>Clientes que precisam de atenção.</p>
+            </div>
+          </div>
+
+          <div className="dashboard-due-list">
+            {criticalClients.length === 0 ? (
+              <div className="empty-mini">Nenhum vencimento crítico.</div>
+            ) : (
+              criticalClients.map((client) => {
+                const status = getClientDueStatus(client);
+
+                return (
+                  <div className="due-row" key={client.id}>
+                    <div>
+                      <strong>{client.name}</strong>
+                      <span>{client.dueDate || "Sem data"}</span>
+                    </div>
+
+                    <div className={`due-badge ${status.className}`}>
+                      {status.label}
+                    </div>
+                  </div>
+                );
+              })
+            )}
+          </div>
+        </div>
+      </section>
+
+      <section className="dashboard-grid">
+        <div className="panel">
+          <div className="panel-header">
+            <div>
+              <h2>Clientes recentes</h2>
+              <p>Últimos clientes cadastrados.</p>
+            </div>
+          </div>
+
+          <div className="dashboard-client-list">
+            {recentClients.length === 0 ? (
+              <div className="empty-mini">Nenhum cliente ainda.</div>
+            ) : (
+              recentClients.map((client) => {
+                const status = getClientDueStatus(client);
+
+                return (
+                  <div className="client-mini-card" key={client.id}>
+                    <div>
+                      <strong>{client.name}</strong>
+                      <span>{client.plan} • {client.billing}</span>
+                    </div>
+
+                    <div className={`due-badge ${status.className}`}>
+                      {status.label}
+                    </div>
+                  </div>
+                );
+              })
+            )}
+          </div>
+        </div>
+
+        <div className="panel">
+          <div className="panel-header">
+            <div>
+              <h2>Programações agendadas</h2>
+              <p>Playlists com data e horário definidos.</p>
+            </div>
+          </div>
+
+          <div className="dashboard-schedule-list">
+            {scheduledPlaylists.length === 0 ? (
+              <div className="empty-mini">Nenhuma programação agendada.</div>
+            ) : (
+              scheduledPlaylists.slice(0, 6).map((playlist) => (
+                <div className="schedule-mini-card" key={`${playlist.clientId}-${playlist.id}`}>
+                  <div>
+                    <strong>{playlist.name}</strong>
+                    <span>{playlist.clientName}</span>
+                  </div>
+
+                  <p>
+                    {playlist.startDate} até {playlist.endDate}
+                    <br />
+                    {playlist.startTime} às {playlist.endTime}
+                  </p>
+                </div>
+              ))
+            )}
+          </div>
+        </div>
       </section>
     </>
   );
 }
+
 
 function ClientsPage({ onOpenClient }) {
   const [clients, setClients] = useState([]);
@@ -800,6 +1081,15 @@ function ClientDashboard({ client }) {
   const [media, setMedia] = useState([]);
   const [playlists, setPlaylists] = useState([]);
   const [screens, setScreens] = useState([]);
+  const [now, setNow] = useState(new Date());
+
+  useEffect(() => {
+    const interval = setInterval(() => {
+      setNow(new Date());
+    }, 15000);
+
+    return () => clearInterval(interval);
+  }, []);
 
   useEffect(() => {
     const unsubMedia = onSnapshot(
@@ -830,38 +1120,200 @@ function ClientDashboard({ client }) {
     };
   }, [client.id]);
 
+  function timeToMinutes(time) {
+    if (!time) return 0;
+
+    const [hours, minutes] = time.split(":").map(Number);
+
+    return hours * 60 + minutes;
+  }
+
+  function getTodayValue(date) {
+    const year = date.getFullYear();
+    const month = String(date.getMonth() + 1).padStart(2, "0");
+    const day = String(date.getDate()).padStart(2, "0");
+
+    return `${year}-${month}-${day}`;
+  }
+
+  function isPlaylistInSchedule(playlist, screenId) {
+    if (!playlist?.scheduleEnabled) return false;
+
+    if (
+      playlist.targetScreenIds &&
+      playlist.targetScreenIds.length > 0 &&
+      !playlist.targetScreenIds.includes(screenId)
+    ) {
+      return false;
+    }
+
+    const today = getTodayValue(now);
+
+    if (playlist.startDate && today < playlist.startDate) return false;
+    if (playlist.endDate && today > playlist.endDate) return false;
+
+    const currentMinutes = now.getHours() * 60 + now.getMinutes();
+    const startMinutes = timeToMinutes(playlist.startTime);
+    const endMinutes = timeToMinutes(playlist.endTime);
+
+    if (startMinutes === endMinutes) return true;
+
+    if (startMinutes < endMinutes) {
+      return currentMinutes >= startMinutes && currentMinutes <= endMinutes;
+    }
+
+    return currentMinutes >= startMinutes || currentMinutes <= endMinutes;
+  }
+
+  function getActivePlaylist(screen) {
+    const scheduled = playlists
+      .filter((playlist) => isPlaylistInSchedule(playlist, screen.id))
+      .sort((a, b) => {
+        const aDate = `${a.startDate || ""} ${a.startTime || ""}`;
+        const bDate = `${b.startDate || ""} ${b.startTime || ""}`;
+
+        return bDate.localeCompare(aDate);
+      });
+
+    if (scheduled.length > 0) {
+      return {
+        playlist: scheduled[0],
+        mode: "scheduled",
+      };
+    }
+
+    return {
+      playlist: playlists.find((playlist) => playlist.id === screen.playlistId),
+      mode: "default",
+    };
+  }
+
+  function getLastSeenDate(screen) {
+    if (screen.lastSeenAt?.toDate) {
+      return screen.lastSeenAt.toDate();
+    }
+
+    if (screen.lastSeenAt?.seconds) {
+      return new Date(screen.lastSeenAt.seconds * 1000);
+    }
+
+    return null;
+  }
+
+  function isScreenOnline(screen) {
+    const lastSeenDate = getLastSeenDate(screen);
+
+    if (!lastSeenDate) return false;
+
+    const diffInSeconds = (Date.now() - lastSeenDate.getTime()) / 1000;
+
+    return diffInSeconds <= 45;
+  }
+
   return (
-    <section className="stats">
-      <StatCard
-        title="Mídias"
-        value={media.length}
-        icon={<Image />}
-        status="Arquivos cadastrados"
-      />
+    <>
+      <section className="stats">
+        <StatCard
+          title="Mídias"
+          value={media.length}
+          icon={<Image />}
+          status="Arquivos cadastrados"
+        />
 
-      <StatCard
-        title="Playlists"
-        value={playlists.length}
-        icon={<ListVideo />}
-        status="Campanhas criadas"
-      />
+        <StatCard
+          title="Playlists"
+          value={playlists.length}
+          icon={<ListVideo />}
+          status="Campanhas criadas"
+        />
 
-      <StatCard
-        title="Telas"
-        value={`${screens.length}/${client.screensLimit}`}
-        icon={<Monitor />}
-        status="Uso do plano"
-      />
+        <StatCard
+          title="Telas"
+          value={`${screens.length}/${client.screensLimit}`}
+          icon={<Monitor />}
+          status="Uso do plano"
+        />
 
-      <StatCard
-        title="Vencimento"
-        value={client.dueDate || "--"}
-        icon={<CreditCard />}
-        status={client.status}
-      />
-    </section>
+        <StatCard
+          title="Vencimento"
+          value={client.dueDate || "--"}
+          icon={<CreditCard />}
+          status={client.status}
+        />
+      </section>
+
+      <section className="panel">
+        <div className="playlist-editor-header">
+          <div>
+            <h2>Preview das telas</h2>
+            <p>
+              Acompanhe em tempo real qual programação cada tela está exibindo.
+            </p>
+          </div>
+        </div>
+
+        <div className="screen-preview-grid">
+          {screens.length === 0 ? (
+            <div className="empty-library">
+              Nenhuma tela cadastrada ainda.
+            </div>
+          ) : (
+            screens.map((screen) => {
+              const active = getActivePlaylist(screen);
+              const activePlaylist = active.playlist;
+              const previewMedia = activePlaylist?.items?.[0];
+              const online = isScreenOnline(screen);
+
+              return (
+                <div className="screen-live-card" key={screen.id}>
+                  <div className="screen-live-preview">
+                    {previewMedia ? (
+                      previewMedia.type === "Vídeo" ? (
+                        <video src={previewMedia.preview} muted />
+                      ) : (
+                        <img src={previewMedia.preview} alt={previewMedia.title} />
+                      )
+                    ) : (
+                      <Monitor size={48} />
+                    )}
+
+                    <div className={online ? "live-dot online" : "live-dot offline"}></div>
+                  </div>
+
+                  <div className="screen-live-info">
+                    <div className="screen-card-top">
+                      <strong>{screen.name}</strong>
+
+                      <div className={online ? "screen-status online" : "screen-status offline"}>
+                        <div></div>
+                        {online ? "Online agora" : "Offline"}
+                      </div>
+                    </div>
+
+                    <p>
+                      {active.mode === "scheduled"
+                        ? "Programação agendada"
+                        : "Playlist padrão"}
+                    </p>
+
+                    <h4>{activePlaylist?.name || "Nenhuma playlist ativa"}</h4>
+
+                    {previewMedia && (
+                      <span>
+                        Prévia: {previewMedia.title}
+                      </span>
+                    )}
+                  </div>
+                </div>
+              );
+            })
+          )}
+        </div>
+      </section>
+    </>
   );
 }
+
 
 function ClientMediaPage({ client }) {
   const [mediaList, setMediaList] = useState([]);
@@ -893,8 +1345,7 @@ function ClientMediaPage({ client }) {
     return () => unsubscribe();
   }, [client.id]);
 
-  function handleFileChange(event) {
-    const file = event.target.files[0];
+  function handleSelectedFile(file) {
     if (!file) return;
 
     const type = file.type.startsWith("video") ? "Vídeo" : "Imagem";
@@ -908,6 +1359,11 @@ function ClientMediaPage({ client }) {
       title: form.title || file.name,
       sound: type === "Vídeo" ? form.sound : false,
     });
+  }
+
+  function handleFileChange(event) {
+    const file = event.target.files[0];
+    handleSelectedFile(file);
   }
 
   async function handleSaveMedia() {
@@ -979,6 +1435,8 @@ function ClientMediaPage({ client }) {
     }
   }
 
+  const fileInputId = `media-file-${client.id}`;
+
   return (
     <>
       <section className="upload-panel">
@@ -992,23 +1450,81 @@ function ClientMediaPage({ client }) {
           ) : (
             <div className="empty-upload">
               <Upload size={42} />
-              <p>Selecione uma imagem ou vídeo</p>
+              <p>Prévia da mídia aparecerá aqui</p>
             </div>
           )}
         </div>
 
         <div className="upload-form">
-          <div className="form-group">
-            <label>Arquivo</label>
-            <input type="file" accept="image/*,video/*" onChange={handleFileChange} />
+          <div className="modern-upload-group">
+            <div className="modern-upload-title">
+              <div className="modern-upload-icon">
+                <Upload size={22} />
+              </div>
+
+              <div>
+                <label>Arquivo</label>
+                <p>Selecione ou arraste uma imagem/vídeo para enviar.</p>
+              </div>
+            </div>
+
+            <label
+              className="file-dropzone"
+              htmlFor={fileInputId}
+              onDragOver={(event) => event.preventDefault()}
+              onDrop={(event) => {
+                event.preventDefault();
+                handleSelectedFile(event.dataTransfer.files[0]);
+              }}
+            >
+              <input
+                id={fileInputId}
+                className="file-input-hidden"
+                type="file"
+                accept="image/*,video/*"
+                onChange={handleFileChange}
+              />
+
+              <div className="file-upload-button">
+                <Upload size={30} />
+
+                <div>
+                  <strong>Selecionar arquivo</strong>
+                  <span>Clique para escolher no dispositivo</span>
+                </div>
+              </div>
+
+              <div className="file-drop-divider"></div>
+
+              <div className="file-drop-copy">
+                <div className="file-drop-icon">📁</div>
+                <strong>Ou arraste e solte aqui</strong>
+                <span>Imagens e vídeos</span>
+              </div>
+            </label>
+
+            <div className="file-upload-help">
+              <span>ⓘ</span>
+              Formatos suportados: JPG, PNG, MP4, MOV e WEBM
+            </div>
+
+            {form.file && (
+              <div className="selected-file-card">
+                <strong>{form.file.name}</strong>
+                <span>{form.type} selecionado</span>
+              </div>
+            )}
           </div>
 
-          <div className="form-group">
+          <div className="form-group media-name-group">
             <label>Nome da mídia</label>
             <input
               value={form.title}
+              maxLength={80}
+              placeholder="Ex.: Promoção Loja, Vídeo Institucional, Música Ambiente..."
               onChange={(e) => setForm({ ...form, title: e.target.value })}
             />
+            <small>{form.title.length}/80</small>
           </div>
 
           <div className="form-group">
@@ -1090,33 +1606,64 @@ function ClientMediaPage({ client }) {
 function ClientPlaylistsPage({ client }) {
   const [mediaList, setMediaList] = useState([]);
   const [playlists, setPlaylists] = useState([]);
+  const [screens, setScreens] = useState([]);
   const [editingPlaylist, setEditingPlaylist] = useState(null);
+  const [draggedMediaId, setDraggedMediaId] = useState(null);
 
   const [form, setForm] = useState({
     name: "",
     transition: "Fade suave",
     orientation: "Paisagem",
     selectedMediaIds: [],
+    scheduleEnabled: false,
+    targetScreenIds: [],
+    startDate: "",
+    endDate: "",
+    startTime: "08:00",
+    endTime: "18:00",
   });
 
   useEffect(() => {
     const unsubMedia = onSnapshot(
       collection(db, "clients", client.id, "media"),
       (snapshot) => {
-        setMediaList(snapshot.docs.map((item) => ({ id: item.id, ...item.data() })));
+        setMediaList(
+          snapshot.docs.map((item) => ({
+            id: item.id,
+            ...item.data(),
+          }))
+        );
       }
     );
 
     const unsubPlaylists = onSnapshot(
       collection(db, "clients", client.id, "playlists"),
       (snapshot) => {
-        setPlaylists(snapshot.docs.map((item) => ({ id: item.id, ...item.data() })));
+        setPlaylists(
+          snapshot.docs.map((item) => ({
+            id: item.id,
+            ...item.data(),
+          }))
+        );
+      }
+    );
+
+    const unsubScreens = onSnapshot(
+      collection(db, "clients", client.id, "screens"),
+      (snapshot) => {
+        setScreens(
+          snapshot.docs.map((item) => ({
+            id: item.id,
+            ...item.data(),
+          }))
+        );
       }
     );
 
     return () => {
       unsubMedia();
       unsubPlaylists();
+      unsubScreens();
     };
   }, [client.id]);
 
@@ -1131,23 +1678,108 @@ function ClientPlaylistsPage({ client }) {
     });
   }
 
+  function toggleTargetScreen(screenId) {
+    const selected = form.targetScreenIds.includes(screenId);
+
+    setForm({
+      ...form,
+      targetScreenIds: selected
+        ? form.targetScreenIds.filter((id) => id !== screenId)
+        : [...form.targetScreenIds, screenId],
+    });
+  }
+
+
+  function handleDragStart(mediaId) {
+    setDraggedMediaId(mediaId);
+  }
+
+  function handleDragOver(e) {
+    e.preventDefault();
+  }
+
+  function handleDrop(targetMediaId) {
+    if (!draggedMediaId || draggedMediaId === targetMediaId) {
+      setDraggedMediaId(null);
+      return;
+    }
+
+    const updated = [...form.selectedMediaIds];
+
+    const draggedIndex = updated.indexOf(draggedMediaId);
+    const targetIndex = updated.indexOf(targetMediaId);
+
+    if (draggedIndex === -1 || targetIndex === -1) {
+      setDraggedMediaId(null);
+      return;
+    }
+
+    updated.splice(draggedIndex, 1);
+    updated.splice(targetIndex, 0, draggedMediaId);
+
+    setForm({
+      ...form,
+      selectedMediaIds: updated,
+    });
+
+    setDraggedMediaId(null);
+  }
+
+  function moveMedia(index, direction) {
+    const newOrder = [...form.selectedMediaIds];
+    const targetIndex = direction === "up" ? index - 1 : index + 1;
+
+    if (targetIndex < 0 || targetIndex >= newOrder.length) {
+      return;
+    }
+
+    [newOrder[index], newOrder[targetIndex]] = [
+      newOrder[targetIndex],
+      newOrder[index],
+    ];
+
+    setForm({
+      ...form,
+      selectedMediaIds: newOrder,
+    });
+  }
+
   function resetPlaylistForm() {
     setEditingPlaylist(null);
+
     setForm({
       name: "",
       transition: "Fade suave",
       orientation: "Paisagem",
       selectedMediaIds: [],
+      scheduleEnabled: false,
+      targetScreenIds: [],
+      startDate: "",
+      endDate: "",
+      startTime: "08:00",
+      endTime: "18:00",
     });
   }
 
   function startEditPlaylist(playlist) {
     setEditingPlaylist(playlist);
+
     setForm({
       name: playlist.name || "",
       transition: playlist.transition || "Fade suave",
       orientation: playlist.orientation || "Paisagem",
       selectedMediaIds: playlist.items?.map((item) => item.id) || [],
+      scheduleEnabled: playlist.scheduleEnabled || false,
+      targetScreenIds: playlist.targetScreenIds || [],
+      startDate: playlist.startDate || "",
+      endDate: playlist.endDate || "",
+      startTime: playlist.startTime || "08:00",
+      endTime: playlist.endTime || "18:00",
+    });
+
+    window.scrollTo({
+      top: 0,
+      behavior: "smooth",
     });
   }
 
@@ -1162,6 +1794,28 @@ function ClientPlaylistsPage({ client }) {
       return;
     }
 
+    if (form.scheduleEnabled) {
+      if (form.targetScreenIds.length === 0) {
+        alert("Selecione pelo menos uma tela para receber esta programação.");
+        return;
+      }
+
+      if (!form.startDate || !form.endDate) {
+        alert("Informe a data inicial e final do agendamento.");
+        return;
+      }
+
+      if (!form.startTime || !form.endTime) {
+        alert("Informe o horário inicial e final do agendamento.");
+        return;
+      }
+
+      if (form.endDate < form.startDate) {
+        alert("A data final não pode ser menor que a data inicial.");
+        return;
+      }
+    }
+
     try {
       const selectedItems = form.selectedMediaIds
         .map((id) => mediaList.find((media) => media.id === id))
@@ -1172,6 +1826,12 @@ function ClientPlaylistsPage({ client }) {
         transition: form.transition,
         orientation: form.orientation,
         items: selectedItems,
+        scheduleEnabled: form.scheduleEnabled,
+        targetScreenIds: form.scheduleEnabled ? form.targetScreenIds : [],
+        startDate: form.scheduleEnabled ? form.startDate : "",
+        endDate: form.scheduleEnabled ? form.endDate : "",
+        startTime: form.scheduleEnabled ? form.startTime : "",
+        endTime: form.scheduleEnabled ? form.endTime : "",
         updatedAt: serverTimestamp(),
       };
 
@@ -1180,12 +1840,14 @@ function ClientPlaylistsPage({ client }) {
           doc(db, "clients", client.id, "playlists", editingPlaylist.id),
           playlistData
         );
+
         alert("Playlist atualizada com sucesso!");
       } else {
         await addDoc(collection(db, "clients", client.id, "playlists"), {
           ...playlistData,
           createdAt: serverTimestamp(),
         });
+
         alert("Playlist criada com sucesso!");
       }
 
@@ -1209,22 +1871,51 @@ function ClientPlaylistsPage({ client }) {
     <>
       <section className="playlist-builder">
         <div className="panel">
-          <h2>{editingPlaylist ? "Editar playlist" : "Criar playlist"}</h2>
+          <div className="playlist-editor-header">
+            <div>
+              <h2>
+                {editingPlaylist ? "Editar playlist" : "Criar playlist"}
+              </h2>
+
+              <p>
+                Selecione as mídias, organize a sequência, defina data/horário e escolha em quais telas vai entrar.
+              </p>
+            </div>
+
+            {editingPlaylist && (
+              <div className="editing-badge">
+                Editando
+              </div>
+            )}
+          </div>
 
           <div className="form-grid">
             <div className="form-group">
               <label>Nome da playlist</label>
+
               <input
                 value={form.name}
-                onChange={(e) => setForm({ ...form, name: e.target.value })}
+                placeholder="Ex.: Promoção Dia dos Namorados"
+                onChange={(e) =>
+                  setForm({
+                    ...form,
+                    name: e.target.value,
+                  })
+                }
               />
             </div>
 
             <div className="form-group">
               <label>Orientação</label>
+
               <select
                 value={form.orientation}
-                onChange={(e) => setForm({ ...form, orientation: e.target.value })}
+                onChange={(e) =>
+                  setForm({
+                    ...form,
+                    orientation: e.target.value,
+                  })
+                }
               >
                 <option>Paisagem</option>
                 <option>Retrato</option>
@@ -1234,9 +1925,15 @@ function ClientPlaylistsPage({ client }) {
 
             <div className="form-group">
               <label>Transição</label>
+
               <select
                 value={form.transition}
-                onChange={(e) => setForm({ ...form, transition: e.target.value })}
+                onChange={(e) =>
+                  setForm({
+                    ...form,
+                    transition: e.target.value,
+                  })
+                }
               >
                 <option>Fade suave</option>
                 <option>Slide lateral</option>
@@ -1247,13 +1944,172 @@ function ClientPlaylistsPage({ client }) {
             </div>
           </div>
 
+          <div className="schedule-box">
+            <div className="schedule-box-header">
+              <div>
+                <h3>Agendamento por data, horário e tela</h3>
+                <p>
+                  Quando ativado, esta playlist entra nas telas escolhidas e depois elas voltam para a playlist padrão.
+                </p>
+              </div>
+
+              <button
+                type="button"
+                className={
+                  form.scheduleEnabled
+                    ? "schedule-toggle active"
+                    : "schedule-toggle"
+                }
+                onClick={() =>
+                  setForm({
+                    ...form,
+                    scheduleEnabled: !form.scheduleEnabled,
+                  })
+                }
+              >
+                {form.scheduleEnabled ? "Ativado" : "Desativado"}
+              </button>
+            </div>
+
+            {form.scheduleEnabled && (
+              <>
+                <div className="target-screens-box">
+                  <div className="playlist-section-title compact">
+                    <div>
+                      <h3>Telas que receberão a programação</h3>
+                      <p>Escolha onde esta playlist agendada vai entrar.</p>
+                    </div>
+
+                    <span>
+                      {form.targetScreenIds.length} tela(s)
+                    </span>
+                  </div>
+
+                  <div className="target-screens-grid">
+                    {screens.length === 0 ? (
+                      <div className="empty-library">
+                        Cadastre uma tela antes de agendar.
+                      </div>
+                    ) : (
+                      screens.map((screen) => (
+                        <button
+                          key={screen.id}
+                          type="button"
+                          className={
+                            form.targetScreenIds.includes(screen.id)
+                              ? "target-screen-card selected"
+                              : "target-screen-card"
+                          }
+                          onClick={() => toggleTargetScreen(screen.id)}
+                        >
+                          <Monitor size={22} />
+
+                          <div>
+                            <strong>{screen.name}</strong>
+                            <span>{screen.location}</span>
+                          </div>
+                        </button>
+                      ))
+                    )}
+                  </div>
+                </div>
+
+                <div className="schedule-grid extended">
+                  <div className="form-group">
+                    <label>Data inicial</label>
+
+                    <input
+                      type="date"
+                      value={form.startDate}
+                      onChange={(e) =>
+                        setForm({
+                          ...form,
+                          startDate: e.target.value,
+                        })
+                      }
+                    />
+                  </div>
+
+                  <div className="form-group">
+                    <label>Data final</label>
+
+                    <input
+                      type="date"
+                      value={form.endDate}
+                      onChange={(e) =>
+                        setForm({
+                          ...form,
+                          endDate: e.target.value,
+                        })
+                      }
+                    />
+                  </div>
+
+                  <div className="form-group">
+                    <label>Início</label>
+
+                    <input
+                      type="time"
+                      value={form.startTime}
+                      onChange={(e) =>
+                        setForm({
+                          ...form,
+                          startTime: e.target.value,
+                        })
+                      }
+                    />
+                  </div>
+
+                  <div className="form-group">
+                    <label>Fim</label>
+
+                    <input
+                      type="time"
+                      value={form.endTime}
+                      onChange={(e) =>
+                        setForm({
+                          ...form,
+                          endTime: e.target.value,
+                        })
+                      }
+                    />
+                  </div>
+
+                  <div className="schedule-preview">
+                    <small>Período de exibição</small>
+                    <strong>
+                      {form.startDate || "--"} até {form.endDate || "--"}
+                    </strong>
+                    <span>
+                      {form.startTime} às {form.endTime}
+                    </span>
+                  </div>
+                </div>
+              </>
+            )}
+          </div>
+
+          <div className="playlist-section-title">
+            <div>
+              <h3>Biblioteca de mídias</h3>
+              <p>Clique nas mídias que deseja adicionar à playlist.</p>
+            </div>
+
+            <span>
+              {form.selectedMediaIds.length} selecionada(s)
+            </span>
+          </div>
+
           <div className="media-selector">
             {mediaList.length === 0 ? (
-              <div className="empty-library">Cadastre mídias primeiro.</div>
+              <div className="empty-library">
+                Cadastre mídias primeiro.
+              </div>
             ) : (
               mediaList.map((media) => (
                 <button
                   key={media.id}
+                  type="button"
                   className={
                     form.selectedMediaIds.includes(media.id)
                       ? "select-media-card selected"
@@ -1270,13 +2126,97 @@ function ClientPlaylistsPage({ client }) {
                   </div>
 
                   <strong>{media.title}</strong>
+
                   <span>
-                    {media.type} • {media.duration}s • {media.sound ? "Com som" : "Sem som"}
+                    {media.type} • {media.duration}s •{" "}
+                    {media.sound ? "Com som" : "Sem som"}
                   </span>
                 </button>
               ))
             )}
           </div>
+
+          {form.selectedMediaIds.length > 0 && (
+            <div className="playlist-order-list">
+              <div className="playlist-order-header">
+                <div>
+                  <h3>Ordem da playlist</h3>
+                  <p>Use os botões para definir a sequência de exibição.</p>
+                </div>
+
+                <span>
+                  {form.selectedMediaIds.length} item(ns)
+                </span>
+              </div>
+
+              {form.selectedMediaIds.map((mediaId, index) => {
+                const media = mediaList.find((item) => item.id === mediaId);
+
+                if (!media) return null;
+
+                return (
+                  <div
+                    key={media.id}
+                    className={
+                      draggedMediaId === media.id
+                        ? "playlist-order-item dragging"
+                        : "playlist-order-item"
+                    }
+                    draggable
+                    onDragStart={() => handleDragStart(media.id)}
+                    onDragOver={handleDragOver}
+                    onDrop={() => handleDrop(media.id)}
+                    onDragEnd={() => setDraggedMediaId(null)}
+                  >
+                    <div className="drag-handle">
+                      <GripVertical size={18} />
+                    </div>
+
+                    <div className="playlist-order-position">
+                      {index + 1}
+                    </div>
+
+                    <div className="playlist-order-thumb">
+                      {media.type === "Vídeo" ? (
+                        <video src={media.preview} />
+                      ) : (
+                        <img src={media.preview} alt={media.title} />
+                      )}
+                    </div>
+
+                    <div className="playlist-order-info">
+                      <strong>{media.title}</strong>
+
+                      <span>
+                        {media.type} • {media.duration}s •{" "}
+                        {media.sound ? "Com som" : "Sem som"}
+                      </span>
+                    </div>
+
+                    <div className="order-buttons">
+                      <button
+                        type="button"
+                        disabled={index === 0}
+                        onClick={() => moveMedia(index, "up")}
+                        title="Subir mídia"
+                      >
+                        ↑
+                      </button>
+
+                      <button
+                        type="button"
+                        disabled={index === form.selectedMediaIds.length - 1}
+                        onClick={() => moveMedia(index, "down")}
+                        title="Descer mídia"
+                      >
+                        ↓
+                      </button>
+                    </div>
+                  </div>
+                );
+              })}
+            </div>
+          )}
 
           <div className="panel-actions">
             <button className="upload-button" onClick={handleSavePlaylist}>
@@ -1295,24 +2235,52 @@ function ClientPlaylistsPage({ client }) {
 
       <section className="playlists-list">
         {playlists.length === 0 ? (
-          <div className="empty-library">Nenhuma playlist criada ainda.</div>
+          <div className="empty-library">
+            Nenhuma playlist criada ainda.
+          </div>
         ) : (
           playlists.map((playlist) => (
-            <div className="playlist-card" key={playlist.id}>
+            <div className={editingPlaylist?.id === playlist.id ? "playlist-card editing-playlist-card" : "playlist-card"} key={playlist.id}>
               <div className="playlist-card-header">
                 <div>
-                  <h3>{playlist.name}</h3>
+                  <div className="playlist-title-row">
+                    <h3>{playlist.name}</h3>
+
+                    {editingPlaylist?.id === playlist.id && (
+                      <span className="editing-now-badge">
+                        Editando agora
+                      </span>
+                    )}
+                  </div>
+
                   <p>
-                    {playlist.orientation} • {playlist.transition} • {playlist.items?.length || 0} mídias
+                    {playlist.orientation} • {playlist.transition} •{" "}
+                    {playlist.items?.length || 0} mídias
                   </p>
+
+                  {playlist.scheduleEnabled ? (
+                    <div className="schedule-badge active">
+                      Agendada: {playlist.startDate} até {playlist.endDate} • {playlist.startTime} às {playlist.endTime} • {playlist.targetScreenIds?.length || 0} tela(s)
+                    </div>
+                  ) : (
+                    <div className="schedule-badge">
+                      Playlist padrão/manual
+                    </div>
+                  )}
                 </div>
 
                 <div className="card-actions">
-                  <button className="upload-button" onClick={() => startEditPlaylist(playlist)}>
-                    Editar
+                  <button
+                    className={editingPlaylist?.id === playlist.id ? "upload-button editing-button-active" : "upload-button"}
+                    onClick={() => startEditPlaylist(playlist)}
+                  >
+                    {editingPlaylist?.id === playlist.id ? "Em edição" : "Editar"}
                   </button>
 
-                  <button className="delete-button" onClick={() => deletePlaylist(playlist.id)}>
+                  <button
+                    className="delete-button"
+                    onClick={() => deletePlaylist(playlist.id)}
+                  >
                     <Trash2 size={16} />
                     Excluir
                   </button>
@@ -1322,7 +2290,9 @@ function ClientPlaylistsPage({ client }) {
               <div className="playlist-items">
                 {playlist.items?.map((item, index) => (
                   <div className="playlist-item" key={`${playlist.id}-${index}`}>
-                    <div className="playlist-number">{index + 1}</div>
+                    <div className="playlist-number">
+                      {index + 1}
+                    </div>
 
                     <div className="playlist-thumb">
                       {item.type === "Vídeo" ? (
@@ -1334,12 +2304,20 @@ function ClientPlaylistsPage({ client }) {
 
                     <div className="playlist-item-info">
                       <strong>{item.title}</strong>
+
                       <span>
-                        {item.type} • {item.duration}s • {item.sound ? "Com som" : "Sem som"}
+                        {item.type} • {item.duration}s •{" "}
+                        {item.sound ? "Com som" : "Sem som"}
                       </span>
                     </div>
 
-                    <div>{item.sound ? <Volume2 size={18} /> : <VolumeX size={18} />}</div>
+                    <div>
+                      {item.sound ? (
+                        <Volume2 size={18} />
+                      ) : (
+                        <VolumeX size={18} />
+                      )}
+                    </div>
                   </div>
                 ))}
               </div>
@@ -1351,9 +2329,12 @@ function ClientPlaylistsPage({ client }) {
   );
 }
 
+
 function ClientScreensPage({ client }) {
   const [screens, setScreens] = useState([]);
   const [playlists, setPlaylists] = useState([]);
+  const [now, setNow] = useState(Date.now());
+  const [editingScreen, setEditingScreen] = useState(null);
 
   const [form, setForm] = useState({
     name: "",
@@ -1361,6 +2342,14 @@ function ClientScreensPage({ client }) {
     orientation: "Paisagem",
     playlistId: "",
   });
+
+  useEffect(() => {
+    const interval = setInterval(() => {
+      setNow(Date.now());
+    }, 10000);
+
+    return () => clearInterval(interval);
+  }, []);
 
   useEffect(() => {
     const unsubScreens = onSnapshot(
@@ -1394,13 +2383,163 @@ function ClientScreensPage({ client }) {
     return code;
   }
 
-  async function handleCreateScreen() {
+  function getLastSeenDate(screen) {
+    if (screen.lastSeenAt?.toDate) {
+      return screen.lastSeenAt.toDate();
+    }
+
+    if (screen.lastSeenAt?.seconds) {
+      return new Date(screen.lastSeenAt.seconds * 1000);
+    }
+
+    return null;
+  }
+
+  function isScreenOnline(screen) {
+    const lastSeenDate = getLastSeenDate(screen);
+
+    if (!lastSeenDate) {
+      return false;
+    }
+
+    const diffInSeconds =
+      (now - lastSeenDate.getTime()) / 1000;
+
+    return diffInSeconds <= 45;
+  }
+
+  function getLastSeenLabel(screen) {
+    const lastSeenDate = getLastSeenDate(screen);
+
+    if (!lastSeenDate) {
+      return "Ainda não conectou";
+    }
+
+    const diffInSeconds = Math.floor(
+      (now - lastSeenDate.getTime()) / 1000
+    );
+
+    if (diffInSeconds < 10) {
+      return "Agora mesmo";
+    }
+
+    if (diffInSeconds < 60) {
+      return `Há ${diffInSeconds}s`;
+    }
+
+    const diffInMinutes = Math.floor(diffInSeconds / 60);
+
+    if (diffInMinutes < 60) {
+      return `Há ${diffInMinutes}min`;
+    }
+
+    return lastSeenDate.toLocaleString("pt-BR");
+  }
+
+  function timeToMinutes(time) {
+    if (!time) return 0;
+
+    const [hours, minutes] = time.split(":").map(Number);
+
+    return hours * 60 + minutes;
+  }
+
+  function getTodayValue() {
+    const date = new Date(now);
+    const year = date.getFullYear();
+    const month = String(date.getMonth() + 1).padStart(2, "0");
+    const day = String(date.getDate()).padStart(2, "0");
+
+    return `${year}-${month}-${day}`;
+  }
+
+  function isPlaylistInSchedule(playlist, screenId) {
+    if (!playlist?.scheduleEnabled) return false;
+
+    if (
+      playlist.targetScreenIds &&
+      playlist.targetScreenIds.length > 0 &&
+      !playlist.targetScreenIds.includes(screenId)
+    ) {
+      return false;
+    }
+
+    const today = getTodayValue();
+
+    if (playlist.startDate && today < playlist.startDate) return false;
+    if (playlist.endDate && today > playlist.endDate) return false;
+
+    const date = new Date(now);
+    const currentMinutes = date.getHours() * 60 + date.getMinutes();
+    const startMinutes = timeToMinutes(playlist.startTime);
+    const endMinutes = timeToMinutes(playlist.endTime);
+
+    if (startMinutes === endMinutes) return true;
+
+    if (startMinutes < endMinutes) {
+      return currentMinutes >= startMinutes && currentMinutes <= endMinutes;
+    }
+
+    return currentMinutes >= startMinutes || currentMinutes <= endMinutes;
+  }
+
+  function getActivePlaylist(screen) {
+    const scheduled = playlists
+      .filter((playlist) => isPlaylistInSchedule(playlist, screen.id))
+      .sort((a, b) => {
+        const aDate = `${a.startDate || ""} ${a.startTime || ""}`;
+        const bDate = `${b.startDate || ""} ${b.startTime || ""}`;
+
+        return bDate.localeCompare(aDate);
+      });
+
+    if (scheduled.length > 0) {
+      return {
+        playlist: scheduled[0],
+        mode: "scheduled",
+      };
+    }
+
+    return {
+      playlist: playlists.find((playlist) => playlist.id === screen.playlistId),
+      mode: "default",
+    };
+  }
+
+  function resetScreenForm() {
+    setEditingScreen(null);
+
+    setForm({
+      name: "",
+      location: "",
+      orientation: "Paisagem",
+      playlistId: "",
+    });
+  }
+
+  function startEditScreen(screen) {
+    setEditingScreen(screen);
+
+    setForm({
+      name: screen.name || "",
+      location: screen.location || "",
+      orientation: screen.orientation || "Paisagem",
+      playlistId: screen.playlistId || "",
+    });
+
+    window.scrollTo({
+      top: 0,
+      behavior: "smooth",
+    });
+  }
+
+  async function handleSaveScreen() {
     if (!form.name.trim()) {
       alert("Informe o nome da tela.");
       return;
     }
 
-    if (screens.length >= Number(client.screensLimit || 0)) {
+    if (!editingScreen && screens.length >= Number(client.screensLimit || 0)) {
       alert("Este cliente atingiu o limite de telas do plano.");
       return;
     }
@@ -1408,29 +2547,41 @@ function ClientScreensPage({ client }) {
     const selectedPlaylist = playlists.find((playlist) => playlist.id === form.playlistId);
 
     try {
-      await addDoc(collection(db, "clients", client.id, "screens"), {
+      const screenData = {
         name: form.name,
         location: form.location || "Não informado",
         orientation: form.orientation,
         playlistId: selectedPlaylist?.id || "",
         playlistName: selectedPlaylist?.name || "Nenhuma playlist vinculada",
-        code: generateCode(),
-        status: "online",
-        lastConnection: new Date().toLocaleString("pt-BR"),
-        createdAt: serverTimestamp(),
-      });
+      };
 
-      setForm({
-        name: "",
-        location: "",
-        orientation: "Paisagem",
-        playlistId: "",
-      });
+      if (editingScreen) {
+        await updateDoc(
+          doc(db, "clients", client.id, "screens", editingScreen.id),
+          {
+            ...screenData,
+            updatedAt: serverTimestamp(),
+          }
+        );
 
-      alert("Tela cadastrada com sucesso!");
+        alert("Tela atualizada com sucesso!");
+      } else {
+        await addDoc(collection(db, "clients", client.id, "screens"), {
+          ...screenData,
+          code: generateCode(),
+          status: "offline",
+          lastConnection: "Ainda não conectou",
+          lastSeenAt: null,
+          createdAt: serverTimestamp(),
+        });
+
+        alert("Tela cadastrada com sucesso!");
+      }
+
+      resetScreenForm();
     } catch (error) {
       console.log(error);
-      alert("Erro ao cadastrar tela.");
+      alert("Erro ao salvar tela.");
     }
   }
 
@@ -1446,8 +2597,20 @@ function ClientScreensPage({ client }) {
   return (
     <>
       <section className="panel">
-        <h2>Nova tela</h2>
-        <p className="stat-status">Uso atual: {screens.length}/{client.screensLimit} telas</p>
+        <div className="playlist-editor-header">
+          <div>
+            <h2>{editingScreen ? "Editar tela" : "Nova tela"}</h2>
+            <p className="stat-status">
+              Uso atual: {screens.length}/{client.screensLimit} telas
+            </p>
+          </div>
+
+          {editingScreen && (
+            <div className="editing-badge">
+              Editando
+            </div>
+          )}
+        </div>
 
         <div className="form-grid">
           <div className="form-group">
@@ -1480,26 +2643,38 @@ function ClientScreensPage({ client }) {
           </div>
 
           <div className="form-group">
-            <label>Playlist vinculada</label>
+            <label>Playlist padrão da tela</label>
             <select
               value={form.playlistId}
               onChange={(e) => setForm({ ...form, playlistId: e.target.value })}
             >
               <option value="">Nenhuma playlist</option>
-              {playlists.map((playlist) => (
-                <option value={playlist.id} key={playlist.id}>
-                  {playlist.name}
-                </option>
-              ))}
+              {playlists
+                .filter((playlist) => !playlist.scheduleEnabled)
+                .map((playlist) => (
+                  <option value={playlist.id} key={playlist.id}>
+                    {playlist.name}
+                  </option>
+                ))}
             </select>
           </div>
         </div>
 
+        <div className="screen-schedule-note">
+          <strong>Como funciona:</strong> a playlist padrão roda normalmente. Quando uma playlist agendada entrar no período configurado, ela assume temporariamente a TV. Ao terminar, a TV volta para a playlist padrão desta tela.
+        </div>
+
         <div className="panel-actions">
-          <button className="upload-button" onClick={handleCreateScreen}>
+          <button className="upload-button" onClick={handleSaveScreen}>
             <Plus size={20} />
-            Cadastrar tela
+            {editingScreen ? "Salvar alterações" : "Cadastrar tela"}
           </button>
+
+          {editingScreen && (
+            <button className="delete-button" onClick={resetScreenForm}>
+              Cancelar edição
+            </button>
+          )}
         </div>
       </section>
 
@@ -1507,57 +2682,211 @@ function ClientScreensPage({ client }) {
         {screens.length === 0 ? (
           <div className="empty-library">Nenhuma tela cadastrada ainda.</div>
         ) : (
-          screens.map((screen) => (
-            <div className="media-card" key={screen.id}>
-              <div className="media-preview">
-                <Monitor size={54} />
+          screens.map((screen) => {
+            const online = isScreenOnline(screen);
+            const active = getActivePlaylist(screen);
+            const activePlaylist = active.playlist;
+            const previewMedia = activePlaylist?.items?.[0];
+
+            return (
+              <div className="media-card" key={screen.id}>
+                <div className="media-preview screen-preview">
+                  {previewMedia ? (
+                    previewMedia.type === "Vídeo" ? (
+                      <video src={previewMedia.preview} muted />
+                    ) : (
+                      <img src={previewMedia.preview} alt={previewMedia.title} />
+                    )
+                  ) : (
+                    <Monitor size={54} />
+                  )}
+
+                  <div className={online ? "live-dot online" : "live-dot offline"}></div>
+                </div>
+
+                <div className="media-info">
+                  <div className="screen-card-top">
+                    <span>{screen.orientation}</span>
+
+                    <div className={online ? "screen-status online" : "screen-status offline"}>
+                      <div></div>
+                      {online ? "Online agora" : "Offline"}
+                    </div>
+                  </div>
+
+                  <h3>{screen.name}</h3>
+                  <p>Local: {screen.location}</p>
+                  <p>Playlist padrão: {screen.playlistName}</p>
+
+                  <div className={active.mode === "scheduled" ? "active-program scheduled" : "active-program"}>
+                    <small>Exibindo agora</small>
+                    <strong>{activePlaylist?.name || "Nenhuma playlist ativa"}</strong>
+                    <span>
+                      {active.mode === "scheduled"
+                        ? "Programação agendada"
+                        : "Playlist padrão"}
+                    </span>
+                  </div>
+
+                  <p>
+                    Código:
+                    <br />
+                    <strong>{screen.code}</strong>
+                  </p>
+
+                  <p>
+                    Player:
+                    <br />
+                    <strong>/player/{client.id}/{screen.code}</strong>
+                  </p>
+
+                  <div className="last-seen-card">
+                    <small>Último sinal</small>
+                    <strong>{getLastSeenLabel(screen)}</strong>
+                  </div>
+
+                  <div className="card-actions">
+                    <button
+                      className="upload-button"
+                      onClick={() => startEditScreen(screen)}
+                    >
+                      Editar tela
+                    </button>
+
+                    <button className="delete-button" onClick={() => deleteScreen(screen.id)}>
+                      <Trash2 size={16} />
+                      Excluir
+                    </button>
+                  </div>
+                </div>
               </div>
-
-              <div className="media-info">
-                <span>{screen.orientation}</span>
-                <h3>{screen.name}</h3>
-                <p>Local: {screen.location}</p>
-                <p>Playlist: {screen.playlistName}</p>
-
-                <p>
-                  Código:
-                  <br />
-                  <strong>{screen.code}</strong>
-                </p>
-
-                <p>
-                  Player:
-                  <br />
-                  <strong>/player/{client.id}/{screen.code}</strong>
-                </p>
-
-                <p>
-                  Última conexão:
-                  <br />
-                  {screen.lastConnection}
-                </p>
-
-                <div className="badge online">Online</div>
-
-                <button className="delete-button" onClick={() => deleteScreen(screen.id)}>
-                  <Trash2 size={16} />
-                  Excluir
-                </button>
-              </div>
-            </div>
-          ))
+            );
+          })
         )}
       </section>
     </>
   );
 }
 
+
 function PlayerPage() {
   const { clientId, codigo } = useParams();
   const [screen, setScreen] = useState(null);
-  const [playlist, setPlaylist] = useState(null);
+  const [defaultPlaylist, setDefaultPlaylist] = useState(null);
+  const [allPlaylists, setAllPlaylists] = useState([]);
+  const [activePlaylist, setActivePlaylist] = useState(null);
+  const [activeMode, setActiveMode] = useState("default");
   const [mediaIndex, setMediaIndex] = useState(0);
   const [loading, setLoading] = useState(true);
+  const [now, setNow] = useState(new Date());
+
+  useEffect(() => {
+    const clock = setInterval(() => {
+      setNow(new Date());
+    }, 15000);
+
+    return () => clearInterval(clock);
+  }, []);
+
+  function timeToMinutes(time) {
+    if (!time) return 0;
+
+    const [hours, minutes] = time.split(":").map(Number);
+
+    return hours * 60 + minutes;
+  }
+
+  function getTodayValue(date) {
+    const year = date.getFullYear();
+    const month = String(date.getMonth() + 1).padStart(2, "0");
+    const day = String(date.getDate()).padStart(2, "0");
+
+    return `${year}-${month}-${day}`;
+  }
+
+  function isPlaylistInSchedule(currentPlaylist) {
+    if (!currentPlaylist?.scheduleEnabled) {
+      return false;
+    }
+
+    if (
+      currentPlaylist.targetScreenIds &&
+      currentPlaylist.targetScreenIds.length > 0 &&
+      screen?.id &&
+      !currentPlaylist.targetScreenIds.includes(screen.id)
+    ) {
+      return false;
+    }
+
+    const today = getTodayValue(now);
+
+    if (
+      currentPlaylist.startDate &&
+      today < currentPlaylist.startDate
+    ) {
+      return false;
+    }
+
+    if (
+      currentPlaylist.endDate &&
+      today > currentPlaylist.endDate
+    ) {
+      return false;
+    }
+
+    const currentMinutes =
+      now.getHours() * 60 + now.getMinutes();
+
+    const startMinutes = timeToMinutes(currentPlaylist.startTime);
+    const endMinutes = timeToMinutes(currentPlaylist.endTime);
+
+    if (startMinutes === endMinutes) {
+      return true;
+    }
+
+    if (startMinutes < endMinutes) {
+      return (
+        currentMinutes >= startMinutes &&
+        currentMinutes <= endMinutes
+      );
+    }
+
+    return (
+      currentMinutes >= startMinutes ||
+      currentMinutes <= endMinutes
+    );
+  }
+
+  function chooseActivePlaylist() {
+    const scheduledPlaylists = allPlaylists
+      .filter((playlist) => isPlaylistInSchedule(playlist))
+      .sort((a, b) => {
+        const aDate = `${a.startDate || ""} ${a.startTime || ""}`;
+        const bDate = `${b.startDate || ""} ${b.startTime || ""}`;
+
+        return bDate.localeCompare(aDate);
+      });
+
+    if (scheduledPlaylists.length > 0) {
+      return {
+        playlist: scheduledPlaylists[0],
+        mode: "scheduled",
+      };
+    }
+
+    return {
+      playlist: defaultPlaylist,
+      mode: "default",
+    };
+  }
+
+  function goToNextMedia() {
+    const items = activePlaylist?.items || [];
+
+    if (items.length === 0) return;
+
+    setMediaIndex((prev) => (prev + 1 >= items.length ? 0 : prev + 1));
+  }
 
   useEffect(() => {
     if (!clientId || !codigo) return;
@@ -1567,7 +2896,7 @@ function PlayerPage() {
       where("code", "==", codigo.toUpperCase())
     );
 
-    const unsubscribe = onSnapshot(screenQuery, async (snapshot) => {
+    const unsubscribe = onSnapshot(screenQuery, (snapshot) => {
       if (snapshot.empty) {
         setScreen(null);
         setLoading(false);
@@ -1579,23 +2908,64 @@ function PlayerPage() {
 
       setScreen(screenData);
       setLoading(false);
-
-      try {
-        await updateDoc(doc(db, "clients", clientId, "screens", screenDoc.id), {
-          status: "online",
-          lastConnection: new Date().toLocaleString("pt-BR"),
-        });
-      } catch (error) {
-        console.log(error);
-      }
     });
 
     return () => unsubscribe();
   }, [clientId, codigo]);
 
   useEffect(() => {
+    if (!screen?.id || !clientId) return;
+
+    const screenDocRef = doc(
+      db,
+      "clients",
+      clientId,
+      "screens",
+      screen.id
+    );
+
+    async function sendHeartbeat() {
+      try {
+        await updateDoc(screenDocRef, {
+          status: "online",
+          lastConnection: new Date().toLocaleString("pt-BR"),
+          lastSeenAt: serverTimestamp(),
+        });
+      } catch (error) {
+        console.log(error);
+      }
+    }
+
+    sendHeartbeat();
+
+    const interval = setInterval(() => {
+      sendHeartbeat();
+    }, 15000);
+
+    return () => clearInterval(interval);
+  }, [screen?.id, clientId]);
+
+  useEffect(() => {
+    if (!clientId) return;
+
+    const unsubscribe = onSnapshot(
+      collection(db, "clients", clientId, "playlists"),
+      (snapshot) => {
+        const list = snapshot.docs.map((playlistDoc) => ({
+          id: playlistDoc.id,
+          ...playlistDoc.data(),
+        }));
+
+        setAllPlaylists(list);
+      }
+    );
+
+    return () => unsubscribe();
+  }, [clientId]);
+
+  useEffect(() => {
     if (!screen?.playlistId || !clientId) {
-      setPlaylist(null);
+      setDefaultPlaylist(null);
       return;
     }
 
@@ -1603,10 +2973,9 @@ function PlayerPage() {
       doc(db, "clients", clientId, "playlists", screen.playlistId),
       (playlistDoc) => {
         if (playlistDoc.exists()) {
-          setPlaylist({ id: playlistDoc.id, ...playlistDoc.data() });
-          setMediaIndex(0);
+          setDefaultPlaylist({ id: playlistDoc.id, ...playlistDoc.data() });
         } else {
-          setPlaylist(null);
+          setDefaultPlaylist(null);
         }
       }
     );
@@ -1615,18 +2984,32 @@ function PlayerPage() {
   }, [screen, clientId]);
 
   useEffect(() => {
-    const items = playlist?.items || [];
+    const selected = chooseActivePlaylist();
+
+    const previousId = activePlaylist?.id;
+
+    setActivePlaylist(selected.playlist || null);
+    setActiveMode(selected.mode);
+
+    if (selected.playlist?.id !== previousId) {
+      setMediaIndex(0);
+    }
+  }, [allPlaylists, defaultPlaylist, now, screen]);
+
+  useEffect(() => {
+    const items = activePlaylist?.items || [];
+
     if (items.length === 0) return;
 
     const currentItem = items[mediaIndex];
     const duration = Number(currentItem?.duration || 10) * 1000;
 
     const timer = setTimeout(() => {
-      setMediaIndex((prev) => (prev + 1 >= items.length ? 0 : prev + 1));
+      goToNextMedia();
     }, duration);
 
     return () => clearTimeout(timer);
-  }, [playlist, mediaIndex]);
+  }, [activePlaylist, mediaIndex]);
 
   if (loading) {
     return <div className="player-screen">Carregando player...</div>;
@@ -1636,22 +3019,28 @@ function PlayerPage() {
     return <div className="player-screen">Tela não encontrada.</div>;
   }
 
-  if (!playlist || !playlist.items || playlist.items.length === 0) {
+  if (!activePlaylist || !activePlaylist.items || activePlaylist.items.length === 0) {
     return (
       <div className="player-screen">
         <div className="player-empty">
           <img src={logo} alt="Totem Park" style={{ width: 180 }} />
           <h1>{screen.name}</h1>
-          <p>Nenhuma playlist vinculada a esta tela.</p>
+          <p>Nenhuma playlist disponível para esta tela.</p>
         </div>
       </div>
     );
   }
 
-  const currentMedia = playlist.items[mediaIndex];
+  const currentMedia = activePlaylist.items[mediaIndex];
 
   return (
     <div className="player-screen">
+      {activeMode === "scheduled" && (
+        <div className="player-schedule-label">
+          Programação ativa: {activePlaylist.name}
+        </div>
+      )}
+
       {currentMedia.type === "Vídeo" ? (
         <video
           key={`${currentMedia.preview}-${mediaIndex}`}
@@ -1660,6 +3049,7 @@ function PlayerPage() {
           muted={!currentMedia.sound}
           playsInline
           className="player-media"
+          onEnded={goToNextMedia}
         />
       ) : (
         <img
@@ -1672,6 +3062,7 @@ function PlayerPage() {
     </div>
   );
 }
+
 
 function PlansPage() {
   return (
