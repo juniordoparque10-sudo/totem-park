@@ -1,5 +1,5 @@
 import { useEffect, useState } from "react";
-import { Routes, Route, useParams } from "react-router-dom";
+import { Routes, Route, useParams, useNavigate } from "react-router-dom";
 import { initializeApp, deleteApp } from "firebase/app";
 
 import {
@@ -65,6 +65,7 @@ export default function App() {
   return (
     <Routes>
       <Route path="/" element={<AdminApp />} />
+      <Route path="/tv" element={<TVConnectPage />} />
       <Route path="/player/:clientId/:codigo" element={<PlayerPage />} />
     </Routes>
   );
@@ -1082,6 +1083,16 @@ function ClientDashboard({ client }) {
   const [playlists, setPlaylists] = useState([]);
   const [screens, setScreens] = useState([]);
   const [now, setNow] = useState(new Date());
+
+  useEffect(() => {
+    localStorage.setItem(
+      "totempark-tv-connection",
+      JSON.stringify({
+        clientId,
+        code: codigo,
+      })
+    );
+  }, [clientId, codigo]);
 
   useEffect(() => {
     const interval = setInterval(() => {
@@ -2765,6 +2776,98 @@ function ClientScreensPage({ client }) {
         )}
       </section>
     </>
+  );
+}
+
+
+
+function TVConnectPage() {
+  const navigate = useNavigate();
+
+  const [clientId, setClientId] = useState("");
+  const [screenCode, setScreenCode] = useState("");
+  const [loading, setLoading] = useState(false);
+
+  function handleConnect() {
+    if (!clientId.trim()) {
+      alert("Informe o ID do cliente.");
+      return;
+    }
+
+    if (!screenCode.trim()) {
+      alert("Informe o código da tela.");
+      return;
+    }
+
+    setLoading(true);
+
+    const code = screenCode.trim().toUpperCase();
+
+    localStorage.setItem(
+      "totempark-tv-connection",
+      JSON.stringify({
+        clientId: clientId.trim(),
+        code,
+      })
+    );
+
+    navigate(`/player/${clientId.trim()}/${code}`);
+  }
+
+  useEffect(() => {
+    const saved = localStorage.getItem("totempark-tv-connection");
+
+    if (!saved) return;
+
+    try {
+      const parsed = JSON.parse(saved);
+
+      if (parsed.clientId && parsed.code) {
+        navigate(`/player/${parsed.clientId}/${parsed.code}`);
+      }
+    } catch (error) {
+      console.log(error);
+    }
+  }, []);
+
+  return (
+    <div className="tv-connect-page">
+      <div className="tv-connect-card">
+        <img src={logo} alt="Totem Park" className="tv-connect-logo" />
+
+        <h1>Conectar TV</h1>
+
+        <p>
+          Digite o ID do cliente e o código da tela para iniciar o player.
+        </p>
+
+        <div className="form-group">
+          <label>ID do cliente</label>
+
+          <input
+            value={clientId}
+            placeholder="Ex: x7ah92Kjs9"
+            onChange={(e) => setClientId(e.target.value)}
+          />
+        </div>
+
+        <div className="form-group">
+          <label>Código da tela</label>
+
+          <input
+            value={screenCode}
+            placeholder="Ex: ABC123"
+            onChange={(e) =>
+              setScreenCode(e.target.value.toUpperCase())
+            }
+          />
+        </div>
+
+        <button className="login-button" onClick={handleConnect}>
+          {loading ? "Conectando..." : "Iniciar player"}
+        </button>
+      </div>
+    </div>
   );
 }
 
