@@ -18,6 +18,8 @@ import {
   Volume2,
   VolumeX,
   GripVertical,
+  Search,
+  X,
 } from "lucide-react";
 
 import {
@@ -39,6 +41,8 @@ import {
   query,
   where,
   updateDoc,
+  setDoc,
+  getDoc,
 } from "firebase/firestore";
 
 import {
@@ -394,6 +398,9 @@ function Dashboard() {
   }, []);
 
   useEffect(() => {
+    let unsubScreens = [];
+    let unsubPlaylists = [];
+
     const unsubscribeClients = onSnapshot(collection(db, "clients"), (snapshot) => {
       const clientsList = snapshot.docs.map((clientDoc) => ({
         id: clientDoc.id,
@@ -401,9 +408,14 @@ function Dashboard() {
       }));
 
       setClients(clientsList);
+      setScreensData([]);
+      setPlaylistsData([]);
 
-      const unsubScreens = [];
-      const unsubPlaylists = [];
+      unsubScreens.forEach((unsub) => unsub());
+      unsubPlaylists.forEach((unsub) => unsub());
+
+      unsubScreens = [];
+      unsubPlaylists = [];
 
       clientsList.forEach((client) => {
         const screensRef = collection(db, "clients", client.id, "screens");
@@ -440,14 +452,13 @@ function Dashboard() {
         unsubScreens.push(screenUnsub);
         unsubPlaylists.push(playlistUnsub);
       });
-
-      return () => {
-        unsubScreens.forEach((unsub) => unsub());
-        unsubPlaylists.forEach((unsub) => unsub());
-      };
     });
 
-    return () => unsubscribeClients();
+    return () => {
+      unsubscribeClients();
+      unsubScreens.forEach((unsub) => unsub());
+      unsubPlaylists.forEach((unsub) => unsub());
+    };
   }, []);
 
   function getLastSeenDate(screen) {
@@ -477,7 +488,6 @@ function Dashboard() {
 
     const today = new Date();
     const due = new Date(`${dueDate}T23:59:59`);
-
     const diff = due.getTime() - today.getTime();
 
     return Math.ceil(diff / (1000 * 60 * 60 * 24));
@@ -527,13 +537,12 @@ function Dashboard() {
   });
 
   const scheduledPlaylists = playlistsData.filter((playlist) => playlist.scheduleEnabled);
-
   const recentClients = [...clients].slice(-5).reverse();
   const criticalClients = [...overdueClients, ...soonDueClients].slice(0, 5);
 
   return (
     <>
-      <header className="header dashboard-hero">
+      <header className="premium-dashboard-hero">
         <div>
           <div className="kicker">Painel Administrativo</div>
           <h1>Dashboard do Totem Park</h1>
@@ -543,75 +552,110 @@ function Dashboard() {
           </p>
         </div>
 
-        <div className="dashboard-hero-card">
-          <span>Status geral</span>
-          <strong>Operacional</strong>
-          <p>{onlineScreens.length} tela(s) online agora</p>
+        <div className="premium-status-card">
+          <div className="premium-status-dot"></div>
+
+          <div>
+            <span>Status geral</span>
+            <strong>Operacional</strong>
+            <p>{onlineScreens.length} tela(s) online agora</p>
+          </div>
+
+          <div className="radar-circle">
+            <div></div>
+          </div>
         </div>
       </header>
 
-      <section className="stats">
-        <StatCard
+      <section className="premium-stats">
+        <PremiumStatCard
           title="Clientes"
           value={clients.length}
-          icon={<Users />}
+          icon={<Users size={26} />}
           status="Cadastrados"
+          link="Ver todos os clientes →"
+          color="purple"
         />
 
-        <StatCard
+        <PremiumStatCard
           title="Telas online"
           value={`${onlineScreens.length}/${screensData.length}`}
-          icon={<Monitor />}
+          icon={<Monitor size={26} />}
           status="Agora"
+          link="Ver todas as telas →"
+          color="cyan"
         />
 
-        <StatCard
+        <PremiumStatCard
           title="Playlists"
           value={playlistsData.length}
-          icon={<ListVideo />}
+          icon={<ListVideo size={26} />}
           status={`${scheduledPlaylists.length} agendada(s)`}
+          link="Ver playlists →"
+          color="purple"
         />
 
-        <StatCard
+        <PremiumStatCard
           title="Financeiro"
           value={overdueClients.length}
-          icon={<CreditCard />}
+          icon={<CreditCard size={26} />}
           status="Cliente(s) vencido(s)"
+          link="Ver financeiro →"
+          color="green"
         />
       </section>
 
-      <section className="dashboard-grid">
-        <div className="panel dashboard-panel-large">
-          <div className="panel-header">
+      <section className="premium-dashboard-grid">
+        <div className="premium-panel">
+          <div className="premium-panel-header">
             <div>
               <h2>Telas em tempo real</h2>
               <p>Monitoramento rápido das TVs conectadas.</p>
             </div>
 
-            <div className="screen-summary">
-              <span className="screen-summary-online">{onlineScreens.length} online</span>
-              <span className="screen-summary-offline">{offlineScreens.length} offline</span>
+            <div className="premium-screen-summary">
+              <span className="online">{onlineScreens.length} online</span>
+              <span className="offline">{offlineScreens.length} offline</span>
             </div>
           </div>
 
-          <div className="dashboard-screen-list">
+          <div className="premium-screen-list">
             {screensData.length === 0 ? (
-              <div className="empty-library">Nenhuma tela cadastrada ainda.</div>
+              <div className="premium-empty">Nenhuma tela cadastrada ainda.</div>
             ) : (
               screensData.slice(0, 8).map((screen) => {
                 const online = isScreenOnline(screen);
 
                 return (
-                  <div className="dashboard-screen-row" key={`${screen.clientId}-${screen.id}`}>
-                    <div className={online ? "screen-pulse online" : "screen-pulse offline"}></div>
+                  <div className="premium-screen-row" key={`${screen.clientId}-${screen.id}`}>
+                    <div className={online ? "premium-screen-dot online" : "premium-screen-dot offline"}></div>
 
-                    <div>
-                      <strong>{screen.name}</strong>
-                      <span>{screen.clientName} • {screen.location}</span>
+                    <div className="premium-screen-icon">
+                      <Monitor size={24} />
                     </div>
 
-                    <div className={online ? "dashboard-status online" : "dashboard-status offline"}>
-                      {online ? "Online agora" : "Offline"}
+                    <div className="premium-screen-text">
+                      <strong>{screen.name}</strong>
+                      <span>
+                        {screen.clientName} • {screen.location || "Não informado"}
+                      </span>
+
+                      <div className="manager-now-playing">
+                        <small>{screen.currentPlaylistName || "Playlist não informada"}</small>
+                        <b>{screen.nowPlayingTitle || "Aguardando mídia"}</b>
+                      </div>
+                    </div>
+
+                    <div className="manager-screen-status-col">
+                      <div className={online ? "premium-live-badge online" : "premium-live-badge offline"}>
+                        {online ? "ONLINE" : "OFFLINE"}
+                      </div>
+
+                      <span>
+                        {screen.nowPlayingIndex && screen.nowPlayingTotal
+                          ? `${screen.nowPlayingIndex}/${screen.nowPlayingTotal}`
+                          : "--"}
+                      </span>
                     </div>
                   </div>
                 );
@@ -620,23 +664,27 @@ function Dashboard() {
           </div>
         </div>
 
-        <div className="panel">
-          <div className="panel-header">
+        <div className="premium-panel premium-center-panel">
+          <div className="premium-panel-header">
             <div>
               <h2>Vencimentos</h2>
               <p>Clientes que precisam de atenção.</p>
             </div>
           </div>
 
-          <div className="dashboard-due-list">
-            {criticalClients.length === 0 ? (
-              <div className="empty-mini">Nenhum vencimento crítico.</div>
-            ) : (
-              criticalClients.map((client) => {
+          {criticalClients.length === 0 ? (
+            <div className="premium-empty-state">
+              <CreditCard size={72} />
+              <p>Nenhum vencimento crítico.</p>
+              <button>Ver todos os vencimentos</button>
+            </div>
+          ) : (
+            <div className="premium-due-list">
+              {criticalClients.map((client) => {
                 const status = getClientDueStatus(client);
 
                 return (
-                  <div className="due-row" key={client.id}>
+                  <div className="premium-due-row" key={client.id}>
                     <div>
                       <strong>{client.name}</strong>
                       <span>{client.dueDate || "Sem data"}</span>
@@ -647,82 +695,109 @@ function Dashboard() {
                     </div>
                   </div>
                 );
-              })
-            )}
-          </div>
+              })}
+            </div>
+          )}
         </div>
       </section>
 
-      <section className="dashboard-grid">
-        <div className="panel">
-          <div className="panel-header">
-            <div>
-              <h2>Clientes recentes</h2>
-              <p>Últimos clientes cadastrados.</p>
-            </div>
-          </div>
-
-          <div className="dashboard-client-list">
-            {recentClients.length === 0 ? (
-              <div className="empty-mini">Nenhum cliente ainda.</div>
-            ) : (
-              recentClients.map((client) => {
-                const status = getClientDueStatus(client);
-
-                return (
-                  <div className="client-mini-card" key={client.id}>
-                    <div>
-                      <strong>{client.name}</strong>
-                      <span>{client.plan} • {client.billing}</span>
-                    </div>
-
-                    <div className={`due-badge ${status.className}`}>
-                      {status.label}
-                    </div>
-                  </div>
-                );
-              })
-            )}
+      <section className="premium-panel premium-full-panel">
+        <div className="premium-panel-header">
+          <div>
+            <h2>Clientes recentes</h2>
+            <p>Últimos clientes cadastrados.</p>
           </div>
         </div>
 
-        <div className="panel">
-          <div className="panel-header">
-            <div>
-              <h2>Programações agendadas</h2>
-              <p>Playlists com data e horário definidos.</p>
-            </div>
+        <div className="premium-client-table">
+          <div className="premium-client-head">
+            <span>Cliente</span>
+            <span>Plano</span>
+            <span>Vencimento</span>
+            <span>Status</span>
           </div>
 
-          <div className="dashboard-schedule-list">
-            {scheduledPlaylists.length === 0 ? (
-              <div className="empty-mini">Nenhuma programação agendada.</div>
-            ) : (
-              scheduledPlaylists.slice(0, 6).map((playlist) => (
-                <div className="schedule-mini-card" key={`${playlist.clientId}-${playlist.id}`}>
-                  <div>
-                    <strong>{playlist.name}</strong>
-                    <span>{playlist.clientName}</span>
+          {recentClients.length === 0 ? (
+            <div className="premium-empty">Nenhum cliente ainda.</div>
+          ) : (
+            recentClients.map((client) => {
+              const status = getClientDueStatus(client);
+
+              return (
+                <div className="premium-client-row" key={client.id}>
+                  <strong>{client.name}</strong>
+                  <span>{client.plan} • {client.billing}</span>
+                  <span>{status.label}</span>
+                  <div className={`premium-client-status ${client.status === "Ativo" ? "active" : "inactive"}`}>
+                    {client.status || "Ativo"}
                   </div>
-
-                  <p>
-                    {playlist.startDate} até {playlist.endDate}
-                    <br />
-                    {playlist.startTime} às {playlist.endTime}
-                  </p>
                 </div>
-              ))
-            )}
+              );
+            })
+          )}
+        </div>
+      </section>
+
+      <section className="premium-panel premium-full-panel">
+        <div className="premium-panel-header">
+          <div>
+            <h2>Programações agendadas</h2>
+            <p>Playlists com data e horário definidos.</p>
           </div>
+        </div>
+
+        <div className="premium-schedule-list">
+          {scheduledPlaylists.length === 0 ? (
+            <div className="premium-empty">Nenhuma programação agendada.</div>
+          ) : (
+            scheduledPlaylists.slice(0, 6).map((playlist) => (
+              <div className="premium-schedule-card" key={`${playlist.clientId}-${playlist.id}`}>
+                <div>
+                  <strong>{playlist.name}</strong>
+                  <span>{playlist.clientName}</span>
+                </div>
+
+                <p>
+                  {playlist.startDate} até {playlist.endDate}
+                  <br />
+                  {playlist.startTime} às {playlist.endTime}
+                </p>
+              </div>
+            ))
+          )}
         </div>
       </section>
     </>
   );
 }
 
+function PremiumStatCard({ title, value, icon, status, link, color }) {
+  return (
+    <div className={`premium-stat-card ${color}`}>
+      <div className="premium-stat-main">
+        <div className="premium-stat-icon">{icon}</div>
+
+        <div>
+          <span>{title}</span>
+          <strong>{value}</strong>
+          <p>{status}</p>
+        </div>
+      </div>
+
+      <div className="premium-stat-link">
+        {link}
+      </div>
+    </div>
+  );
+}
+
 
 function ClientsPage({ onOpenClient }) {
   const [clients, setClients] = useState([]);
+  const [showCreateModal, setShowCreateModal] = useState(false);
+  const [searchTerm, setSearchTerm] = useState("");
+  const [statusFilter, setStatusFilter] = useState("Todos");
+
   const [form, setForm] = useState({
     name: "",
     email: "",
@@ -747,6 +822,76 @@ function ClientsPage({ onOpenClient }) {
     return () => unsubscribe();
   }, []);
 
+  function getDaysToDue(dueDate) {
+    if (!dueDate) return null;
+
+    const today = new Date();
+    const due = new Date(`${dueDate}T23:59:59`);
+    const diff = due.getTime() - today.getTime();
+
+    return Math.ceil(diff / (1000 * 60 * 60 * 24));
+  }
+
+  function getDueInfo(client) {
+    const days = getDaysToDue(client.dueDate);
+
+    if (days === null) {
+      return {
+        text: "Sem vencimento",
+        className: "neutral",
+      };
+    }
+
+    if (days < 0) {
+      return {
+        text: `Vencido há ${Math.abs(days)} dia(s)`,
+        className: "danger",
+      };
+    }
+
+    if (days <= 7) {
+      return {
+        text: `Vence em ${days} dia(s)`,
+        className: "warning",
+      };
+    }
+
+    return {
+      text: `Vence em ${days} dia(s)`,
+      className: "success",
+    };
+  }
+
+  function getStatusClass(status) {
+    if (status === "Ativo") return "active";
+    if (status === "Suspenso") return "warning";
+    if (status === "Vencido") return "danger";
+
+    return "neutral";
+  }
+
+  const activeClients = clients.filter((client) => client.status === "Ativo");
+  const suspendedClients = clients.filter((client) => client.status === "Suspenso");
+  const overdueClients = clients.filter((client) => {
+    const days = getDaysToDue(client.dueDate);
+    return days !== null && days < 0;
+  });
+
+  const filteredClients = clients.filter((client) => {
+    const search = searchTerm.toLowerCase().trim();
+
+    const matchesSearch =
+      !search ||
+      client.name?.toLowerCase().includes(search) ||
+      client.email?.toLowerCase().includes(search) ||
+      client.plan?.toLowerCase().includes(search);
+
+    const matchesStatus =
+      statusFilter === "Todos" || client.status === statusFilter;
+
+    return matchesSearch && matchesStatus;
+  });
+
   async function createClientAuthUser(email, password) {
     const secondaryApp = initializeApp(
       firebaseConfig,
@@ -766,6 +911,19 @@ function ClientsPage({ onOpenClient }) {
     } finally {
       await deleteApp(secondaryApp);
     }
+  }
+
+  function resetForm() {
+    setForm({
+      name: "",
+      email: "",
+      password: "",
+      plan: "Básico",
+      billing: "Mensal",
+      dueDate: "",
+      screensLimit: "2",
+      status: "Ativo",
+    });
   }
 
   async function handleCreateClient() {
@@ -809,16 +967,8 @@ function ClientsPage({ onOpenClient }) {
         createdAt: serverTimestamp(),
       });
 
-      setForm({
-        name: "",
-        email: "",
-        password: "",
-        plan: "Básico",
-        billing: "Mensal",
-        dueDate: "",
-        screensLimit: "2",
-        status: "Ativo",
-      });
+      resetForm();
+      setShowCreateModal(false);
 
       alert("Cliente cadastrado com login, senha e vencimento!");
     } catch (error) {
@@ -839,6 +989,12 @@ function ClientsPage({ onOpenClient }) {
   }
 
   async function deleteClient(id) {
+    const confirmDelete = window.confirm(
+      "Tem certeza que deseja excluir este cliente do Firestore?"
+    );
+
+    if (!confirmDelete) return;
+
     try {
       await deleteDoc(doc(db, "clients", id));
     } catch (error) {
@@ -864,155 +1020,284 @@ function ClientsPage({ onOpenClient }) {
 
   return (
     <>
-      <header className="header">
+      <header className="clients-premium-header">
         <div>
           <div className="kicker">Gestão SaaS</div>
           <h1>Clientes</h1>
-          <p>Gerencie clientes, planos, limites de telas e cobrança.</p>
+          <p>Gerencie clientes, planos, vencimentos, acessos e limites de telas.</p>
         </div>
+
+        <button
+          className="clients-create-button"
+          onClick={() => setShowCreateModal(true)}
+        >
+          <Plus size={20} />
+          Novo cliente
+        </button>
       </header>
 
-      <section className="panel">
-        <h2>Novo cliente</h2>
-
-        <div className="form-grid">
-          <div className="form-group">
-            <label>Nome do cliente</label>
-            <input
-              value={form.name}
-              placeholder="Ex: Supermercado Central"
-              onChange={(e) => setForm({ ...form, name: e.target.value })}
-            />
-          </div>
-
-          <div className="form-group">
-            <label>E-mail</label>
-            <input
-              type="email"
-              value={form.email}
-              placeholder="cliente@email.com"
-              onChange={(e) => setForm({ ...form, email: e.target.value })}
-            />
-          </div>
-
-          <div className="form-group">
-            <label>Senha inicial</label>
-            <input
-              type="password"
-              value={form.password}
-              placeholder="Mínimo 6 caracteres"
-              onChange={(e) => setForm({ ...form, password: e.target.value })}
-            />
-          </div>
-
-          <div className="form-group">
-            <label>Plano</label>
-            <select
-              value={form.plan}
-              onChange={(e) => setForm({ ...form, plan: e.target.value })}
-            >
-              <option>Básico</option>
-              <option>Profissional</option>
-              <option>Enterprise</option>
-            </select>
-          </div>
-
-          <div className="form-group">
-            <label>Cobrança</label>
-            <select
-              value={form.billing}
-              onChange={(e) => setForm({ ...form, billing: e.target.value })}
-            >
-              <option>Mensal</option>
-              <option>Anual</option>
-            </select>
-          </div>
-
-          <div className="form-group">
-            <label>Vencimento do plano</label>
-            <input
-              type="date"
-              value={form.dueDate}
-              onChange={(e) => setForm({ ...form, dueDate: e.target.value })}
-            />
-          </div>
-
-          <div className="form-group">
-            <label>Limite de telas</label>
-            <input
-              type="number"
-              min="1"
-              value={form.screensLimit}
-              onChange={(e) =>
-                setForm({ ...form, screensLimit: e.target.value })
-              }
-            />
-          </div>
-
-          <div className="form-group">
-            <label>Status</label>
-            <select
-              value={form.status}
-              onChange={(e) => setForm({ ...form, status: e.target.value })}
-            >
-              <option>Ativo</option>
-              <option>Suspenso</option>
-              <option>Vencido</option>
-            </select>
-          </div>
+      <section className="clients-kpi-grid">
+        <div className="clients-kpi-card">
+          <span>Total</span>
+          <strong>{clients.length}</strong>
+          <p>Clientes cadastrados</p>
         </div>
 
-        <div className="panel-actions">
-          <button className="upload-button" onClick={handleCreateClient}>
-            <Plus size={20} />
-            Criar cliente
-          </button>
+        <div className="clients-kpi-card active">
+          <span>Ativos</span>
+          <strong>{activeClients.length}</strong>
+          <p>Em operação</p>
+        </div>
+
+        <div className="clients-kpi-card warning">
+          <span>Suspensos</span>
+          <strong>{suspendedClients.length}</strong>
+          <p>Atenção necessária</p>
+        </div>
+
+        <div className="clients-kpi-card danger">
+          <span>Vencidos</span>
+          <strong>{overdueClients.length}</strong>
+          <p>Planos em atraso</p>
         </div>
       </section>
 
-      <section className="cards-grid">
-        {clients.length === 0 ? (
-          <div className="empty-library">Nenhum cliente cadastrado ainda.</div>
-        ) : (
-          clients.map((client) => (
-            <div className="media-card" key={client.id}>
-              <div className="media-info">
-                <span>{client.plan}</span>
-                <h3>{client.name}</h3>
-                <p>{client.email || "Sem e-mail cadastrado"}</p>
-                <p>Cobrança: {client.billing}</p>
-                <p>Vencimento: {client.dueDate || "Não informado"}</p>
-                <p>Limite de telas: {client.screensLimit}</p>
-                <p>Status: {client.status}</p>
+      <section className="clients-toolbar">
+        <div className="clients-search">
+          <Search size={20} />
+          <input
+            value={searchTerm}
+            placeholder="Buscar por nome, e-mail ou plano..."
+            onChange={(e) => setSearchTerm(e.target.value)}
+          />
+        </div>
 
-                <div className="card-actions">
+        <div className="clients-filter-group">
+          {["Todos", "Ativo", "Suspenso", "Vencido"].map((status) => (
+            <button
+              key={status}
+              className={statusFilter === status ? "active" : ""}
+              onClick={() => setStatusFilter(status)}
+            >
+              {status}
+            </button>
+          ))}
+        </div>
+      </section>
+
+      <section className="clients-table-panel">
+        <div className="clients-table-head">
+          <span>Cliente</span>
+          <span>Plano</span>
+          <span>Vencimento</span>
+          <span>Telas</span>
+          <span>Status</span>
+          <span>Ações</span>
+        </div>
+
+        {filteredClients.length === 0 ? (
+          <div className="clients-empty">
+            Nenhum cliente encontrado.
+          </div>
+        ) : (
+          filteredClients.map((client) => {
+            const dueInfo = getDueInfo(client);
+
+            return (
+              <div className="clients-table-row" key={client.id}>
+                <div className="client-profile-cell">
+                  <div className="client-avatar">
+                    {client.name?.charAt(0)?.toUpperCase() || "C"}
+                  </div>
+
+                  <div>
+                    <strong>{client.name}</strong>
+                    <span>{client.email || "Sem e-mail cadastrado"}</span>
+                  </div>
+                </div>
+
+                <div>
+                  <strong>{client.plan}</strong>
+                  <span>{client.billing}</span>
+                </div>
+
+                <div>
+                  <strong>{client.dueDate || "Não informado"}</strong>
+                  <span className={`client-due ${dueInfo.className}`}>
+                    {dueInfo.text}
+                  </span>
+                </div>
+
+                <div>
+                  <strong>{client.screensLimit}</strong>
+                  <span>limite de telas</span>
+                </div>
+
+                <div>
+                  <span className={`client-status-badge ${getStatusClass(client.status)}`}>
+                    {client.status || "Ativo"}
+                  </span>
+                </div>
+
+                <div className="clients-actions">
                   <button
-                    className="upload-button"
+                    className="client-action primary"
                     onClick={() => onOpenClient(client)}
                   >
-                    Abrir cliente
+                    Abrir
                   </button>
 
                   <button
-                    className="upload-button"
+                    className="client-action"
                     onClick={() => resetClientPassword(client.email)}
                   >
-                    Resetar senha
+                    Senha
                   </button>
 
                   <button
-                    className="delete-button"
+                    className="client-action danger"
                     onClick={() => deleteClient(client.id)}
                   >
-                    <Trash2 size={16} />
-                    Excluir
+                    <Trash2 size={15} />
                   </button>
                 </div>
               </div>
-            </div>
-          ))
+            );
+          })
         )}
       </section>
+
+      {showCreateModal && (
+        <div className="client-modal-overlay">
+          <div className="client-modal">
+            <div className="client-modal-header">
+              <div>
+                <div className="kicker">Novo acesso</div>
+                <h2>Cadastrar cliente</h2>
+                <p>Crie o cliente, login, senha inicial e vencimento do plano.</p>
+              </div>
+
+              <button
+                className="modal-close-button"
+                onClick={() => setShowCreateModal(false)}
+              >
+                <X size={22} />
+              </button>
+            </div>
+
+            <div className="client-modal-section">
+              <h3>Dados principais</h3>
+
+              <div className="form-grid">
+                <div className="form-group">
+                  <label>Nome do cliente</label>
+                  <input
+                    value={form.name}
+                    placeholder="Ex: Supermercado Central"
+                    onChange={(e) => setForm({ ...form, name: e.target.value })}
+                  />
+                </div>
+
+                <div className="form-group">
+                  <label>E-mail</label>
+                  <input
+                    type="email"
+                    value={form.email}
+                    placeholder="cliente@email.com"
+                    onChange={(e) => setForm({ ...form, email: e.target.value })}
+                  />
+                </div>
+
+                <div className="form-group">
+                  <label>Senha inicial</label>
+                  <input
+                    type="password"
+                    value={form.password}
+                    placeholder="Mínimo 6 caracteres"
+                    onChange={(e) => setForm({ ...form, password: e.target.value })}
+                  />
+                </div>
+
+                <div className="form-group">
+                  <label>Status</label>
+                  <select
+                    value={form.status}
+                    onChange={(e) => setForm({ ...form, status: e.target.value })}
+                  >
+                    <option>Ativo</option>
+                    <option>Suspenso</option>
+                    <option>Vencido</option>
+                  </select>
+                </div>
+              </div>
+            </div>
+
+            <div className="client-modal-section">
+              <h3>Plano e cobrança</h3>
+
+              <div className="form-grid">
+                <div className="form-group">
+                  <label>Plano</label>
+                  <select
+                    value={form.plan}
+                    onChange={(e) => setForm({ ...form, plan: e.target.value })}
+                  >
+                    <option>Básico</option>
+                    <option>Profissional</option>
+                    <option>Enterprise</option>
+                  </select>
+                </div>
+
+                <div className="form-group">
+                  <label>Cobrança</label>
+                  <select
+                    value={form.billing}
+                    onChange={(e) => setForm({ ...form, billing: e.target.value })}
+                  >
+                    <option>Mensal</option>
+                    <option>Anual</option>
+                  </select>
+                </div>
+
+                <div className="form-group">
+                  <label>Vencimento do plano</label>
+                  <input
+                    type="date"
+                    value={form.dueDate}
+                    onChange={(e) => setForm({ ...form, dueDate: e.target.value })}
+                  />
+                </div>
+
+                <div className="form-group">
+                  <label>Limite de telas</label>
+                  <input
+                    type="number"
+                    min="1"
+                    value={form.screensLimit}
+                    onChange={(e) =>
+                      setForm({ ...form, screensLimit: e.target.value })
+                    }
+                  />
+                </div>
+              </div>
+            </div>
+
+            <div className="client-modal-actions">
+              <button
+                className="client-modal-cancel"
+                onClick={() => setShowCreateModal(false)}
+              >
+                Cancelar
+              </button>
+
+              <button className="clients-create-button" onClick={handleCreateClient}>
+                <Plus size={20} />
+                Criar cliente
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
     </>
   );
 }
@@ -1083,16 +1368,6 @@ function ClientDashboard({ client }) {
   const [playlists, setPlaylists] = useState([]);
   const [screens, setScreens] = useState([]);
   const [now, setNow] = useState(new Date());
-
-  useEffect(() => {
-    localStorage.setItem(
-      "totempark-tv-connection",
-      JSON.stringify({
-        clientId,
-        code: codigo,
-      })
-    );
-  }, [clientId, codigo]);
 
   useEffect(() => {
     const interval = setInterval(() => {
@@ -1301,19 +1576,29 @@ function ClientDashboard({ client }) {
                       </div>
                     </div>
 
-                    <p>
-                      {active.mode === "scheduled"
-                        ? "Programação agendada"
-                        : "Playlist padrão"}
-                    </p>
+                    <div className="tv-monitor-meta">
+                      <div className={screen.currentPlaylistMode === "scheduled" || active.mode === "scheduled" ? "monitor-mode scheduled" : "monitor-mode"}>
+                        {screen.currentPlaylistMode === "scheduled" || active.mode === "scheduled"
+                          ? "Agendada ativa"
+                          : "Playlist padrão"}
+                      </div>
 
-                    <h4>{activePlaylist?.name || "Nenhuma playlist ativa"}</h4>
+                      <div className={online ? "monitor-heartbeat online" : "monitor-heartbeat offline"}>
+                        {online ? "Sinal ativo" : "Sem sinal"}
+                      </div>
+                    </div>
 
-                    {previewMedia && (
+                    <h4>{screen.currentPlaylistName || activePlaylist?.name || "Nenhuma playlist ativa"}</h4>
+
+                    <div className="now-playing-box">
+                      <small>Passando agora</small>
+                      <strong>{screen.nowPlayingTitle || previewMedia?.title || "Aguardando mídia"}</strong>
                       <span>
-                        Prévia: {previewMedia.title}
+                        {screen.nowPlayingIndex && screen.nowPlayingTotal
+                          ? `${screen.nowPlayingIndex}/${screen.nowPlayingTotal}`
+                          : "Sem progresso"} • {screen.nowPlayingType || previewMedia?.type || "Mídia"}
                       </span>
-                    )}
+                    </div>
                   </div>
                 </div>
               );
@@ -2363,6 +2648,14 @@ function ClientScreensPage({ client }) {
   }, []);
 
   useEffect(() => {
+    screens.forEach((screen) => {
+      if (screen.code) {
+        syncTvCode(screen.id, screen.code, screen.name);
+      }
+    });
+  }, [screens]);
+
+  useEffect(() => {
     const unsubScreens = onSnapshot(
       collection(db, "clients", client.id, "screens"),
       (snapshot) => {
@@ -2392,6 +2685,27 @@ function ClientScreensPage({ client }) {
     }
 
     return code;
+  }
+
+  async function syncTvCode(screenId, code, screenName) {
+    if (!code) return;
+
+    try {
+      await setDoc(
+        doc(db, "tv_codes", code),
+        {
+          code,
+          clientId: client.id,
+          screenId,
+          screenName: screenName || "",
+          clientName: client.name || "",
+          updatedAt: serverTimestamp(),
+        },
+        { merge: true }
+      );
+    } catch (error) {
+      console.log("Erro ao sincronizar código da TV:", error);
+    }
   }
 
   function getLastSeenDate(screen) {
@@ -2575,16 +2889,22 @@ function ClientScreensPage({ client }) {
           }
         );
 
+        await syncTvCode(editingScreen.id, editingScreen.code, form.name);
+
         alert("Tela atualizada com sucesso!");
       } else {
-        await addDoc(collection(db, "clients", client.id, "screens"), {
+        const code = generateCode();
+
+        const screenRef = await addDoc(collection(db, "clients", client.id, "screens"), {
           ...screenData,
-          code: generateCode(),
+          code,
           status: "offline",
           lastConnection: "Ainda não conectou",
           lastSeenAt: null,
           createdAt: serverTimestamp(),
         });
+
+        await syncTvCode(screenRef.id, code, form.name);
 
         alert("Tela cadastrada com sucesso!");
       }
@@ -2598,12 +2918,67 @@ function ClientScreensPage({ client }) {
 
   async function deleteScreen(id) {
     try {
+      const screenToDelete = screens.find((screen) => screen.id === id);
+
       await deleteDoc(doc(db, "clients", client.id, "screens", id));
+
+      if (screenToDelete?.code) {
+        await deleteDoc(doc(db, "tv_codes", screenToDelete.code));
+      }
     } catch (error) {
       console.log(error);
       alert("Erro ao excluir tela.");
     }
   }
+
+
+  async function sendRemoteCommand(screenId, command) {
+    try {
+      await updateDoc(doc(db, "clients", client.id, "screens", screenId), {
+        remoteCommand: {
+          id: `${Date.now()}-${Math.random().toString(36).slice(2)}`,
+          ...command,
+          sentAt: new Date().toISOString(),
+        },
+        lastCommandSent: command.type,
+        lastCommandSentAt: serverTimestamp(),
+      });
+    } catch (error) {
+      console.log(error);
+      alert("Erro ao enviar comando para a TV.");
+    }
+  }
+
+  function sendOverlayCommand(screenId) {
+    const message = window.prompt("Digite a mensagem do overlay:");
+
+    if (!message) return;
+
+    sendRemoteCommand(screenId, {
+      type: "overlay",
+      title: "Aviso",
+      message,
+      duration: 10,
+    });
+  }
+
+  function sendTakeoverCommand(screenId) {
+    const title = window.prompt("Título do alerta:", "ATENÇÃO");
+
+    if (!title) return;
+
+    const message = window.prompt("Mensagem do alerta:");
+
+    if (!message) return;
+
+    sendRemoteCommand(screenId, {
+      type: "takeover",
+      title,
+      message,
+      duration: 20,
+    });
+  }
+
 
   return (
     <>
@@ -2672,7 +3047,7 @@ function ClientScreensPage({ client }) {
         </div>
 
         <div className="screen-schedule-note">
-          <strong>Como funciona:</strong> a playlist padrão roda normalmente. Quando uma playlist agendada entrar no período configurado, ela assume temporariamente a TV. Ao terminar, a TV volta para a playlist padrão desta tela.
+          <strong>Como funciona:</strong> a playlist padrão roda normalmente. Quando uma playlist agendada entrar no período configurado, ela assume temporariamente a TV. Ao terminar, a TV volta para a playlist padrão desta tela. Para conectar uma TV, abra /tv e digite apenas o código da tela.
         </div>
 
         <div className="panel-actions">
@@ -2729,24 +3104,33 @@ function ClientScreensPage({ client }) {
                   <p>Local: {screen.location}</p>
                   <p>Playlist padrão: {screen.playlistName}</p>
 
-                  <div className={active.mode === "scheduled" ? "active-program scheduled" : "active-program"}>
+                  <div className={screen.currentPlaylistMode === "scheduled" || active.mode === "scheduled" ? "active-program scheduled" : "active-program"}>
                     <small>Exibindo agora</small>
-                    <strong>{activePlaylist?.name || "Nenhuma playlist ativa"}</strong>
+                    <strong>{screen.currentPlaylistName || activePlaylist?.name || "Nenhuma playlist ativa"}</strong>
                     <span>
-                      {active.mode === "scheduled"
+                      {screen.currentPlaylistMode === "scheduled" || active.mode === "scheduled"
                         ? "Programação agendada"
                         : "Playlist padrão"}
                     </span>
+
+                    <div className="screen-now-playing">
+                      <small>Mídia atual</small>
+                      <strong>{screen.nowPlayingTitle || previewMedia?.title || "Aguardando mídia"}</strong>
+                      <span>
+                        {screen.nowPlayingIndex && screen.nowPlayingTotal
+                          ? `${screen.nowPlayingIndex}/${screen.nowPlayingTotal}`
+                          : "Sem progresso"} • {screen.nowPlayingType || previewMedia?.type || "Mídia"}
+                      </span>
+                    </div>
+                  </div>
+
+                  <div className="screen-code-box">
+                    <small>Código para conectar no /tv</small>
+                    <strong>{screen.code}</strong>
                   </div>
 
                   <p>
-                    Código:
-                    <br />
-                    <strong>{screen.code}</strong>
-                  </p>
-
-                  <p>
-                    Player:
+                    Player direto:
                     <br />
                     <strong>/player/{client.id}/{screen.code}</strong>
                   </p>
@@ -2754,6 +3138,89 @@ function ClientScreensPage({ client }) {
                   <div className="last-seen-card">
                     <small>Último sinal</small>
                     <strong>{getLastSeenLabel(screen)}</strong>
+                  </div>
+
+                  <div className="remote-control-panel-inline">
+                    <div className="remote-control-title">
+                      Controle remoto
+                    </div>
+
+                    <div className="remote-control-grid-inline">
+                      <button
+                        className="remote-mini-button info"
+                        onClick={() => sendRemoteCommand(screen.id, { type: "refresh" })}
+                      >
+                        Atualizar
+                      </button>
+
+                      <button
+                        className="remote-mini-button"
+                        onClick={() => sendRemoteCommand(screen.id, { type: "pause" })}
+                      >
+                        Pausar
+                      </button>
+
+                      <button
+                        className="remote-mini-button"
+                        onClick={() => sendRemoteCommand(screen.id, { type: "play" })}
+                      >
+                        Play
+                      </button>
+
+                      <button
+                        className="remote-mini-button warning"
+                        onClick={() => sendOverlayCommand(screen.id)}
+                      >
+                        Overlay
+                      </button>
+
+                      <button
+                        className="remote-mini-button danger"
+                        onClick={() => sendTakeoverCommand(screen.id)}
+                      >
+                        Takeover
+                      </button>
+
+                      <button
+                        className="remote-mini-button"
+                        onClick={() =>
+                          sendRemoteCommand(
+                            screen.id,
+                            {
+                              type:
+                                screen.lastCommandExecuted === "maintenance"
+                                  ? "clear"
+                                  : "maintenance",
+                            }
+                          )
+                        }
+                      >
+                        {screen.lastCommandExecuted === "maintenance"
+                          ? "Sair manutenção"
+                          : "Manutenção"}
+                      </button>
+
+                      <button
+                        className="remote-mini-button"
+                        onClick={() => sendRemoteCommand(screen.id, { type: "blackout" })}
+                      >
+                        Tela preta
+                      </button>
+
+                      <button
+                        className="remote-mini-button success"
+                        onClick={() => sendRemoteCommand(screen.id, { type: "clear" })}
+                      >
+                        Limpar
+                      </button>
+
+                      <button
+                        className="remote-mini-button danger"
+                        onClick={() => sendRemoteCommand(screen.id, { type: "reload" })}
+                      >
+                        Reiniciar
+                      </button>
+                    </div>
                   </div>
 
                   <div className="card-actions">
@@ -2784,34 +3251,54 @@ function ClientScreensPage({ client }) {
 function TVConnectPage() {
   const navigate = useNavigate();
 
-  const [clientId, setClientId] = useState("");
   const [screenCode, setScreenCode] = useState("");
   const [loading, setLoading] = useState(false);
 
-  function handleConnect() {
-    if (!clientId.trim()) {
-      alert("Informe o ID do cliente.");
-      return;
-    }
-
+  async function handleConnect() {
     if (!screenCode.trim()) {
       alert("Informe o código da tela.");
       return;
     }
 
-    setLoading(true);
-
     const code = screenCode.trim().toUpperCase();
 
-    localStorage.setItem(
-      "totempark-tv-connection",
-      JSON.stringify({
-        clientId: clientId.trim(),
-        code,
-      })
-    );
+    try {
+      setLoading(true);
 
-    navigate(`/player/${clientId.trim()}/${code}`);
+      const codeRef = doc(db, "tv_codes", code);
+      const codeSnap = await getDoc(codeRef);
+
+      if (!codeSnap.exists()) {
+        alert(
+          "Tela não encontrada. Abra o cliente no painel, vá em Telas e confirme o código exibido."
+        );
+        setLoading(false);
+        return;
+      }
+
+      const codeData = codeSnap.data();
+      const clientId = codeData.clientId;
+
+      if (!clientId) {
+        alert("Não foi possível identificar o cliente desta tela.");
+        setLoading(false);
+        return;
+      }
+
+      localStorage.setItem(
+        "totempark-tv-connection",
+        JSON.stringify({
+          clientId,
+          code,
+        })
+      );
+
+      navigate(`/player/${clientId}/${code}`);
+    } catch (error) {
+      console.log(error);
+      alert("Erro ao conectar a TV. Verifique as regras do Firestore para leitura da coleção tv_codes.");
+      setLoading(false);
+    }
   }
 
   useEffect(() => {
@@ -2827,45 +3314,64 @@ function TVConnectPage() {
       }
     } catch (error) {
       console.log(error);
+      localStorage.removeItem("totempark-tv-connection");
     }
-  }, []);
+  }, [navigate]);
 
   return (
     <div className="tv-connect-page">
-      <div className="tv-connect-card">
+      <div className="tv-connect-card tv-code-only-card">
         <img src={logo} alt="Totem Park" className="tv-connect-logo" />
+
+        <div className="tv-connect-kicker">
+          Totem Park Player
+        </div>
 
         <h1>Conectar TV</h1>
 
         <p>
-          Digite o ID do cliente e o código da tela para iniciar o player.
+          Digite apenas o código da tela. O sistema identifica o cliente automaticamente.
         </p>
 
-        <div className="form-group">
-          <label>ID do cliente</label>
+        <div className="tv-connect-form">
+          <div className="tv-field tv-code-field">
+            <div className="tv-field-icon">
+              <Monitor size={32} />
+            </div>
 
-          <input
-            value={clientId}
-            placeholder="Ex: x7ah92Kjs9"
-            onChange={(e) => setClientId(e.target.value)}
-          />
+            <div className="tv-field-content">
+              <label>Código da tela</label>
+
+              <input
+                value={screenCode}
+                placeholder="ABC123"
+                autoFocus
+                maxLength={8}
+                onKeyDown={(event) => {
+                  if (event.key === "Enter") {
+                    handleConnect();
+                  }
+                }}
+                onChange={(e) =>
+                  setScreenCode(e.target.value.toUpperCase())
+                }
+              />
+            </div>
+          </div>
+
+          <button
+            className="tv-connect-button"
+            onClick={handleConnect}
+            disabled={loading}
+          >
+            {loading ? "Conectando..." : "Iniciar player"}
+          </button>
         </div>
 
-        <div className="form-group">
-          <label>Código da tela</label>
-
-          <input
-            value={screenCode}
-            placeholder="Ex: ABC123"
-            onChange={(e) =>
-              setScreenCode(e.target.value.toUpperCase())
-            }
-          />
+        <div className="tv-help">
+          <span>?</span>
+          O código aparece no painel do cliente, dentro da aba Telas.
         </div>
-
-        <button className="login-button" onClick={handleConnect}>
-          {loading ? "Conectando..." : "Iniciar player"}
-        </button>
       </div>
     </div>
   );
@@ -2882,6 +3388,12 @@ function PlayerPage() {
   const [mediaIndex, setMediaIndex] = useState(0);
   const [loading, setLoading] = useState(true);
   const [now, setNow] = useState(new Date());
+  const [remoteOverlay, setRemoteOverlay] = useState(null);
+  const [takeoverMessage, setTakeoverMessage] = useState(null);
+  const [maintenanceMode, setMaintenanceMode] = useState(false);
+  const [blackoutMode, setBlackoutMode] = useState(false);
+  const [pauseMode, setPauseMode] = useState(false);
+  const [lastCommandId, setLastCommandId] = useState(null);
 
   useEffect(() => {
     const clock = setInterval(() => {
@@ -3048,6 +3560,159 @@ function PlayerPage() {
     return () => clearInterval(interval);
   }, [screen?.id, clientId]);
 
+
+  useEffect(() => {
+    if (!screen?.id || !clientId) return;
+
+    const screenDocRef = doc(
+      db,
+      "clients",
+      clientId,
+      "screens",
+      screen.id
+    );
+
+    const unsubscribe = onSnapshot(screenDocRef, async (snapshot) => {
+      if (!snapshot.exists()) return;
+
+      const data = snapshot.data();
+      const remoteCommand = data.remoteCommand;
+
+      if (!remoteCommand?.id || remoteCommand.id === lastCommandId) {
+        return;
+      }
+
+      setLastCommandId(remoteCommand.id);
+
+      try {
+        await updateDoc(screenDocRef, {
+          lastCommandExecuted: remoteCommand.type || "",
+          lastCommandExecutedAt: serverTimestamp(),
+        });
+      } catch (error) {
+        console.log(error);
+      }
+
+      if (remoteCommand.type === "reload") {
+        window.location.reload();
+        return;
+      }
+
+      if (remoteCommand.type === "refresh") {
+        setMediaIndex(0);
+        setNow(new Date());
+        return;
+      }
+
+      if (remoteCommand.type === "pause") {
+        setPauseMode(true);
+        return;
+      }
+
+      if (remoteCommand.type === "play") {
+        setPauseMode(false);
+        setNow(new Date());
+        return;
+      }
+
+      if (remoteCommand.type === "blackout") {
+        setBlackoutMode(true);
+        setMaintenanceMode(false);
+        setTakeoverMessage(null);
+        return;
+      }
+
+      if (remoteCommand.type === "maintenance") {
+        setMaintenanceMode(true);
+        setBlackoutMode(false);
+        setTakeoverMessage(null);
+        return;
+      }
+
+      if (remoteCommand.type === "clear") {
+        setBlackoutMode(false);
+        setMaintenanceMode(false);
+        setTakeoverMessage(null);
+        setRemoteOverlay(null);
+        setPauseMode(false);
+        return;
+      }
+
+      if (remoteCommand.type === "overlay") {
+        setRemoteOverlay({
+          title: remoteCommand.title || "Mensagem",
+          message: remoteCommand.message || "",
+        });
+
+        setTimeout(() => {
+          setRemoteOverlay(null);
+        }, Number(remoteCommand.duration || 10) * 1000);
+
+        return;
+      }
+
+      if (remoteCommand.type === "takeover") {
+        setTakeoverMessage({
+          title: remoteCommand.title || "Atenção",
+          message: remoteCommand.message || "",
+        });
+
+        setBlackoutMode(false);
+        setMaintenanceMode(false);
+
+        if (Number(remoteCommand.duration || 0) > 0) {
+          setTimeout(() => {
+            setTakeoverMessage(null);
+          }, Number(remoteCommand.duration) * 1000);
+        }
+
+        return;
+      }
+    });
+
+    return () => unsubscribe();
+  }, [screen?.id, clientId, lastCommandId]);
+
+
+  useEffect(() => {
+    if (!screen?.id || !clientId || !activePlaylist) return;
+
+    const items = activePlaylist?.items || [];
+    const currentItem = items[mediaIndex];
+
+    if (!currentItem) return;
+
+    const screenDocRef = doc(
+      db,
+      "clients",
+      clientId,
+      "screens",
+      screen.id
+    );
+
+    async function updateNowPlaying() {
+      try {
+        await updateDoc(screenDocRef, {
+          nowPlayingTitle: currentItem.title || "",
+          nowPlayingType: currentItem.type || "",
+          nowPlayingDuration: Number(currentItem.duration || 10),
+          nowPlayingPreview: currentItem.preview || "",
+          nowPlayingSound: currentItem.sound || false,
+          nowPlayingIndex: mediaIndex + 1,
+          nowPlayingTotal: items.length,
+          currentPlaylistId: activePlaylist.id || "",
+          currentPlaylistName: activePlaylist.name || "",
+          currentPlaylistMode: activeMode,
+          lastMediaUpdateAt: serverTimestamp(),
+        });
+      } catch (error) {
+        console.log(error);
+      }
+    }
+
+    updateNowPlaying();
+  }, [screen?.id, clientId, activePlaylist?.id, activeMode, mediaIndex]);
+
   useEffect(() => {
     if (!clientId) return;
 
@@ -3102,6 +3767,8 @@ function PlayerPage() {
   useEffect(() => {
     const items = activePlaylist?.items || [];
 
+    if (pauseMode || takeoverMessage || blackoutMode || maintenanceMode) return;
+
     if (items.length === 0) return;
 
     const currentItem = items[mediaIndex];
@@ -3112,7 +3779,67 @@ function PlayerPage() {
     }, duration);
 
     return () => clearTimeout(timer);
-  }, [activePlaylist, mediaIndex]);
+  }, [activePlaylist, mediaIndex, pauseMode, takeoverMessage, blackoutMode, maintenanceMode]);
+
+  useEffect(() => {
+    const mediaElement = document.querySelector(".player-media");
+
+    if (!mediaElement || mediaElement.tagName !== "VIDEO") {
+      return;
+    }
+
+    if (pauseMode) {
+      mediaElement.pause();
+      return;
+    }
+
+    mediaElement.play().catch((error) => {
+      console.log("Autoplay bloqueado ao retomar vídeo:", error);
+    });
+  }, [pauseMode, mediaIndex, activePlaylist?.id]);
+
+  if (blackoutMode) {
+    return (
+      <div className="player-screen tv-blackout-screen"></div>
+    );
+  }
+
+  if (maintenanceMode) {
+    return (
+      <div className="player-screen tv-maintenance-screen">
+        <div className="tv-maintenance-content">
+          <img src={logo} alt="Totem Park" />
+
+          <div className="tv-maintenance-icon">
+            🛠️
+          </div>
+
+          <h1>
+            <span>TELA</span> em Manutenção
+          </h1>
+
+          <div className="tv-maintenance-divider"></div>
+
+          <p>
+            Aguarde. Esta tela está temporariamente em modo manutenção.
+          </p>
+
+          <div className="tv-maintenance-loader"></div>
+        </div>
+      </div>
+    );
+  }
+
+  if (takeoverMessage) {
+    return (
+      <div className="player-screen tv-takeover-screen">
+        <div className="tv-takeover-content">
+          <h1>{takeoverMessage.title}</h1>
+          <p>{takeoverMessage.message}</p>
+        </div>
+      </div>
+    );
+  }
 
   if (loading) {
     return <div className="player-screen">Carregando player...</div>;
@@ -3138,6 +3865,19 @@ function PlayerPage() {
 
   return (
     <div className="player-screen">
+      {remoteOverlay && (
+        <div className="tv-overlay-alert">
+          <strong>{remoteOverlay.title}</strong>
+          <span>{remoteOverlay.message}</span>
+        </div>
+      )}
+
+      {pauseMode && (
+        <div className="tv-pause-badge">
+          PAUSADO PELO PAINEL
+        </div>
+      )}
+
       {activeMode === "scheduled" && (
         <div className="player-schedule-label">
           Programação ativa: {activePlaylist.name}
@@ -3148,10 +3888,15 @@ function PlayerPage() {
         <video
           key={`${currentMedia.preview}-${mediaIndex}`}
           src={currentMedia.preview}
-          autoPlay
+          autoPlay={!pauseMode}
           muted={!currentMedia.sound}
           playsInline
           className="player-media"
+          onPlay={(event) => {
+            if (pauseMode) {
+              event.currentTarget.pause();
+            }
+          }}
           onEnded={goToNextMedia}
         />
       ) : (
