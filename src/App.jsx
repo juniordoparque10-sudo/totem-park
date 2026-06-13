@@ -55,6 +55,17 @@ import { auth, db, storage } from "./firebase";
 import logo from "./assets/logo.png";
 import "./App.css";
 
+
+function isNativeApp() {
+  return (
+    typeof window !== "undefined" &&
+    (
+      window.Capacitor?.isNativePlatform?.() ||
+      window.location.protocol === "capacitor:"
+    )
+  );
+}
+
 const firebaseConfig = {
   apiKey: "AIzaSyBk775KTH959oIIEqnWiJRFW7Fo-1AX5AY",
   authDomain: "totem-park.firebaseapp.com",
@@ -80,6 +91,11 @@ function AdminApp() {
   const [loadingAuth, setLoadingAuth] = useState(true);
   const [activePage, setActivePage] = useState("dashboard");
   const [selectedClient, setSelectedClient] = useState(null);
+  const [appMode, setAppMode] = useState(() => {
+    if (!isNativeApp()) return "web";
+
+    return localStorage.getItem("totempark-app-mode") || "";
+  });
 
   useEffect(() => {
     let unsubscribeClient = null;
@@ -185,6 +201,22 @@ function AdminApp() {
       );
     }
 
+    if (isNativeApp() && !appMode) {
+      return (
+        <AppModeChoice
+          client={user.clientData}
+          onSelectMode={(mode) => {
+            localStorage.setItem("totempark-app-mode", mode);
+            setAppMode(mode);
+          }}
+        />
+      );
+    }
+
+    if (isNativeApp() && appMode === "tv") {
+      return <TVConnectPage />;
+    }
+
     return (
       <div className="app">
         <div className="layout">
@@ -207,13 +239,34 @@ function AdminApp() {
               </p>
             </div>
 
-            <button className="logout-button" onClick={() => signOut(auth)}>
+            <button
+              className="logout-button"
+              onClick={() => {
+                localStorage.removeItem("totempark-app-mode");
+                signOut(auth);
+              }}
+            >
               <LogOut size={18} />
               Sair
             </button>
           </aside>
 
           <main className="content">
+            {isNativeApp() && (
+              <div className="native-mode-switch">
+                <span>Modo Gestor ativo</span>
+
+                <button
+                  onClick={() => {
+                    localStorage.removeItem("totempark-app-mode");
+                    setAppMode("");
+                  }}
+                >
+                  Trocar modo
+                </button>
+              </div>
+            )}
+
             <ClientInternalPanel
               client={user.clientData}
               hideBackButton
@@ -316,6 +369,63 @@ function AdminApp() {
     </div>
   );
 }
+
+
+function AppModeChoice({ client, onSelectMode }) {
+  return (
+    <div className="app-mode-page">
+      <div className="app-mode-card">
+        <img src={logo} alt="Totem Park" />
+
+        <div className="app-mode-kicker">Aplicativo Totem Park</div>
+
+        <h1>Escolha o modo de uso</h1>
+
+        <p>
+          Você está logado como <strong>{client?.name}</strong>. Escolha se deseja
+          gerenciar sua conta ou abrir este dispositivo como TV.
+        </p>
+
+        <div className="app-mode-grid">
+          <button
+            type="button"
+            className="app-mode-option manager"
+            onClick={() => onSelectMode("manager")}
+          >
+            <span>Modo Gestor</span>
+            <strong>Gerenciar painel</strong>
+            <p>
+              Acesse mídias, playlists, telas e configurações do cliente.
+            </p>
+          </button>
+
+          <button
+            type="button"
+            className="app-mode-option tv"
+            onClick={() => onSelectMode("tv")}
+          >
+            <span>Modo TV</span>
+            <strong>Abrir player</strong>
+            <p>
+              Digite o código da tela e transforme este dispositivo em player fullscreen.
+            </p>
+          </button>
+        </div>
+
+        <button
+          className="app-mode-logout"
+          onClick={() => {
+            localStorage.removeItem("totempark-app-mode");
+            signOut(auth);
+          }}
+        >
+          Sair desta conta
+        </button>
+      </div>
+    </div>
+  );
+}
+
 
 function LoginPage() {
   const [mode, setMode] = useState("login");
@@ -3372,6 +3482,31 @@ function TVConnectPage() {
           <span>?</span>
           O código aparece no painel do cliente, dentro da aba Telas.
         </div>
+
+        {isNativeApp() && (
+          <div className="tv-app-actions">
+            <button
+              className="tv-change-mode-button"
+              onClick={() => {
+                localStorage.removeItem("totempark-app-mode");
+                localStorage.removeItem("totempark-tv-connection");
+                window.location.href = "/";
+              }}
+            >
+              Voltar para Modo Gestor
+            </button>
+
+            <button
+              className="tv-change-screen-button"
+              onClick={() => {
+                localStorage.removeItem("totempark-tv-connection");
+                setScreenCode("");
+              }}
+            >
+              Conectar outra tela
+            </button>
+          </div>
+        )}
       </div>
     </div>
   );
@@ -3394,6 +3529,7 @@ function PlayerPage() {
   const [blackoutMode, setBlackoutMode] = useState(false);
   const [pauseMode, setPauseMode] = useState(false);
   const [lastCommandId, setLastCommandId] = useState(null);
+  const [showTvMenu, setShowTvMenu] = useState(false);
 
   useEffect(() => {
     const clock = setInterval(() => {
@@ -3501,6 +3637,10 @@ function PlayerPage() {
     if (items.length === 0) return;
 
     setMediaIndex((prev) => (prev + 1 >= items.length ? 0 : prev + 1));
+  }
+
+  function getPlayerOrientationClass() {
+    return screen?.orientation === "Retrato" ? "portrait-mode" : "landscape-mode";
   }
 
   useEffect(() => {
@@ -3800,13 +3940,13 @@ function PlayerPage() {
 
   if (blackoutMode) {
     return (
-      <div className="player-screen tv-blackout-screen"></div>
+      <div className={`player-screen tv-blackout-screen ${getPlayerOrientationClass()}`}></div>
     );
   }
 
   if (maintenanceMode) {
     return (
-      <div className="player-screen tv-maintenance-screen">
+      <div className={`player-screen tv-maintenance-screen ${getPlayerOrientationClass()}`}>
         <div className="tv-maintenance-content">
           <img src={logo} alt="Totem Park" />
 
@@ -3832,7 +3972,7 @@ function PlayerPage() {
 
   if (takeoverMessage) {
     return (
-      <div className="player-screen tv-takeover-screen">
+      <div className={`player-screen tv-takeover-screen ${getPlayerOrientationClass()}`}>
         <div className="tv-takeover-content">
           <h1>{takeoverMessage.title}</h1>
           <p>{takeoverMessage.message}</p>
@@ -3862,9 +4002,67 @@ function PlayerPage() {
   }
 
   const currentMedia = activePlaylist.items[mediaIndex];
+  const nextMedia =
+    activePlaylist.items[
+      mediaIndex + 1 >= activePlaylist.items.length ? 0 : mediaIndex + 1
+    ];
 
   return (
-    <div className="player-screen">
+    <div
+      className={`player-screen ${getPlayerOrientationClass()}`}
+      onDoubleClick={() => {
+        if (isNativeApp()) {
+          setShowTvMenu(true);
+        }
+      }}
+    >
+      {isNativeApp() && (
+        <button
+          className="tv-hidden-menu-zone"
+          onClick={() => setShowTvMenu(true)}
+          aria-label="Abrir menu da TV"
+        ></button>
+      )}
+
+      {showTvMenu && (
+        <div className="tv-player-menu">
+          <div className="tv-player-menu-card">
+            <img src={logo} alt="Totem Park" />
+
+            <h2>Modo TV ativo</h2>
+
+            <p>
+              Tela conectada: <strong>{screen?.name}</strong>
+              <br />
+              Código: <strong>{codigo}</strong>
+            </p>
+
+            <button onClick={() => setShowTvMenu(false)}>
+              Continuar exibindo
+            </button>
+
+            <button
+              onClick={() => {
+                localStorage.removeItem("totempark-tv-connection");
+                window.location.href = "/tv";
+              }}
+            >
+              Conectar outra tela
+            </button>
+
+            <button
+              onClick={() => {
+                localStorage.removeItem("totempark-app-mode");
+                localStorage.removeItem("totempark-tv-connection");
+                window.location.href = "/";
+              }}
+            >
+              Voltar para Modo Gestor
+            </button>
+          </div>
+        </div>
+      )}
+
       {remoteOverlay && (
         <div className="tv-overlay-alert">
           <strong>{remoteOverlay.title}</strong>
@@ -3891,6 +4089,9 @@ function PlayerPage() {
           autoPlay={!pauseMode}
           muted={!currentMedia.sound}
           playsInline
+          preload="auto"
+          controls={false}
+          disablePictureInPicture
           className="player-media"
           onPlay={(event) => {
             if (pauseMode) {
@@ -3905,7 +4106,19 @@ function PlayerPage() {
           src={currentMedia.preview}
           alt={currentMedia.title}
           className="player-media"
+          loading="eager"
+          decoding="sync"
         />
+      )}
+
+      {nextMedia && (
+        <div className="player-preload-media" aria-hidden="true">
+          {nextMedia.type === "Vídeo" ? (
+            <video src={nextMedia.preview} preload="auto" muted playsInline />
+          ) : (
+            <img src={nextMedia.preview} alt="" />
+          )}
+        </div>
       )}
     </div>
   );
