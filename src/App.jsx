@@ -3484,28 +3484,16 @@ function TVConnectPage() {
         </div>
 
         {isNativeApp() && (
-          <div className="tv-app-actions">
-            <button
-              className="tv-change-mode-button"
-              onClick={() => {
-                localStorage.removeItem("totempark-app-mode");
-                localStorage.removeItem("totempark-tv-connection");
-                window.location.href = "/";
-              }}
-            >
-              Voltar para Modo Gestor
-            </button>
-
-            <button
-              className="tv-change-screen-button"
-              onClick={() => {
-                localStorage.removeItem("totempark-tv-connection");
-                setScreenCode("");
-              }}
-            >
-              Conectar outra tela
-            </button>
-          </div>
+          <button
+            className="tv-change-mode-button"
+            onClick={() => {
+              localStorage.removeItem("totempark-app-mode");
+              localStorage.removeItem("totempark-tv-connection");
+              window.location.href = "/";
+            }}
+          >
+            Trocar modo do aplicativo
+          </button>
         )}
       </div>
     </div>
@@ -3529,7 +3517,6 @@ function PlayerPage() {
   const [blackoutMode, setBlackoutMode] = useState(false);
   const [pauseMode, setPauseMode] = useState(false);
   const [lastCommandId, setLastCommandId] = useState(null);
-  const [showTvMenu, setShowTvMenu] = useState(false);
 
   useEffect(() => {
     const clock = setInterval(() => {
@@ -4002,67 +3989,9 @@ function PlayerPage() {
   }
 
   const currentMedia = activePlaylist.items[mediaIndex];
-  const nextMedia =
-    activePlaylist.items[
-      mediaIndex + 1 >= activePlaylist.items.length ? 0 : mediaIndex + 1
-    ];
 
   return (
-    <div
-      className={`player-screen ${getPlayerOrientationClass()}`}
-      onDoubleClick={() => {
-        if (isNativeApp()) {
-          setShowTvMenu(true);
-        }
-      }}
-    >
-      {isNativeApp() && (
-        <button
-          className="tv-hidden-menu-zone"
-          onClick={() => setShowTvMenu(true)}
-          aria-label="Abrir menu da TV"
-        ></button>
-      )}
-
-      {showTvMenu && (
-        <div className="tv-player-menu">
-          <div className="tv-player-menu-card">
-            <img src={logo} alt="Totem Park" />
-
-            <h2>Modo TV ativo</h2>
-
-            <p>
-              Tela conectada: <strong>{screen?.name}</strong>
-              <br />
-              Código: <strong>{codigo}</strong>
-            </p>
-
-            <button onClick={() => setShowTvMenu(false)}>
-              Continuar exibindo
-            </button>
-
-            <button
-              onClick={() => {
-                localStorage.removeItem("totempark-tv-connection");
-                window.location.href = "/tv";
-              }}
-            >
-              Conectar outra tela
-            </button>
-
-            <button
-              onClick={() => {
-                localStorage.removeItem("totempark-app-mode");
-                localStorage.removeItem("totempark-tv-connection");
-                window.location.href = "/";
-              }}
-            >
-              Voltar para Modo Gestor
-            </button>
-          </div>
-        </div>
-      )}
-
+    <div className={`player-screen ${getPlayerOrientationClass()}`}>
       {remoteOverlay && (
         <div className="tv-overlay-alert">
           <strong>{remoteOverlay.title}</strong>
@@ -4089,9 +4018,6 @@ function PlayerPage() {
           autoPlay={!pauseMode}
           muted={!currentMedia.sound}
           playsInline
-          preload="auto"
-          controls={false}
-          disablePictureInPicture
           className="player-media"
           onPlay={(event) => {
             if (pauseMode) {
@@ -4106,19 +4032,7 @@ function PlayerPage() {
           src={currentMedia.preview}
           alt={currentMedia.title}
           className="player-media"
-          loading="eager"
-          decoding="sync"
         />
-      )}
-
-      {nextMedia && (
-        <div className="player-preload-media" aria-hidden="true">
-          {nextMedia.type === "Vídeo" ? (
-            <video src={nextMedia.preview} preload="auto" muted playsInline />
-          ) : (
-            <img src={nextMedia.preview} alt="" />
-          )}
-        </div>
       )}
     </div>
   );
