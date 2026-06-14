@@ -20,6 +20,10 @@ import {
   GripVertical,
   Search,
   X,
+  Newspaper,
+  CloudSun,
+  Palette,
+  Clock3,
 } from "lucide-react";
 
 import {
@@ -115,6 +119,73 @@ function renderLivePreviewMedia(screen, fallbackMedia, icon = null) {
       alt={media.title || "Preview da tela"}
     />
   );
+}
+
+
+const DEFAULT_NEWS_ITEMS = [
+  "Totem Park exibe comunicados, ofertas e informações em tempo real.",
+  "Atualize suas telas com notícias, clima e campanhas dinâmicas.",
+  "Sua comunicação visual agora está conectada com o que acontece ao vivo.",
+];
+
+async function fetchWeatherByCity(cityName) {
+  const city = (cityName || "João Câmara").trim();
+
+  const geoResponse = await fetch(
+    `https://geocoding-api.open-meteo.com/v1/search?name=${encodeURIComponent(city)}&count=1&language=pt&format=json`
+  );
+
+  const geoData = await geoResponse.json();
+  const place = geoData?.results?.[0];
+
+  if (!place) {
+    throw new Error("Cidade não encontrada.");
+  }
+
+  const weatherResponse = await fetch(
+    `https://api.open-meteo.com/v1/forecast?latitude=${place.latitude}&longitude=${place.longitude}&current=temperature_2m,relative_humidity_2m,apparent_temperature,weather_code,wind_speed_10m&daily=temperature_2m_max,temperature_2m_min,weather_code&timezone=auto&forecast_days=3`
+  );
+
+  const weatherData = await weatherResponse.json();
+
+  return {
+    city: `${place.name}${place.admin1 ? `/${place.admin1}` : ""}`,
+    temperature: Math.round(weatherData?.current?.temperature_2m ?? 0),
+    sensation: Math.round(weatherData?.current?.apparent_temperature ?? 0),
+    humidity: Math.round(weatherData?.current?.relative_humidity_2m ?? 0),
+    wind: Math.round(weatherData?.current?.wind_speed_10m ?? 0),
+    daily: weatherData?.daily || null,
+  };
+}
+
+async function fetchNewsFromRss(feedUrl) {
+  const url = (feedUrl || "").trim();
+
+  if (!url) {
+    return DEFAULT_NEWS_ITEMS;
+  }
+
+  const response = await fetch(
+    `https://api.rss2json.com/v1/api.json?rss_url=${encodeURIComponent(url)}`
+  );
+
+  const data = await response.json();
+
+  const items = (data?.items || [])
+    .slice(0, 6)
+    .map((item) => item.title)
+    .filter(Boolean);
+
+  return items.length > 0 ? items : DEFAULT_NEWS_ITEMS;
+}
+
+function getTemplateThemeStyle(template) {
+  return {
+    "--template-primary": template?.primaryColor || "#06b6d4",
+    "--template-secondary": template?.secondaryColor || "#9333ea",
+    "--template-accent": template?.accentColor || "#22d3ee",
+    "--template-text": template?.textColor || "#ffffff",
+  };
 }
 
 const firebaseConfig = {
@@ -1565,12 +1636,20 @@ function ClientInternalPanel({ client, onBack, hideBackButton = false }) {
         >
           Telas
         </button>
+
+        <button
+          className={tab === "templates" ? "client-tab active" : "client-tab"}
+          onClick={() => setTab("templates")}
+        >
+          Templates
+        </button>
       </div>
 
       {tab === "dashboard" && <ClientDashboard client={client} />}
       {tab === "media" && <ClientMediaPage client={client} />}
       {tab === "playlists" && <ClientPlaylistsPage client={client} />}
       {tab === "screens" && <ClientScreensPage client={client} />}
+      {tab === "templates" && <ClientTemplatesPage client={client} />}
     </>
   );
 }
@@ -2880,36 +2959,38 @@ function ClientPlaylistsPage({ client }) {
 }
 
 
-function ClientScreensPage({ client }) {
+
+
+function ClientTemplatesPage({ client }) {
+  const [templates, setTemplates] = useState([]);
   const [screens, setScreens] = useState([]);
-  const [playlists, setPlaylists] = useState([]);
-  const [now, setNow] = useState(Date.now());
-  const [editingScreen, setEditingScreen] = useState(null);
+  const [saving, setSaving] = useState(false);
 
   const [form, setForm] = useState({
-    name: "",
-    location: "",
+    name: "Clima ao vivo",
+    type: "clima",
     orientation: "Paisagem",
-    playlistId: "",
+    duration: "15",
+    city: "João Câmara",
+    newsFeedUrl: "https://g1.globo.com/rss/g1/rn/rio-grande-do-norte/",
+    title: "Informação ao vivo",
+    subtitle: "Atualização automática para sua TV",
+    primaryColor: "#06b6d4",
+    secondaryColor: "#9333ea",
+    accentColor: "#22d3ee",
+    textColor: "#ffffff",
+    targetScreenIds: [],
+    enabled: true,
   });
 
   useEffect(() => {
-    const interval = setInterval(() => {
-      setNow(Date.now());
-    }, 10000);
-
-    return () => clearInterval(interval);
-  }, []);
-
-  useEffect(() => {
-    screens.forEach((screen) => {
-      if (screen.code) {
-        syncTvCode(screen.id, screen.code, screen.name);
+    const unsubTemplates = onSnapshot(
+      collection(db, "clients", client.id, "templates"),
+      (snapshot) => {
+        setTemplates(snapshot.docs.map((item) => ({ id: item.id, ...item.data() })));
       }
-    });
-  }, [screens]);
+    );
 
-  useEffect(() => {
     const unsubScreens = onSnapshot(
       collection(db, "clients", client.id, "screens"),
       (snapshot) => {
@@ -2917,617 +2998,571 @@ function ClientScreensPage({ client }) {
       }
     );
 
-    const unsubPlaylists = onSnapshot(
-      collection(db, "clients", client.id, "playlists"),
-      (snapshot) => {
-        setPlaylists(snapshot.docs.map((item) => ({ id: item.id, ...item.data() })));
-      }
-    );
-
     return () => {
+      unsubTemplates();
       unsubScreens();
-      unsubPlaylists();
     };
   }, [client.id]);
 
-  function generateCode() {
-    const chars = "ABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789";
-    let code = "";
-
-    for (let i = 0; i < 6; i++) {
-      code += chars.charAt(Math.floor(Math.random() * chars.length));
-    }
-
-    return code;
+  function changeType(type) {
+    setForm((prev) => ({
+      ...prev,
+      type,
+      name:
+        type === "clima"
+          ? "Clima ao vivo"
+          : type === "noticias"
+            ? "Notícias ao vivo"
+            : type === "comercial"
+              ? "Oferta premium"
+              : "Aviso institucional",
+      title:
+        type === "clima"
+          ? "Clima ao vivo"
+          : type === "noticias"
+            ? "Últimas notícias"
+            : type === "comercial"
+              ? "Oferta especial"
+              : "Comunicado importante",
+      subtitle:
+        type === "clima"
+          ? "Previsão atualizada automaticamente"
+          : type === "noticias"
+            ? "Manchetes atualizadas automaticamente"
+            : type === "comercial"
+              ? "Destaque sua promoção na TV"
+              : "Informe seu público com visual profissional",
+    }));
   }
 
-  async function syncTvCode(screenId, code, screenName) {
-    if (!code) return;
+  function toggleTargetScreen(screenId) {
+    const selected = form.targetScreenIds.includes(screenId);
+
+    setForm({
+      ...form,
+      targetScreenIds: selected
+        ? form.targetScreenIds.filter((id) => id !== screenId)
+        : [...form.targetScreenIds, screenId],
+    });
+  }
+
+  function resetForm() {
+    setForm({
+      name: "Clima ao vivo",
+      type: "clima",
+      orientation: "Paisagem",
+      duration: "15",
+      city: "João Câmara",
+      newsFeedUrl: "https://g1.globo.com/rss/g1/rn/rio-grande-do-norte/",
+      title: "Informação ao vivo",
+      subtitle: "Atualização automática para sua TV",
+      primaryColor: "#06b6d4",
+      secondaryColor: "#9333ea",
+      accentColor: "#22d3ee",
+      textColor: "#ffffff",
+      targetScreenIds: [],
+      enabled: true,
+    });
+  }
+
+  async function handleSaveTemplate() {
+    if (!form.name.trim()) {
+      alert("Informe o nome do template.");
+      return;
+    }
+
+    if (Number(form.duration || 0) < 5) {
+      alert("A duração mínima recomendada é de 5 segundos.");
+      return;
+    }
 
     try {
-      await setDoc(
-        doc(db, "tv_codes", code),
-        {
-          code,
-          clientId: client.id,
-          screenId,
-          screenName: screenName || "",
-          clientName: client.name || "",
-          updatedAt: serverTimestamp(),
-        },
-        { merge: true }
-      );
-    } catch (error) {
-      console.log("Erro ao sincronizar código da TV:", error);
-    }
-  }
+      setSaving(true);
 
-  function getLastSeenDate(screen) {
-    if (screen.lastSeenAt?.toDate) {
-      return screen.lastSeenAt.toDate();
-    }
-
-    if (screen.lastSeenAt?.seconds) {
-      return new Date(screen.lastSeenAt.seconds * 1000);
-    }
-
-    return null;
-  }
-
-  function isScreenOnline(screen) {
-    const lastSeenDate = getLastSeenDate(screen);
-
-    if (!lastSeenDate) {
-      return false;
-    }
-
-    const diffInSeconds =
-      (now - lastSeenDate.getTime()) / 1000;
-
-    return diffInSeconds <= 20;
-  }
-
-  function getLastSeenLabel(screen) {
-    const lastSeenDate = getLastSeenDate(screen);
-
-    if (!lastSeenDate) {
-      return "Ainda não conectou";
-    }
-
-    const diffInSeconds = Math.floor(
-      (now - lastSeenDate.getTime()) / 1000
-    );
-
-    if (diffInSeconds < 10) {
-      return "Agora mesmo";
-    }
-
-    if (diffInSeconds < 60) {
-      return `Há ${diffInSeconds}s`;
-    }
-
-    const diffInMinutes = Math.floor(diffInSeconds / 60);
-
-    if (diffInMinutes < 60) {
-      return `Há ${diffInMinutes}min`;
-    }
-
-    return lastSeenDate.toLocaleString("pt-BR");
-  }
-
-  function timeToMinutes(time) {
-    if (!time) return 0;
-
-    const [hours, minutes] = time.split(":").map(Number);
-
-    return hours * 60 + minutes;
-  }
-
-  function getTodayValue() {
-    const date = new Date(now);
-    const year = date.getFullYear();
-    const month = String(date.getMonth() + 1).padStart(2, "0");
-    const day = String(date.getDate()).padStart(2, "0");
-
-    return `${year}-${month}-${day}`;
-  }
-
-  function isPlaylistInSchedule(playlist, screenId) {
-    if (!playlist?.scheduleEnabled) return false;
-
-    if (
-      playlist.targetScreenIds &&
-      playlist.targetScreenIds.length > 0 &&
-      !playlist.targetScreenIds.includes(screenId)
-    ) {
-      return false;
-    }
-
-    const today = getTodayValue();
-
-    if (playlist.startDate && today < playlist.startDate) return false;
-    if (playlist.endDate && today > playlist.endDate) return false;
-
-    const date = new Date(now);
-    const currentMinutes = date.getHours() * 60 + date.getMinutes();
-    const startMinutes = timeToMinutes(playlist.startTime);
-    const endMinutes = timeToMinutes(playlist.endTime);
-
-    if (startMinutes === endMinutes) return true;
-
-    if (startMinutes < endMinutes) {
-      return currentMinutes >= startMinutes && currentMinutes <= endMinutes;
-    }
-
-    return currentMinutes >= startMinutes || currentMinutes <= endMinutes;
-  }
-
-  function getActivePlaylist(screen) {
-    const scheduled = playlists
-      .filter((playlist) => isPlaylistInSchedule(playlist, screen.id))
-      .sort((a, b) => {
-        const aDate = `${a.startDate || ""} ${a.startTime || ""}`;
-        const bDate = `${b.startDate || ""} ${b.startTime || ""}`;
-
-        return bDate.localeCompare(aDate);
+      await addDoc(collection(db, "clients", client.id, "templates"), {
+        ...form,
+        duration: Number(form.duration || 15),
+        createdAt: serverTimestamp(),
+        updatedAt: serverTimestamp(),
       });
 
-    if (scheduled.length > 0) {
-      return {
-        playlist: scheduled[0],
-        mode: "scheduled",
-      };
+      resetForm();
+      alert("Template criado com sucesso!");
+    } catch (error) {
+      console.log(error);
+      alert("Erro ao salvar template.");
+    } finally {
+      setSaving(false);
     }
-
-    return {
-      playlist: playlists.find((playlist) => playlist.id === screen.playlistId),
-      mode: "default",
-    };
   }
 
-  function resetScreenForm() {
-    setEditingScreen(null);
-
-    setForm({
-      name: "",
-      location: "",
-      orientation: "Paisagem",
-      playlistId: "",
-    });
+  async function deleteTemplate(id) {
+    try {
+      await deleteDoc(doc(db, "clients", client.id, "templates", id));
+    } catch (error) {
+      console.log(error);
+      alert("Erro ao excluir template.");
+    }
   }
 
-  function startEditScreen(screen) {
-    setEditingScreen(screen);
-
-    setForm({
-      name: screen.name || "",
-      location: screen.location || "",
-      orientation: screen.orientation || "Paisagem",
-      playlistId: screen.playlistId || "",
-    });
-
-    window.scrollTo({
-      top: 0,
-      behavior: "smooth",
-    });
+  async function toggleTemplate(template) {
+    try {
+      await updateDoc(doc(db, "clients", client.id, "templates", template.id), {
+        enabled: !template.enabled,
+        updatedAt: serverTimestamp(),
+      });
+    } catch (error) {
+      console.log(error);
+      alert("Erro ao alterar status do template.");
+    }
   }
 
-  async function handleSaveScreen() {
-    if (!form.name.trim()) {
-      alert("Informe o nome da tela.");
+  async function applyTemplateToScreens(template) {
+    const targetScreens =
+      template.targetScreenIds && template.targetScreenIds.length > 0
+        ? screens.filter((screen) => template.targetScreenIds.includes(screen.id))
+        : screens;
+
+    if (targetScreens.length === 0) {
+      alert("Nenhuma tela selecionada ou cadastrada.");
       return;
     }
 
-    if (!editingScreen && screens.length >= Number(client.screensLimit || 0)) {
-      alert("Este cliente atingiu o limite de telas do plano.");
-      return;
-    }
-
-    const selectedPlaylist = playlists.find((playlist) => playlist.id === form.playlistId);
-
     try {
-      const screenData = {
-        name: form.name,
-        location: form.location || "Não informado",
-        orientation: form.orientation,
-        playlistId: selectedPlaylist?.id || "",
-        playlistName: selectedPlaylist?.name || "Nenhuma playlist vinculada",
-      };
+      await Promise.all(
+        targetScreens.map((screen) =>
+          updateDoc(doc(db, "clients", client.id, "screens", screen.id), {
+            activeTemplateId: template.id,
+            activeTemplateName: template.name,
+            templateUpdatedAt: serverTimestamp(),
+          })
+        )
+      );
 
-      if (editingScreen) {
-        await updateDoc(
-          doc(db, "clients", client.id, "screens", editingScreen.id),
-          {
-            ...screenData,
-            updatedAt: serverTimestamp(),
-          }
-        );
-
-        await syncTvCode(editingScreen.id, editingScreen.code, form.name);
-
-        alert("Tela atualizada com sucesso!");
-      } else {
-        const code = generateCode();
-
-        const screenRef = await addDoc(collection(db, "clients", client.id, "screens"), {
-          ...screenData,
-          code,
-          status: "offline",
-          lastConnection: "Ainda não conectou",
-          lastSeenAt: null,
-          createdAt: serverTimestamp(),
-        });
-
-        await syncTvCode(screenRef.id, code, form.name);
-
-        alert("Tela cadastrada com sucesso!");
-      }
-
-      resetScreenForm();
+      alert("Template aplicado nas telas selecionadas.");
     } catch (error) {
       console.log(error);
-      alert("Erro ao salvar tela.");
+      alert("Erro ao aplicar template nas telas.");
     }
   }
-
-  async function deleteScreen(id) {
-    try {
-      const screenToDelete = screens.find((screen) => screen.id === id);
-
-      await deleteDoc(doc(db, "clients", client.id, "screens", id));
-
-      if (screenToDelete?.code) {
-        await deleteDoc(doc(db, "tv_codes", screenToDelete.code));
-      }
-    } catch (error) {
-      console.log(error);
-      alert("Erro ao excluir tela.");
-    }
-  }
-
-
-  async function sendRemoteCommand(screenId, command) {
-    try {
-      const commandId = `${Date.now()}-${Math.random().toString(36).slice(2)}`;
-
-      const payload = {
-        remoteCommand: {
-          id: commandId,
-          ...command,
-          sentAt: new Date().toISOString(),
-        },
-        lastCommandSent: command.type,
-        lastCommandSentAt: serverTimestamp(),
-        commandStatus: "sent",
-      };
-
-      if (command.type === "maintenance") {
-        payload.lastCommandExecuted = "maintenance";
-      }
-
-      if (command.type === "clear") {
-        payload.lastCommandExecuted = "clear";
-      }
-
-      await updateDoc(doc(db, "clients", client.id, "screens", screenId), payload);
-    } catch (error) {
-      console.log(error);
-      alert("Erro ao enviar comando para a TV.");
-    }
-  }
-
-  function sendOverlayCommand(screenId) {
-    const message = window.prompt("Digite a mensagem do overlay:");
-
-    if (!message) return;
-
-    sendRemoteCommand(screenId, {
-      type: "overlay",
-      title: "Aviso",
-      message,
-      duration: 10,
-    });
-  }
-
-  function sendTakeoverCommand(screenId) {
-    const title = window.prompt("Título do alerta:", "ATENÇÃO");
-
-    if (!title) return;
-
-    const message = window.prompt("Mensagem do alerta:");
-
-    if (!message) return;
-
-    sendRemoteCommand(screenId, {
-      type: "takeover",
-      title,
-      message,
-      duration: 20,
-    });
-  }
-
 
   return (
     <>
-      <section className="panel">
-        <div className="playlist-editor-header">
-          <div>
-            <h2>{editingScreen ? "Editar tela" : "Nova tela"}</h2>
-            <p className="stat-status">
-              Uso atual: {screens.length}/{client.screensLimit} telas
-            </p>
-          </div>
-
-          {editingScreen && (
-            <div className="editing-badge">
-              Editando
-            </div>
-          )}
+      <section className="templates-hero">
+        <div>
+          <div className="kicker">Templates dinâmicos</div>
+          <h1>Templates prontos para TV</h1>
+          <p>
+            Crie telas modernas de clima, notícias, avisos e campanhas comerciais.
+            Cada template tem duração, cores e telas de destino.
+          </p>
         </div>
 
-        <div className="form-grid">
-          <div className="form-group">
-            <label>Nome da tela</label>
-            <input
-              placeholder="Ex: TV Recepção"
-              value={form.name}
-              onChange={(e) => setForm({ ...form, name: e.target.value })}
-            />
-          </div>
-
-          <div className="form-group">
-            <label>Local de instalação</label>
-            <input
-              placeholder="Ex: Entrada principal"
-              value={form.location}
-              onChange={(e) => setForm({ ...form, location: e.target.value })}
-            />
-          </div>
-
-          <div className="form-group">
-            <label>Orientação</label>
-            <select
-              value={form.orientation}
-              onChange={(e) => setForm({ ...form, orientation: e.target.value })}
-            >
-              <option>Paisagem</option>
-              <option>Retrato</option>
-            </select>
-          </div>
-
-          <div className="form-group">
-            <label>Playlist padrão da tela</label>
-            <select
-              value={form.playlistId}
-              onChange={(e) => setForm({ ...form, playlistId: e.target.value })}
-            >
-              <option value="">Nenhuma playlist</option>
-              {playlists
-                .filter((playlist) => !playlist.scheduleEnabled)
-                .map((playlist) => (
-                  <option value={playlist.id} key={playlist.id}>
-                    {playlist.name}
-                  </option>
-                ))}
-            </select>
-          </div>
-        </div>
-
-        <div className="screen-schedule-note">
-          <strong>Como funciona:</strong> a playlist padrão roda normalmente. Quando uma playlist agendada entrar no período configurado, ela assume temporariamente a TV. Ao terminar, a TV volta para a playlist padrão desta tela. Para conectar uma TV, abra /tv e digite apenas o código da tela.
-        </div>
-
-        <div className="panel-actions">
-          <button className="upload-button" onClick={handleSaveScreen}>
-            <Plus size={20} />
-            {editingScreen ? "Salvar alterações" : "Cadastrar tela"}
-          </button>
-
-          {editingScreen && (
-            <button className="delete-button" onClick={resetScreenForm}>
-              Cancelar edição
-            </button>
-          )}
+        <div className="templates-hero-badge">
+          <SparklineIcon />
+          Ao vivo + personalizável
         </div>
       </section>
 
-      <section className="cards-grid">
-        {screens.length === 0 ? (
-          <div className="empty-library">Nenhuma tela cadastrada ainda.</div>
-        ) : (
-          screens.map((screen) => {
-            const online = isScreenOnline(screen);
-            const active = getActivePlaylist(screen);
-            const activePlaylist = active.playlist;
-            const previewMedia = screen.nowPlayingPreview
-              ? {
-                  preview: screen.nowPlayingPreview,
-                  title: screen.nowPlayingTitle || "Mídia atual",
-                  type: screen.nowPlayingType || "Imagem",
-                }
-              : activePlaylist?.items?.[0];
+      <section className="templates-builder-grid">
+        <div className="templates-editor-panel">
+          <div className="playlist-editor-header">
+            <div>
+              <h2>Novo template</h2>
+              <p>Configure o visual, duração e origem do conteúdo.</p>
+            </div>
+          </div>
 
-            return (
-              <div className="media-card" key={screen.id}>
-                <div className="media-preview screen-preview">
-                  {previewMedia ? (
-                    previewMedia.type === "Vídeo" ? (
-                      <video
-                        key={`${screen.id}-${screen.nowPlayingPreview || previewMedia.preview}-${screen.nowPlayingIndex || 0}`}
-                        src={previewMedia.preview}
-                        muted
-                        autoPlay
-                        loop
-                        playsInline
-                        preload="auto"
-                      />
-                    ) : (
-                      <img
-                          key={`${screen.id}-${screen.nowPlayingPreview || previewMedia.preview}-${screen.nowPlayingIndex || 0}`}
-                          src={previewMedia.preview}
-                          alt={previewMedia.title}
-                        />
-                    )
-                  ) : (
-                    <Monitor size={54} />
-                  )}
+          <div className="template-type-grid">
+            <button
+              className={form.type === "clima" ? "template-type-card active" : "template-type-card"}
+              onClick={() => changeType("clima")}
+              type="button"
+            >
+              <CloudSun size={28} />
+              <strong>Clima ao vivo</strong>
+              <span>Open-Meteo, cidade configurável</span>
+            </button>
 
-                  <div className={online ? "live-dot online" : "live-dot offline"}></div>
-                </div>
+            <button
+              className={form.type === "noticias" ? "template-type-card active" : "template-type-card"}
+              onClick={() => changeType("noticias")}
+              type="button"
+            >
+              <Newspaper size={28} />
+              <strong>Notícias ao vivo</strong>
+              <span>RSS de portal ou fonte local</span>
+            </button>
 
-                <div className="media-info">
-                  <div className="screen-card-top">
-                    <span>{screen.orientation}</span>
+            <button
+              className={form.type === "comercial" ? "template-type-card active" : "template-type-card"}
+              onClick={() => changeType("comercial")}
+              type="button"
+            >
+              <Palette size={28} />
+              <strong>Comercial</strong>
+              <span>Promoção, serviço ou oferta</span>
+            </button>
 
-                    <div className={online ? "screen-status online" : "screen-status offline"}>
-                      <div></div>
-                      {online ? "Online agora" : "Offline"}
+            <button
+              className={form.type === "aviso" ? "template-type-card active" : "template-type-card"}
+              onClick={() => changeType("aviso")}
+              type="button"
+            >
+              <Clock3 size={28} />
+              <strong>Aviso</strong>
+              <span>Comunicado institucional</span>
+            </button>
+          </div>
+
+          <div className="form-grid">
+            <div className="form-group">
+              <label>Nome do template</label>
+              <input
+                value={form.name}
+                onChange={(e) => setForm({ ...form, name: e.target.value })}
+              />
+            </div>
+
+            <div className="form-group">
+              <label>Duração na TV (segundos)</label>
+              <input
+                type="number"
+                min="5"
+                value={form.duration}
+                onChange={(e) => setForm({ ...form, duration: e.target.value })}
+              />
+            </div>
+
+            <div className="form-group">
+              <label>Orientação</label>
+              <select
+                value={form.orientation}
+                onChange={(e) => setForm({ ...form, orientation: e.target.value })}
+              >
+                <option>Paisagem</option>
+                <option>Retrato</option>
+                <option>Paisagem + Retrato</option>
+              </select>
+            </div>
+
+            <div className="form-group">
+              <label>Título principal</label>
+              <input
+                value={form.title}
+                onChange={(e) => setForm({ ...form, title: e.target.value })}
+              />
+            </div>
+
+            <div className="form-group">
+              <label>Subtítulo</label>
+              <input
+                value={form.subtitle}
+                onChange={(e) => setForm({ ...form, subtitle: e.target.value })}
+              />
+            </div>
+
+            {form.type === "clima" && (
+              <div className="form-group">
+                <label>Cidade do clima</label>
+                <input
+                  value={form.city}
+                  placeholder="Ex: João Câmara"
+                  onChange={(e) => setForm({ ...form, city: e.target.value })}
+                />
+              </div>
+            )}
+
+            {form.type === "noticias" && (
+              <div className="form-group">
+                <label>URL RSS de notícias</label>
+                <input
+                  value={form.newsFeedUrl}
+                  placeholder="https://site.com/rss"
+                  onChange={(e) => setForm({ ...form, newsFeedUrl: e.target.value })}
+                />
+              </div>
+            )}
+          </div>
+
+          <div className="template-color-panel">
+            <div className="playlist-section-title compact">
+              <div>
+                <h3>Cores do template</h3>
+                <p>Personalize a identidade visual exibida na TV.</p>
+              </div>
+            </div>
+
+            <div className="template-color-grid">
+              <label>
+                <span>Primária</span>
+                <input
+                  type="color"
+                  value={form.primaryColor}
+                  onChange={(e) => setForm({ ...form, primaryColor: e.target.value })}
+                />
+              </label>
+
+              <label>
+                <span>Secundária</span>
+                <input
+                  type="color"
+                  value={form.secondaryColor}
+                  onChange={(e) => setForm({ ...form, secondaryColor: e.target.value })}
+                />
+              </label>
+
+              <label>
+                <span>Destaque</span>
+                <input
+                  type="color"
+                  value={form.accentColor}
+                  onChange={(e) => setForm({ ...form, accentColor: e.target.value })}
+                />
+              </label>
+
+              <label>
+                <span>Texto</span>
+                <input
+                  type="color"
+                  value={form.textColor}
+                  onChange={(e) => setForm({ ...form, textColor: e.target.value })}
+                />
+              </label>
+            </div>
+          </div>
+
+          <div className="target-screens-box">
+            <div className="playlist-section-title compact">
+              <div>
+                <h3>Telas de destino</h3>
+                <p>Se não selecionar nenhuma, poderá aplicar em todas.</p>
+              </div>
+
+              <span>{form.targetScreenIds.length} tela(s)</span>
+            </div>
+
+            <div className="target-screens-grid">
+              {screens.length === 0 ? (
+                <div className="empty-library">Cadastre uma tela primeiro.</div>
+              ) : (
+                screens.map((screen) => (
+                  <button
+                    type="button"
+                    key={screen.id}
+                    className={
+                      form.targetScreenIds.includes(screen.id)
+                        ? "target-screen-card selected"
+                        : "target-screen-card"
+                    }
+                    onClick={() => toggleTargetScreen(screen.id)}
+                  >
+                    <Monitor size={22} />
+
+                    <div>
+                      <strong>{screen.name}</strong>
+                      <span>{screen.location}</span>
                     </div>
-                  </div>
+                  </button>
+                ))
+              )}
+            </div>
+          </div>
 
-                  <h3>{screen.name}</h3>
-                  <p>Local: {screen.location}</p>
-                  <p>Playlist padrão: {screen.playlistName}</p>
+          <div className="panel-actions">
+            <button className="upload-button" onClick={handleSaveTemplate} disabled={saving}>
+              <Plus size={20} />
+              {saving ? "Salvando..." : "Salvar template"}
+            </button>
+          </div>
+        </div>
 
-                  <div className={screen.currentPlaylistMode === "scheduled" || active.mode === "scheduled" ? "active-program scheduled" : "active-program"}>
-                    <small>Exibindo agora</small>
-                    <strong>{screen.currentPlaylistName || activePlaylist?.name || "Nenhuma playlist ativa"}</strong>
+        <div className="templates-preview-panel">
+          <TemplateVisualPreview template={form} compact={false} />
+        </div>
+      </section>
+
+      <section className="templates-list-panel">
+        <div className="playlist-editor-header">
+          <div>
+            <h2>Templates cadastrados</h2>
+            <p>Esses templates entram no loop da TV com a duração configurada.</p>
+          </div>
+        </div>
+
+        <div className="templates-list-grid">
+          {templates.length === 0 ? (
+            <div className="empty-library">Nenhum template criado ainda.</div>
+          ) : (
+            templates.map((template) => (
+              <div className="template-saved-card" key={template.id}>
+                <TemplateVisualPreview template={template} compact />
+
+                <div className="template-saved-info">
+                  <div>
+                    <strong>{template.name}</strong>
                     <span>
-                      {screen.currentPlaylistMode === "scheduled" || active.mode === "scheduled"
-                        ? "Programação agendada"
-                        : "Playlist padrão"}
+                      {template.type} • {template.duration || 15}s • {template.orientation}
                     </span>
-
-                    <div className="screen-now-playing">
-                      <small>Mídia atual</small>
-                      <strong>{screen.nowPlayingTitle || previewMedia?.title || "Aguardando mídia"}</strong>
-                      <span>
-                        {screen.nowPlayingIndex && screen.nowPlayingTotal
-                          ? `${screen.nowPlayingIndex}/${screen.nowPlayingTotal}`
-                          : "Sem progresso"} • {screen.nowPlayingType || previewMedia?.type || "Mídia"}
-                      </span>
-                    </div>
                   </div>
 
-                  <div className="screen-code-box">
-                    <small>Código para conectar no /tv</small>
-                    <strong>{screen.code}</strong>
-                  </div>
-
-                  <p>
-                    Player direto:
-                    <br />
-                    <strong>/player/{client.id}/{screen.code}</strong>
-                  </p>
-
-                  <div className="last-seen-card">
-                    <small>Último sinal</small>
-                    <strong>{getLastSeenLabel(screen)}</strong>
-                  </div>
-
-                  <div className="remote-control-panel-inline">
-                    <div className="remote-control-title">
-                      Controle remoto
-                    </div>
-
-                    <div className="remote-control-grid-inline">
-                      <button
-                        className="remote-mini-button info"
-                        onClick={() => sendRemoteCommand(screen.id, { type: "refresh" })}
-                      >
-                        Atualizar
-                      </button>
-
-                      <button
-                        className="remote-mini-button"
-                        onClick={() => sendRemoteCommand(screen.id, { type: "pause" })}
-                      >
-                        Pausar
-                      </button>
-
-                      <button
-                        className="remote-mini-button"
-                        onClick={() => sendRemoteCommand(screen.id, { type: "play" })}
-                      >
-                        Play
-                      </button>
-
-                      <button
-                        className="remote-mini-button warning"
-                        onClick={() => sendOverlayCommand(screen.id)}
-                      >
-                        Overlay
-                      </button>
-
-                      <button
-                        className="remote-mini-button danger"
-                        onClick={() => sendTakeoverCommand(screen.id)}
-                      >
-                        Takeover
-                      </button>
-
-                      <button
-                        className="remote-mini-button"
-                        onClick={() =>
-                          sendRemoteCommand(
-                            screen.id,
-                            {
-                              type:
-                                screen.lastCommandExecuted === "maintenance"
-                                  ? "clear"
-                                  : "maintenance",
-                            }
-                          )
-                        }
-                      >
-                        {screen.lastCommandExecuted === "maintenance"
-                          ? "Sair manutenção"
-                          : "Manutenção"}
-                      </button>
-
-                      <button
-                        className="remote-mini-button"
-                        onClick={() => sendRemoteCommand(screen.id, { type: "blackout" })}
-                      >
-                        Tela preta
-                      </button>
-
-                      <button
-                        className="remote-mini-button success"
-                        onClick={() => sendRemoteCommand(screen.id, { type: "clear" })}
-                      >
-                        Limpar
-                      </button>
-
-                      <button
-                        className="remote-mini-button danger"
-                        onClick={() => sendRemoteCommand(screen.id, { type: "reload" })}
-                      >
-                        Reiniciar
-                      </button>
-                    </div>
-                  </div>
-
-                  <div className="card-actions">
+                  <div className="template-actions-row">
                     <button
-                      className="upload-button"
-                      onClick={() => startEditScreen(screen)}
+                      className={template.enabled ? "client-action primary" : "client-action"}
+                      onClick={() => toggleTemplate(template)}
                     >
-                      Editar tela
+                      {template.enabled ? "Ativo" : "Desativado"}
                     </button>
 
-                    <button className="delete-button" onClick={() => deleteScreen(screen.id)}>
-                      <Trash2 size={16} />
-                      Excluir
+                    <button
+                      className="client-action primary"
+                      onClick={() => applyTemplateToScreens(template)}
+                    >
+                      Aplicar nas telas
+                    </button>
+
+                    <button
+                      className="client-action danger"
+                      onClick={() => deleteTemplate(template.id)}
+                    >
+                      <Trash2 size={15} />
                     </button>
                   </div>
                 </div>
               </div>
-            );
-          })
-        )}
+            ))
+          )}
+        </div>
       </section>
     </>
+  );
+}
+
+function SparklineIcon() {
+  return (
+    <div className="sparkline-icon">
+      <span></span>
+      <span></span>
+      <span></span>
+    </div>
+  );
+}
+
+function TemplateVisualPreview({ template, compact = false }) {
+  const [weather, setWeather] = useState(null);
+  const [news, setNews] = useState(DEFAULT_NEWS_ITEMS);
+  const [loading, setLoading] = useState(false);
+
+  useEffect(() => {
+    let cancelled = false;
+
+    async function loadTemplateContent() {
+      try {
+        setLoading(true);
+
+        if (template.type === "clima") {
+          const data = await fetchWeatherByCity(template.city);
+          if (!cancelled) setWeather(data);
+        }
+
+        if (template.type === "noticias") {
+          const data = await fetchNewsFromRss(template.newsFeedUrl);
+          if (!cancelled) setNews(data);
+        }
+      } catch (error) {
+        console.log(error);
+      } finally {
+        if (!cancelled) setLoading(false);
+      }
+    }
+
+    loadTemplateContent();
+
+    const interval = setInterval(loadTemplateContent, 10 * 60 * 1000);
+
+    return () => {
+      cancelled = true;
+      clearInterval(interval);
+    };
+  }, [template.type, template.city, template.newsFeedUrl]);
+
+  return (
+    <div
+      className={`template-tv-preview template-${template.type} ${compact ? "compact" : ""}`}
+      style={getTemplateThemeStyle(template)}
+    >
+      <div className="template-orb one"></div>
+      <div className="template-orb two"></div>
+
+      <div className="template-tv-topbar">
+        <span>{template.title || "Totem Park"}</span>
+        <strong>{new Date().toLocaleTimeString("pt-BR", { hour: "2-digit", minute: "2-digit" })}</strong>
+      </div>
+
+      {template.type === "clima" && (
+        <div className="template-weather-layout">
+          <div>
+            <small>Agora em</small>
+            <h2>{weather?.city || template.city || "Sua cidade"}</h2>
+            <p>{template.subtitle || "Previsão atualizada automaticamente"}</p>
+          </div>
+
+          <div className="template-weather-temp">
+            {loading && !weather ? "--" : `${weather?.temperature ?? "--"}°`}
+          </div>
+
+          <div className="template-weather-info">
+            <span>Sensação {weather?.sensation ?? "--"}°</span>
+            <span>Umidade {weather?.humidity ?? "--"}%</span>
+            <span>Vento {weather?.wind ?? "--"} km/h</span>
+          </div>
+        </div>
+      )}
+
+      {template.type === "noticias" && (
+        <div className="template-news-layout">
+          <div className="template-breaking">AO VIVO</div>
+
+          <h2>{template.title || "Últimas notícias"}</h2>
+          <p>{template.subtitle || "Manchetes atualizadas automaticamente"}</p>
+
+          <div className="template-news-list">
+            {news.slice(0, compact ? 2 : 4).map((item, index) => (
+              <div key={`${item}-${index}`} className="template-news-item">
+                <span>{String(index + 1).padStart(2, "0")}</span>
+                <strong>{item}</strong>
+              </div>
+            ))}
+          </div>
+        </div>
+      )}
+
+      {(template.type === "comercial" || template.type === "aviso") && (
+        <div className="template-generic-layout">
+          <div className="template-generic-badge">
+            {template.type === "comercial" ? "OFERTA" : "AVISO"}
+          </div>
+
+          <h2>{template.title || template.name}</h2>
+          <p>{template.subtitle || "Mensagem personalizada para sua TV."}</p>
+
+          <div className="template-generic-footer">
+            <span>Totem Park</span>
+            <strong>{template.duration || 15}s</strong>
+          </div>
+        </div>
+      )}
+
+      <div className="template-tv-ticker">
+        <span>
+          {template.type === "noticias"
+            ? (news[0] || "Notícias ao vivo")
+            : template.type === "clima"
+              ? `Clima em ${weather?.city || template.city || "sua cidade"} • Atualização automática`
+              : template.subtitle || "Template profissional para TV"}
+        </span>
+      </div>
+    </div>
   );
 }
 
@@ -3702,7 +3737,9 @@ function PlayerPage() {
   const [screen, setScreen] = useState(null);
   const [defaultPlaylist, setDefaultPlaylist] = useState(null);
   const [allPlaylists, setAllPlaylists] = useState([]);
+  const [screenTemplates, setScreenTemplates] = useState([]);
   const [activePlaylist, setActivePlaylist] = useState(null);
+  const [activeTemplate, setActiveTemplate] = useState(null);
   const [activeMode, setActiveMode] = useState("default");
   const [mediaIndex, setMediaIndex] = useState(0);
   const [loading, setLoading] = useState(true);
@@ -3815,12 +3852,26 @@ function PlayerPage() {
     };
   }
 
-  const activeItemsKey = (activePlaylist?.items || [])
-    .map((item) => `${item.id || item.preview || item.title}`)
+  const playerItems = [
+    ...(activePlaylist?.items || []).map((item) => ({
+      ...item,
+      playerItemType: "media",
+    })),
+    ...screenTemplates.map((template) => ({
+      ...template,
+      title: template.name,
+      type: "Template",
+      duration: Number(template.duration || 15),
+      playerItemType: "template",
+    })),
+  ];
+
+  const activeItemsKey = playerItems
+    .map((item) => `${item.playerItemType}-${item.id || item.preview || item.title}-${item.updatedAt?.seconds || ""}`)
     .join("|");
 
   function goToNextMedia() {
-    const items = activePlaylist?.items || [];
+    const items = playerItems;
 
     if (items.length === 0) return;
 
@@ -4035,7 +4086,7 @@ function PlayerPage() {
   useEffect(() => {
     if (!screen?.id || !clientId || !activePlaylist) return;
 
-    const items = activePlaylist?.items || [];
+    const items = playerItems;
     const safeIndex = mediaIndex >= items.length ? 0 : mediaIndex;
     const currentItem = items[safeIndex];
 
@@ -4052,8 +4103,8 @@ function PlayerPage() {
     async function updateNowPlaying() {
       try {
         await updateDoc(screenDocRef, {
-          nowPlayingTitle: currentItem.title || "",
-          nowPlayingType: currentItem.type || "",
+          nowPlayingTitle: currentItem.title || currentItem.name || "",
+          nowPlayingType: currentItem.playerItemType === "template" ? "Template" : currentItem.type || "",
           nowPlayingDuration: Number(currentItem.duration || 10),
           nowPlayingPreview: currentItem.preview || "",
           nowPlayingSound: currentItem.sound || false,
@@ -4070,7 +4121,7 @@ function PlayerPage() {
     }
 
     updateNowPlaying();
-  }, [screen?.id, clientId, activePlaylist?.id, activeMode, mediaIndex]);
+  }, [screen?.id, clientId, activePlaylist?.id, activeMode, mediaIndex, activeItemsKey]);
 
   useEffect(() => {
     if (!clientId) return;
@@ -4089,6 +4140,38 @@ function PlayerPage() {
 
     return () => unsubscribe();
   }, [clientId]);
+
+  useEffect(() => {
+    if (!clientId || !screen?.id) return;
+
+    const unsubscribe = onSnapshot(
+      collection(db, "clients", clientId, "templates"),
+      (snapshot) => {
+        const list = snapshot.docs
+          .map((templateDoc) => ({
+            id: templateDoc.id,
+            ...templateDoc.data(),
+          }))
+          .filter((template) => {
+            if (!template.enabled) return false;
+
+            if (
+              template.targetScreenIds &&
+              template.targetScreenIds.length > 0 &&
+              !template.targetScreenIds.includes(screen.id)
+            ) {
+              return false;
+            }
+
+            return true;
+          });
+
+        setScreenTemplates(list);
+      }
+    );
+
+    return () => unsubscribe();
+  }, [clientId, screen?.id]);
 
   useEffect(() => {
     if (!screen?.playlistId || !clientId) {
@@ -4111,6 +4194,26 @@ function PlayerPage() {
   }, [screen, clientId]);
 
   useEffect(() => {
+    if (!screen?.templateEnabled || !screen?.templateId || !clientId) {
+      setActiveTemplate(null);
+      return;
+    }
+
+    const unsubscribe = onSnapshot(
+      doc(db, "clients", clientId, "templates", screen.templateId),
+      (templateDoc) => {
+        if (templateDoc.exists()) {
+          setActiveTemplate({ id: templateDoc.id, ...templateDoc.data() });
+        } else {
+          setActiveTemplate(null);
+        }
+      }
+    );
+
+    return () => unsubscribe();
+  }, [screen?.templateEnabled, screen?.templateId, clientId]);
+
+  useEffect(() => {
     const selected = chooseActivePlaylist();
 
     const previousId = activePlaylist?.id;
@@ -4125,7 +4228,7 @@ function PlayerPage() {
   }, [allPlaylists, defaultPlaylist, now, screen?.id, screen?.playlistId]);
 
   useEffect(() => {
-    const items = activePlaylist?.items || [];
+    const items = playerItems;
 
     if (items.length === 0) return;
 
@@ -4136,7 +4239,7 @@ function PlayerPage() {
   }, [activePlaylist?.id, activePlaylist?.items?.length]);
 
   useEffect(() => {
-    const items = activePlaylist?.items || [];
+    const items = playerItems;
 
     if (pauseMode || takeoverMessage || blackoutMode || maintenanceMode) return;
 
@@ -4223,7 +4326,25 @@ function PlayerPage() {
     return <div className="player-screen">Tela não encontrada.</div>;
   }
 
-  if (!activePlaylist || !activePlaylist.items || activePlaylist.items.length === 0) {
+  if (activeTemplate) {
+    return (
+      <div className={`player-screen ${getPlayerOrientationClass()}`}>
+        <TemplatePreviewCard template={activeTemplate} />
+
+        <button
+          className="tv-player-exit-button"
+          onClick={() => {
+            localStorage.removeItem("totempark-tv-connection");
+            window.location.href = "/tv";
+          }}
+        >
+          Sair da TV
+        </button>
+      </div>
+    );
+  }
+
+  if ((!activePlaylist || !activePlaylist.items || activePlaylist.items.length === 0) && screenTemplates.length === 0) {
     return (
       <div className="player-screen">
         <div className="player-empty">
@@ -4236,14 +4357,14 @@ function PlayerPage() {
   }
 
   const safeMediaIndex =
-    mediaIndex >= activePlaylist.items.length ? 0 : mediaIndex;
-  const currentMedia = activePlaylist.items[safeMediaIndex] || activePlaylist.items[0];
+    mediaIndex >= playerItems.length ? 0 : mediaIndex;
+  const currentMedia = playerItems[safeMediaIndex] || playerItems[0];
   const nextMedia =
-    activePlaylist.items[
-      safeMediaIndex + 1 >= activePlaylist.items.length ? 0 : safeMediaIndex + 1
+    playerItems[
+      safeMediaIndex + 1 >= playerItems.length ? 0 : safeMediaIndex + 1
     ];
-  const transitionClass = getTransitionClass(activePlaylist.transition);
-  const transitionSpeedClass = getTransitionSpeedClass(activePlaylist.transitionSpeed);
+  const transitionClass = getTransitionClass(activePlaylist?.transition || "Fade suave");
+  const transitionSpeedClass = getTransitionSpeedClass(activePlaylist?.transitionSpeed || "Normal");
   return (
     <div className={`player-screen ${getPlayerOrientationClass()}`}>
       {remoteOverlay && (
@@ -4269,17 +4390,19 @@ function PlayerPage() {
         Sair da TV
       </button>
 
-      {activeMode === "scheduled" && (
+      {activeMode === "scheduled" && activePlaylist && (
         <div className="player-schedule-label">
           Programação ativa: {activePlaylist.name}
         </div>
       )}
 
       <div
-        key={`${activePlaylist.id}-${currentMedia.preview}-${safeMediaIndex}-${transitionClass}-${transitionSpeedClass}`}
+        key={`${activePlaylist?.id || "templates"}-${currentMedia.id || currentMedia.preview}-${safeMediaIndex}-${transitionClass}-${transitionSpeedClass}`}
         className={`player-transition-layer ${transitionClass} ${transitionSpeedClass}`}
       >
-        {currentMedia.type === "Vídeo" ? (
+        {currentMedia.playerItemType === "template" ? (
+          <TemplateVisualPreview template={currentMedia} />
+        ) : currentMedia.type === "Vídeo" ? (
           <video
             src={currentMedia.preview}
             autoPlay={!pauseMode}
@@ -4334,7 +4457,7 @@ function PlayerPage() {
 
       {nextMedia && nextMedia.preview && (
         <div className="player-preload-media" aria-hidden="true">
-          {nextMedia.type === "Vídeo" ? (
+          {nextMedia.playerItemType === "template" ? null : nextMedia.type === "Vídeo" ? (
             <video
               src={nextMedia.preview}
               muted
