@@ -66,6 +66,57 @@ function isNativeApp() {
   );
 }
 
+
+function buildLivePreviewMedia(screen, fallbackMedia) {
+  if (screen?.nowPlayingPreview) {
+    return {
+      preview: screen.nowPlayingPreview,
+      title: screen.nowPlayingTitle || "Mídia atual",
+      type: screen.nowPlayingType || "Imagem",
+      liveKey: `${screen.id}-${screen.nowPlayingPreview}-${screen.nowPlayingIndex || 0}-${screen.lastMediaUpdateAt?.seconds || ""}`,
+    };
+  }
+
+  if (fallbackMedia?.preview) {
+    return {
+      ...fallbackMedia,
+      liveKey: `${screen?.id || "screen"}-${fallbackMedia.preview}`,
+    };
+  }
+
+  return null;
+}
+
+function renderLivePreviewMedia(screen, fallbackMedia, icon = null) {
+  const media = buildLivePreviewMedia(screen, fallbackMedia);
+
+  if (!media?.preview) {
+    return icon || <Monitor size={48} />;
+  }
+
+  if (media.type === "Vídeo") {
+    return (
+      <video
+        key={media.liveKey}
+        src={media.preview}
+        muted
+        autoPlay
+        loop
+        playsInline
+        preload="auto"
+      />
+    );
+  }
+
+  return (
+    <img
+      key={media.liveKey}
+      src={media.preview}
+      alt={media.title || "Preview da tela"}
+    />
+  );
+}
+
 const firebaseConfig = {
   apiKey: "AIzaSyBk775KTH959oIIEqnWiJRFW7Fo-1AX5AY",
   authDomain: "totem-park.firebaseapp.com",
@@ -650,6 +701,53 @@ function Dashboard() {
   const recentClients = [...clients].slice(-5).reverse();
   const criticalClients = [...overdueClients, ...soonDueClients].slice(0, 5);
 
+  function getDashboardActivePlaylist(screen) {
+    const clientPlaylists = playlistsData.filter(
+      (playlist) => playlist.clientId === screen.clientId
+    );
+
+    const scheduled = clientPlaylists
+      .filter((playlist) => {
+        if (!playlist?.scheduleEnabled) return false;
+
+        if (
+          playlist.targetScreenIds &&
+          playlist.targetScreenIds.length > 0 &&
+          !playlist.targetScreenIds.includes(screen.id)
+        ) {
+          return false;
+        }
+
+        const date = new Date(now);
+        const today = `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, "0")}-${String(date.getDate()).padStart(2, "0")}`;
+
+        if (playlist.startDate && today < playlist.startDate) return false;
+        if (playlist.endDate && today > playlist.endDate) return false;
+
+        const currentMinutes = date.getHours() * 60 + date.getMinutes();
+        const startMinutes = timeToMinutes(playlist.startTime);
+        const endMinutes = timeToMinutes(playlist.endTime);
+
+        if (startMinutes === endMinutes) return true;
+
+        if (startMinutes < endMinutes) {
+          return currentMinutes >= startMinutes && currentMinutes <= endMinutes;
+        }
+
+        return currentMinutes >= startMinutes || currentMinutes <= endMinutes;
+      })
+      .sort((a, b) => {
+        const aDate = `${a.startDate || ""} ${a.startTime || ""}`;
+        const bDate = `${b.startDate || ""} ${b.startTime || ""}`;
+
+        return bDate.localeCompare(aDate);
+      });
+
+    if (scheduled.length > 0) return scheduled[0];
+
+    return clientPlaylists.find((playlist) => playlist.id === screen.playlistId);
+  }
+
   return (
     <>
       <header className="premium-dashboard-hero">
@@ -740,8 +838,12 @@ function Dashboard() {
                   <div className="premium-screen-row" key={`${screen.clientId}-${screen.id}`}>
                     <div className={online ? "premium-screen-dot online" : "premium-screen-dot offline"}></div>
 
-                    <div className="premium-screen-icon">
-                      <Monitor size={24} />
+                    <div className="premium-screen-icon premium-screen-thumb">
+                      {renderLivePreviewMedia(
+                        screen,
+                        getDashboardActivePlaylist(screen)?.items?.[0],
+                        <Monitor size={24} />
+                      )}
                     </div>
 
                     <div className="premium-screen-text">
@@ -1657,7 +1759,14 @@ function ClientDashboard({ client }) {
             screens.map((screen) => {
               const active = getActivePlaylist(screen);
               const activePlaylist = active.playlist;
-              const previewMedia = activePlaylist?.items?.[0];
+              const previewMedia = screen.nowPlayingPreview
+                ? {
+                    preview: screen.nowPlayingPreview,
+                    title: screen.nowPlayingTitle || "Mídia atual",
+                    type: screen.nowPlayingType || "Imagem",
+                  }
+                : activePlaylist?.items?.[0];
+
               const online = isScreenOnline(screen);
 
               return (
@@ -1665,9 +1774,21 @@ function ClientDashboard({ client }) {
                   <div className="screen-live-preview">
                     {previewMedia ? (
                       previewMedia.type === "Vídeo" ? (
-                        <video src={previewMedia.preview} muted />
+                        <video
+                          key={`${screen.id}-${screen.nowPlayingPreview || previewMedia.preview}-${screen.nowPlayingIndex || 0}`}
+                          src={previewMedia.preview}
+                          muted
+                          autoPlay
+                          loop
+                          playsInline
+                          preload="auto"
+                        />
                       ) : (
-                        <img src={previewMedia.preview} alt={previewMedia.title} />
+                        <img
+                          key={`${screen.id}-${screen.nowPlayingPreview || previewMedia.preview}-${screen.nowPlayingIndex || 0}`}
+                          src={previewMedia.preview}
+                          alt={previewMedia.title}
+                        />
                       )
                     ) : (
                       <Monitor size={48} />
@@ -2525,7 +2646,7 @@ function ClientPlaylistsPage({ client }) {
                 >
                   <div className="select-media-thumb">
                     {media.type === "Vídeo" ? (
-                      <video src={media.preview} />
+                      <video src={media.preview} muted playsInline preload="metadata" />
                     ) : (
                       <img src={media.preview} alt={media.title} />
                     )}
@@ -2584,7 +2705,7 @@ function ClientPlaylistsPage({ client }) {
 
                     <div className="playlist-order-thumb">
                       {media.type === "Vídeo" ? (
-                        <video src={media.preview} />
+                        <video src={media.preview} muted playsInline preload="metadata" />
                       ) : (
                         <img src={media.preview} alt={media.title} />
                       )}
@@ -2702,7 +2823,7 @@ function ClientPlaylistsPage({ client }) {
 
                     <div className="playlist-thumb">
                       {item.type === "Vídeo" ? (
-                        <video src={item.preview} />
+                        <video src={item.preview} muted playsInline preload="metadata" />
                       ) : (
                         <img src={item.preview} alt={item.title} />
                       )}
@@ -3182,16 +3303,34 @@ function ClientScreensPage({ client }) {
             const online = isScreenOnline(screen);
             const active = getActivePlaylist(screen);
             const activePlaylist = active.playlist;
-            const previewMedia = activePlaylist?.items?.[0];
+            const previewMedia = screen.nowPlayingPreview
+              ? {
+                  preview: screen.nowPlayingPreview,
+                  title: screen.nowPlayingTitle || "Mídia atual",
+                  type: screen.nowPlayingType || "Imagem",
+                }
+              : activePlaylist?.items?.[0];
 
             return (
               <div className="media-card" key={screen.id}>
                 <div className="media-preview screen-preview">
                   {previewMedia ? (
                     previewMedia.type === "Vídeo" ? (
-                      <video src={previewMedia.preview} muted />
+                      <video
+                        key={`${screen.id}-${screen.nowPlayingPreview || previewMedia.preview}-${screen.nowPlayingIndex || 0}`}
+                        src={previewMedia.preview}
+                        muted
+                        autoPlay
+                        loop
+                        playsInline
+                        preload="auto"
+                      />
                     ) : (
-                      <img src={previewMedia.preview} alt={previewMedia.title} />
+                      <img
+                          key={`${screen.id}-${screen.nowPlayingPreview || previewMedia.preview}-${screen.nowPlayingIndex || 0}`}
+                          src={previewMedia.preview}
+                          alt={previewMedia.title}
+                        />
                     )
                   ) : (
                     <Monitor size={54} />
@@ -3483,16 +3622,37 @@ function TVConnectPage() {
           O código aparece no painel do cliente, dentro da aba Telas.
         </div>
 
+        <button
+          className="tv-change-mode-button"
+          onClick={() => {
+            localStorage.removeItem("totempark-tv-connection");
+            setScreenCode("");
+          }}
+        >
+          Digitar outro código
+        </button>
+
+        <button
+          className="tv-change-mode-button secondary"
+          onClick={() => {
+            localStorage.removeItem("totempark-tv-connection");
+            localStorage.removeItem("totempark-app-mode");
+            window.location.href = "/";
+          }}
+        >
+          Voltar para o painel gestor
+        </button>
+
         {isNativeApp() && (
           <button
-            className="tv-change-mode-button"
+            className="tv-change-mode-button tertiary"
             onClick={() => {
               localStorage.removeItem("totempark-app-mode");
               localStorage.removeItem("totempark-tv-connection");
               window.location.href = "/";
             }}
           >
-            Trocar modo do aplicativo
+            Trocar Modo Gestor / Modo TV
           </button>
         )}
       </div>
@@ -3618,16 +3778,32 @@ function PlayerPage() {
     };
   }
 
+  const activeItemsKey = (activePlaylist?.items || [])
+    .map((item) => `${item.id || item.preview || item.title}`)
+    .join("|");
+
   function goToNextMedia() {
     const items = activePlaylist?.items || [];
 
     if (items.length === 0) return;
 
-    setMediaIndex((prev) => (prev + 1 >= items.length ? 0 : prev + 1));
+    setMediaIndex((prev) => {
+      const safePrev = prev >= items.length ? 0 : prev;
+      return safePrev + 1 >= items.length ? 0 : safePrev + 1;
+    });
   }
 
   function getPlayerOrientationClass() {
     return screen?.orientation === "Retrato" ? "portrait-mode" : "landscape-mode";
+  }
+
+  function getTransitionClass(transition) {
+    if (transition === "Slide lateral") return "transition-slide";
+    if (transition === "Zoom leve") return "transition-zoom";
+    if (transition === "Corte seco") return "transition-cut";
+    if (transition === "Dissolver") return "transition-dissolve";
+
+    return "transition-fade";
   }
 
   useEffect(() => {
@@ -3705,11 +3881,24 @@ function PlayerPage() {
       const data = snapshot.data();
       const remoteCommand = data.remoteCommand;
 
-      if (!remoteCommand?.id || remoteCommand.id === lastCommandId) {
+      if (!remoteCommand?.id) {
         return;
       }
 
-      setLastCommandId(remoteCommand.id);
+      let alreadyExecuted = false;
+
+      setLastCommandId((previous) => {
+        if (previous === remoteCommand.id) {
+          alreadyExecuted = true;
+          return previous;
+        }
+
+        return remoteCommand.id;
+      });
+
+      if (alreadyExecuted) {
+        return;
+      }
 
       try {
         await updateDoc(screenDocRef, {
@@ -3798,14 +3987,15 @@ function PlayerPage() {
     });
 
     return () => unsubscribe();
-  }, [screen?.id, clientId, lastCommandId]);
+  }, [screen?.id, clientId]);
 
 
   useEffect(() => {
     if (!screen?.id || !clientId || !activePlaylist) return;
 
     const items = activePlaylist?.items || [];
-    const currentItem = items[mediaIndex];
+    const safeIndex = mediaIndex >= items.length ? 0 : mediaIndex;
+    const currentItem = items[safeIndex];
 
     if (!currentItem) return;
 
@@ -3825,7 +4015,7 @@ function PlayerPage() {
           nowPlayingDuration: Number(currentItem.duration || 10),
           nowPlayingPreview: currentItem.preview || "",
           nowPlayingSound: currentItem.sound || false,
-          nowPlayingIndex: mediaIndex + 1,
+          nowPlayingIndex: safeIndex + 1,
           nowPlayingTotal: items.length,
           currentPlaylistId: activePlaylist.id || "",
           currentPlaylistName: activePlaylist.name || "",
@@ -3882,14 +4072,26 @@ function PlayerPage() {
     const selected = chooseActivePlaylist();
 
     const previousId = activePlaylist?.id;
+    const nextId = selected.playlist?.id || "";
 
     setActivePlaylist(selected.playlist || null);
     setActiveMode(selected.mode);
 
-    if (selected.playlist?.id !== previousId) {
+    if (nextId && nextId !== previousId) {
       setMediaIndex(0);
     }
-  }, [allPlaylists, defaultPlaylist, now, screen]);
+  }, [allPlaylists, defaultPlaylist, now, screen?.id, screen?.playlistId]);
+
+  useEffect(() => {
+    const items = activePlaylist?.items || [];
+
+    if (items.length === 0) return;
+
+    setMediaIndex((prev) => {
+      if (prev >= items.length) return 0;
+      return prev;
+    });
+  }, [activePlaylist?.id, activePlaylist?.items?.length]);
 
   useEffect(() => {
     const items = activePlaylist?.items || [];
@@ -3899,6 +4101,9 @@ function PlayerPage() {
     if (items.length === 0) return;
 
     const currentItem = items[mediaIndex];
+
+    // Todas as mídias seguem o tempo configurado na playlist.
+    // Isso evita o vídeo ficar preso esperando terminar naturalmente.
     const duration = Number(currentItem?.duration || 10) * 1000;
 
     const timer = setTimeout(() => {
@@ -3906,7 +4111,7 @@ function PlayerPage() {
     }, duration);
 
     return () => clearTimeout(timer);
-  }, [activePlaylist, mediaIndex, pauseMode, takeoverMessage, blackoutMode, maintenanceMode]);
+  }, [activePlaylist?.id, activeItemsKey, mediaIndex, pauseMode, takeoverMessage, blackoutMode, maintenanceMode]);
 
   useEffect(() => {
     const mediaElement = document.querySelector(".player-media");
@@ -3988,8 +4193,14 @@ function PlayerPage() {
     );
   }
 
-  const currentMedia = activePlaylist.items[mediaIndex];
-
+  const safeMediaIndex =
+    mediaIndex >= activePlaylist.items.length ? 0 : mediaIndex;
+  const currentMedia = activePlaylist.items[safeMediaIndex] || activePlaylist.items[0];
+  const nextMedia =
+    activePlaylist.items[
+      safeMediaIndex + 1 >= activePlaylist.items.length ? 0 : safeMediaIndex + 1
+    ];
+  const transitionClass = getTransitionClass(activePlaylist.transition);
   return (
     <div className={`player-screen ${getPlayerOrientationClass()}`}>
       {remoteOverlay && (
@@ -4005,6 +4216,16 @@ function PlayerPage() {
         </div>
       )}
 
+      <button
+        className="tv-player-exit-button"
+        onClick={() => {
+          localStorage.removeItem("totempark-tv-connection");
+          window.location.href = "/tv";
+        }}
+      >
+        Sair da TV
+      </button>
+
       {activeMode === "scheduled" && (
         <div className="player-schedule-label">
           Programação ativa: {activePlaylist.name}
@@ -4018,21 +4239,66 @@ function PlayerPage() {
           autoPlay={!pauseMode}
           muted={!currentMedia.sound}
           playsInline
-          className="player-media"
+          preload="auto"
+          controls={false}
+          controlsList="nodownload nofullscreen noremoteplayback"
+          disablePictureInPicture
+          className={`player-media ${transitionClass}`}
+          onLoadedData={(event) => {
+            const video = event.currentTarget;
+
+            if (!pauseMode) {
+              video.play().catch((error) => {
+                console.log("Autoplay aguardando vídeo:", error);
+              });
+            }
+          }}
+          onCanPlay={(event) => {
+            const video = event.currentTarget;
+
+            if (!pauseMode) {
+              video.play().catch(() => {});
+            }
+          }}
           onPlay={(event) => {
             if (pauseMode) {
               event.currentTarget.pause();
             }
           }}
-          onEnded={goToNextMedia}
+          onEnded={() => {
+            goToNextMedia();
+          }}
+          onError={() => {
+            console.log("Erro ao carregar vídeo. Pulando mídia.");
+            setTimeout(goToNextMedia, 800);
+          }}
         />
       ) : (
         <img
           key={`${currentMedia.preview}-${mediaIndex}`}
           src={currentMedia.preview}
           alt={currentMedia.title}
-          className="player-media"
+          className={`player-media ${transitionClass}`}
+          onError={() => {
+            console.log("Erro ao carregar imagem. Pulando mídia.");
+            setTimeout(goToNextMedia, 800);
+          }}
         />
+      )}
+
+      {nextMedia && nextMedia.preview && (
+        <div className="player-preload-media" aria-hidden="true">
+          {nextMedia.type === "Vídeo" ? (
+            <video
+              src={nextMedia.preview}
+              muted
+              playsInline
+              preload="auto"
+            />
+          ) : (
+            <img src={nextMedia.preview} alt="" />
+          )}
+        </div>
       )}
     </div>
   );

@@ -4103,3 +4103,366 @@
     min-height: 190px;
   }
 }
+
+
+/* =====================================================
+   FIX 14/06 - RESTAURA UPLOAD, PREVIEW, CONTROLE E PLAYER
+===================================================== */
+
+/* Esconde definitivamente o input HTML padrão de arquivo */
+.file-input-hidden,
+.modern-upload-group input[type="file"],
+.file-dropzone input[type="file"] {
+  display: none !important;
+  opacity: 0 !important;
+  visibility: hidden !important;
+  width: 0 !important;
+  height: 0 !important;
+  position: absolute !important;
+  pointer-events: none !important;
+}
+
+/* Garante que o botão bonito do upload fique visível */
+.file-dropzone {
+  width: 100%;
+}
+
+.file-upload-button {
+  cursor: pointer;
+  user-select: none;
+}
+
+.file-upload-button * {
+  pointer-events: none;
+}
+
+.modern-upload-title label {
+  color: #ffffff !important;
+}
+
+/* Mini preview real no dashboard do gestor */
+.premium-screen-thumb {
+  overflow: hidden !important;
+  padding: 0 !important;
+  background: linear-gradient(135deg, #11182f, #3b1767) !important;
+}
+
+.premium-screen-thumb img,
+.premium-screen-thumb video {
+  width: 100% !important;
+  height: 100% !important;
+  object-fit: cover !important;
+  display: block !important;
+}
+
+.premium-screen-thumb svg {
+  margin: auto;
+}
+
+/* Player mais estável */
+.player-screen {
+  background: #000000 !important;
+}
+
+.player-media {
+  width: 100% !important;
+  height: 100% !important;
+  object-fit: cover !important;
+  background: #000000 !important;
+  backface-visibility: hidden !important;
+  transform: translateZ(0) !important;
+}
+
+video.player-media {
+  pointer-events: none !important;
+}
+
+video.player-media::-webkit-media-controls,
+video.player-media::-webkit-media-controls-panel,
+video.player-media::-webkit-media-controls-play-button,
+video.player-media::-webkit-media-controls-start-playback-button {
+  display: none !important;
+  opacity: 0 !important;
+  pointer-events: none !important;
+  -webkit-appearance: none !important;
+}
+
+.tv-change-mode-button {
+  width: 100%;
+  min-height: 54px;
+  border: none;
+  border-radius: 16px;
+  margin-top: 16px;
+  padding: 0 18px;
+  background: rgba(255, 255, 255, 0.08);
+  color: #ffffff;
+  font-weight: 900;
+  cursor: pointer;
+}
+
+.tv-change-mode-button.secondary {
+  background: rgba(239, 68, 68, 0.16);
+  color: #fca5a5;
+}
+
+
+/* =====================================================
+   FIX FINAL - PRÉ-CARREGAMENTO DO PRÓXIMO VÍDEO
+   Reduz tela preta entre vídeos usando preload invisível.
+===================================================== */
+
+.player-preload-media {
+  position: fixed !important;
+  width: 1px !important;
+  height: 1px !important;
+  left: -99999px !important;
+  top: -99999px !important;
+  opacity: 0 !important;
+  pointer-events: none !important;
+  overflow: hidden !important;
+  z-index: -1 !important;
+}
+
+.player-preload-media video,
+.player-preload-media img {
+  width: 1px !important;
+  height: 1px !important;
+  opacity: 0 !important;
+}
+
+.player-media {
+  animation: playerFastSmoothFade 0.28s ease-in-out both !important;
+  will-change: opacity, transform;
+}
+
+@keyframes playerFastSmoothFade {
+  from {
+    opacity: 0.15;
+    transform: scale(1.003);
+  }
+
+  to {
+    opacity: 1;
+    transform: scale(1);
+  }
+}
+
+
+/* =====================================================
+   FIX PLAYER - TROCA POR TEMPO CONFIGURADO
+===================================================== */
+
+.player-media {
+  animation: playerNoBlackFade 0.16s ease-out both !important;
+  background: #000000 !important;
+}
+
+@keyframes playerNoBlackFade {
+  from {
+    opacity: 0.45;
+  }
+
+  to {
+    opacity: 1;
+  }
+}
+
+
+/* =====================================================
+   FIX TRANSIÇÕES REAIS DA PLAYLIST
+   Agora cada opção do select aplica uma animação diferente.
+===================================================== */
+
+.player-media.transition-fade {
+  animation: totemTransitionFade 0.42s ease-in-out both !important;
+}
+
+.player-media.transition-slide {
+  animation: totemTransitionSlide 0.46s ease-out both !important;
+}
+
+.player-media.transition-zoom {
+  animation: totemTransitionZoom 0.46s ease-out both !important;
+}
+
+.player-media.transition-cut {
+  animation: none !important;
+  opacity: 1 !important;
+  transform: none !important;
+}
+
+.player-media.transition-dissolve {
+  animation: totemTransitionDissolve 0.55s ease-in-out both !important;
+}
+
+@keyframes totemTransitionFade {
+  from {
+    opacity: 0.35;
+  }
+  to {
+    opacity: 1;
+  }
+}
+
+@keyframes totemTransitionSlide {
+  from {
+    opacity: 0.45;
+    transform: translateX(22px) scale(1.01);
+  }
+  to {
+    opacity: 1;
+    transform: translateX(0) scale(1);
+  }
+}
+
+@keyframes totemTransitionZoom {
+  from {
+    opacity: 0.45;
+    transform: scale(1.045);
+  }
+  to {
+    opacity: 1;
+    transform: scale(1);
+  }
+}
+
+@keyframes totemTransitionDissolve {
+  0% {
+    opacity: 0.18;
+    filter: blur(8px);
+  }
+  55% {
+    opacity: 0.72;
+    filter: blur(2px);
+  }
+  100% {
+    opacity: 1;
+    filter: blur(0);
+  }
+}
+
+/* Mantém fundo preto, mas evita animação antiga sobrescrever a nova */
+.player-media {
+  will-change: opacity, transform, filter;
+}
+
+
+/* =====================================================
+   FIX PREVIEW AO VIVO + VOLTAR DO /TV
+===================================================== */
+
+.screen-live-preview video,
+.media-preview.screen-preview video,
+.premium-screen-thumb video {
+  display: block !important;
+  background: #000000 !important;
+}
+
+.tv-change-mode-button.tertiary {
+  background: rgba(34, 211, 238, 0.12);
+  color: #67e8f9;
+}
+
+.tv-player-exit-button {
+  position: fixed;
+  right: 18px;
+  bottom: 18px;
+  z-index: 99999;
+  min-height: 42px;
+  padding: 0 14px;
+  border: none;
+  border-radius: 999px;
+  background: rgba(15, 23, 42, 0.72);
+  color: #ffffff;
+  font-weight: 900;
+  cursor: pointer;
+  opacity: 0.22;
+  backdrop-filter: blur(12px);
+  transition: 0.2s;
+}
+
+.tv-player-exit-button:hover {
+  opacity: 1;
+  background: rgba(239, 68, 68, 0.82);
+}
+
+
+/* =====================================================
+   FIX PREVIEW VISUAL AO VIVO
+   O texto já mudava; agora a imagem/vídeo também força atualização.
+===================================================== */
+
+.screen-live-preview video,
+.screen-live-preview img,
+.media-preview.screen-preview video,
+.media-preview.screen-preview img,
+.premium-screen-thumb video,
+.premium-screen-thumb img {
+  width: 100% !important;
+  height: 100% !important;
+  object-fit: cover !important;
+  display: block !important;
+  background: #000000 !important;
+}
+
+
+/* =====================================================
+   FIX DEFINITIVO PREVIEW AO VIVO + TRANSIÇÕES DO PLAYER
+===================================================== */
+
+.screen-live-preview img,
+.screen-live-preview video,
+.media-preview.screen-preview img,
+.media-preview.screen-preview video,
+.premium-screen-thumb img,
+.premium-screen-thumb video {
+  width: 100% !important;
+  height: 100% !important;
+  object-fit: cover !important;
+  display: block !important;
+  background: #000000 !important;
+}
+
+.player-media.transition-fade {
+  animation: tpFade 0.45s ease-in-out both !important;
+}
+
+.player-media.transition-slide {
+  animation: tpSlide 0.5s ease-out both !important;
+}
+
+.player-media.transition-zoom {
+  animation: tpZoom 0.5s ease-out both !important;
+}
+
+.player-media.transition-cut {
+  animation: none !important;
+  opacity: 1 !important;
+  transform: none !important;
+  filter: none !important;
+}
+
+.player-media.transition-dissolve {
+  animation: tpDissolve 0.65s ease-in-out both !important;
+}
+
+@keyframes tpFade {
+  from { opacity: 0.25; }
+  to { opacity: 1; }
+}
+
+@keyframes tpSlide {
+  from { opacity: 0.35; transform: translateX(32px); }
+  to { opacity: 1; transform: translateX(0); }
+}
+
+@keyframes tpZoom {
+  from { opacity: 0.35; transform: scale(1.06); }
+  to { opacity: 1; transform: scale(1); }
+}
+
+@keyframes tpDissolve {
+  0% { opacity: 0.12; filter: blur(10px); }
+  60% { opacity: 0.72; filter: blur(2px); }
+  100% { opacity: 1; filter: blur(0); }
+}
