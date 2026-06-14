@@ -4466,3 +4466,233 @@ video.player-media::-webkit-media-controls-start-playback-button {
   60% { opacity: 0.72; filter: blur(2px); }
   100% { opacity: 1; filter: blur(0); }
 }
+
+
+/* =====================================================
+   TRANSIÇÕES CONFIGURÁVEIS - TIPO + VELOCIDADE
+   Este bloco deve ficar no final para sobrescrever todos os anteriores.
+===================================================== */
+
+.player-media.speed-fast {
+  --tp-transition-duration: 0.22s;
+}
+
+.player-media.speed-normal {
+  --tp-transition-duration: 0.45s;
+}
+
+.player-media.speed-slow {
+  --tp-transition-duration: 0.85s;
+}
+
+.player-media.speed-cinematic {
+  --tp-transition-duration: 1.35s;
+}
+
+.player-media.transition-fade {
+  animation-name: tpRealFade !important;
+  animation-duration: var(--tp-transition-duration) !important;
+  animation-timing-function: ease-in-out !important;
+  animation-fill-mode: both !important;
+}
+
+.player-media.transition-slide {
+  animation-name: tpRealSlide !important;
+  animation-duration: var(--tp-transition-duration) !important;
+  animation-timing-function: cubic-bezier(0.22, 1, 0.36, 1) !important;
+  animation-fill-mode: both !important;
+}
+
+.player-media.transition-zoom {
+  animation-name: tpRealZoom !important;
+  animation-duration: var(--tp-transition-duration) !important;
+  animation-timing-function: ease-out !important;
+  animation-fill-mode: both !important;
+}
+
+.player-media.transition-cut {
+  animation: none !important;
+  opacity: 1 !important;
+  transform: none !important;
+  filter: none !important;
+}
+
+.player-media.transition-dissolve {
+  animation-name: tpRealDissolve !important;
+  animation-duration: var(--tp-transition-duration) !important;
+  animation-timing-function: ease-in-out !important;
+  animation-fill-mode: both !important;
+}
+
+@keyframes tpRealFade {
+  from {
+    opacity: 0.05;
+  }
+
+  to {
+    opacity: 1;
+  }
+}
+
+@keyframes tpRealSlide {
+  from {
+    opacity: 0.15;
+    transform: translateX(9vw) scale(1.015);
+  }
+
+  to {
+    opacity: 1;
+    transform: translateX(0) scale(1);
+  }
+}
+
+@keyframes tpRealZoom {
+  from {
+    opacity: 0.15;
+    transform: scale(1.12);
+  }
+
+  to {
+    opacity: 1;
+    transform: scale(1);
+  }
+}
+
+@keyframes tpRealDissolve {
+  0% {
+    opacity: 0;
+    filter: blur(14px) brightness(0.8);
+  }
+
+  55% {
+    opacity: 0.65;
+    filter: blur(5px) brightness(1.05);
+  }
+
+  100% {
+    opacity: 1;
+    filter: blur(0) brightness(1);
+  }
+}
+
+
+/* =====================================================
+   FIX REAL - TRANSIÇÃO NO WRAPPER + CONTROLE REMOTO
+   A animação agora fica na camada do player, não no video.
+===================================================== */
+
+.player-transition-layer {
+  position: absolute !important;
+  inset: 0 !important;
+  width: 100% !important;
+  height: 100% !important;
+  background: #000000 !important;
+  overflow: hidden !important;
+  --tp-transition-duration: 0.45s;
+  will-change: opacity, transform, filter;
+}
+
+.player-transition-layer.speed-fast {
+  --tp-transition-duration: 0.22s;
+}
+
+.player-transition-layer.speed-normal {
+  --tp-transition-duration: 0.55s;
+}
+
+.player-transition-layer.speed-slow {
+  --tp-transition-duration: 1s;
+}
+
+.player-transition-layer.speed-cinematic {
+  --tp-transition-duration: 1.65s;
+}
+
+.player-transition-layer.transition-fade {
+  animation: tpLayerFade var(--tp-transition-duration) ease-in-out both !important;
+}
+
+.player-transition-layer.transition-slide {
+  animation: tpLayerSlide var(--tp-transition-duration) cubic-bezier(0.22, 1, 0.36, 1) both !important;
+}
+
+.player-transition-layer.transition-zoom {
+  animation: tpLayerZoom var(--tp-transition-duration) ease-out both !important;
+}
+
+.player-transition-layer.transition-cut {
+  animation: none !important;
+}
+
+.player-transition-layer.transition-dissolve {
+  animation: tpLayerDissolve var(--tp-transition-duration) ease-in-out both !important;
+}
+
+@keyframes tpLayerFade {
+  from { opacity: 0; }
+  to { opacity: 1; }
+}
+
+@keyframes tpLayerSlide {
+  from {
+    opacity: 0.2;
+    transform: translateX(14vw);
+  }
+  to {
+    opacity: 1;
+    transform: translateX(0);
+  }
+}
+
+@keyframes tpLayerZoom {
+  from {
+    opacity: 0.2;
+    transform: scale(1.16);
+  }
+  to {
+    opacity: 1;
+    transform: scale(1);
+  }
+}
+
+@keyframes tpLayerDissolve {
+  0% {
+    opacity: 0;
+    filter: blur(18px) brightness(0.7);
+  }
+  50% {
+    opacity: 0.65;
+    filter: blur(7px) brightness(1.08);
+  }
+  100% {
+    opacity: 1;
+    filter: blur(0) brightness(1);
+  }
+}
+
+.player-transition-layer .player-media {
+  animation: none !important;
+}
+
+
+/* =====================================================
+   FIX CONTROLE REMOTO - RESPOSTA VISUAL MAIS RÁPIDA
+===================================================== */
+
+.remote-mini-button:active {
+  transform: scale(0.96) !important;
+  filter: brightness(1.25) !important;
+}
+
+.remote-control-panel-inline {
+  position: relative;
+}
+
+.remote-control-panel-inline::after {
+  content: "Comandos em tempo real";
+  display: block;
+  margin-top: 10px;
+  color: #64748b;
+  font-size: 11px;
+  font-weight: 800;
+}

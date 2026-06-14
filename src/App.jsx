@@ -1,4 +1,4 @@
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { Routes, Route, useParams, useNavigate } from "react-router-dom";
 import { initializeApp, deleteApp } from "firebase/app";
 
@@ -553,7 +553,7 @@ function Dashboard() {
   useEffect(() => {
     const interval = setInterval(() => {
       setNow(Date.now());
-    }, 15000);
+    }, 5000);
 
     return () => clearInterval(interval);
   }, []);
@@ -641,7 +641,7 @@ function Dashboard() {
 
     const diffInSeconds = (now - lastSeenDate.getTime()) / 1000;
 
-    return diffInSeconds <= 45;
+    return diffInSeconds <= 20;
   }
 
   function getDaysToDue(dueDate) {
@@ -1584,7 +1584,7 @@ function ClientDashboard({ client }) {
   useEffect(() => {
     const interval = setInterval(() => {
       setNow(new Date());
-    }, 15000);
+    }, 5000);
 
     return () => clearInterval(interval);
   }, []);
@@ -1705,7 +1705,7 @@ function ClientDashboard({ client }) {
 
     const diffInSeconds = (Date.now() - lastSeenDate.getTime()) / 1000;
 
-    return diffInSeconds <= 45;
+    return diffInSeconds <= 20;
   }
 
   return (
@@ -2140,6 +2140,7 @@ function ClientPlaylistsPage({ client }) {
   const [form, setForm] = useState({
     name: "",
     transition: "Fade suave",
+    transitionSpeed: "Normal",
     orientation: "Paisagem",
     selectedMediaIds: [],
     scheduleEnabled: false,
@@ -2277,6 +2278,7 @@ function ClientPlaylistsPage({ client }) {
     setForm({
       name: "",
       transition: "Fade suave",
+      transitionSpeed: "Normal",
       orientation: "Paisagem",
       selectedMediaIds: [],
       scheduleEnabled: false,
@@ -2294,6 +2296,7 @@ function ClientPlaylistsPage({ client }) {
     setForm({
       name: playlist.name || "",
       transition: playlist.transition || "Fade suave",
+      transitionSpeed: playlist.transitionSpeed || "Normal",
       orientation: playlist.orientation || "Paisagem",
       selectedMediaIds: playlist.items?.map((item) => item.id) || [],
       scheduleEnabled: playlist.scheduleEnabled || false,
@@ -2351,6 +2354,7 @@ function ClientPlaylistsPage({ client }) {
       const playlistData = {
         name: form.name,
         transition: form.transition,
+        transitionSpeed: form.transitionSpeed,
         orientation: form.orientation,
         items: selectedItems,
         scheduleEnabled: form.scheduleEnabled,
@@ -2467,6 +2471,25 @@ function ClientPlaylistsPage({ client }) {
                 <option>Zoom leve</option>
                 <option>Corte seco</option>
                 <option>Dissolver</option>
+              </select>
+            </div>
+
+            <div className="form-group">
+              <label>Velocidade da transição</label>
+
+              <select
+                value={form.transitionSpeed}
+                onChange={(e) =>
+                  setForm({
+                    ...form,
+                    transitionSpeed: e.target.value,
+                  })
+                }
+              >
+                <option>Rápida</option>
+                <option>Normal</option>
+                <option>Lenta</option>
+                <option>Cinematográfica</option>
               </select>
             </div>
           </div>
@@ -2781,7 +2804,7 @@ function ClientPlaylistsPage({ client }) {
                   </div>
 
                   <p>
-                    {playlist.orientation} • {playlist.transition} •{" "}
+                    {playlist.orientation} • {playlist.transition} • {playlist.transitionSpeed || "Normal"} •{" "}
                     {playlist.items?.length || 0} mídias
                   </p>
 
@@ -2961,7 +2984,7 @@ function ClientScreensPage({ client }) {
     const diffInSeconds =
       (now - lastSeenDate.getTime()) / 1000;
 
-    return diffInSeconds <= 45;
+    return diffInSeconds <= 20;
   }
 
   function getLastSeenLabel(screen) {
@@ -3165,15 +3188,28 @@ function ClientScreensPage({ client }) {
 
   async function sendRemoteCommand(screenId, command) {
     try {
-      await updateDoc(doc(db, "clients", client.id, "screens", screenId), {
+      const commandId = `${Date.now()}-${Math.random().toString(36).slice(2)}`;
+
+      const payload = {
         remoteCommand: {
-          id: `${Date.now()}-${Math.random().toString(36).slice(2)}`,
+          id: commandId,
           ...command,
           sentAt: new Date().toISOString(),
         },
         lastCommandSent: command.type,
         lastCommandSentAt: serverTimestamp(),
-      });
+        commandStatus: "sent",
+      };
+
+      if (command.type === "maintenance") {
+        payload.lastCommandExecuted = "maintenance";
+      }
+
+      if (command.type === "clear") {
+        payload.lastCommandExecuted = "clear";
+      }
+
+      await updateDoc(doc(db, "clients", client.id, "screens", screenId), payload);
     } catch (error) {
       console.log(error);
       alert("Erro ao enviar comando para a TV.");
@@ -3677,6 +3713,7 @@ function PlayerPage() {
   const [blackoutMode, setBlackoutMode] = useState(false);
   const [pauseMode, setPauseMode] = useState(false);
   const [lastCommandId, setLastCommandId] = useState(null);
+  const lastCommandIdRef = useRef(null);
 
   useEffect(() => {
     const clock = setInterval(() => {
@@ -3806,6 +3843,14 @@ function PlayerPage() {
     return "transition-fade";
   }
 
+  function getTransitionSpeedClass(speed) {
+    if (speed === "Rápida") return "speed-fast";
+    if (speed === "Lenta") return "speed-slow";
+    if (speed === "Cinematográfica") return "speed-cinematic";
+
+    return "speed-normal";
+  }
+
   useEffect(() => {
     if (!clientId || !codigo) return;
 
@@ -3861,7 +3906,7 @@ function PlayerPage() {
     }, 15000);
 
     return () => clearInterval(interval);
-  }, [screen?.id, clientId]);
+  }, [screen?.id, clientId, maintenanceMode, blackoutMode, takeoverMessage]);
 
 
   useEffect(() => {
@@ -3885,25 +3930,18 @@ function PlayerPage() {
         return;
       }
 
-      let alreadyExecuted = false;
-
-      setLastCommandId((previous) => {
-        if (previous === remoteCommand.id) {
-          alreadyExecuted = true;
-          return previous;
-        }
-
-        return remoteCommand.id;
-      });
-
-      if (alreadyExecuted) {
+      if (lastCommandIdRef.current === remoteCommand.id) {
         return;
       }
+
+      lastCommandIdRef.current = remoteCommand.id;
+      setLastCommandId(remoteCommand.id);
 
       try {
         await updateDoc(screenDocRef, {
           lastCommandExecuted: remoteCommand.type || "",
           lastCommandExecutedAt: serverTimestamp(),
+          commandStatus: "executed",
         });
       } catch (error) {
         console.log(error);
@@ -3921,7 +3959,9 @@ function PlayerPage() {
       }
 
       if (remoteCommand.type === "pause") {
-        setPauseMode(true);
+        if (!maintenanceMode && !blackoutMode && !takeoverMessage) {
+          setPauseMode(true);
+        }
         return;
       }
 
@@ -3942,6 +3982,8 @@ function PlayerPage() {
         setMaintenanceMode(true);
         setBlackoutMode(false);
         setTakeoverMessage(null);
+        setRemoteOverlay(null);
+        setPauseMode(false);
         return;
       }
 
@@ -4201,6 +4243,7 @@ function PlayerPage() {
       safeMediaIndex + 1 >= activePlaylist.items.length ? 0 : safeMediaIndex + 1
     ];
   const transitionClass = getTransitionClass(activePlaylist.transition);
+  const transitionSpeedClass = getTransitionSpeedClass(activePlaylist.transitionSpeed);
   return (
     <div className={`player-screen ${getPlayerOrientationClass()}`}>
       {remoteOverlay && (
@@ -4232,59 +4275,62 @@ function PlayerPage() {
         </div>
       )}
 
-      {currentMedia.type === "Vídeo" ? (
-        <video
-          key={`${currentMedia.preview}-${mediaIndex}`}
-          src={currentMedia.preview}
-          autoPlay={!pauseMode}
-          muted={!currentMedia.sound}
-          playsInline
-          preload="auto"
-          controls={false}
-          controlsList="nodownload nofullscreen noremoteplayback"
-          disablePictureInPicture
-          className={`player-media ${transitionClass}`}
-          onLoadedData={(event) => {
-            const video = event.currentTarget;
+      <div
+        key={`${activePlaylist.id}-${currentMedia.preview}-${safeMediaIndex}-${transitionClass}-${transitionSpeedClass}`}
+        className={`player-transition-layer ${transitionClass} ${transitionSpeedClass}`}
+      >
+        {currentMedia.type === "Vídeo" ? (
+          <video
+            src={currentMedia.preview}
+            autoPlay={!pauseMode}
+            muted={!currentMedia.sound}
+            playsInline
+            preload="auto"
+            controls={false}
+            controlsList="nodownload nofullscreen noremoteplayback"
+            disablePictureInPicture
+            className="player-media"
+            onLoadedData={(event) => {
+              const video = event.currentTarget;
 
-            if (!pauseMode) {
-              video.play().catch((error) => {
-                console.log("Autoplay aguardando vídeo:", error);
-              });
-            }
-          }}
-          onCanPlay={(event) => {
-            const video = event.currentTarget;
+              if (!pauseMode) {
+                video.play().catch((error) => {
+                  console.log("Autoplay aguardando vídeo:", error);
+                });
+              }
+            }}
+            onCanPlay={(event) => {
+              const video = event.currentTarget;
 
-            if (!pauseMode) {
-              video.play().catch(() => {});
-            }
-          }}
-          onPlay={(event) => {
-            if (pauseMode) {
-              event.currentTarget.pause();
-            }
-          }}
-          onEnded={() => {
-            goToNextMedia();
-          }}
-          onError={() => {
-            console.log("Erro ao carregar vídeo. Pulando mídia.");
-            setTimeout(goToNextMedia, 800);
-          }}
-        />
-      ) : (
-        <img
-          key={`${currentMedia.preview}-${mediaIndex}`}
-          src={currentMedia.preview}
-          alt={currentMedia.title}
-          className={`player-media ${transitionClass}`}
-          onError={() => {
-            console.log("Erro ao carregar imagem. Pulando mídia.");
-            setTimeout(goToNextMedia, 800);
-          }}
-        />
-      )}
+              if (!pauseMode) {
+                video.play().catch(() => {});
+              }
+            }}
+            onPlay={(event) => {
+              if (pauseMode) {
+                event.currentTarget.pause();
+              }
+            }}
+            onEnded={() => {
+              goToNextMedia();
+            }}
+            onError={() => {
+              console.log("Erro ao carregar vídeo. Pulando mídia.");
+              setTimeout(goToNextMedia, 800);
+            }}
+          />
+        ) : (
+          <img
+            src={currentMedia.preview}
+            alt={currentMedia.title}
+            className="player-media"
+            onError={() => {
+              console.log("Erro ao carregar imagem. Pulando mídia.");
+              setTimeout(goToNextMedia, 800);
+            }}
+          />
+        )}
+      </div>
 
       {nextMedia && nextMedia.preview && (
         <div className="player-preload-media" aria-hidden="true">
