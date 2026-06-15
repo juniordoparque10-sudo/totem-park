@@ -131,31 +131,46 @@ const DEFAULT_NEWS_ITEMS = [
 async function fetchWeatherByCity(cityName) {
   const city = (cityName || "João Câmara").trim();
 
-  const geoResponse = await fetch(
-    `https://geocoding-api.open-meteo.com/v1/search?name=${encodeURIComponent(city)}&count=1&language=pt&format=json`
-  );
+  try {
+    const geoResponse = await fetch(
+      `https://geocoding-api.open-meteo.com/v1/search?name=${encodeURIComponent(city)}&count=1&language=pt&format=json`
+    );
 
-  const geoData = await geoResponse.json();
-  const place = geoData?.results?.[0];
+    const geoData = await geoResponse.json();
+    const place = geoData?.results?.[0];
 
-  if (!place) {
-    throw new Error("Cidade não encontrada.");
+    if (!place) {
+      throw new Error("Cidade não encontrada.");
+    }
+
+    const weatherResponse = await fetch(
+      `https://api.open-meteo.com/v1/forecast?latitude=${place.latitude}&longitude=${place.longitude}&current=temperature_2m,relative_humidity_2m,apparent_temperature,weather_code,wind_speed_10m&daily=temperature_2m_max,temperature_2m_min,weather_code&timezone=auto&forecast_days=3`
+    );
+
+    const weatherData = await weatherResponse.json();
+
+    return {
+      city: `${place.name}${place.admin1 ? `/${place.admin1}` : ""}`,
+      temperature: Math.round(weatherData?.current?.temperature_2m ?? 0),
+      sensation: Math.round(weatherData?.current?.apparent_temperature ?? 0),
+      humidity: Math.round(weatherData?.current?.relative_humidity_2m ?? 0),
+      wind: Math.round(weatherData?.current?.wind_speed_10m ?? 0),
+      daily: weatherData?.daily || null,
+      source: "Open-Meteo",
+    };
+  } catch (error) {
+    console.log("Erro ao buscar clima:", error);
+
+    return {
+      city,
+      temperature: "--",
+      sensation: "--",
+      humidity: "--",
+      wind: "--",
+      daily: null,
+      source: "Aguardando atualização",
+    };
   }
-
-  const weatherResponse = await fetch(
-    `https://api.open-meteo.com/v1/forecast?latitude=${place.latitude}&longitude=${place.longitude}&current=temperature_2m,relative_humidity_2m,apparent_temperature,weather_code,wind_speed_10m&daily=temperature_2m_max,temperature_2m_min,weather_code&timezone=auto&forecast_days=3`
-  );
-
-  const weatherData = await weatherResponse.json();
-
-  return {
-    city: `${place.name}${place.admin1 ? `/${place.admin1}` : ""}`,
-    temperature: Math.round(weatherData?.current?.temperature_2m ?? 0),
-    sensation: Math.round(weatherData?.current?.apparent_temperature ?? 0),
-    humidity: Math.round(weatherData?.current?.relative_humidity_2m ?? 0),
-    wind: Math.round(weatherData?.current?.wind_speed_10m ?? 0),
-    daily: weatherData?.daily || null,
-  };
 }
 
 async function fetchNewsFromRss(feedUrl) {
@@ -165,18 +180,23 @@ async function fetchNewsFromRss(feedUrl) {
     return DEFAULT_NEWS_ITEMS;
   }
 
-  const response = await fetch(
-    `https://api.rss2json.com/v1/api.json?rss_url=${encodeURIComponent(url)}`
-  );
+  try {
+    const response = await fetch(
+      `https://api.rss2json.com/v1/api.json?rss_url=${encodeURIComponent(url)}`
+    );
 
-  const data = await response.json();
+    const data = await response.json();
 
-  const items = (data?.items || [])
-    .slice(0, 6)
-    .map((item) => item.title)
-    .filter(Boolean);
+    const items = (data?.items || [])
+      .slice(0, 6)
+      .map((item) => item.title)
+      .filter(Boolean);
 
-  return items.length > 0 ? items : DEFAULT_NEWS_ITEMS;
+    return items.length > 0 ? items : DEFAULT_NEWS_ITEMS;
+  } catch (error) {
+    console.log("Erro ao buscar notícias:", error);
+    return DEFAULT_NEWS_ITEMS;
+  }
 }
 
 function getTemplateThemeStyle(template) {
@@ -3134,6 +3154,9 @@ function ClientTemplatesPage({ client }) {
           updateDoc(doc(db, "clients", client.id, "screens", screen.id), {
             activeTemplateId: template.id,
             activeTemplateName: template.name,
+            ...(template.orientation === "Retrato" || template.orientation === "Paisagem"
+              ? { orientation: template.orientation }
+              : {}),
             templateUpdatedAt: serverTimestamp(),
           })
         )
@@ -3460,17 +3483,34 @@ function TemplateVisualPreview({ template, compact = false }) {
       try {
         setLoading(true);
 
-        if (template.type === "clima") {
+        const realTemplateType = template.templateType || template.type;
+
+        if (realTemplateType === "clima") {
           const data = await fetchWeatherByCity(template.city);
           if (!cancelled) setWeather(data);
         }
 
-        if (template.type === "noticias") {
+        if (realTemplateType === "noticias") {
           const data = await fetchNewsFromRss(template.newsFeedUrl);
           if (!cancelled) setNews(data);
         }
       } catch (error) {
         console.log(error);
+
+        if ((template.templateType || template.type) === "clima" && !cancelled) {
+          setWeather({
+            city: template.city || "Sua cidade",
+            temperature: "--",
+            sensation: "--",
+            humidity: "--",
+            wind: "--",
+            source: "Aguardando atualização",
+          });
+        }
+
+        if ((template.templateType || template.type) === "noticias" && !cancelled) {
+          setNews(DEFAULT_NEWS_ITEMS);
+        }
       } finally {
         if (!cancelled) setLoading(false);
       }
@@ -3488,7 +3528,7 @@ function TemplateVisualPreview({ template, compact = false }) {
 
   return (
     <div
-      className={`template-tv-preview template-${template.type} ${compact ? "compact" : ""}`}
+      className={`template-tv-preview template-${template.templateType || template.type} template-orientation-${template.orientation === "Retrato" ? "portrait" : "landscape"} ${compact ? "compact" : ""}`}
       style={getTemplateThemeStyle(template)}
     >
       <div className="template-orb one"></div>
@@ -3499,12 +3539,15 @@ function TemplateVisualPreview({ template, compact = false }) {
         <strong>{new Date().toLocaleTimeString("pt-BR", { hour: "2-digit", minute: "2-digit" })}</strong>
       </div>
 
-      {template.type === "clima" && (
+      {(template.templateType || template.type) === "clima" && (
         <div className="template-weather-layout">
           <div>
             <small>Agora em</small>
             <h2>{weather?.city || template.city || "Sua cidade"}</h2>
-            <p>{template.subtitle || "Previsão atualizada automaticamente"}</p>
+            <p>
+              {template.subtitle || "Previsão atualizada automaticamente"}
+              {weather?.source ? ` • ${weather.source}` : ""}
+            </p>
           </div>
 
           <div className="template-weather-temp">
@@ -3519,7 +3562,7 @@ function TemplateVisualPreview({ template, compact = false }) {
         </div>
       )}
 
-      {template.type === "noticias" && (
+      {(template.templateType || template.type) === "noticias" && (
         <div className="template-news-layout">
           <div className="template-breaking">AO VIVO</div>
 
@@ -3537,7 +3580,7 @@ function TemplateVisualPreview({ template, compact = false }) {
         </div>
       )}
 
-      {(template.type === "comercial" || template.type === "aviso") && (
+      {((template.templateType || template.type) === "comercial" || (template.templateType || template.type) === "aviso") && (
         <div className="template-generic-layout">
           <div className="template-generic-badge">
             {template.type === "comercial" ? "OFERTA" : "AVISO"}
@@ -3860,7 +3903,8 @@ function PlayerPage() {
     ...screenTemplates.map((template) => ({
       ...template,
       title: template.name,
-      type: "Template",
+      templateType: template.type,
+      type: template.type,
       duration: Number(template.duration || 15),
       playerItemType: "template",
     })),
@@ -4104,7 +4148,10 @@ function PlayerPage() {
       try {
         await updateDoc(screenDocRef, {
           nowPlayingTitle: currentItem.title || currentItem.name || "",
-          nowPlayingType: currentItem.playerItemType === "template" ? "Template" : currentItem.type || "",
+          nowPlayingType:
+            currentItem.playerItemType === "template"
+              ? `Template ${currentItem.type || ""}`
+              : currentItem.type || "",
           nowPlayingDuration: Number(currentItem.duration || 10),
           nowPlayingPreview: currentItem.preview || "",
           nowPlayingSound: currentItem.sound || false,
@@ -4365,8 +4412,15 @@ function PlayerPage() {
     ];
   const transitionClass = getTransitionClass(activePlaylist?.transition || "Fade suave");
   const transitionSpeedClass = getTransitionSpeedClass(activePlaylist?.transitionSpeed || "Normal");
+  const playerOrientationClass =
+    currentMedia?.playerItemType === "template" && currentMedia.orientation === "Retrato"
+      ? "portrait-mode"
+      : currentMedia?.playerItemType === "template" && currentMedia.orientation === "Paisagem"
+        ? "landscape-mode"
+        : getPlayerOrientationClass();
+
   return (
-    <div className={`player-screen ${getPlayerOrientationClass()}`}>
+    <div className={`player-screen ${playerOrientationClass}`}>
       {remoteOverlay && (
         <div className="tv-overlay-alert">
           <strong>{remoteOverlay.title}</strong>
@@ -4398,7 +4452,7 @@ function PlayerPage() {
 
       <div
         key={`${activePlaylist?.id || "templates"}-${currentMedia.id || currentMedia.preview}-${safeMediaIndex}-${transitionClass}-${transitionSpeedClass}`}
-        className={`player-transition-layer ${transitionClass} ${transitionSpeedClass}`}
+        className={`player-transition-layer ${transitionClass} ${transitionSpeedClass} ${currentMedia.playerItemType === "template" ? "template-layer" : ""}`}
       >
         {currentMedia.playerItemType === "template" ? (
           <TemplateVisualPreview template={currentMedia} />

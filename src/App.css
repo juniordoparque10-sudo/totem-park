@@ -5619,3 +5619,105 @@ video.player-media::-webkit-media-controls-start-playback-button {
     flex-direction: column;
   }
 }
+
+
+/* =====================================================
+   FIX TEMPLATE TV - ORIENTAÇÃO + CONTEÚDO AO VIVO
+===================================================== */
+
+.template-tv-preview.template-orientation-portrait {
+  aspect-ratio: 9 / 16;
+}
+
+.player-screen.landscape-mode .player-transition-layer.template-layer {
+  position: absolute !important;
+  inset: 0 !important;
+  width: 100vw !important;
+  height: 100vh !important;
+  transform: none !important;
+}
+
+.player-screen.portrait-mode .player-transition-layer.template-layer {
+  position: absolute !important;
+  top: 50% !important;
+  left: 50% !important;
+  width: 100vh !important;
+  height: 100vw !important;
+  transform: translate(-50%, -50%) rotate(90deg) !important;
+  transform-origin: center center !important;
+}
+
+.player-transition-layer.template-layer .template-tv-preview {
+  width: 100% !important;
+  height: 100% !important;
+  min-height: 100% !important;
+  aspect-ratio: auto !important;
+}
+
+.template-weather-layout,
+.template-news-layout,
+.template-generic-layout {
+  opacity: 1 !important;
+  visibility: visible !important;
+}
+
+.template-weather-temp,
+.template-weather-info,
+.template-news-list,
+.template-news-item {
+  position: relative;
+  z-index: 4;
+}
+
+.template-news-item strong,
+.template-weather-info span {
+  overflow-wrap: anywhere;
+}
+
+.template-tv-preview.compact .template-weather-layout,
+.template-tv-preview.compact .template-news-layout,
+.template-tv-preview.compact .template-generic-layout {
+  padding: 70px 26px 58px;
+}
+
+.template-tv-preview.compact .template-weather-layout h2,
+.template-tv-preview.compact .template-news-layout h2,
+.template-tv-preview.compact .template-generic-layout h2 {
+  font-size: 34px;
+}
+
+.template-tv-preview.compact .template-weather-temp {
+  font-size: 64px;
+}
+
+.template-tv-preview.compact .template-weather-info {
+  gap: 8px;
+}
+
+.template-tv-preview.compact .template-weather-info span {
+  min-height: 48px;
+  font-size: 12px;
+}
+
+
+/* =====================================================
+   FIX TEMPLATE TV - TIPO REAL CLIMA/NOTÍCIAS
+===================================================== */
+
+.player-transition-layer.template-layer .template-weather-layout,
+.player-transition-layer.template-layer .template-news-layout,
+.player-transition-layer.template-layer .template-generic-layout {
+  display: grid;
+  opacity: 1 !important;
+  visibility: visible !important;
+}
+
+.player-transition-layer.template-layer .template-news-layout,
+.player-transition-layer.template-layer .template-generic-layout {
+  display: block;
+}
+
+.player-transition-layer.template-layer .template-tv-topbar,
+.player-transition-layer.template-layer .template-tv-ticker {
+  display: flex !important;
+}
