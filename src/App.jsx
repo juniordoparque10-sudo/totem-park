@@ -4308,11 +4308,26 @@ function TVConnectPage() {
 
       const codeData = codeSnap.data();
       const clientId = codeData.clientId;
+      const screenId = codeData.screenId;
 
       if (!clientId) {
         alert("Não foi possível identificar o cliente desta tela.");
         setLoading(false);
         return;
+      }
+
+      if (screenId) {
+        try {
+          await updateDoc(doc(db, "clients", clientId, "screens", screenId), {
+            remoteCommand: null,
+            lastCommandSent: "",
+            commandStatus: "connected",
+            lastConnection: new Date().toLocaleString("pt-BR"),
+            lastSeenAt: serverTimestamp(),
+          });
+        } catch (error) {
+          console.log("Não foi possível limpar comando antigo:", error);
+        }
       }
 
       localStorage.setItem(
@@ -4682,6 +4697,8 @@ function PlayerPage() {
       screen.id
     );
 
+    let firstSnapshot = true;
+
     const unsubscribe = onSnapshot(screenDocRef, async (snapshot) => {
       if (!snapshot.exists()) return;
 
@@ -4689,6 +4706,14 @@ function PlayerPage() {
       const remoteCommand = data.remoteCommand;
 
       if (!remoteCommand?.id) {
+        firstSnapshot = false;
+        return;
+      }
+
+      if (firstSnapshot) {
+        lastCommandIdRef.current = remoteCommand.id;
+        setLastCommandId(remoteCommand.id);
+        firstSnapshot = false;
         return;
       }
 
@@ -4712,7 +4737,13 @@ function PlayerPage() {
       if (remoteCommand.type === "exitTv") {
         localStorage.removeItem("totempark-tv-connection");
         localStorage.removeItem("totempark-app-mode");
-        window.location.href = "/";
+
+        if (isNativeApp()) {
+          window.location.href = "/";
+        } else {
+          window.location.href = "/tv";
+        }
+
         return;
       }
 
