@@ -2981,6 +2981,658 @@ function ClientPlaylistsPage({ client }) {
 
 
 
+function ClientScreensPage({ client }) {
+  const [screens, setScreens] = useState([]);
+  const [playlists, setPlaylists] = useState([]);
+  const [now, setNow] = useState(Date.now());
+  const [editingScreen, setEditingScreen] = useState(null);
+
+  const [form, setForm] = useState({
+    name: "",
+    location: "",
+    orientation: "Paisagem",
+    playlistId: "",
+  });
+
+  useEffect(() => {
+    const interval = setInterval(() => {
+      setNow(Date.now());
+    }, 10000);
+
+    return () => clearInterval(interval);
+  }, []);
+
+  useEffect(() => {
+    screens.forEach((screen) => {
+      if (screen.code) {
+        syncTvCode(screen.id, screen.code, screen.name);
+      }
+    });
+  }, [screens]);
+
+  useEffect(() => {
+    const unsubScreens = onSnapshot(
+      collection(db, "clients", client.id, "screens"),
+      (snapshot) => {
+        setScreens(snapshot.docs.map((item) => ({ id: item.id, ...item.data() })));
+      }
+    );
+
+    const unsubPlaylists = onSnapshot(
+      collection(db, "clients", client.id, "playlists"),
+      (snapshot) => {
+        setPlaylists(snapshot.docs.map((item) => ({ id: item.id, ...item.data() })));
+      }
+    );
+
+    return () => {
+      unsubScreens();
+      unsubPlaylists();
+    };
+  }, [client.id]);
+
+  function generateCode() {
+    const chars = "ABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789";
+    let code = "";
+
+    for (let i = 0; i < 6; i++) {
+      code += chars.charAt(Math.floor(Math.random() * chars.length));
+    }
+
+    return code;
+  }
+
+  async function syncTvCode(screenId, code, screenName) {
+    if (!code) return;
+
+    try {
+      await setDoc(
+        doc(db, "tv_codes", code),
+        {
+          code,
+          clientId: client.id,
+          screenId,
+          screenName: screenName || "",
+          clientName: client.name || "",
+          updatedAt: serverTimestamp(),
+        },
+        { merge: true }
+      );
+    } catch (error) {
+      console.log("Erro ao sincronizar código da TV:", error);
+    }
+  }
+
+  function getLastSeenDate(screen) {
+    if (screen.lastSeenAt?.toDate) {
+      return screen.lastSeenAt.toDate();
+    }
+
+    if (screen.lastSeenAt?.seconds) {
+      return new Date(screen.lastSeenAt.seconds * 1000);
+    }
+
+    return null;
+  }
+
+  function isScreenOnline(screen) {
+    const lastSeenDate = getLastSeenDate(screen);
+
+    if (!lastSeenDate) {
+      return false;
+    }
+
+    const diffInSeconds =
+      (now - lastSeenDate.getTime()) / 1000;
+
+    return diffInSeconds <= 20;
+  }
+
+  function getLastSeenLabel(screen) {
+    const lastSeenDate = getLastSeenDate(screen);
+
+    if (!lastSeenDate) {
+      return "Ainda não conectou";
+    }
+
+    const diffInSeconds = Math.floor(
+      (now - lastSeenDate.getTime()) / 1000
+    );
+
+    if (diffInSeconds < 10) {
+      return "Agora mesmo";
+    }
+
+    if (diffInSeconds < 60) {
+      return `Há ${diffInSeconds}s`;
+    }
+
+    const diffInMinutes = Math.floor(diffInSeconds / 60);
+
+    if (diffInMinutes < 60) {
+      return `Há ${diffInMinutes}min`;
+    }
+
+    return lastSeenDate.toLocaleString("pt-BR");
+  }
+
+  function timeToMinutes(time) {
+    if (!time) return 0;
+
+    const [hours, minutes] = time.split(":").map(Number);
+
+    return hours * 60 + minutes;
+  }
+
+  function getTodayValue() {
+    const date = new Date(now);
+    const year = date.getFullYear();
+    const month = String(date.getMonth() + 1).padStart(2, "0");
+    const day = String(date.getDate()).padStart(2, "0");
+
+    return `${year}-${month}-${day}`;
+  }
+
+  function isPlaylistInSchedule(playlist, screenId) {
+    if (!playlist?.scheduleEnabled) return false;
+
+    if (
+      playlist.targetScreenIds &&
+      playlist.targetScreenIds.length > 0 &&
+      !playlist.targetScreenIds.includes(screenId)
+    ) {
+      return false;
+    }
+
+    const today = getTodayValue();
+
+    if (playlist.startDate && today < playlist.startDate) return false;
+    if (playlist.endDate && today > playlist.endDate) return false;
+
+    const date = new Date(now);
+    const currentMinutes = date.getHours() * 60 + date.getMinutes();
+    const startMinutes = timeToMinutes(playlist.startTime);
+    const endMinutes = timeToMinutes(playlist.endTime);
+
+    if (startMinutes === endMinutes) return true;
+
+    if (startMinutes < endMinutes) {
+      return currentMinutes >= startMinutes && currentMinutes <= endMinutes;
+    }
+
+    return currentMinutes >= startMinutes || currentMinutes <= endMinutes;
+  }
+
+  function getActivePlaylist(screen) {
+    const scheduled = playlists
+      .filter((playlist) => isPlaylistInSchedule(playlist, screen.id))
+      .sort((a, b) => {
+        const aDate = `${a.startDate || ""} ${a.startTime || ""}`;
+        const bDate = `${b.startDate || ""} ${b.startTime || ""}`;
+
+        return bDate.localeCompare(aDate);
+      });
+
+    if (scheduled.length > 0) {
+      return {
+        playlist: scheduled[0],
+        mode: "scheduled",
+      };
+    }
+
+    return {
+      playlist: playlists.find((playlist) => playlist.id === screen.playlistId),
+      mode: "default",
+    };
+  }
+
+  function resetScreenForm() {
+    setEditingScreen(null);
+
+    setForm({
+      name: "",
+      location: "",
+      orientation: "Paisagem",
+      playlistId: "",
+    });
+  }
+
+  function startEditScreen(screen) {
+    setEditingScreen(screen);
+
+    setForm({
+      name: screen.name || "",
+      location: screen.location || "",
+      orientation: screen.orientation || "Paisagem",
+      playlistId: screen.playlistId || "",
+    });
+
+    window.scrollTo({
+      top: 0,
+      behavior: "smooth",
+    });
+  }
+
+  async function handleSaveScreen() {
+    if (!form.name.trim()) {
+      alert("Informe o nome da tela.");
+      return;
+    }
+
+    if (!editingScreen && screens.length >= Number(client.screensLimit || 0)) {
+      alert("Este cliente atingiu o limite de telas do plano.");
+      return;
+    }
+
+    const selectedPlaylist = playlists.find((playlist) => playlist.id === form.playlistId);
+
+    try {
+      const screenData = {
+        name: form.name,
+        location: form.location || "Não informado",
+        orientation: form.orientation,
+        playlistId: selectedPlaylist?.id || "",
+        playlistName: selectedPlaylist?.name || "Nenhuma playlist vinculada",
+      };
+
+      if (editingScreen) {
+        await updateDoc(
+          doc(db, "clients", client.id, "screens", editingScreen.id),
+          {
+            ...screenData,
+            updatedAt: serverTimestamp(),
+          }
+        );
+
+        await syncTvCode(editingScreen.id, editingScreen.code, form.name);
+
+        alert("Tela atualizada com sucesso!");
+      } else {
+        const code = generateCode();
+
+        const screenRef = await addDoc(collection(db, "clients", client.id, "screens"), {
+          ...screenData,
+          code,
+          status: "offline",
+          lastConnection: "Ainda não conectou",
+          lastSeenAt: null,
+          createdAt: serverTimestamp(),
+        });
+
+        await syncTvCode(screenRef.id, code, form.name);
+
+        alert("Tela cadastrada com sucesso!");
+      }
+
+      resetScreenForm();
+    } catch (error) {
+      console.log(error);
+      alert("Erro ao salvar tela.");
+    }
+  }
+
+  async function deleteScreen(id) {
+    try {
+      const screenToDelete = screens.find((screen) => screen.id === id);
+
+      await deleteDoc(doc(db, "clients", client.id, "screens", id));
+
+      if (screenToDelete?.code) {
+        await deleteDoc(doc(db, "tv_codes", screenToDelete.code));
+      }
+    } catch (error) {
+      console.log(error);
+      alert("Erro ao excluir tela.");
+    }
+  }
+
+
+  async function sendRemoteCommand(screenId, command) {
+    try {
+      const commandId = `${Date.now()}-${Math.random().toString(36).slice(2)}`;
+
+      const payload = {
+        remoteCommand: {
+          id: commandId,
+          ...command,
+          sentAt: new Date().toISOString(),
+        },
+        lastCommandSent: command.type,
+        lastCommandSentAt: serverTimestamp(),
+        commandStatus: "sent",
+      };
+
+      if (command.type === "maintenance") {
+        payload.lastCommandExecuted = "maintenance";
+      }
+
+      if (command.type === "clear") {
+        payload.lastCommandExecuted = "clear";
+      }
+
+      await updateDoc(doc(db, "clients", client.id, "screens", screenId), payload);
+    } catch (error) {
+      console.log(error);
+      alert("Erro ao enviar comando para a TV.");
+    }
+  }
+
+  function sendOverlayCommand(screenId) {
+    const message = window.prompt("Digite a mensagem do overlay:");
+
+    if (!message) return;
+
+    sendRemoteCommand(screenId, {
+      type: "overlay",
+      title: "Aviso",
+      message,
+      duration: 10,
+    });
+  }
+
+  function sendTakeoverCommand(screenId) {
+    const title = window.prompt("Título do alerta:", "ATENÇÃO");
+
+    if (!title) return;
+
+    const message = window.prompt("Mensagem do alerta:");
+
+    if (!message) return;
+
+    sendRemoteCommand(screenId, {
+      type: "takeover",
+      title,
+      message,
+      duration: 20,
+    });
+  }
+
+
+  return (
+    <>
+      <section className="panel">
+        <div className="playlist-editor-header">
+          <div>
+            <h2>{editingScreen ? "Editar tela" : "Nova tela"}</h2>
+            <p className="stat-status">
+              Uso atual: {screens.length}/{client.screensLimit} telas
+            </p>
+          </div>
+
+          {editingScreen && (
+            <div className="editing-badge">
+              Editando
+            </div>
+          )}
+        </div>
+
+        <div className="form-grid">
+          <div className="form-group">
+            <label>Nome da tela</label>
+            <input
+              placeholder="Ex: TV Recepção"
+              value={form.name}
+              onChange={(e) => setForm({ ...form, name: e.target.value })}
+            />
+          </div>
+
+          <div className="form-group">
+            <label>Local de instalação</label>
+            <input
+              placeholder="Ex: Entrada principal"
+              value={form.location}
+              onChange={(e) => setForm({ ...form, location: e.target.value })}
+            />
+          </div>
+
+          <div className="form-group">
+            <label>Orientação</label>
+            <select
+              value={form.orientation}
+              onChange={(e) => setForm({ ...form, orientation: e.target.value })}
+            >
+              <option>Paisagem</option>
+              <option>Retrato</option>
+            </select>
+          </div>
+
+          <div className="form-group">
+            <label>Playlist padrão da tela</label>
+            <select
+              value={form.playlistId}
+              onChange={(e) => setForm({ ...form, playlistId: e.target.value })}
+            >
+              <option value="">Nenhuma playlist</option>
+              {playlists
+                .filter((playlist) => !playlist.scheduleEnabled)
+                .map((playlist) => (
+                  <option value={playlist.id} key={playlist.id}>
+                    {playlist.name}
+                  </option>
+                ))}
+            </select>
+          </div>
+        </div>
+
+        <div className="screen-schedule-note">
+          <strong>Como funciona:</strong> a playlist padrão roda normalmente. Quando uma playlist agendada entrar no período configurado, ela assume temporariamente a TV. Ao terminar, a TV volta para a playlist padrão desta tela. Para conectar uma TV, abra /tv e digite apenas o código da tela.
+        </div>
+
+        <div className="panel-actions">
+          <button className="upload-button" onClick={handleSaveScreen}>
+            <Plus size={20} />
+            {editingScreen ? "Salvar alterações" : "Cadastrar tela"}
+          </button>
+
+          {editingScreen && (
+            <button className="delete-button" onClick={resetScreenForm}>
+              Cancelar edição
+            </button>
+          )}
+        </div>
+      </section>
+
+      <section className="cards-grid">
+        {screens.length === 0 ? (
+          <div className="empty-library">Nenhuma tela cadastrada ainda.</div>
+        ) : (
+          screens.map((screen) => {
+            const online = isScreenOnline(screen);
+            const active = getActivePlaylist(screen);
+            const activePlaylist = active.playlist;
+            const previewMedia = screen.nowPlayingPreview
+              ? {
+                  preview: screen.nowPlayingPreview,
+                  title: screen.nowPlayingTitle || "Mídia atual",
+                  type: screen.nowPlayingType || "Imagem",
+                }
+              : activePlaylist?.items?.[0];
+
+            return (
+              <div className="media-card" key={screen.id}>
+                <div className="media-preview screen-preview">
+                  {previewMedia ? (
+                    previewMedia.type === "Vídeo" ? (
+                      <video
+                        key={`${screen.id}-${screen.nowPlayingPreview || previewMedia.preview}-${screen.nowPlayingIndex || 0}`}
+                        src={previewMedia.preview}
+                        muted
+                        autoPlay
+                        loop
+                        playsInline
+                        preload="auto"
+                      />
+                    ) : (
+                      <img
+                          key={`${screen.id}-${screen.nowPlayingPreview || previewMedia.preview}-${screen.nowPlayingIndex || 0}`}
+                          src={previewMedia.preview}
+                          alt={previewMedia.title}
+                        />
+                    )
+                  ) : (
+                    <Monitor size={54} />
+                  )}
+
+                  <div className={online ? "live-dot online" : "live-dot offline"}></div>
+                </div>
+
+                <div className="media-info">
+                  <div className="screen-card-top">
+                    <span>{screen.orientation}</span>
+
+                    <div className={online ? "screen-status online" : "screen-status offline"}>
+                      <div></div>
+                      {online ? "Online agora" : "Offline"}
+                    </div>
+                  </div>
+
+                  <h3>{screen.name}</h3>
+                  <p>Local: {screen.location}</p>
+                  <p>Playlist padrão: {screen.playlistName}</p>
+
+                  <div className={screen.currentPlaylistMode === "scheduled" || active.mode === "scheduled" ? "active-program scheduled" : "active-program"}>
+                    <small>Exibindo agora</small>
+                    <strong>{screen.currentPlaylistName || activePlaylist?.name || "Nenhuma playlist ativa"}</strong>
+                    <span>
+                      {screen.currentPlaylistMode === "scheduled" || active.mode === "scheduled"
+                        ? "Programação agendada"
+                        : "Playlist padrão"}
+                    </span>
+
+                    <div className="screen-now-playing">
+                      <small>Mídia atual</small>
+                      <strong>{screen.nowPlayingTitle || previewMedia?.title || "Aguardando mídia"}</strong>
+                      <span>
+                        {screen.nowPlayingIndex && screen.nowPlayingTotal
+                          ? `${screen.nowPlayingIndex}/${screen.nowPlayingTotal}`
+                          : "Sem progresso"} • {screen.nowPlayingType || previewMedia?.type || "Mídia"}
+                      </span>
+                    </div>
+                  </div>
+
+                  <div className="screen-code-box">
+                    <small>Código para conectar no /tv</small>
+                    <strong>{screen.code}</strong>
+                  </div>
+
+                  <p>
+                    Player direto:
+                    <br />
+                    <strong>/player/{client.id}/{screen.code}</strong>
+                  </p>
+
+                  <div className="last-seen-card">
+                    <small>Último sinal</small>
+                    <strong>{getLastSeenLabel(screen)}</strong>
+                  </div>
+
+                  <div className="remote-control-panel-inline">
+                    <div className="remote-control-title">
+                      Controle remoto
+                    </div>
+
+                    <div className="remote-control-grid-inline">
+                      <button
+                        className="remote-mini-button info"
+                        onClick={() => sendRemoteCommand(screen.id, { type: "refresh" })}
+                      >
+                        Atualizar
+                      </button>
+
+                      <button
+                        className="remote-mini-button"
+                        onClick={() => sendRemoteCommand(screen.id, { type: "pause" })}
+                      >
+                        Pausar
+                      </button>
+
+                      <button
+                        className="remote-mini-button"
+                        onClick={() => sendRemoteCommand(screen.id, { type: "play" })}
+                      >
+                        Play
+                      </button>
+
+                      <button
+                        className="remote-mini-button warning"
+                        onClick={() => sendOverlayCommand(screen.id)}
+                      >
+                        Overlay
+                      </button>
+
+                      <button
+                        className="remote-mini-button danger"
+                        onClick={() => sendTakeoverCommand(screen.id)}
+                      >
+                        Takeover
+                      </button>
+
+                      <button
+                        className="remote-mini-button"
+                        onClick={() =>
+                          sendRemoteCommand(
+                            screen.id,
+                            {
+                              type:
+                                screen.lastCommandExecuted === "maintenance"
+                                  ? "clear"
+                                  : "maintenance",
+                            }
+                          )
+                        }
+                      >
+                        {screen.lastCommandExecuted === "maintenance"
+                          ? "Sair manutenção"
+                          : "Manutenção"}
+                      </button>
+
+                      <button
+                        className="remote-mini-button"
+                        onClick={() => sendRemoteCommand(screen.id, { type: "blackout" })}
+                      >
+                        Tela preta
+                      </button>
+
+                      <button
+                        className="remote-mini-button success"
+                        onClick={() => sendRemoteCommand(screen.id, { type: "clear" })}
+                      >
+                        Limpar
+                      </button>
+
+                      <button
+                        className="remote-mini-button danger"
+                        onClick={() => sendRemoteCommand(screen.id, { type: "reload" })}
+                      >
+                        Reiniciar
+                      </button>
+                    </div>
+                  </div>
+
+                  <div className="card-actions">
+                    <button
+                      className="upload-button"
+                      onClick={() => startEditScreen(screen)}
+                    >
+                      Editar tela
+                    </button>
+
+                    <button className="delete-button" onClick={() => deleteScreen(screen.id)}>
+                      <Trash2 size={16} />
+                      Excluir
+                    </button>
+                  </div>
+                </div>
+              </div>
+            );
+          })
+        )}
+      </section>
+    </>
+  );
+}
+
+
 function ClientTemplatesPage({ client }) {
   const [templates, setTemplates] = useState([]);
   const [screens, setScreens] = useState([]);
