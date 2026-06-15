@@ -3606,6 +3606,21 @@ function ClientScreensPage({ client }) {
                       >
                         Reiniciar
                       </button>
+
+                      <button
+                        className="remote-mini-button exit-tv"
+                        onClick={() => {
+                          const confirmExit = window.confirm(
+                            "Deseja tirar esta tela do modo TV e voltar para a escolha de modo?"
+                          );
+
+                          if (!confirmExit) return;
+
+                          sendRemoteCommand(screen.id, { type: "exitTv" });
+                        }}
+                      >
+                        Sair da TV
+                      </button>
                     </div>
                   </div>
 
@@ -4694,6 +4709,13 @@ function PlayerPage() {
         console.log(error);
       }
 
+      if (remoteCommand.type === "exitTv") {
+        localStorage.removeItem("totempark-tv-connection");
+        localStorage.removeItem("totempark-app-mode");
+        window.location.href = "/";
+        return;
+      }
+
       if (remoteCommand.type === "reload") {
         window.location.reload();
         return;
@@ -5085,16 +5107,6 @@ function PlayerPage() {
           PAUSADO PELO PAINEL
         </div>
       )}
-
-      <button
-        className="tv-player-exit-button"
-        onClick={() => {
-          localStorage.removeItem("totempark-tv-connection");
-          window.location.href = "/tv";
-        }}
-      >
-        Sair da TV
-      </button>
 
       {activeMode === "scheduled" && activePlaylist && (
         <div className="player-schedule-label">

@@ -5721,3 +5721,22 @@ video.player-media::-webkit-media-controls-start-playback-button {
 .player-transition-layer.template-layer .template-tv-ticker {
   display: flex !important;
 }
+
+
+/* =====================================================
+   FIX GESTOR - SAIR DA TV PELO CARD DA TELA
+   Remove botão flutuante do player e deixa o controle no painel.
+===================================================== */
+
+.tv-player-exit-button {
+  display: none !important;
+  opacity: 0 !important;
+  visibility: hidden !important;
+  pointer-events: none !important;
+}
+
+.remote-mini-button.exit-tv {
+  background: linear-gradient(135deg, rgba(239, 68, 68, 0.28), rgba(147, 51, 234, 0.28)) !important;
+  color: #ffffff !important;
+  border: 1px solid rgba(248, 113, 113, 0.35) !important;
+}
