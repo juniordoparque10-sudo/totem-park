@@ -515,8 +515,8 @@ function AdminApp() {
 
 function AppModeChoice({ client, onSelectMode }) {
   return (
-    <div className="app-mode-page">
-      <div className="app-mode-card">
+    <div className="app-mode-page app-mode-native-only">
+      <div className="app-mode-card app-mode-ultra-compact">
         <img src={logo} alt="Totem Park" />
 
         <div className="app-mode-kicker">Aplicativo Totem Park</div>
@@ -524,8 +524,9 @@ function AppModeChoice({ client, onSelectMode }) {
         <h1>Escolha o modo de uso</h1>
 
         <p>
-          Você está logado como <strong>{client?.name}</strong>. Escolha se deseja
-          gerenciar sua conta ou abrir este dispositivo como TV.
+          Você está logado como <strong>{client?.name}</strong>.
+          <br />
+          Escolha se deseja gerenciar sua conta ou abrir este dispositivo como TV.
         </p>
 
         <div className="app-mode-grid">
@@ -537,7 +538,7 @@ function AppModeChoice({ client, onSelectMode }) {
             <span>Modo Gestor</span>
             <strong>Gerenciar painel</strong>
             <p>
-              Acesse mídias, playlists, telas e configurações do cliente.
+              Gerenciar painel, mídias, playlists, telas e configurações.
             </p>
           </button>
 
@@ -549,7 +550,7 @@ function AppModeChoice({ client, onSelectMode }) {
             <span>Modo TV</span>
             <strong>Abrir player</strong>
             <p>
-              Digite o código da tela e transforme este dispositivo em player fullscreen.
+              Abrir este dispositivo como TV para exibir conteúdos.
             </p>
           </button>
         </div>
@@ -563,6 +564,10 @@ function AppModeChoice({ client, onSelectMode }) {
         >
           Sair desta conta
         </button>
+
+        <div className="auth-footer-brand">
+          Desenvolvido por <strong>Park Solutions</strong>
+        </div>
       </div>
     </div>
   );

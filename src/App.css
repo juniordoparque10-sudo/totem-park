@@ -5930,3 +5930,771 @@ video.player-media::-webkit-media-controls-start-playback-button {
     grid-template-columns: 62px 1fr !important;
   }
 }
+/* =====================================================
+   AJUSTE FINAL 16/06 - TELA ESCOLHA MODO DE USO COMPACTA
+   + assinatura Park Solutions nas telas de login.
+===================================================== */
+
+.app-mode-page {
+  padding: 18px !important;
+  overflow: hidden !important;
+}
+
+.app-mode-card,
+.app-mode-card-compact {
+  width: min(560px, 100%) !important;
+  padding: 28px !important;
+  border-radius: 28px !important;
+}
+
+.app-mode-card > img,
+.app-mode-card-compact > img {
+  width: 140px !important;
+  margin-bottom: 14px !important;
+}
+
+.app-mode-kicker {
+  margin-bottom: 12px !important;
+  padding: 6px 12px !important;
+  font-size: 11px !important;
+}
+
+.app-mode-card h1,
+.app-mode-card-compact h1 {
+  font-size: clamp(28px, 3.6vw, 42px) !important;
+  margin-bottom: 10px !important;
+}
+
+.app-mode-card p,
+.app-mode-card-compact p {
+  font-size: 14px !important;
+  line-height: 1.35 !important;
+}
+
+.app-mode-grid {
+  gap: 12px !important;
+  margin-top: 22px !important;
+}
+
+.app-mode-option {
+  min-height: 150px !important;
+  border-radius: 20px !important;
+  padding: 18px !important;
+  text-align: center !important;
+}
+
+.app-mode-option span {
+  padding: 6px 10px !important;
+  font-size: 10px !important;
+  margin-bottom: 14px !important;
+}
+
+.app-mode-option strong {
+  font-size: 20px !important;
+  margin-bottom: 8px !important;
+}
+
+.app-mode-option p {
+  font-size: 13px !important;
+}
+
+.app-mode-logout {
+  margin-top: 16px !important;
+  min-height: 42px !important;
+  border-radius: 13px !important;
+  font-size: 13px !important;
+}
+
+.auth-footer-brand {
+  margin-top: 18px;
+  padding-top: 16px;
+  border-top: 1px solid rgba(255,255,255,0.08);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+  color: #cbd5e1;
+  font-size: 13px;
+  font-weight: 700;
+}
+
+.auth-footer-brand::before {
+  content: "";
+  width: 18px;
+  height: 18px;
+  border-radius: 6px;
+  border: 2px solid #22d3ee;
+  box-shadow: 0 0 14px rgba(34,211,238,0.35);
+  display: inline-block;
+}
+
+.auth-footer-brand strong {
+  background: linear-gradient(90deg, #22d3ee, #9333ea);
+  -webkit-background-clip: text;
+  -webkit-text-fill-color: transparent;
+}
+
+/* assinatura também no login e conectar TV sem alterar funções */
+.login-card::after,
+.tv-connect-card::after {
+  content: "Desenvolvido por Park Solutions";
+  display: block;
+  margin-top: 18px;
+  padding-top: 14px;
+  border-top: 1px solid rgba(255,255,255,0.08);
+  color: #cbd5e1;
+  font-size: 13px;
+  font-weight: 700;
+  text-align: center;
+}
+
+@media (max-height: 720px) {
+  .app-mode-card,
+  .app-mode-card-compact {
+    transform: scale(0.88);
+  }
+}
+
+@media (max-width: 700px) {
+  .app-mode-card,
+  .app-mode-card-compact {
+    width: min(420px, 100%) !important;
+    padding: 24px !important;
+  }
+
+  .app-mode-card > img,
+  .app-mode-card-compact > img {
+    width: 124px !important;
+  }
+
+  .app-mode-grid {
+    grid-template-columns: 1fr !important;
+  }
+
+  .app-mode-option {
+    min-height: 130px !important;
+  }
+}
+/* =====================================================
+   AJUSTE FINAL - APP ANDROID: MODO DE USO RESPONSIVO
+   TV / TABLET / CELULAR sem rolagem
+   Não altera a versão web do painel.
+===================================================== */
+
+.app-mode-native-only {
+  min-height: 100vh !important;
+  height: 100vh !important;
+  padding: clamp(10px, 2vw, 18px) !important;
+  overflow: hidden !important;
+  align-items: center !important;
+  justify-content: center !important;
+}
+
+.app-mode-ultra-compact {
+  width: min(720px, 92vw) !important;
+  max-height: calc(100vh - 24px) !important;
+  padding: clamp(18px, 2.1vw, 30px) !important;
+  border-radius: clamp(22px, 2.2vw, 32px) !important;
+  display: flex !important;
+  flex-direction: column !important;
+  align-items: center !important;
+  justify-content: center !important;
+  text-align: center !important;
+  overflow: hidden !important;
+}
+
+.app-mode-ultra-compact > img {
+  width: clamp(118px, 13vw, 165px) !important;
+  margin: 0 auto clamp(8px, 1.1vw, 14px) !important;
+}
+
+.app-mode-ultra-compact .app-mode-kicker {
+  margin: 0 auto clamp(10px, 1.2vw, 16px) !important;
+  padding: 6px 13px !important;
+  min-height: 28px !important;
+  font-size: clamp(10px, 1vw, 12px) !important;
+  line-height: 1 !important;
+}
+
+.app-mode-ultra-compact h1 {
+  font-size: clamp(30px, 4.1vw, 48px) !important;
+  line-height: 1.02 !important;
+  margin: 0 0 clamp(8px, 1vw, 12px) !important;
+  letter-spacing: -0.5px !important;
+}
+
+.app-mode-ultra-compact > p {
+  max-width: 680px !important;
+  margin: 0 auto !important;
+  color: #cbd5e1 !important;
+  font-size: clamp(14px, 1.55vw, 18px) !important;
+  line-height: 1.35 !important;
+}
+
+.app-mode-ultra-compact .app-mode-grid {
+  width: 100% !important;
+  display: grid !important;
+  grid-template-columns: repeat(2, minmax(0, 1fr)) !important;
+  gap: clamp(12px, 1.4vw, 18px) !important;
+  margin-top: clamp(18px, 2vw, 28px) !important;
+}
+
+.app-mode-ultra-compact .app-mode-option {
+  min-height: clamp(135px, 16vh, 180px) !important;
+  border-radius: clamp(18px, 2vw, 26px) !important;
+  padding: clamp(16px, 1.8vw, 24px) !important;
+  display: grid !important;
+  grid-template-columns: auto 1fr !important;
+  grid-template-areas:
+    "icon tag"
+    "icon title"
+    "icon text";
+  column-gap: clamp(14px, 1.5vw, 20px) !important;
+  align-items: center !important;
+  text-align: left !important;
+}
+
+.app-mode-ultra-compact .app-mode-option span {
+  grid-area: tag !important;
+  width: fit-content !important;
+  margin: 0 0 6px !important;
+  padding: 6px 11px !important;
+  font-size: clamp(10px, 1vw, 12px) !important;
+  line-height: 1 !important;
+}
+
+.app-mode-ultra-compact .app-mode-option::before {
+  grid-area: icon !important;
+  width: clamp(48px, 5.2vw, 62px) !important;
+  height: clamp(48px, 5.2vw, 62px) !important;
+  border-radius: 16px !important;
+  display: flex !important;
+  align-items: center !important;
+  justify-content: center !important;
+  font-size: clamp(22px, 2.5vw, 30px) !important;
+  color: #fff !important;
+}
+
+.app-mode-ultra-compact .app-mode-option.manager::before {
+  content: "👤";
+  background: linear-gradient(135deg, #06b6d4, #0891b2);
+  box-shadow: 0 14px 34px rgba(6, 182, 212, 0.20);
+}
+
+.app-mode-ultra-compact .app-mode-option.tv::before {
+  content: "▣";
+  background: linear-gradient(135deg, #9333ea, #7c3aed);
+  box-shadow: 0 14px 34px rgba(147, 51, 234, 0.20);
+}
+
+.app-mode-ultra-compact .app-mode-option strong {
+  grid-area: title !important;
+  font-size: clamp(18px, 1.9vw, 24px) !important;
+  line-height: 1.1 !important;
+  margin: 0 0 5px !important;
+}
+
+.app-mode-ultra-compact .app-mode-option p {
+  grid-area: text !important;
+  margin: 0 !important;
+  font-size: clamp(13px, 1.35vw, 16px) !important;
+  line-height: 1.35 !important;
+}
+
+.app-mode-ultra-compact .app-mode-logout {
+  margin-top: clamp(14px, 1.6vw, 20px) !important;
+  min-height: 38px !important;
+  padding: 0 18px !important;
+  border-radius: 13px !important;
+  font-size: 12px !important;
+}
+
+.auth-footer-brand {
+  width: 100%;
+  margin-top: clamp(12px, 1.5vw, 18px);
+  padding-top: clamp(10px, 1.3vw, 16px);
+  border-top: 1px solid rgba(255,255,255,0.08);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 7px;
+  color: #cbd5e1;
+  font-size: clamp(12px, 1.1vw, 14px);
+  font-weight: 700;
+}
+
+.auth-footer-brand::before {
+  content: "";
+  width: 18px;
+  height: 18px;
+  border-radius: 6px;
+  border: 2px solid #22d3ee;
+  box-shadow: 0 0 14px rgba(34,211,238,0.35);
+  display: inline-block;
+}
+
+.auth-footer-brand strong {
+  background: linear-gradient(90deg, #22d3ee, #9333ea);
+  -webkit-background-clip: text;
+  -webkit-text-fill-color: transparent;
+}
+
+/* TV horizontal baixa: tudo precisa caber sem scroll */
+@media (min-width: 900px) and (max-height: 760px) {
+  .app-mode-ultra-compact {
+    width: min(760px, 86vw) !important;
+    transform: scale(0.82) !important;
+    transform-origin: center center !important;
+  }
+
+  .app-mode-ultra-compact .app-mode-option {
+    min-height: 130px !important;
+  }
+}
+
+/* TABLET: cards horizontais, bem proporcionais */
+@media (min-width: 701px) and (max-width: 1100px) {
+  .app-mode-ultra-compact {
+    width: min(640px, 90vw) !important;
+  }
+
+  .app-mode-ultra-compact .app-mode-grid {
+    grid-template-columns: 1fr !important;
+  }
+
+  .app-mode-ultra-compact .app-mode-option {
+    min-height: 112px !important;
+  }
+}
+
+/* CELULAR: tudo visível sem rolagem */
+@media (max-width: 700px) {
+  .app-mode-native-only {
+    padding: 12px !important;
+  }
+
+  .app-mode-ultra-compact {
+    width: min(390px, 92vw) !important;
+    padding: 18px !important;
+    border-radius: 24px !important;
+    max-height: calc(100vh - 18px) !important;
+  }
+
+  .app-mode-ultra-compact > img {
+    width: 112px !important;
+    margin-bottom: 8px !important;
+  }
+
+  .app-mode-ultra-compact .app-mode-kicker {
+    font-size: 10px !important;
+    padding: 6px 10px !important;
+    margin-bottom: 10px !important;
+  }
+
+  .app-mode-ultra-compact h1 {
+    font-size: 27px !important;
+    margin-bottom: 8px !important;
+  }
+
+  .app-mode-ultra-compact > p {
+    font-size: 13px !important;
+    line-height: 1.32 !important;
+  }
+
+  .app-mode-ultra-compact .app-mode-grid {
+    grid-template-columns: 1fr !important;
+    gap: 10px !important;
+    margin-top: 14px !important;
+  }
+
+  .app-mode-ultra-compact .app-mode-option {
+    min-height: 96px !important;
+    border-radius: 18px !important;
+    padding: 14px !important;
+    grid-template-columns: 48px 1fr !important;
+    column-gap: 13px !important;
+  }
+
+  .app-mode-ultra-compact .app-mode-option::before {
+    width: 44px !important;
+    height: 44px !important;
+    border-radius: 14px !important;
+    font-size: 21px !important;
+  }
+
+  .app-mode-ultra-compact .app-mode-option span {
+    font-size: 10px !important;
+    padding: 5px 8px !important;
+    margin-bottom: 4px !important;
+  }
+
+  .app-mode-ultra-compact .app-mode-option strong {
+    font-size: 17px !important;
+    margin-bottom: 3px !important;
+  }
+
+  .app-mode-ultra-compact .app-mode-option p {
+    font-size: 12px !important;
+    line-height: 1.28 !important;
+  }
+
+  .app-mode-ultra-compact .app-mode-logout {
+    min-height: 34px !important;
+    margin-top: 10px !important;
+    font-size: 11px !important;
+  }
+
+  .auth-footer-brand {
+    margin-top: 9px !important;
+    padding-top: 9px !important;
+    font-size: 11px !important;
+  }
+
+  .auth-footer-brand::before {
+    width: 15px !important;
+    height: 15px !important;
+    border-radius: 5px !important;
+  }
+}
+
+/* Celulares muito baixos */
+@media (max-width: 700px) and (max-height: 740px) {
+  .app-mode-ultra-compact {
+    transform: scale(0.9) !important;
+    transform-origin: center center !important;
+  }
+}/* =====================================================
+   AJUSTE FINAL - APP ANDROID MODO USO
+   TV e tablet paisagem: cards lado a lado
+   Celular/retrato: cards empilhados
+   Não altera o painel web.
+===================================================== */
+
+.app-mode-native-only {
+  height: 100vh !important;
+  min-height: 100vh !important;
+  padding: 10px !important;
+  overflow: hidden !important;
+  align-items: center !important;
+  justify-content: center !important;
+}
+
+.app-mode-ultra-compact {
+  width: min(760px, 88vw) !important;
+  max-height: calc(100vh - 18px) !important;
+  padding: 20px 28px !important;
+  border-radius: 28px !important;
+  display: flex !important;
+  flex-direction: column !important;
+  align-items: center !important;
+  justify-content: center !important;
+  text-align: center !important;
+  overflow: hidden !important;
+}
+
+.app-mode-ultra-compact > img {
+  width: clamp(95px, 10vw, 128px) !important;
+  margin: 0 auto 8px !important;
+}
+
+.app-mode-ultra-compact .app-mode-kicker {
+  margin: 0 auto 10px !important;
+  padding: 5px 12px !important;
+  min-height: 26px !important;
+  font-size: 10px !important;
+  line-height: 1 !important;
+}
+
+.app-mode-ultra-compact h1 {
+  font-size: clamp(30px, 3.8vw, 44px) !important;
+  line-height: 1 !important;
+  margin: 0 0 8px !important;
+  letter-spacing: -0.5px !important;
+}
+
+.app-mode-ultra-compact > p {
+  max-width: 680px !important;
+  margin: 0 auto !important;
+  color: #cbd5e1 !important;
+  font-size: clamp(13px, 1.35vw, 16px) !important;
+  line-height: 1.28 !important;
+}
+
+.app-mode-ultra-compact .app-mode-grid {
+  width: 100% !important;
+  display: grid !important;
+  grid-template-columns: repeat(2, minmax(0, 1fr)) !important;
+  gap: 14px !important;
+  margin-top: 18px !important;
+}
+
+.app-mode-ultra-compact .app-mode-option {
+  min-height: 118px !important;
+  border-radius: 20px !important;
+  padding: 16px !important;
+  display: grid !important;
+  grid-template-columns: 56px 1fr 18px !important;
+  grid-template-areas:
+    "icon tag arrow"
+    "icon title arrow"
+    "icon text arrow";
+  column-gap: 14px !important;
+  align-items: center !important;
+  text-align: left !important;
+}
+
+.app-mode-ultra-compact .app-mode-option::before {
+  grid-area: icon !important;
+  width: 50px !important;
+  height: 50px !important;
+  border-radius: 15px !important;
+  display: flex !important;
+  align-items: center !important;
+  justify-content: center !important;
+  font-size: 23px !important;
+  color: #ffffff !important;
+}
+
+.app-mode-ultra-compact .app-mode-option::after {
+  content: "›";
+  grid-area: arrow !important;
+  font-size: 34px !important;
+  line-height: 1 !important;
+  color: #22d3ee !important;
+  opacity: 0.95 !important;
+}
+
+.app-mode-ultra-compact .app-mode-option.tv::after {
+  color: #c084fc !important;
+}
+
+.app-mode-ultra-compact .app-mode-option.manager::before {
+  content: "👤";
+  background: linear-gradient(135deg, #06b6d4, #0891b2);
+  box-shadow: 0 12px 28px rgba(6, 182, 212, 0.22);
+}
+
+.app-mode-ultra-compact .app-mode-option.tv::before {
+  content: "▣";
+  background: linear-gradient(135deg, #9333ea, #7c3aed);
+  box-shadow: 0 12px 28px rgba(147, 51, 234, 0.22);
+}
+
+.app-mode-ultra-compact .app-mode-option span {
+  grid-area: tag !important;
+  width: fit-content !important;
+  margin: 0 0 4px !important;
+  padding: 5px 9px !important;
+  font-size: 10px !important;
+  line-height: 1 !important;
+}
+
+.app-mode-ultra-compact .app-mode-option strong {
+  grid-area: title !important;
+  font-size: clamp(16px, 1.7vw, 20px) !important;
+  line-height: 1.1 !important;
+  margin: 0 0 4px !important;
+}
+
+.app-mode-ultra-compact .app-mode-option p {
+  grid-area: text !important;
+  margin: 0 !important;
+  font-size: clamp(12px, 1.15vw, 14px) !important;
+  line-height: 1.28 !important;
+}
+
+.app-mode-ultra-compact .app-mode-logout {
+  margin-top: 14px !important;
+  min-height: 36px !important;
+  padding: 0 22px !important;
+  border-radius: 13px !important;
+  font-size: 12px !important;
+}
+
+.auth-footer-brand {
+  width: 100%;
+  margin-top: 12px;
+  padding-top: 10px;
+  border-top: 1px solid rgba(255,255,255,0.08);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 7px;
+  color: #cbd5e1;
+  font-size: 12px;
+  font-weight: 700;
+}
+
+.auth-footer-brand::before {
+  content: "";
+  width: 16px;
+  height: 16px;
+  border-radius: 5px;
+  border: 2px solid #22d3ee;
+  box-shadow: 0 0 14px rgba(34,211,238,0.35);
+  display: inline-block;
+}
+
+.auth-footer-brand strong {
+  background: linear-gradient(90deg, #22d3ee, #9333ea);
+  -webkit-background-clip: text;
+  -webkit-text-fill-color: transparent;
+}
+
+/* SMART TV / TABLET EM PAISAGEM: cards lado a lado e logo sem cortar */
+@media (orientation: landscape) and (min-width: 700px) {
+  .app-mode-native-only {
+    padding: 8px !important;
+  }
+
+  .app-mode-ultra-compact {
+    width: min(790px, 82vw) !important;
+    padding: 16px 28px !important;
+    transform: scale(0.9) !important;
+    transform-origin: center center !important;
+  }
+
+  .app-mode-ultra-compact > img {
+    width: 104px !important;
+    margin-bottom: 6px !important;
+  }
+
+  .app-mode-ultra-compact .app-mode-kicker {
+    margin-bottom: 9px !important;
+  }
+
+  .app-mode-ultra-compact h1 {
+    font-size: clamp(30px, 3.2vw, 42px) !important;
+  }
+
+  .app-mode-ultra-compact > p {
+    font-size: clamp(13px, 1.25vw, 15px) !important;
+  }
+
+  .app-mode-ultra-compact .app-mode-grid {
+    grid-template-columns: repeat(2, minmax(0, 1fr)) !important;
+    gap: 14px !important;
+    margin-top: 17px !important;
+  }
+
+  .app-mode-ultra-compact .app-mode-option {
+    min-height: 118px !important;
+  }
+}
+
+/* TV com pouca altura */
+@media (orientation: landscape) and (max-height: 620px) {
+  .app-mode-ultra-compact {
+    transform: scale(0.82) !important;
+  }
+
+  .app-mode-ultra-compact > img {
+    width: 92px !important;
+  }
+
+  .app-mode-ultra-compact h1 {
+    font-size: 34px !important;
+  }
+
+  .app-mode-ultra-compact .app-mode-option {
+    min-height: 108px !important;
+  }
+}
+
+/* TABLET/CELULAR EM RETRATO: cards um abaixo do outro */
+@media (orientation: portrait), (max-width: 699px) {
+  .app-mode-native-only {
+    padding: 12px !important;
+  }
+
+  .app-mode-ultra-compact {
+    width: min(390px, 92vw) !important;
+    padding: 18px !important;
+    border-radius: 24px !important;
+    max-height: calc(100vh - 18px) !important;
+    transform: none !important;
+  }
+
+  .app-mode-ultra-compact > img {
+    width: 112px !important;
+    margin-bottom: 8px !important;
+  }
+
+  .app-mode-ultra-compact .app-mode-kicker {
+    font-size: 10px !important;
+    padding: 6px 10px !important;
+    margin-bottom: 10px !important;
+  }
+
+  .app-mode-ultra-compact h1 {
+    font-size: 27px !important;
+    margin-bottom: 8px !important;
+  }
+
+  .app-mode-ultra-compact > p {
+    font-size: 13px !important;
+    line-height: 1.32 !important;
+  }
+
+  .app-mode-ultra-compact .app-mode-grid {
+    grid-template-columns: 1fr !important;
+    gap: 10px !important;
+    margin-top: 14px !important;
+  }
+
+  .app-mode-ultra-compact .app-mode-option {
+    min-height: 96px !important;
+    border-radius: 18px !important;
+    padding: 14px !important;
+    grid-template-columns: 48px 1fr 14px !important;
+    column-gap: 13px !important;
+  }
+
+  .app-mode-ultra-compact .app-mode-option::before {
+    width: 44px !important;
+    height: 44px !important;
+    border-radius: 14px !important;
+    font-size: 21px !important;
+  }
+
+  .app-mode-ultra-compact .app-mode-option::after {
+    font-size: 28px !important;
+  }
+
+  .app-mode-ultra-compact .app-mode-option span {
+    font-size: 10px !important;
+    padding: 5px 8px !important;
+    margin-bottom: 4px !important;
+  }
+
+  .app-mode-ultra-compact .app-mode-option strong {
+    font-size: 17px !important;
+    margin-bottom: 3px !important;
+  }
+
+  .app-mode-ultra-compact .app-mode-option p {
+    font-size: 12px !important;
+    line-height: 1.28 !important;
+  }
+
+  .app-mode-ultra-compact .app-mode-logout {
+    min-height: 34px !important;
+    margin-top: 10px !important;
+    font-size: 11px !important;
+  }
+
+  .auth-footer-brand {
+    margin-top: 9px !important;
+    padding-top: 9px !important;
+    font-size: 11px !important;
+  }
+}
+
+/* Celulares muito baixos */
+@media (orientation: portrait) and (max-height: 740px) {
+  .app-mode-ultra-compact {
+    transform: scale(0.9) !important;
+    transform-origin: center center !important;
+  }
+}
+
