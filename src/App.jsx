@@ -2511,17 +2511,6 @@ function ClientPlaylistsPage({ client }) {
     return `${item.type} • ${item.duration}s • ${item.sound ? "Com som" : "Sem som"}`;
   }
 
-  function changeNewsSource(sourceName) {
-    setForm((prev) => ({
-      ...prev,
-      newsSource: sourceName,
-      newsFeedUrl:
-        sourceName === "Personalizado"
-          ? prev.newsFeedUrl
-          : NEWS_SOURCE_PRESETS[sourceName] || prev.newsFeedUrl,
-    }));
-  }
-
   function toggleTargetScreen(screenId) {
     const selected = form.targetScreenIds.includes(screenId);
 
@@ -3971,6 +3960,17 @@ function ClientTemplatesPage({ client }) {
             : type === "comercial"
               ? "Destaque sua promoção na TV"
               : "Informe seu público com visual profissional",
+    }));
+  }
+
+  function changeNewsSource(sourceName) {
+    setForm((prev) => ({
+      ...prev,
+      newsSource: sourceName,
+      newsFeedUrl:
+        sourceName === "Personalizado"
+          ? prev.newsFeedUrl
+          : NEWS_SOURCE_PRESETS[sourceName] || prev.newsFeedUrl,
     }));
   }
 
