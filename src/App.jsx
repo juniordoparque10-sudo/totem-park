@@ -123,10 +123,107 @@ function renderLivePreviewMedia(screen, fallbackMedia, icon = null) {
 
 
 const DEFAULT_NEWS_ITEMS = [
-  "Totem Park exibe comunicados, ofertas e informações em tempo real.",
-  "Atualize suas telas com notícias, clima e campanhas dinâmicas.",
-  "Sua comunicação visual agora está conectada com o que acontece ao vivo.",
+  {
+    title: "Totem Park exibe comunicados, ofertas e informações em tempo real.",
+    description: "Conteúdo dinâmico para sua TV.",
+    image: "",
+    source: "Totem Park",
+    pubDate: "",
+    link: "",
+  },
+  {
+    title: "Atualize suas telas com notícias, clima e campanhas dinâmicas.",
+    description: "Sua comunicação visual mais moderna.",
+    image: "",
+    source: "Totem Park",
+    pubDate: "",
+    link: "",
+  },
+  {
+    title: "Sua comunicação visual agora está conectada com o que acontece ao vivo.",
+    description: "Templates profissionais para qualquer negócio.",
+    image: "",
+    source: "Totem Park",
+    pubDate: "",
+    link: "",
+  },
 ];
+
+const NEWS_SOURCE_PRESETS = {
+  "G1 RN": "https://g1.globo.com/rss/g1/rn/rio-grande-do-norte/",
+  "G1 Brasil": "https://g1.globo.com/rss/g1/",
+  "CNN Brasil": "https://www.cnnbrasil.com.br/feed/",
+  "UOL Notícias": "https://rss.uol.com.br/feed/noticias.xml",
+  "Globo": "https://g1.globo.com/rss/g1/",
+  "Personalizado": "",
+};
+
+function stripHtml(value) {
+  return String(value || "")
+    .replace(/<[^>]*>/g, " ")
+    .replace(/&nbsp;/g, " ")
+    .replace(/&amp;/g, "&")
+    .replace(/&quot;/g, '"')
+    .replace(/&#39;/g, "'")
+    .replace(/\s+/g, " ")
+    .trim();
+}
+
+function getNewsItemTitle(item) {
+  if (typeof item === "string") return item;
+  return item?.title || "Notícia em atualização";
+}
+
+function getNewsItemDescription(item) {
+  if (typeof item === "string") return "";
+  return item?.description || "";
+}
+
+function getNewsItemImage(item) {
+  if (typeof item === "string") return "";
+  return item?.image || "";
+}
+
+function getNewsItemSource(item, fallback = "Notícias") {
+  if (typeof item === "string") return fallback;
+  return item?.source || fallback;
+}
+
+function getNewsItemTime(item) {
+  if (typeof item === "string" || !item?.pubDate) {
+    return new Date().toLocaleTimeString("pt-BR", {
+      hour: "2-digit",
+      minute: "2-digit",
+    });
+  }
+
+  const date = new Date(item.pubDate);
+
+  if (Number.isNaN(date.getTime())) {
+    return new Date().toLocaleTimeString("pt-BR", {
+      hour: "2-digit",
+      minute: "2-digit",
+    });
+  }
+
+  return date.toLocaleTimeString("pt-BR", {
+    hour: "2-digit",
+    minute: "2-digit",
+  });
+}
+
+function getNewsItemImageFromRss(item) {
+  return (
+    item?.thumbnail ||
+    item?.enclosure?.link ||
+    item?.enclosure?.url ||
+    item?.media?.content?.url ||
+    item?.media?.thumbnail?.url ||
+    item?.["media:content"]?.url ||
+    item?.["media:thumbnail"]?.url ||
+    ""
+  );
+}
 
 async function fetchWeatherByCity(cityName) {
   const city = (cityName || "João Câmara").trim();
@@ -186,11 +283,19 @@ async function fetchNewsFromRss(feedUrl) {
     );
 
     const data = await response.json();
+    const feedTitle = data?.feed?.title || data?.feed?.description || "Notícias";
 
     const items = (data?.items || [])
-      .slice(0, 6)
-      .map((item) => item.title)
-      .filter(Boolean);
+      .slice(0, 8)
+      .map((item) => ({
+        title: stripHtml(item.title),
+        description: stripHtml(item.description || item.content || "").slice(0, 160),
+        image: getNewsItemImageFromRss(item),
+        source: feedTitle,
+        pubDate: item.pubDate || item.published || "",
+        link: item.link || "",
+      }))
+      .filter((item) => item.title);
 
     return items.length > 0 ? items : DEFAULT_NEWS_ITEMS;
   } catch (error) {
@@ -2406,6 +2511,17 @@ function ClientPlaylistsPage({ client }) {
     return `${item.type} • ${item.duration}s • ${item.sound ? "Com som" : "Sem som"}`;
   }
 
+  function changeNewsSource(sourceName) {
+    setForm((prev) => ({
+      ...prev,
+      newsSource: sourceName,
+      newsFeedUrl:
+        sourceName === "Personalizado"
+          ? prev.newsFeedUrl
+          : NEWS_SOURCE_PRESETS[sourceName] || prev.newsFeedUrl,
+    }));
+  }
+
   function toggleTargetScreen(screenId) {
     const selected = form.targetScreenIds.includes(screenId);
 
@@ -3794,7 +3910,8 @@ function ClientTemplatesPage({ client }) {
     orientation: "Paisagem",
     duration: "15",
     city: "João Câmara",
-    newsFeedUrl: "https://g1.globo.com/rss/g1/rn/rio-grande-do-norte/",
+    newsSource: "G1 RN",
+    newsFeedUrl: NEWS_SOURCE_PRESETS["G1 RN"],
     title: "Informação ao vivo",
     subtitle: "Atualização automática para sua TV",
     primaryColor: "#06b6d4",
@@ -3875,7 +3992,8 @@ function ClientTemplatesPage({ client }) {
       orientation: "Paisagem",
       duration: "15",
       city: "João Câmara",
-      newsFeedUrl: "https://g1.globo.com/rss/g1/rn/rio-grande-do-norte/",
+      newsSource: "G1 RN",
+      newsFeedUrl: NEWS_SOURCE_PRESETS["G1 RN"],
       title: "Informação ao vivo",
       subtitle: "Atualização automática para sua TV",
       primaryColor: "#06b6d4",
@@ -4099,14 +4217,34 @@ function ClientTemplatesPage({ client }) {
             )}
 
             {form.type === "noticias" && (
-              <div className="form-group">
-                <label>URL RSS de notícias</label>
-                <input
-                  value={form.newsFeedUrl}
-                  placeholder="https://site.com/rss"
-                  onChange={(e) => setForm({ ...form, newsFeedUrl: e.target.value })}
-                />
-              </div>
+              <>
+                <div className="form-group">
+                  <label>Fonte de notícias</label>
+                  <select
+                    value={form.newsSource || "G1 RN"}
+                    onChange={(e) => changeNewsSource(e.target.value)}
+                  >
+                    {Object.keys(NEWS_SOURCE_PRESETS).map((sourceName) => (
+                      <option key={sourceName}>{sourceName}</option>
+                    ))}
+                  </select>
+                </div>
+
+                <div className="form-group">
+                  <label>URL RSS de notícias</label>
+                  <input
+                    value={form.newsFeedUrl}
+                    placeholder="https://site.com/rss"
+                    onChange={(e) =>
+                      setForm({
+                        ...form,
+                        newsSource: "Personalizado",
+                        newsFeedUrl: e.target.value,
+                      })
+                    }
+                  />
+                </div>
+              </>
             )}
           </div>
 
@@ -4326,7 +4464,7 @@ function TemplateVisualPreview({ template, compact = false }) {
       cancelled = true;
       clearInterval(interval);
     };
-  }, [template.type, template.city, template.newsFeedUrl]);
+  }, [template.type, template.templateType, template.city, template.newsFeedUrl]);
 
   return (
     <div
@@ -4365,19 +4503,118 @@ function TemplateVisualPreview({ template, compact = false }) {
       )}
 
       {(template.templateType || template.type) === "noticias" && (
-        <div className="template-news-layout">
-          <div className="template-breaking">AO VIVO</div>
+        <div
+          className="template-news-layout"
+          style={{
+            display: "grid",
+            gridTemplateColumns: compact ? "1fr" : "1.05fr 0.95fr",
+            gap: compact ? 12 : 30,
+            alignItems: "center",
+          }}
+        >
+          <div>
+            <div className="template-breaking">
+              {template.newsSource || "AO VIVO"}
+            </div>
 
-          <h2>{template.title || "Últimas notícias"}</h2>
-          <p>{template.subtitle || "Manchetes atualizadas automaticamente"}</p>
+            <h2>{template.title || "Últimas notícias"}</h2>
+            <p>{template.subtitle || "Manchetes atualizadas automaticamente"}</p>
 
-          <div className="template-news-list">
-            {news.slice(0, compact ? 2 : 4).map((item, index) => (
-              <div key={`${item}-${index}`} className="template-news-item">
-                <span>{String(index + 1).padStart(2, "0")}</span>
-                <strong>{item}</strong>
+            <div className="template-news-list">
+              {news.slice(0, compact ? 2 : 3).map((item, index) => (
+                <div key={`${getNewsItemTitle(item)}-${index}`} className="template-news-item">
+                  <span>{String(index + 1).padStart(2, "0")}</span>
+                  <strong>{getNewsItemTitle(item)}</strong>
+                </div>
+              ))}
+            </div>
+          </div>
+
+          <div
+            style={{
+              minHeight: compact ? 120 : 330,
+              borderRadius: compact ? 18 : 28,
+              overflow: "hidden",
+              background: "linear-gradient(135deg, rgba(34, 211, 238, 0.16), rgba(147, 51, 234, 0.22))",
+              border: "1px solid rgba(255,255,255,0.12)",
+              position: "relative",
+              display: "flex",
+              alignItems: "stretch",
+            }}
+          >
+            {getNewsItemImage(news[0]) ? (
+              <img
+                src={getNewsItemImage(news[0])}
+                alt={getNewsItemTitle(news[0])}
+                style={{
+                  width: "100%",
+                  height: "100%",
+                  objectFit: "cover",
+                  display: "block",
+                }}
+              />
+            ) : (
+              <div
+                style={{
+                  width: "100%",
+                  minHeight: compact ? 120 : 330,
+                  display: "flex",
+                  alignItems: "center",
+                  justifyContent: "center",
+                  color: "var(--template-accent)",
+                }}
+              >
+                <Newspaper size={compact ? 42 : 88} />
               </div>
-            ))}
+            )}
+
+            <div
+              style={{
+                position: "absolute",
+                left: 0,
+                right: 0,
+                bottom: 0,
+                padding: compact ? 12 : 22,
+                background: "linear-gradient(180deg, transparent, rgba(2, 6, 23, 0.92))",
+              }}
+            >
+              <strong
+                style={{
+                  display: "block",
+                  fontSize: compact ? 14 : 26,
+                  lineHeight: 1.08,
+                  color: "#ffffff",
+                }}
+              >
+                {getNewsItemTitle(news[0])}
+              </strong>
+
+              {!compact && (
+                <p
+                  style={{
+                    marginTop: 10,
+                    color: "rgba(255,255,255,0.78)",
+                    fontSize: 16,
+                    lineHeight: 1.25,
+                  }}
+                >
+                  {getNewsItemDescription(news[0]) ||
+                    `${getNewsItemSource(news[0], template.newsSource || "Notícias")} • ${getNewsItemTime(news[0])}`}
+                </p>
+              )}
+
+              <span
+                style={{
+                  display: "block",
+                  marginTop: 10,
+                  color: "var(--template-accent)",
+                  fontWeight: 950,
+                  fontSize: compact ? 11 : 14,
+                }}
+              >
+                {getNewsItemSource(news[0], template.newsSource || "Notícias")} • {getNewsItemTime(news[0])}
+              </span>
+            </div>
           </div>
         </div>
       )}
@@ -4400,9 +4637,9 @@ function TemplateVisualPreview({ template, compact = false }) {
 
       <div className="template-tv-ticker">
         <span>
-          {template.type === "noticias"
-            ? (news[0] || "Notícias ao vivo")
-            : template.type === "clima"
+          {(template.templateType || template.type) === "noticias"
+            ? `${getNewsItemSource(news[0], template.newsSource || "Notícias")} • ${getNewsItemTitle(news[0])}`
+            : (template.templateType || template.type) === "clima"
               ? `Clima em ${weather?.city || template.city || "sua cidade"} • Atualização automática`
               : template.subtitle || "Template profissional para TV"}
         </span>
