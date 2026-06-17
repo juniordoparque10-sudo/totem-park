@@ -155,8 +155,52 @@ const NEWS_SOURCE_PRESETS = {
   "CNN Brasil": "https://www.cnnbrasil.com.br/feed/",
   "UOL Notícias": "https://rss.uol.com.br/feed/noticias.xml",
   "Globo": "https://g1.globo.com/rss/g1/",
+  "Metrópoles": "https://www.metropoles.com/feed",
+  "Jovem Pan": "https://jovempan.com.br/feed",
+  "GE": "https://ge.globo.com/rss/ge/",
   "Personalizado": "",
 };
+
+function getSavedCustomNewsSources() {
+  try {
+    const saved = JSON.parse(
+      localStorage.getItem("totempark-custom-news-sources") || "[]"
+    );
+
+    return Array.isArray(saved)
+      ? saved.filter((item) => item?.name && item?.url)
+      : [];
+  } catch (error) {
+    return [];
+  }
+}
+
+function saveCustomNewsSource(url) {
+  const cleanUrl = String(url || "").trim();
+
+  if (!cleanUrl) return null;
+
+  const saved = getSavedCustomNewsSources();
+  const alreadyExists = saved.some((item) => item.url === cleanUrl);
+
+  if (alreadyExists) {
+    return saved.find((item) => item.url === cleanUrl);
+  }
+
+  const source = {
+    name: `Personalizado ${saved.length + 1}`,
+    url: cleanUrl,
+  };
+
+  const updated = [...saved, source];
+
+  localStorage.setItem(
+    "totempark-custom-news-sources",
+    JSON.stringify(updated)
+  );
+
+  return source;
+}
 
 function stripHtml(value) {
   return String(value || "")
@@ -311,6 +355,101 @@ function getTemplateThemeStyle(template) {
     "--template-accent": template?.accentColor || "#22d3ee",
     "--template-text": template?.textColor || "#ffffff",
   };
+}
+
+function getTemplateTypeLabel(type) {
+  const labels = {
+    clima: "Clima ao vivo",
+    noticias: "Notícias ao vivo",
+    comercial: "Comercial",
+    aviso: "Aviso",
+    jornal_premium: "Jornal TV Premium",
+    cardapio_premium: "Cardápio Premium",
+    promocao_premium: "Promoção Premium",
+    corporativo_premium: "Corporativo Premium",
+  };
+
+  return labels[type] || type || "Template";
+}
+
+function getTemplateBadge(type) {
+  if (type === "jornal_premium") return "JORNAL TV";
+  if (type === "cardapio_premium") return "CARDÁPIO";
+  if (type === "promocao_premium") return "OFERTAS";
+  if (type === "corporativo_premium") return "CORPORATIVO";
+  if (type === "comercial") return "OFERTA";
+  if (type === "aviso") return "AVISO";
+
+  return "AO VIVO";
+}
+
+const PREMIUM_TEMPLATE_TYPES = [
+  "jornal_premium",
+  "cardapio_premium",
+  "promocao_premium",
+  "corporativo_premium",
+];
+
+const DEFAULT_MENU_ITEMS = [
+  { category: "Lanches", name: "Combo Especial", description: "Sanduíche, batata e bebida", price: "R$ 29,90" },
+  { category: "Bebidas", name: "Refrigerante", description: "Lata ou copo", price: "R$ 7,00" },
+  { category: "Sobremesa", name: "Doce da Casa", description: "Sobremesa especial", price: "R$ 12,00" },
+  { category: "Promoção", name: "Oferta do Dia", description: "Produto em destaque", price: "R$ 24,90" },
+];
+
+const DEFAULT_PROMO_ITEMS = [
+  { name: "Produto destaque", description: "Oferta principal da campanha", oldPrice: "R$ 49,90", price: "R$ 39,90" },
+  { name: "Oferta 01", description: "Produto em promoção", oldPrice: "R$ 19,90", price: "R$ 14,90" },
+  { name: "Oferta 02", description: "Produto em promoção", oldPrice: "R$ 29,90", price: "R$ 21,90" },
+  { name: "Oferta 03", description: "Produto em promoção", oldPrice: "R$ 12,90", price: "R$ 9,90" },
+];
+
+const DEFAULT_CORPORATE_ITEMS = [
+  "Atendimento com qualidade e agilidade",
+  "Agenda do dia disponível na recepção",
+  "Novos comunicados atualizados em tempo real",
+];
+
+const DEFAULT_AGENDA_ITEMS = [
+  { time: "08:00", title: "Abertura", responsible: "Equipe" },
+  { time: "10:00", title: "Reunião", responsible: "Coordenação" },
+  { time: "15:00", title: "Atendimento", responsible: "Recepção" },
+];
+
+const DEFAULT_INDICATOR_ITEMS = [
+  { label: "Atendimento", value: "98%", note: "Satisfação" },
+  { label: "Agenda", value: "12", note: "Eventos hoje" },
+  { label: "Status", value: "OK", note: "Operação" },
+];
+
+function getTemplateMenuItems(template) {
+  return Array.isArray(template?.menuItems) && template.menuItems.length > 0
+    ? template.menuItems
+    : DEFAULT_MENU_ITEMS;
+}
+
+function getTemplatePromoItems(template) {
+  return Array.isArray(template?.promoItems) && template.promoItems.length > 0
+    ? template.promoItems
+    : DEFAULT_PROMO_ITEMS;
+}
+
+function getTemplateCorporateItems(template) {
+  return Array.isArray(template?.corporateItems) && template.corporateItems.length > 0
+    ? template.corporateItems
+    : DEFAULT_CORPORATE_ITEMS;
+}
+
+function getTemplateAgendaItems(template) {
+  return Array.isArray(template?.agendaItems) && template.agendaItems.length > 0
+    ? template.agendaItems
+    : DEFAULT_AGENDA_ITEMS;
+}
+
+function getTemplateIndicatorItems(template) {
+  return Array.isArray(template?.indicatorItems) && template.indicatorItems.length > 0
+    ? template.indicatorItems
+    : DEFAULT_INDICATOR_ITEMS;
 }
 
 const firebaseConfig = {
@@ -2505,10 +2644,67 @@ function ClientPlaylistsPage({ client }) {
     if (!item) return "Item não encontrado";
 
     if (item.playerItemType === "template" || item.templateType) {
-      return `Template ${item.templateType || item.type} • ${item.duration || 15}s`;
+      return `${getTemplateTypeLabel(item.templateType || item.type)} • ${item.duration || 15}s`;
     }
 
     return `${item.type} • ${item.duration}s • ${item.sound ? "Com som" : "Sem som"}`;
+  }
+
+  function handleCustomNewsUrlChange(url) {
+    const source = saveCustomNewsSource(url);
+
+    setCustomNewsSources(getSavedCustomNewsSources());
+
+    setForm({
+      ...form,
+      newsSource: source?.name || "Personalizado",
+      newsFeedUrl: url,
+    });
+  }
+
+  function updateArrayItem(field, index, key, value) {
+    setForm((prev) => {
+      const current = Array.isArray(prev[field]) ? [...prev[field]] : [];
+
+      current[index] = {
+        ...(current[index] || {}),
+        [key]: value,
+      };
+
+      return {
+        ...prev,
+        [field]: current,
+      };
+    });
+  }
+
+  function updateTextArrayItem(field, index, value) {
+    setForm((prev) => {
+      const current = Array.isArray(prev[field]) ? [...prev[field]] : [];
+
+      current[index] = value;
+
+      return {
+        ...prev,
+        [field]: current,
+      };
+    });
+  }
+
+  function addArrayItem(field, item) {
+    setForm((prev) => ({
+      ...prev,
+      [field]: [...(Array.isArray(prev[field]) ? prev[field] : []), item],
+    }));
+  }
+
+  function removeArrayItem(field, index) {
+    setForm((prev) => ({
+      ...prev,
+      [field]: (Array.isArray(prev[field]) ? prev[field] : []).filter(
+        (_, itemIndex) => itemIndex !== index
+      ),
+    }));
   }
 
   function toggleTargetScreen(screenId) {
@@ -3026,7 +3222,7 @@ function ClientPlaylistsPage({ client }) {
                   <strong>{template.name}</strong>
 
                   <span>
-                    Template {template.type} • {template.duration || 15}s
+                    {getTemplateTypeLabel(template.type)} • {template.duration || 15}s
                   </span>
                 </button>
               ))
@@ -3892,6 +4088,9 @@ function ClientTemplatesPage({ client }) {
   const [templates, setTemplates] = useState([]);
   const [screens, setScreens] = useState([]);
   const [saving, setSaving] = useState(false);
+  const [customNewsSources, setCustomNewsSources] = useState(() =>
+    getSavedCustomNewsSources()
+  );
 
   const [form, setForm] = useState({
     name: "Clima ao vivo",
@@ -3909,6 +4108,13 @@ function ClientTemplatesPage({ client }) {
     textColor: "#ffffff",
     targetScreenIds: [],
     enabled: true,
+    menuItems: DEFAULT_MENU_ITEMS.map((item) => ({ ...item })),
+    promoItems: DEFAULT_PROMO_ITEMS.map((item) => ({ ...item })),
+    corporateItems: [...DEFAULT_CORPORATE_ITEMS],
+    agendaItems: DEFAULT_AGENDA_ITEMS.map((item) => ({ ...item })),
+    indicatorItems: DEFAULT_INDICATOR_ITEMS.map((item) => ({ ...item })),
+    footerText: "Desenvolvido por Park Solutions",
+    callToAction: "Aponte a câmera e saiba mais",
   });
 
   useEffect(() => {
@@ -3933,44 +4139,165 @@ function ClientTemplatesPage({ client }) {
   }, [client.id]);
 
   function changeType(type) {
+    const presets = {
+      clima: {
+        name: "Clima ao vivo",
+        title: "Clima ao vivo",
+        subtitle: "Previsão atualizada automaticamente",
+        duration: "15",
+        city: "João Câmara",
+      },
+      noticias: {
+        name: "Notícias ao vivo",
+        title: "Últimas notícias",
+        subtitle: "Manchetes atualizadas automaticamente",
+        duration: "15",
+      },
+      comercial: {
+        name: "Oferta premium",
+        title: "Oferta especial",
+        subtitle: "Destaque sua promoção na TV",
+        duration: "15",
+      },
+      aviso: {
+        name: "Aviso institucional",
+        title: "Comunicado importante",
+        subtitle: "Informe seu público com visual profissional",
+        duration: "15",
+      },
+      jornal_premium: {
+        name: "Jornal TV Premium",
+        title: "Jornal TV",
+        subtitle: "Notícias, clima e hora em layout profissional",
+        duration: "20",
+        city: "João Câmara",
+      },
+      cardapio_premium: {
+        name: "Cardápio Premium",
+        title: "Cardápio Digital",
+        subtitle: "Produtos, categorias e preços com visual moderno",
+        duration: "20",
+        menuItems: DEFAULT_MENU_ITEMS.map((item) => ({ ...item })),
+        callToAction: "Peça pelo QR Code ou no balcão",
+        footerText: "Totem Park Menu",
+      },
+      promocao_premium: {
+        name: "Promoção Premium",
+        title: "Ofertas da Semana",
+        subtitle: "Promoções em destaque para sua TV",
+        duration: "18",
+        promoItems: DEFAULT_PROMO_ITEMS.map((item) => ({ ...item })),
+        callToAction: "Promoção por tempo limitado",
+      },
+      corporativo_premium: {
+        name: "Corporativo Premium",
+        title: "Comunicação Corporativa",
+        subtitle: "Avisos, agenda, indicadores e vídeo institucional",
+        duration: "20",
+        corporateItems: [...DEFAULT_CORPORATE_ITEMS],
+        agendaItems: DEFAULT_AGENDA_ITEMS.map((item) => ({ ...item })),
+        indicatorItems: DEFAULT_INDICATOR_ITEMS.map((item) => ({ ...item })),
+        footerText: "Comunicação interna atualizada em tempo real",
+      },
+    };
+
+    const preset = presets[type] || presets.clima;
+
     setForm((prev) => ({
       ...prev,
+      ...preset,
       type,
-      name:
-        type === "clima"
-          ? "Clima ao vivo"
-          : type === "noticias"
-            ? "Notícias ao vivo"
-            : type === "comercial"
-              ? "Oferta premium"
-              : "Aviso institucional",
-      title:
-        type === "clima"
-          ? "Clima ao vivo"
-          : type === "noticias"
-            ? "Últimas notícias"
-            : type === "comercial"
-              ? "Oferta especial"
-              : "Comunicado importante",
-      subtitle:
-        type === "clima"
-          ? "Previsão atualizada automaticamente"
-          : type === "noticias"
-            ? "Manchetes atualizadas automaticamente"
-            : type === "comercial"
-              ? "Destaque sua promoção na TV"
-              : "Informe seu público com visual profissional",
+      newsSource:
+        type === "noticias" || type === "jornal_premium"
+          ? prev.newsSource || "G1 RN"
+          : prev.newsSource,
+      newsFeedUrl:
+        type === "noticias" || type === "jornal_premium"
+          ? prev.newsFeedUrl || NEWS_SOURCE_PRESETS["G1 RN"]
+          : prev.newsFeedUrl,
     }));
   }
 
   function changeNewsSource(sourceName) {
+    const customSource = customNewsSources.find(
+      (source) => source.name === sourceName
+    );
+
     setForm((prev) => ({
       ...prev,
       newsSource: sourceName,
       newsFeedUrl:
         sourceName === "Personalizado"
           ? prev.newsFeedUrl
-          : NEWS_SOURCE_PRESETS[sourceName] || prev.newsFeedUrl,
+          : customSource?.url || NEWS_SOURCE_PRESETS[sourceName] || prev.newsFeedUrl,
+    }));
+  }
+
+  function handleCustomNewsUrlChange(url) {
+    const source = saveCustomNewsSource(url);
+
+    setCustomNewsSources(getSavedCustomNewsSources());
+
+    setForm((prev) => ({
+      ...prev,
+      newsSource: source?.name || "Personalizado",
+      newsFeedUrl: url,
+    }));
+  }
+
+  function updateArrayItem(field, index, key, value) {
+    setForm((prev) => {
+      const current = Array.isArray(prev[field])
+        ? prev[field].map((item) =>
+            item && typeof item === "object" && !Array.isArray(item)
+              ? { ...item }
+              : item
+          )
+        : [];
+
+      current[index] = {
+        ...(current[index] || {}),
+        [key]: value,
+      };
+
+      return {
+        ...prev,
+        [field]: current,
+      };
+    });
+  }
+
+  function updateTextArrayItem(field, index, value) {
+    setForm((prev) => {
+      const current = Array.isArray(prev[field]) ? [...prev[field]] : [];
+
+      current[index] = value;
+
+      return {
+        ...prev,
+        [field]: current,
+      };
+    });
+  }
+
+  function addArrayItem(field, item) {
+    setForm((prev) => ({
+      ...prev,
+      [field]: [
+        ...(Array.isArray(prev[field]) ? prev[field] : []),
+        item && typeof item === "object" && !Array.isArray(item)
+          ? { ...item }
+          : item,
+      ],
+    }));
+  }
+
+  function removeArrayItem(field, index) {
+    setForm((prev) => ({
+      ...prev,
+      [field]: (Array.isArray(prev[field]) ? prev[field] : []).filter(
+        (_, itemIndex) => itemIndex !== index
+      ),
     }));
   }
 
@@ -4002,6 +4329,13 @@ function ClientTemplatesPage({ client }) {
       textColor: "#ffffff",
       targetScreenIds: [],
       enabled: true,
+      menuItems: DEFAULT_MENU_ITEMS.map((item) => ({ ...item })),
+      promoItems: DEFAULT_PROMO_ITEMS.map((item) => ({ ...item })),
+      corporateItems: [...DEFAULT_CORPORATE_ITEMS],
+      agendaItems: DEFAULT_AGENDA_ITEMS.map((item) => ({ ...item })),
+      indicatorItems: DEFAULT_INDICATOR_ITEMS.map((item) => ({ ...item })),
+      footerText: "Desenvolvido por Park Solutions",
+      callToAction: "Aponte a câmera e saiba mais",
     });
   }
 
@@ -4156,6 +4490,46 @@ function ClientTemplatesPage({ client }) {
               <strong>Aviso</strong>
               <span>Comunicado institucional</span>
             </button>
+
+            <button
+              className={form.type === "jornal_premium" ? "template-type-card active" : "template-type-card"}
+              onClick={() => changeType("jornal_premium")}
+              type="button"
+            >
+              <Newspaper size={28} />
+              <strong>Jornal TV Premium</strong>
+              <span>RSS + clima + hora, em paisagem e retrato</span>
+            </button>
+
+            <button
+              className={form.type === "cardapio_premium" ? "template-type-card active" : "template-type-card"}
+              onClick={() => changeType("cardapio_premium")}
+              type="button"
+            >
+              <Palette size={28} />
+              <strong>Cardápio Premium</strong>
+              <span>Produtos, categorias e preços para restaurantes</span>
+            </button>
+
+            <button
+              className={form.type === "promocao_premium" ? "template-type-card active" : "template-type-card"}
+              onClick={() => changeType("promocao_premium")}
+              type="button"
+            >
+              <CreditCard size={28} />
+              <strong>Promoção Premium</strong>
+              <span>Ofertas, preço antigo, preço destaque e CTA</span>
+            </button>
+
+            <button
+              className={form.type === "corporativo_premium" ? "template-type-card active" : "template-type-card"}
+              onClick={() => changeType("corporativo_premium")}
+              type="button"
+            >
+              <Clock3 size={28} />
+              <strong>Corporativo Premium</strong>
+              <span>Avisos, agenda, indicadores e comunicação interna</span>
+            </button>
           </div>
 
           <div className="form-grid">
@@ -4205,7 +4579,7 @@ function ClientTemplatesPage({ client }) {
               />
             </div>
 
-            {form.type === "clima" && (
+            {(form.type === "clima" || form.type === "jornal_premium") && (
               <div className="form-group">
                 <label>Cidade do clima</label>
                 <input
@@ -4216,7 +4590,7 @@ function ClientTemplatesPage({ client }) {
               </div>
             )}
 
-            {form.type === "noticias" && (
+            {(form.type === "noticias" || form.type === "jornal_premium") && (
               <>
                 <div className="form-group">
                   <label>Fonte de notícias</label>
@@ -4227,26 +4601,378 @@ function ClientTemplatesPage({ client }) {
                     {Object.keys(NEWS_SOURCE_PRESETS).map((sourceName) => (
                       <option key={sourceName}>{sourceName}</option>
                     ))}
+
+                    {customNewsSources.map((source) => (
+                      <option key={source.url}>{source.name}</option>
+                    ))}
                   </select>
                 </div>
 
                 <div className="form-group">
-                  <label>URL RSS de notícias</label>
+                  <label>URL RSS personalizada</label>
                   <input
                     value={form.newsFeedUrl}
                     placeholder="https://site.com/rss"
-                    onChange={(e) =>
-                      setForm({
-                        ...form,
-                        newsSource: "Personalizado",
-                        newsFeedUrl: e.target.value,
-                      })
-                    }
+                    onChange={(e) => handleCustomNewsUrlChange(e.target.value)}
                   />
                 </div>
               </>
             )}
           </div>
+
+          {form.type === "cardapio_premium" && (
+            <div className="template-color-panel">
+              <div className="playlist-section-title compact">
+                <div>
+                  <h3>Itens do cardápio</h3>
+                  <p>Edite categorias, produtos, descrições e preços.</p>
+                </div>
+
+                <button
+                  type="button"
+                  className="client-action primary"
+                  onClick={() =>
+                    addArrayItem("menuItems", {
+                      category: "Categoria",
+                      name: "Novo produto",
+                      description: "Descrição do produto",
+                      price: "R$ 0,00",
+                    })
+                  }
+                >
+                  + Item
+                </button>
+              </div>
+
+              {(form.menuItems || []).map((item, index) => (
+                <div className="form-grid" key={`menu-item-${index}`}>
+                  <div className="form-group">
+                    <label>Categoria</label>
+                    <input
+                      value={item.category || ""}
+                      onChange={(e) =>
+                        updateArrayItem("menuItems", index, "category", e.target.value)
+                      }
+                    />
+                  </div>
+
+                  <div className="form-group">
+                    <label>Produto</label>
+                    <input
+                      value={item.name || ""}
+                      onChange={(e) =>
+                        updateArrayItem("menuItems", index, "name", e.target.value)
+                      }
+                    />
+                  </div>
+
+                  <div className="form-group">
+                    <label>Descrição</label>
+                    <input
+                      value={item.description || ""}
+                      onChange={(e) =>
+                        updateArrayItem("menuItems", index, "description", e.target.value)
+                      }
+                    />
+                  </div>
+
+                  <div className="form-group">
+                    <label>Preço</label>
+                    <input
+                      value={item.price || ""}
+                      onChange={(e) =>
+                        updateArrayItem("menuItems", index, "price", e.target.value)
+                      }
+                    />
+                  </div>
+
+                  <button
+                    type="button"
+                    className="delete-button"
+                    onClick={() => removeArrayItem("menuItems", index)}
+                  >
+                    Remover
+                  </button>
+                </div>
+              ))}
+
+              <div className="form-group">
+                <label>Chamada do rodapé</label>
+                <input
+                  value={form.callToAction || ""}
+                  onChange={(e) => setForm({ ...form, callToAction: e.target.value })}
+                />
+              </div>
+            </div>
+          )}
+
+          {form.type === "promocao_premium" && (
+            <div className="template-color-panel">
+              <div className="playlist-section-title compact">
+                <div>
+                  <h3>Produtos em promoção</h3>
+                  <p>Edite produto, descrição, preço antigo e preço promocional.</p>
+                </div>
+
+                <button
+                  type="button"
+                  className="client-action primary"
+                  onClick={() =>
+                    addArrayItem("promoItems", {
+                      name: "Nova oferta",
+                      description: "Descrição da oferta",
+                      oldPrice: "R$ 0,00",
+                      price: "R$ 0,00",
+                    })
+                  }
+                >
+                  + Oferta
+                </button>
+              </div>
+
+              {(form.promoItems || []).map((item, index) => (
+                <div className="form-grid" key={`promo-item-${index}`}>
+                  <div className="form-group">
+                    <label>Produto</label>
+                    <input
+                      value={item.name || ""}
+                      onChange={(e) =>
+                        updateArrayItem("promoItems", index, "name", e.target.value)
+                      }
+                    />
+                  </div>
+
+                  <div className="form-group">
+                    <label>Descrição</label>
+                    <input
+                      value={item.description || ""}
+                      onChange={(e) =>
+                        updateArrayItem("promoItems", index, "description", e.target.value)
+                      }
+                    />
+                  </div>
+
+                  <div className="form-group">
+                    <label>Preço antigo</label>
+                    <input
+                      value={item.oldPrice || ""}
+                      onChange={(e) =>
+                        updateArrayItem("promoItems", index, "oldPrice", e.target.value)
+                      }
+                    />
+                  </div>
+
+                  <div className="form-group">
+                    <label>Preço promocional</label>
+                    <input
+                      value={item.price || ""}
+                      onChange={(e) =>
+                        updateArrayItem("promoItems", index, "price", e.target.value)
+                      }
+                    />
+                  </div>
+
+                  <button
+                    type="button"
+                    className="delete-button"
+                    onClick={() => removeArrayItem("promoItems", index)}
+                  >
+                    Remover
+                  </button>
+                </div>
+              ))}
+
+              <div className="form-group">
+                <label>Chamada da promoção</label>
+                <input
+                  value={form.callToAction || ""}
+                  onChange={(e) => setForm({ ...form, callToAction: e.target.value })}
+                />
+              </div>
+            </div>
+          )}
+
+          {form.type === "corporativo_premium" && (
+            <div className="template-color-panel">
+              <div className="playlist-section-title compact">
+                <div>
+                  <h3>Comunicação corporativa</h3>
+                  <p>Edite avisos, agenda e indicadores exibidos na TV.</p>
+                </div>
+              </div>
+
+              <div className="playlist-section-title compact">
+                <div>
+                  <h3>Avisos</h3>
+                  <p>Mensagens rápidas da empresa.</p>
+                </div>
+
+                <button
+                  type="button"
+                  className="client-action primary"
+                  onClick={() => addArrayItem("corporateItems", "Novo aviso corporativo")}
+                >
+                  + Aviso
+                </button>
+              </div>
+
+              {(form.corporateItems || []).map((item, index) => (
+                <div className="form-grid" key={`corporate-item-${index}`}>
+                  <div className="form-group">
+                    <label>Aviso {index + 1}</label>
+                    <input
+                      value={item || ""}
+                      onChange={(e) =>
+                        updateTextArrayItem("corporateItems", index, e.target.value)
+                      }
+                    />
+                  </div>
+
+                  <button
+                    type="button"
+                    className="delete-button"
+                    onClick={() => removeArrayItem("corporateItems", index)}
+                  >
+                    Remover
+                  </button>
+                </div>
+              ))}
+
+              <div className="playlist-section-title compact">
+                <div>
+                  <h3>Agenda</h3>
+                  <p>Horários, eventos e responsáveis.</p>
+                </div>
+
+                <button
+                  type="button"
+                  className="client-action primary"
+                  onClick={() =>
+                    addArrayItem("agendaItems", {
+                      time: "00:00",
+                      title: "Novo evento",
+                      responsible: "Responsável",
+                    })
+                  }
+                >
+                  + Agenda
+                </button>
+              </div>
+
+              {(form.agendaItems || []).map((item, index) => (
+                <div className="form-grid" key={`agenda-item-${index}`}>
+                  <div className="form-group">
+                    <label>Hora</label>
+                    <input
+                      value={item.time || ""}
+                      onChange={(e) =>
+                        updateArrayItem("agendaItems", index, "time", e.target.value)
+                      }
+                    />
+                  </div>
+
+                  <div className="form-group">
+                    <label>Evento</label>
+                    <input
+                      value={item.title || ""}
+                      onChange={(e) =>
+                        updateArrayItem("agendaItems", index, "title", e.target.value)
+                      }
+                    />
+                  </div>
+
+                  <div className="form-group">
+                    <label>Responsável</label>
+                    <input
+                      value={item.responsible || ""}
+                      onChange={(e) =>
+                        updateArrayItem("agendaItems", index, "responsible", e.target.value)
+                      }
+                    />
+                  </div>
+
+                  <button
+                    type="button"
+                    className="delete-button"
+                    onClick={() => removeArrayItem("agendaItems", index)}
+                  >
+                    Remover
+                  </button>
+                </div>
+              ))}
+
+              <div className="playlist-section-title compact">
+                <div>
+                  <h3>Indicadores</h3>
+                  <p>Metas, números e status.</p>
+                </div>
+
+                <button
+                  type="button"
+                  className="client-action primary"
+                  onClick={() =>
+                    addArrayItem("indicatorItems", {
+                      label: "Indicador",
+                      value: "0",
+                      note: "Descrição",
+                    })
+                  }
+                >
+                  + Indicador
+                </button>
+              </div>
+
+              {(form.indicatorItems || []).map((item, index) => (
+                <div className="form-grid" key={`indicator-item-${index}`}>
+                  <div className="form-group">
+                    <label>Nome</label>
+                    <input
+                      value={item.label || ""}
+                      onChange={(e) =>
+                        updateArrayItem("indicatorItems", index, "label", e.target.value)
+                      }
+                    />
+                  </div>
+
+                  <div className="form-group">
+                    <label>Valor</label>
+                    <input
+                      value={item.value || ""}
+                      onChange={(e) =>
+                        updateArrayItem("indicatorItems", index, "value", e.target.value)
+                      }
+                    />
+                  </div>
+
+                  <div className="form-group">
+                    <label>Observação</label>
+                    <input
+                      value={item.note || ""}
+                      onChange={(e) =>
+                        updateArrayItem("indicatorItems", index, "note", e.target.value)
+                      }
+                    />
+                  </div>
+
+                  <button
+                    type="button"
+                    className="delete-button"
+                    onClick={() => removeArrayItem("indicatorItems", index)}
+                  >
+                    Remover
+                  </button>
+                </div>
+              ))}
+
+              <div className="form-group">
+                <label>Rodapé corporativo</label>
+                <input
+                  value={form.footerText || ""}
+                  onChange={(e) => setForm({ ...form, footerText: e.target.value })}
+                />
+              </div>
+            </div>
+          )}
 
           <div className="template-color-panel">
             <div className="playlist-section-title compact">
@@ -4365,7 +5091,7 @@ function ClientTemplatesPage({ client }) {
                   <div>
                     <strong>{template.name}</strong>
                     <span>
-                      {template.type} • {template.duration || 15}s • {template.orientation}
+                      {getTemplateTypeLabel(template.type)} • {template.duration || 15}s • {template.orientation}
                     </span>
                   </div>
 
@@ -4425,19 +5151,19 @@ function TemplateVisualPreview({ template, compact = false }) {
 
         const realTemplateType = template.templateType || template.type;
 
-        if (realTemplateType === "clima") {
+        if (realTemplateType === "clima" || realTemplateType === "jornal_premium") {
           const data = await fetchWeatherByCity(template.city);
           if (!cancelled) setWeather(data);
         }
 
-        if (realTemplateType === "noticias") {
+        if (realTemplateType === "noticias" || realTemplateType === "jornal_premium") {
           const data = await fetchNewsFromRss(template.newsFeedUrl);
           if (!cancelled) setNews(data);
         }
       } catch (error) {
         console.log(error);
 
-        if ((template.templateType || template.type) === "clima" && !cancelled) {
+        if (((template.templateType || template.type) === "clima" || (template.templateType || template.type) === "jornal_premium") && !cancelled) {
           setWeather({
             city: template.city || "Sua cidade",
             temperature: "--",
@@ -4448,7 +5174,7 @@ function TemplateVisualPreview({ template, compact = false }) {
           });
         }
 
-        if ((template.templateType || template.type) === "noticias" && !cancelled) {
+        if (((template.templateType || template.type) === "noticias" || (template.templateType || template.type) === "jornal_premium") && !cancelled) {
           setNews(DEFAULT_NEWS_ITEMS);
         }
       } finally {
@@ -4466,16 +5192,38 @@ function TemplateVisualPreview({ template, compact = false }) {
     };
   }, [template.type, template.templateType, template.city, template.newsFeedUrl]);
 
+  const realTemplateType = template.templateType || template.type;
+  const isPortrait = template.orientation === "Retrato";
+  const orientationLabel = isPortrait ? "Retrato" : "Paisagem";
+  const mainNews = news[0] || DEFAULT_NEWS_ITEMS[0];
+
+  const premiumFrameStyle = {
+    minHeight: compact ? 160 : isPortrait ? 620 : 430,
+    height: compact ? "100%" : "auto",
+    display: "flex",
+    flexDirection: "column",
+    gap: compact ? 10 : 18,
+    position: "relative",
+    zIndex: 2,
+  };
+
+  const premiumGridStyle = {
+    display: "grid",
+    gridTemplateColumns: isPortrait || compact ? "1fr" : "1.25fr 0.75fr",
+    gap: compact ? 10 : 18,
+    flex: 1,
+  };
+
   return (
     <div
-      className={`template-tv-preview template-${template.templateType || template.type} template-orientation-${template.orientation === "Retrato" ? "portrait" : "landscape"} ${compact ? "compact" : ""}`}
+      className={`template-tv-preview template-${realTemplateType} template-orientation-${isPortrait ? "portrait" : "landscape"} ${compact ? "compact" : ""}`}
       style={getTemplateThemeStyle(template)}
     >
       <div className="template-orb one"></div>
       <div className="template-orb two"></div>
 
       <div className="template-tv-topbar">
-        <span>{template.title || "Totem Park"}</span>
+        <span>{template.title || "Totem Park"} • {orientationLabel}</span>
         <strong>{new Date().toLocaleTimeString("pt-BR", { hour: "2-digit", minute: "2-digit" })}</strong>
       </div>
 
@@ -4619,10 +5367,273 @@ function TemplateVisualPreview({ template, compact = false }) {
         </div>
       )}
 
+      {realTemplateType === "jornal_premium" && (
+        <div style={premiumFrameStyle}>
+          <div style={premiumGridStyle}>
+            <div
+              style={{
+                borderRadius: compact ? 18 : 30,
+                overflow: "hidden",
+                minHeight: compact ? 120 : isPortrait ? 300 : 360,
+                background: "rgba(255,255,255,0.07)",
+                border: "1px solid rgba(255,255,255,0.14)",
+                position: "relative",
+              }}
+            >
+              {getNewsItemImage(mainNews) ? (
+                <img
+                  src={getNewsItemImage(mainNews)}
+                  alt={getNewsItemTitle(mainNews)}
+                  style={{ width: "100%", height: "100%", objectFit: "cover", display: "block" }}
+                />
+              ) : (
+                <div style={{ width: "100%", height: "100%", minHeight: compact ? 120 : 300, display: "flex", alignItems: "center", justifyContent: "center", color: "var(--template-accent)" }}>
+                  <Newspaper size={compact ? 40 : 96} />
+                </div>
+              )}
+
+              <div
+                style={{
+                  position: "absolute",
+                  inset: "auto 0 0 0",
+                  padding: compact ? 12 : 26,
+                  background: "linear-gradient(180deg, transparent, rgba(0,0,0,0.94))",
+                }}
+              >
+                <div className="template-breaking">{template.newsSource || getNewsItemSource(mainNews, "Notícias")}</div>
+                <h2 style={{ margin: "8px 0 0", fontSize: compact ? 18 : isPortrait ? 34 : 42, lineHeight: 1.02 }}>
+                  {getNewsItemTitle(mainNews)}
+                </h2>
+                {!compact && (
+                  <p style={{ marginTop: 12, color: "rgba(255,255,255,0.78)", fontSize: isPortrait ? 16 : 18 }}>
+                    {getNewsItemDescription(mainNews) || template.subtitle}
+                  </p>
+                )}
+              </div>
+            </div>
+
+            <div
+              style={{
+                display: "grid",
+                gridTemplateColumns: isPortrait || compact ? "1fr 1fr" : "1fr",
+                gap: compact ? 8 : 14,
+              }}
+            >
+              <div style={{ borderRadius: 24, padding: compact ? 12 : 22, background: "rgba(255,255,255,0.08)", border: "1px solid rgba(255,255,255,0.14)" }}>
+                <small>Clima</small>
+                <h2 style={{ margin: "6px 0", fontSize: compact ? 22 : 42 }}>{weather?.temperature ?? "--"}°</h2>
+                <p style={{ margin: 0 }}>{weather?.city || template.city || "Sua cidade"}</p>
+              </div>
+
+              <div style={{ borderRadius: 24, padding: compact ? 12 : 22, background: "rgba(255,255,255,0.08)", border: "1px solid rgba(255,255,255,0.14)" }}>
+                <small>Agora</small>
+                <h2 style={{ margin: "6px 0", fontSize: compact ? 22 : 42 }}>
+                  {new Date().toLocaleTimeString("pt-BR", { hour: "2-digit", minute: "2-digit" })}
+                </h2>
+                <p style={{ margin: 0 }}>{new Date().toLocaleDateString("pt-BR")}</p>
+              </div>
+
+              {!compact && (
+                <div style={{ borderRadius: 24, padding: 22, background: "rgba(255,255,255,0.08)", border: "1px solid rgba(255,255,255,0.14)", gridColumn: isPortrait ? "1 / -1" : "auto" }}>
+                  <small>Manchetes</small>
+                  {news.slice(1, isPortrait ? 4 : 5).map((item, index) => (
+                    <p key={`${getNewsItemTitle(item)}-${index}`} style={{ margin: "10px 0 0", fontWeight: 800 }}>
+                      {String(index + 1).padStart(2, "0")} • {getNewsItemTitle(item)}
+                    </p>
+                  ))}
+                </div>
+              )}
+            </div>
+          </div>
+        </div>
+      )}
+
+      {realTemplateType === "cardapio_premium" && (
+        <div style={premiumFrameStyle}>
+          <div
+            style={{
+              borderRadius: compact ? 18 : 30,
+              padding: compact ? 14 : 30,
+              background: "linear-gradient(135deg, rgba(6,182,212,0.22), rgba(147,51,234,0.24))",
+              border: "1px solid rgba(255,255,255,0.16)",
+            }}
+          >
+            <div className="template-breaking">CARDÁPIO DIGITAL</div>
+            <h2 style={{ margin: "8px 0 0", fontSize: compact ? 22 : isPortrait ? 42 : 54 }}>{template.title || "Cardápio Digital"}</h2>
+            <p style={{ margin: "8px 0 0", color: "rgba(255,255,255,0.74)" }}>{template.subtitle || "Produtos e preços em destaque"}</p>
+          </div>
+
+          <div
+            style={{
+              display: "grid",
+              gridTemplateColumns: isPortrait || compact ? "1fr" : "repeat(2, 1fr)",
+              gap: compact ? 10 : 16,
+            }}
+          >
+            {getTemplateMenuItems(template).slice(0, compact ? 2 : 6).map((item, index) => (
+              <div
+                key={`${item.name}-${index}`}
+                style={{
+                  borderRadius: compact ? 16 : 24,
+                  padding: compact ? 12 : 22,
+                  background: "rgba(255,255,255,0.08)",
+                  border: "1px solid rgba(255,255,255,0.13)",
+                  display: "flex",
+                  alignItems: "center",
+                  justifyContent: "space-between",
+                  gap: 12,
+                }}
+              >
+                <div>
+                  <small style={{ color: "var(--template-accent)", fontWeight: 900 }}>{item.category}</small>
+                  <strong style={{ display: "block", fontSize: compact ? 15 : 22, marginTop: 4 }}>{item.name}</strong>
+                  {!compact && item.description && (
+                    <span style={{ display: "block", color: "rgba(255,255,255,0.62)", marginTop: 4, fontSize: 13 }}>
+                      {item.description}
+                    </span>
+                  )}
+                </div>
+                <strong style={{ fontSize: compact ? 18 : 28, color: "var(--template-accent)" }}>{item.price}</strong>
+              </div>
+            ))}
+          </div>
+
+          {!compact && (
+            <div style={{ marginTop: "auto", borderRadius: 22, padding: 18, background: "rgba(0,0,0,0.26)", display: "flex", alignItems: "center", justifyContent: "space-between", gap: 14 }}>
+              <span>{template.callToAction || "Peça pelo QR Code ou no balcão"}</span>
+              <strong style={{ color: "var(--template-accent)" }}>{template.footerText || "Totem Park Menu"}</strong>
+            </div>
+          )}
+        </div>
+      )}
+
+      {realTemplateType === "promocao_premium" && (
+        <div style={premiumFrameStyle}>
+          <div
+            style={{
+              borderRadius: compact ? 18 : 32,
+              padding: compact ? 14 : 34,
+              background: "linear-gradient(135deg, rgba(251,191,36,0.22), rgba(239,68,68,0.25), rgba(147,51,234,0.24))",
+              border: "1px solid rgba(255,255,255,0.16)",
+              textAlign: "center",
+            }}
+          >
+            <div className="template-breaking">OFERTA ESPECIAL</div>
+            <h2 style={{ margin: "8px 0", fontSize: compact ? 24 : isPortrait ? 46 : 64 }}>{template.title || "Ofertas da Semana"}</h2>
+            <p style={{ margin: 0, color: "rgba(255,255,255,0.78)" }}>{template.subtitle || "Promoções em destaque para sua TV"}</p>
+          </div>
+
+          <div
+            style={{
+              display: "grid",
+              gridTemplateColumns: isPortrait || compact ? "1fr" : "1.25fr repeat(3, 1fr)",
+              gap: compact ? 10 : 16,
+              flex: 1,
+            }}
+          >
+            {getTemplatePromoItems(template).slice(0, compact ? 2 : 4).map((item, index) => (
+              <div
+                key={`${item.name}-${index}`}
+                style={{
+                  borderRadius: compact ? 16 : 26,
+                  padding: compact ? 12 : 22,
+                  background: index === 0 ? "rgba(255,255,255,0.14)" : "rgba(255,255,255,0.08)",
+                  border: "1px solid rgba(255,255,255,0.14)",
+                  display: "flex",
+                  flexDirection: "column",
+                  justifyContent: "center",
+                  minHeight: compact ? 82 : isPortrait ? 120 : 210,
+                }}
+              >
+                <small style={{ color: "rgba(255,255,255,0.62)", textDecoration: "line-through" }}>{item.oldPrice}</small>
+                <strong style={{ marginTop: 8, fontSize: compact ? 15 : 22 }}>{item.name}</strong>
+                {!compact && item.description && (
+                  <small style={{ marginTop: 6, color: "rgba(255,255,255,0.62)", textDecoration: "none" }}>
+                    {item.description}
+                  </small>
+                )}
+                <span style={{ marginTop: 10, color: "var(--template-accent)", fontWeight: 1000, fontSize: index === 0 && !compact ? 46 : compact ? 22 : 32 }}>
+                  {item.price}
+                </span>
+              </div>
+            ))}
+          </div>
+        </div>
+      )}
+
+      {realTemplateType === "corporativo_premium" && (
+        <div style={premiumFrameStyle}>
+          <div style={premiumGridStyle}>
+            <div
+              style={{
+                borderRadius: compact ? 18 : 30,
+                padding: compact ? 14 : 30,
+                background: "linear-gradient(135deg, rgba(15,23,42,0.82), rgba(88,28,135,0.46))",
+                border: "1px solid rgba(255,255,255,0.16)",
+                display: "flex",
+                flexDirection: "column",
+                justifyContent: "space-between",
+                minHeight: compact ? 120 : isPortrait ? 260 : 360,
+              }}
+            >
+              <div>
+                <div className="template-breaking">COMUNICAÇÃO INTERNA</div>
+                <h2 style={{ margin: "10px 0 0", fontSize: compact ? 22 : isPortrait ? 42 : 56 }}>{template.title || "Comunicação Corporativa"}</h2>
+                <p style={{ color: "rgba(255,255,255,0.76)" }}>{template.subtitle || "Avisos, agenda e indicadores em tempo real"}</p>
+              </div>
+
+              {!compact && (
+                <div style={{ display: "grid", gridTemplateColumns: "repeat(3, 1fr)", gap: 12 }}>
+                  {getTemplateIndicatorItems(template).slice(0, 3).map((item, index) => (
+                    <div key={`${item.label}-${index}`} style={{ borderRadius: 18, padding: 16, background: "rgba(255,255,255,0.08)" }}>
+                      <small>{item.label}</small>
+                      <strong style={{ display: "block", marginTop: 6, color: "var(--template-accent)" }}>
+                        {item.value}
+                      </strong>
+                      <span style={{ display: "block", marginTop: 4, color: "rgba(255,255,255,0.62)", fontSize: 12 }}>{item.note}</span>
+                    </div>
+                  ))}
+                </div>
+              )}
+            </div>
+
+            <div
+              style={{
+                display: "grid",
+                gridTemplateColumns: isPortrait || compact ? "1fr" : "1fr",
+                gap: compact ? 8 : 14,
+              }}
+            >
+              {getTemplateCorporateItems(template).slice(0, compact ? 2 : 3).map((item, index) => (
+                <div key={`${item}-${index}`} style={{ borderRadius: 22, padding: compact ? 12 : 20, background: "rgba(255,255,255,0.08)", border: "1px solid rgba(255,255,255,0.13)" }}>
+                  <small style={{ color: "var(--template-accent)", fontWeight: 900 }}>Aviso {String(index + 1).padStart(2, "0")}</small>
+                  <strong style={{ display: "block", marginTop: 8 }}>{item}</strong>
+                </div>
+              ))}
+
+              {!compact && getTemplateAgendaItems(template).slice(0, 2).map((item, index) => (
+                <div key={`${item.time}-${index}`} style={{ borderRadius: 22, padding: compact ? 12 : 20, background: "rgba(255,255,255,0.08)", border: "1px solid rgba(255,255,255,0.13)" }}>
+                  <small style={{ color: "var(--template-accent)", fontWeight: 900 }}>{item.time}</small>
+                  <strong style={{ display: "block", marginTop: 8 }}>{item.title}</strong>
+                  <span style={{ display: "block", marginTop: 4, color: "rgba(255,255,255,0.62)" }}>{item.responsible}</span>
+                </div>
+              ))}
+
+              <div style={{ borderRadius: 22, padding: compact ? 12 : 20, background: "rgba(0,0,0,0.24)", border: "1px solid rgba(255,255,255,0.13)" }}>
+                <small>Agora</small>
+                <strong style={{ display: "block", marginTop: 8, fontSize: compact ? 20 : 34 }}>
+                  {new Date().toLocaleTimeString("pt-BR", { hour: "2-digit", minute: "2-digit" })}
+                </strong>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
+
       {((template.templateType || template.type) === "comercial" || (template.templateType || template.type) === "aviso") && (
         <div className="template-generic-layout">
           <div className="template-generic-badge">
-            {template.type === "comercial" ? "OFERTA" : "AVISO"}
+            {getTemplateBadge(realTemplateType)}
           </div>
 
           <h2>{template.title || template.name}</h2>
@@ -4637,11 +5648,17 @@ function TemplateVisualPreview({ template, compact = false }) {
 
       <div className="template-tv-ticker">
         <span>
-          {(template.templateType || template.type) === "noticias"
+          {realTemplateType === "noticias" || realTemplateType === "jornal_premium"
             ? `${getNewsItemSource(news[0], template.newsSource || "Notícias")} • ${getNewsItemTitle(news[0])}`
-            : (template.templateType || template.type) === "clima"
+            : realTemplateType === "clima"
               ? `Clima em ${weather?.city || template.city || "sua cidade"} • Atualização automática`
-              : template.subtitle || "Template profissional para TV"}
+              : realTemplateType === "cardapio_premium"
+                ? `${template.title || "Cardápio Digital"} • Produtos, categorias e preços`
+                : realTemplateType === "promocao_premium"
+                  ? `${template.title || "Ofertas da Semana"} • Promoções em destaque`
+                  : realTemplateType === "corporativo_premium"
+                    ? `${template.title || "Comunicação Corporativa"} • Avisos, agenda e indicadores`
+                    : template.subtitle || "Template profissional para TV"}
         </span>
       </div>
     </div>
@@ -5466,7 +6483,7 @@ function PlayerPage() {
   if (activeTemplate) {
     return (
       <div className={`player-screen ${getPlayerOrientationClass()}`}>
-        <TemplatePreviewCard template={activeTemplate} />
+        <TemplateVisualPreview template={activeTemplate} />
 
         <button
           className="tv-player-exit-button"
