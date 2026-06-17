@@ -2236,6 +2236,7 @@ function ClientMediaPage({ client }) {
 
 function ClientPlaylistsPage({ client }) {
   const [mediaList, setMediaList] = useState([]);
+  const [templates, setTemplates] = useState([]);
   const [playlists, setPlaylists] = useState([]);
   const [screens, setScreens] = useState([]);
   const [editingPlaylist, setEditingPlaylist] = useState(null);
@@ -2260,6 +2261,18 @@ function ClientPlaylistsPage({ client }) {
       collection(db, "clients", client.id, "media"),
       (snapshot) => {
         setMediaList(
+          snapshot.docs.map((item) => ({
+            id: item.id,
+            ...item.data(),
+          }))
+        );
+      }
+    );
+
+    const unsubTemplates = onSnapshot(
+      collection(db, "clients", client.id, "templates"),
+      (snapshot) => {
+        setTemplates(
           snapshot.docs.map((item) => ({
             id: item.id,
             ...item.data(),
@@ -2294,20 +2307,103 @@ function ClientPlaylistsPage({ client }) {
 
     return () => {
       unsubMedia();
+      unsubTemplates();
       unsubPlaylists();
       unsubScreens();
     };
   }, [client.id]);
 
-  function toggleMedia(mediaId) {
-    const selected = form.selectedMediaIds.includes(mediaId);
+  function getMediaKey(mediaId) {
+    return `media:${mediaId}`;
+  }
+
+  function getTemplateKey(templateId) {
+    return `template:${templateId}`;
+  }
+
+  function getPlaylistItemKey(item) {
+    if (item?.playerItemType === "template" || item?.templateType) {
+      return getTemplateKey(item.id);
+    }
+
+    return getMediaKey(item.id);
+  }
+
+  function getSelectedItemByKey(key) {
+    if (key?.startsWith("template:")) {
+      const templateId = key.replace("template:", "");
+      const template = templates.find((item) => item.id === templateId);
+
+      if (!template) return null;
+
+      return {
+        ...template,
+        title: template.name,
+        preview: "",
+        sound: false,
+        playerItemType: "template",
+        templateType: template.type,
+        type: template.type,
+        duration: Number(template.duration || 15),
+      };
+    }
+
+    const mediaId = key?.startsWith("media:") ? key.replace("media:", "") : key;
+    const media = mediaList.find((item) => item.id === mediaId);
+
+    if (!media) return null;
+
+    return {
+      ...media,
+      playerItemType: "media",
+    };
+  }
+
+  function isSelectedKey(key) {
+    return form.selectedMediaIds.includes(key);
+  }
+
+  function toggleItemKey(key) {
+    const selected = isSelectedKey(key);
 
     setForm({
       ...form,
       selectedMediaIds: selected
-        ? form.selectedMediaIds.filter((id) => id !== mediaId)
-        : [...form.selectedMediaIds, mediaId],
+        ? form.selectedMediaIds.filter((id) => id !== key)
+        : [...form.selectedMediaIds, key],
     });
+  }
+
+  function toggleMedia(mediaId) {
+    toggleItemKey(getMediaKey(mediaId));
+  }
+
+  function toggleTemplate(templateId) {
+    toggleItemKey(getTemplateKey(templateId));
+  }
+
+  function renderPlaylistMiniPreview(item) {
+    if (!item) return <Monitor size={26} />;
+
+    if (item.playerItemType === "template" || item.templateType) {
+      return <TemplateVisualPreview template={item} compact />;
+    }
+
+    if (item.type === "Vídeo") {
+      return <video src={item.preview} muted playsInline preload="metadata" />;
+    }
+
+    return <img src={item.preview} alt={item.title} />;
+  }
+
+  function getPlaylistItemLabel(item) {
+    if (!item) return "Item não encontrado";
+
+    if (item.playerItemType === "template" || item.templateType) {
+      return `Template ${item.templateType || item.type} • ${item.duration || 15}s`;
+    }
+
+    return `${item.type} • ${item.duration}s • ${item.sound ? "Com som" : "Sem som"}`;
   }
 
   function toggleTargetScreen(screenId) {
@@ -2322,16 +2418,16 @@ function ClientPlaylistsPage({ client }) {
   }
 
 
-  function handleDragStart(mediaId) {
-    setDraggedMediaId(mediaId);
+  function handleDragStart(itemKey) {
+    setDraggedMediaId(itemKey);
   }
 
   function handleDragOver(e) {
     e.preventDefault();
   }
 
-  function handleDrop(targetMediaId) {
-    if (!draggedMediaId || draggedMediaId === targetMediaId) {
+  function handleDrop(targetItemKey) {
+    if (!draggedMediaId || draggedMediaId === targetItemKey) {
       setDraggedMediaId(null);
       return;
     }
@@ -2339,7 +2435,7 @@ function ClientPlaylistsPage({ client }) {
     const updated = [...form.selectedMediaIds];
 
     const draggedIndex = updated.indexOf(draggedMediaId);
-    const targetIndex = updated.indexOf(targetMediaId);
+    const targetIndex = updated.indexOf(targetItemKey);
 
     if (draggedIndex === -1 || targetIndex === -1) {
       setDraggedMediaId(null);
@@ -2402,7 +2498,7 @@ function ClientPlaylistsPage({ client }) {
       transition: playlist.transition || "Fade suave",
       transitionSpeed: playlist.transitionSpeed || "Normal",
       orientation: playlist.orientation || "Paisagem",
-      selectedMediaIds: playlist.items?.map((item) => item.id) || [],
+      selectedMediaIds: playlist.items?.map((item) => getPlaylistItemKey(item)) || [],
       scheduleEnabled: playlist.scheduleEnabled || false,
       targetScreenIds: playlist.targetScreenIds || [],
       startDate: playlist.startDate || "",
@@ -2424,7 +2520,7 @@ function ClientPlaylistsPage({ client }) {
     }
 
     if (form.selectedMediaIds.length === 0) {
-      alert("Selecione pelo menos uma mídia.");
+      alert("Selecione pelo menos uma mídia ou template.");
       return;
     }
 
@@ -2452,7 +2548,7 @@ function ClientPlaylistsPage({ client }) {
 
     try {
       const selectedItems = form.selectedMediaIds
-        .map((id) => mediaList.find((media) => media.id === id))
+        .map((key) => getSelectedItemByKey(key))
         .filter(Boolean);
 
       const playlistData = {
@@ -2750,7 +2846,7 @@ function ClientPlaylistsPage({ client }) {
             </div>
 
             <span>
-              {form.selectedMediaIds.length} selecionada(s)
+              {form.selectedMediaIds.length} item(ns) selecionado(s)
             </span>
           </div>
 
@@ -2765,7 +2861,7 @@ function ClientPlaylistsPage({ client }) {
                   key={media.id}
                   type="button"
                   className={
-                    form.selectedMediaIds.includes(media.id)
+                    isSelectedKey(getMediaKey(media.id))
                       ? "select-media-card selected"
                       : "select-media-card"
                   }
@@ -2790,6 +2886,48 @@ function ClientPlaylistsPage({ client }) {
             )}
           </div>
 
+          <div className="playlist-section-title">
+            <div>
+              <h3>Templates da playlist</h3>
+              <p>Adicione clima, notícias, avisos e campanhas no mesmo loop das mídias.</p>
+            </div>
+
+            <span>
+              {form.selectedMediaIds.filter((key) => key.startsWith("template:")).length} template(s)
+            </span>
+          </div>
+
+          <div className="media-selector">
+            {templates.length === 0 ? (
+              <div className="empty-library">
+                Cadastre templates primeiro na aba Templates.
+              </div>
+            ) : (
+              templates.map((template) => (
+                <button
+                  key={template.id}
+                  type="button"
+                  className={
+                    isSelectedKey(getTemplateKey(template.id))
+                      ? "select-media-card selected"
+                      : "select-media-card"
+                  }
+                  onClick={() => toggleTemplate(template.id)}
+                >
+                  <div className="select-media-thumb">
+                    <TemplateVisualPreview template={template} compact />
+                  </div>
+
+                  <strong>{template.name}</strong>
+
+                  <span>
+                    Template {template.type} • {template.duration || 15}s
+                  </span>
+                </button>
+              ))
+            )}
+          </div>
+
           {form.selectedMediaIds.length > 0 && (
             <div className="playlist-order-list">
               <div className="playlist-order-header">
@@ -2803,23 +2941,23 @@ function ClientPlaylistsPage({ client }) {
                 </span>
               </div>
 
-              {form.selectedMediaIds.map((mediaId, index) => {
-                const media = mediaList.find((item) => item.id === mediaId);
+              {form.selectedMediaIds.map((itemKey, index) => {
+                const item = getSelectedItemByKey(itemKey);
 
-                if (!media) return null;
+                if (!item) return null;
 
                 return (
                   <div
-                    key={media.id}
+                    key={itemKey}
                     className={
-                      draggedMediaId === media.id
+                      draggedMediaId === itemKey
                         ? "playlist-order-item dragging"
                         : "playlist-order-item"
                     }
                     draggable
-                    onDragStart={() => handleDragStart(media.id)}
+                    onDragStart={() => handleDragStart(itemKey)}
                     onDragOver={handleDragOver}
-                    onDrop={() => handleDrop(media.id)}
+                    onDrop={() => handleDrop(itemKey)}
                     onDragEnd={() => setDraggedMediaId(null)}
                   >
                     <div className="drag-handle">
@@ -2831,19 +2969,14 @@ function ClientPlaylistsPage({ client }) {
                     </div>
 
                     <div className="playlist-order-thumb">
-                      {media.type === "Vídeo" ? (
-                        <video src={media.preview} muted playsInline preload="metadata" />
-                      ) : (
-                        <img src={media.preview} alt={media.title} />
-                      )}
+                      {renderPlaylistMiniPreview(item)}
                     </div>
 
                     <div className="playlist-order-info">
-                      <strong>{media.title}</strong>
+                      <strong>{item.title || item.name}</strong>
 
                       <span>
-                        {media.type} • {media.duration}s •{" "}
-                        {media.sound ? "Com som" : "Sem som"}
+                        {getPlaylistItemLabel(item)}
                       </span>
                     </div>
 
@@ -2852,7 +2985,7 @@ function ClientPlaylistsPage({ client }) {
                         type="button"
                         disabled={index === 0}
                         onClick={() => moveMedia(index, "up")}
-                        title="Subir mídia"
+                        title="Subir item"
                       >
                         ↑
                       </button>
@@ -2861,7 +2994,7 @@ function ClientPlaylistsPage({ client }) {
                         type="button"
                         disabled={index === form.selectedMediaIds.length - 1}
                         onClick={() => moveMedia(index, "down")}
-                        title="Descer mídia"
+                        title="Descer item"
                       >
                         ↓
                       </button>
@@ -2909,7 +3042,7 @@ function ClientPlaylistsPage({ client }) {
 
                   <p>
                     {playlist.orientation} • {playlist.transition} • {playlist.transitionSpeed || "Normal"} •{" "}
-                    {playlist.items?.length || 0} mídias
+                    {playlist.items?.length || 0} item(ns)
                   </p>
 
                   {playlist.scheduleEnabled ? (
@@ -2949,24 +3082,21 @@ function ClientPlaylistsPage({ client }) {
                     </div>
 
                     <div className="playlist-thumb">
-                      {item.type === "Vídeo" ? (
-                        <video src={item.preview} muted playsInline preload="metadata" />
-                      ) : (
-                        <img src={item.preview} alt={item.title} />
-                      )}
+                      {renderPlaylistMiniPreview(item)}
                     </div>
 
                     <div className="playlist-item-info">
-                      <strong>{item.title}</strong>
+                      <strong>{item.title || item.name}</strong>
 
                       <span>
-                        {item.type} • {item.duration}s •{" "}
-                        {item.sound ? "Com som" : "Sem som"}
+                        {getPlaylistItemLabel(item)}
                       </span>
                     </div>
 
                     <div>
-                      {item.sound ? (
+                      {item.playerItemType === "template" || item.templateType ? (
+                        <Newspaper size={18} />
+                      ) : item.sound ? (
                         <Volume2 size={18} />
                       ) : (
                         <VolumeX size={18} />
@@ -4583,10 +4713,23 @@ function PlayerPage() {
   }
 
   const playerItems = [
-    ...(activePlaylist?.items || []).map((item) => ({
-      ...item,
-      playerItemType: "media",
-    })),
+    ...(activePlaylist?.items || []).map((item) => {
+      if (item?.playerItemType === "template" || item?.templateType) {
+        return {
+          ...item,
+          title: item.title || item.name,
+          templateType: item.templateType || item.type,
+          type: item.templateType || item.type,
+          duration: Number(item.duration || 15),
+          playerItemType: "template",
+        };
+      }
+
+      return {
+        ...item,
+        playerItemType: "media",
+      };
+    }),
     ...screenTemplates.map((template) => ({
       ...template,
       title: template.name,
