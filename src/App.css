@@ -4674,6 +4674,158 @@ video.player-media::-webkit-media-controls-start-playback-button {
   animation: none !important;
 }
 
+.tv-screen-in-use {
+  max-width: 520px !important;
+}
+
+.tv-screen-in-use h1 {
+  color: #f8fafc !important;
+  letter-spacing: 1px !important;
+}
+
+.tv-screen-in-use-icon {
+  width: 92px;
+  height: 92px;
+  margin: 0 auto 18px;
+  border-radius: 26px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  color: #fbbf24;
+  background: rgba(245, 158, 11, 0.14);
+  border: 1px solid rgba(251, 191, 36, 0.35);
+  box-shadow: 0 18px 50px rgba(245, 158, 11, 0.14);
+}
+
+.tv-screen-in-use-details {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 9px;
+  margin: 16px 0;
+  text-align: left;
+}
+
+.tv-screen-in-use-details > div {
+  min-width: 0;
+  padding: 10px 12px;
+  border-radius: 12px;
+  background: rgba(255, 255, 255, 0.05);
+  border: 1px solid rgba(255, 255, 255, 0.09);
+}
+
+.tv-screen-in-use-details span,
+.tv-screen-in-use-details strong {
+  display: block;
+}
+
+.tv-screen-in-use-details span {
+  margin-bottom: 4px;
+  color: #94a3b8;
+  font-size: 10px;
+  font-weight: 800;
+  text-transform: uppercase;
+}
+
+.tv-screen-in-use-details strong {
+  overflow: hidden;
+  color: #f8fafc;
+  font-size: 13px;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.tv-screen-online-status {
+  color: #86efac !important;
+}
+
+.tv-screen-online-status::before {
+  content: "";
+  display: inline-block;
+  width: 7px;
+  height: 7px;
+  margin-right: 6px;
+  border-radius: 50%;
+  background: #22c55e;
+  box-shadow: 0 0 12px rgba(34, 197, 94, 0.8);
+}
+
+.tv-screen-in-use-actions {
+  display: grid;
+  grid-template-columns: 0.7fr 1.3fr;
+  gap: 10px;
+}
+
+.tv-screen-in-use-actions .tv-change-mode-button,
+.tv-screen-in-use-actions .tv-connect-button {
+  width: 100%;
+  min-height: 48px;
+  height: auto !important;
+  margin: 0 !important;
+  padding: 10px 12px;
+  font-size: 13px !important;
+}
+
+@media (max-width: 520px) {
+  .tv-screen-in-use-details,
+  .tv-screen-in-use-actions {
+    grid-template-columns: 1fr;
+  }
+}
+
+/* Celulares e tablets seguem a rotacao natural do Android/giroscopio. */
+.player-screen.natural-mode .player-media,
+.player-screen.natural-mode .player-transition-layer {
+  position: absolute !important;
+  inset: 0 !important;
+  width: 100vw !important;
+  height: 100vh !important;
+  transform: none !important;
+}
+
+/* Mantem o ultimo frame visivel enquanto a proxima midia e decodificada. */
+.player-buffer-layer.is-previous {
+  z-index: 1 !important;
+  animation: none !important;
+  opacity: 1 !important;
+}
+
+.player-buffer-layer.is-current {
+  z-index: 2 !important;
+}
+
+.player-buffer-layer.is-pending {
+  opacity: 0 !important;
+  visibility: hidden !important;
+  animation: none !important;
+}
+
+.player-buffer-layer.is-ready {
+  visibility: visible !important;
+}
+
+.offline-cache-status {
+  position: fixed;
+  right: 18px;
+  bottom: 18px;
+  z-index: 40;
+  padding: 8px 12px;
+  border-radius: 999px;
+  background: rgba(2, 6, 23, 0.82);
+  border: 1px solid rgba(255, 255, 255, 0.18);
+  color: #e2e8f0;
+  font-size: 11px;
+  font-weight: 800;
+  pointer-events: none;
+}
+
+.offline-cache-status.ready {
+  color: #86efac;
+}
+
+.offline-cache-status.partial {
+  color: #fcd34d;
+}
+
 
 /* =====================================================
    FIX CONTROLE REMOTO - RESPOSTA VISUAL MAIS RÁPIDA
@@ -6696,5 +6848,230 @@ video.player-media::-webkit-media-controls-start-playback-button {
     transform: scale(0.9) !important;
     transform-origin: center center !important;
   }
+}
+
+/* Rotacao manual do aplicativo nativo. A versao web nao usa este wrapper. */
+.native-rotation-shell {
+  position: fixed;
+  inset: 0;
+  width: 100vw;
+  height: 100vh;
+  overflow: hidden;
+  background: #020617;
+  z-index: 9999;
+}
+
+.native-rotation-content {
+  position: absolute;
+  top: 50%;
+  left: 50%;
+  width: 100vw;
+  height: 100vh;
+  overflow: hidden;
+  transform-origin: center center;
+}
+
+.rotation-horizontal .native-rotation-content {
+  transform: translate(-50%, -50%) rotate(0deg);
+}
+
+.rotation-horizontalInvertida .native-rotation-content {
+  transform: translate(-50%, -50%) rotate(180deg);
+}
+
+.rotation-vertical .native-rotation-content,
+.rotation-verticalInvertida .native-rotation-content {
+  width: 100vh;
+  height: 100vw;
+}
+
+.rotation-vertical .native-rotation-content {
+  transform: translate(-50%, -50%) rotate(90deg);
+}
+
+.rotation-verticalInvertida .native-rotation-content {
+  transform: translate(-50%, -50%) rotate(270deg);
+}
+
+.native-rotation-content .app,
+.native-rotation-content .login-page,
+.native-rotation-content .app-mode-page,
+.native-rotation-content .tv-connect-page,
+.native-rotation-content .player-screen {
+  width: 100% !important;
+  height: 100% !important;
+  min-height: 100% !important;
+}
+
+.native-rotation-content .player-screen.natural-mode .player-media,
+.native-rotation-content .player-screen.natural-mode .player-transition-layer {
+  width: 100% !important;
+  height: 100% !important;
+}
+
+.app-rotation-picker {
+  width: 100%;
+  margin-top: 12px;
+  padding: 10px;
+  border-radius: 16px;
+  background: rgba(15, 23, 42, 0.72);
+  border: 1px solid rgba(255, 255, 255, 0.1);
+}
+
+.app-rotation-picker > span {
+  display: block;
+  margin-bottom: 7px;
+  color: #94a3b8;
+  font-size: 10px;
+  font-weight: 900;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+}
+
+.app-rotation-grid {
+  display: grid;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  gap: 7px;
+}
+
+.app-rotation-grid button {
+  min-height: 34px;
+  padding: 6px 8px;
+  border: 1px solid rgba(255, 255, 255, 0.12);
+  border-radius: 10px;
+  background: rgba(255, 255, 255, 0.05);
+  color: #cbd5e1;
+  font-size: 10px;
+  font-weight: 800;
+  cursor: pointer;
+}
+
+.app-rotation-grid button.active {
+  border-color: #22d3ee;
+  background: rgba(6, 182, 212, 0.2);
+  color: #ecfeff;
+  box-shadow: 0 0 0 1px rgba(34, 211, 238, 0.18);
+}
+
+@media (max-width: 700px) {
+  .app-rotation-grid {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+
+  .app-rotation-picker {
+    margin-top: 9px;
+    padding: 8px;
+  }
+
+  .app-rotation-grid button {
+    min-height: 30px;
+  }
+}
+
+/* Conexao compacta dentro do app/Smart TV, sem alterar a rota web. */
+.native-rotation-content .tv-connect-page {
+  padding: 8px !important;
+  overflow: auto !important;
+}
+
+.native-rotation-content .tv-connect-card,
+.native-rotation-content .tv-code-only-card {
+  width: min(440px, calc(100% - 16px)) !important;
+  max-width: 440px !important;
+  max-height: calc(100% - 16px) !important;
+  padding: 18px 20px !important;
+  border-radius: 22px !important;
+  overflow: auto !important;
+}
+
+.native-rotation-content .tv-connect-logo {
+  width: 108px !important;
+  margin: 0 auto 10px !important;
+}
+
+.native-rotation-content .tv-connect-kicker {
+  margin-bottom: 8px !important;
+  padding: 5px 10px !important;
+  font-size: 9px !important;
+}
+
+.native-rotation-content .tv-connect-card h1 {
+  margin-bottom: 8px !important;
+  font-size: clamp(27px, 4vw, 36px) !important;
+  letter-spacing: 2px !important;
+}
+
+.native-rotation-content .tv-connect-card > p {
+  margin-bottom: 12px !important;
+  font-size: 13px !important;
+  line-height: 1.28 !important;
+}
+
+.native-rotation-content .tv-connect-form {
+  gap: 8px !important;
+}
+
+.native-rotation-content .tv-field,
+.native-rotation-content .tv-code-field {
+  min-height: 62px !important;
+  grid-template-columns: 58px 1fr !important;
+  border-radius: 13px !important;
+}
+
+.native-rotation-content .tv-field-icon svg {
+  width: 23px !important;
+  height: 23px !important;
+}
+
+.native-rotation-content .tv-code-field .tv-field-content input {
+  font-size: clamp(28px, 4.5vw, 38px) !important;
+  letter-spacing: 5px !important;
+}
+
+.native-rotation-content .tv-connect-button {
+  height: 48px !important;
+  min-height: 48px !important;
+  border-radius: 13px !important;
+  font-size: 15px !important;
+}
+
+.native-rotation-content .tv-help {
+  margin-top: 9px !important;
+  padding: 8px 10px !important;
+  font-size: 11px !important;
+}
+
+.native-rotation-content .tv-change-mode-button {
+  min-height: 32px !important;
+  margin-top: 7px !important;
+  padding: 6px 10px !important;
+  font-size: 10px !important;
+}
+
+.native-rotation-content .tv-connect-card::after {
+  margin-top: 9px !important;
+  padding-top: 8px !important;
+  font-size: 10px !important;
+}
+
+.native-rotation-content .tv-screen-in-use-icon {
+  width: 62px;
+  height: 62px;
+  margin-bottom: 10px;
+  border-radius: 18px;
+}
+
+.native-rotation-content .tv-screen-in-use-icon svg {
+  width: 34px;
+  height: 34px;
+}
+
+.native-rotation-content .tv-screen-in-use-details {
+  margin: 10px 0;
+  gap: 6px;
+}
+
+.native-rotation-content .tv-screen-in-use-details > div {
+  padding: 7px 9px;
 }
 

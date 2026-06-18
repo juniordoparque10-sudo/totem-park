@@ -1,6 +1,7 @@
 import { useEffect, useRef, useState } from "react";
 import { Routes, Route, useParams, useNavigate } from "react-router-dom";
 import { initializeApp, deleteApp } from "firebase/app";
+import { registerPlugin } from "@capacitor/core";
 
 import {
   LayoutDashboard,
@@ -47,6 +48,8 @@ import {
   updateDoc,
   setDoc,
   getDoc,
+  runTransaction,
+  deleteField,
 } from "firebase/firestore";
 
 import {
@@ -56,9 +59,14 @@ import {
 } from "firebase/storage";
 
 import { auth, db, storage } from "./firebase";
+import {
+  cacheOfflineAssets,
+  restoreOfflineAssetMap,
+} from "./offline-player-cache";
 import logo from "./assets/logo.png";
 import "./App.css";
 
+const TotemDevice = registerPlugin("TotemDevice");
 
 function isNativeApp() {
   return (
@@ -68,6 +76,33 @@ function isNativeApp() {
       window.location.protocol === "capacitor:"
     )
   );
+}
+
+const SCREEN_ROTATIONS = {
+  horizontal: 0,
+  vertical: 90,
+  horizontalInvertida: 180,
+  verticalInvertida: 270,
+};
+
+function getSavedScreenRotation() {
+  if (!isNativeApp()) return "horizontal";
+
+  const saved = localStorage.getItem("totempark-screen-rotation");
+  return Object.hasOwn(SCREEN_ROTATIONS, saved) ? saved : "horizontal";
+}
+
+function getTotemDeviceId() {
+  const storageKey = "totempark-device-id";
+  const saved = localStorage.getItem(storageKey);
+
+  if (saved) return saved;
+
+  const id = globalThis.crypto?.randomUUID?.()
+    || `totem-${Date.now()}-${Math.random().toString(36).slice(2)}`;
+
+  localStorage.setItem(storageKey, id);
+  return id;
 }
 
 
@@ -367,6 +402,7 @@ function getTemplateTypeLabel(type) {
     cardapio_premium: "Cardápio Premium",
     promocao_premium: "Promoção Premium",
     corporativo_premium: "Corporativo Premium",
+    marketing_art: "Arte de Marketing",
   };
 
   return labels[type] || type || "Template";
@@ -463,16 +499,43 @@ const firebaseConfig = {
 
 
 export default function App() {
-  return (
+  const [screenRotation, setScreenRotation] = useState(getSavedScreenRotation);
+
+  function handleScreenRotation(rotation) {
+    if (!isNativeApp() || !Object.hasOwn(SCREEN_ROTATIONS, rotation)) return;
+
+    localStorage.setItem("totempark-screen-rotation", rotation);
+    setScreenRotation(rotation);
+  }
+
+  const routes = (
     <Routes>
-      <Route path="/" element={<AdminApp />} />
+      <Route
+        path="/"
+        element={(
+          <AdminApp
+            screenRotation={screenRotation}
+            onScreenRotationChange={handleScreenRotation}
+          />
+        )}
+      />
       <Route path="/tv" element={<TVConnectPage />} />
       <Route path="/player/:clientId/:codigo" element={<PlayerPage />} />
     </Routes>
   );
+
+  if (!isNativeApp()) return routes;
+
+  return (
+    <div className={`native-rotation-shell rotation-${screenRotation}`}>
+      <div className="native-rotation-content">
+        {routes}
+      </div>
+    </div>
+  );
 }
 
-function AdminApp() {
+function AdminApp({ screenRotation, onScreenRotationChange }) {
   const [user, setUser] = useState(null);
   const [loadingAuth, setLoadingAuth] = useState(true);
   const [activePage, setActivePage] = useState("dashboard");
@@ -591,6 +654,8 @@ function AdminApp() {
       return (
         <AppModeChoice
           client={user.clientData}
+          screenRotation={screenRotation}
+          onScreenRotationChange={onScreenRotationChange}
           onSelectMode={(mode) => {
             localStorage.setItem("totempark-app-mode", mode);
             setAppMode(mode);
@@ -757,7 +822,19 @@ function AdminApp() {
 }
 
 
-function AppModeChoice({ client, onSelectMode }) {
+function AppModeChoice({
+  client,
+  onSelectMode,
+  screenRotation,
+  onScreenRotationChange,
+}) {
+  const rotationOptions = [
+    { value: "horizontal", label: "Horizontal" },
+    { value: "vertical", label: "Vertical" },
+    { value: "horizontalInvertida", label: "Horizontal invertida" },
+    { value: "verticalInvertida", label: "Vertical invertida" },
+  ];
+
   return (
     <div className="app-mode-page app-mode-native-only">
       <div className="app-mode-card app-mode-ultra-compact">
@@ -772,6 +849,25 @@ function AppModeChoice({ client, onSelectMode }) {
           <br />
           Escolha se deseja gerenciar sua conta ou abrir este dispositivo como TV.
         </p>
+
+        {isNativeApp() && (
+          <div className="app-rotation-picker">
+            <span>Orientação da tela</span>
+
+            <div className="app-rotation-grid">
+              {rotationOptions.map((option) => (
+                <button
+                  key={option.value}
+                  type="button"
+                  className={screenRotation === option.value ? "active" : ""}
+                  onClick={() => onScreenRotationChange(option.value)}
+                >
+                  {option.label}
+                </button>
+              ))}
+            </div>
+          </div>
+        )}
 
         <div className="app-mode-grid">
           <button
@@ -1912,6 +2008,13 @@ function ClientInternalPanel({ client, onBack, hideBackButton = false }) {
         >
           Templates
         </button>
+
+        <button
+          className={tab === "marketing" ? "client-tab active" : "client-tab"}
+          onClick={() => setTab("marketing")}
+        >
+          Marketing
+        </button>
       </div>
 
       {tab === "dashboard" && <ClientDashboard client={client} />}
@@ -1919,6 +2022,7 @@ function ClientInternalPanel({ client, onBack, hideBackButton = false }) {
       {tab === "playlists" && <ClientPlaylistsPage client={client} />}
       {tab === "screens" && <ClientScreensPage client={client} />}
       {tab === "templates" && <ClientTemplatesPage client={client} />}
+      {tab === "marketing" && <ClientMarketingPage client={client} />}
     </>
   );
 }
@@ -4084,6 +4188,878 @@ function ClientScreensPage({ client }) {
 }
 
 
+
+const MARKETING_TYPE_LABELS = {
+  feed: "Feed Instagram",
+  story: "Stories",
+  reels: "Capa Reels",
+};
+
+function getMarketingFormatSize(type) {
+  if (type === "feed") return "1080x1080";
+  return "1080x1920";
+}
+
+function getMarketingFormatRatio(type) {
+  if (type === "feed") {
+    return {
+      width: 1080,
+      height: 1080,
+      aspectRatio: "1 / 1",
+    };
+  }
+
+  return {
+    width: 1080,
+    height: 1920,
+    aspectRatio: "9 / 16",
+  };
+}
+
+function getMarketingDefaultForm() {
+  return {
+    type: "feed",
+    title: "Seu título",
+    subtitle: "Seu subtítulo",
+    cta: "Chamada para ação",
+    whatsapp: "",
+    location: "",
+    qrText: "",
+    primaryColor: "#06b6d4",
+    secondaryColor: "#9333ea",
+    accentColor: "#22d3ee",
+    textColor: "#ffffff",
+    imageFile: null,
+    imagePreview: "",
+    imageUrl: "",
+    logoFile: null,
+    logoPreview: "",
+    logoUrl: "",
+  };
+}
+
+function buildQrUrl(value) {
+  const cleanValue = String(value || "").trim();
+
+  if (!cleanValue) return "";
+
+  return `https://api.qrserver.com/v1/create-qr-code/?size=260x260&data=${encodeURIComponent(cleanValue)}`;
+}
+
+const OFFLINE_ASSET_FIELDS = new Set(["preview", "imageUrl", "logoUrl"]);
+
+function collectOfflineAssetUrls(values) {
+  const urls = new Set();
+  const visited = new WeakSet();
+
+  function visit(value) {
+    if (!value || typeof value !== "object") return;
+    if (visited.has(value)) return;
+    visited.add(value);
+
+    if (Array.isArray(value)) {
+      value.forEach(visit);
+      return;
+    }
+
+    Object.entries(value).forEach(([key, fieldValue]) => {
+      if (
+        OFFLINE_ASSET_FIELDS.has(key) &&
+        typeof fieldValue === "string" &&
+        /^https?:\/\//i.test(fieldValue)
+      ) {
+        urls.add(fieldValue);
+      }
+
+      if (fieldValue && typeof fieldValue === "object") visit(fieldValue);
+    });
+
+    const qrUrl = buildQrUrl(value.qrText || value.whatsapp || "");
+    if (qrUrl) urls.add(qrUrl);
+  }
+
+  visit(values);
+  return [...urls].sort();
+}
+
+function applyOfflineAssetUrls(item, urlMap) {
+  if (!item) return item;
+
+  const localized = { ...item };
+
+  OFFLINE_ASSET_FIELDS.forEach((field) => {
+    if (localized[field] && urlMap[localized[field]]) {
+      if (field === "preview") localized.remotePreview = localized[field];
+      localized[field] = urlMap[localized[field]];
+    }
+  });
+
+  const qrUrl = buildQrUrl(localized.qrText || localized.whatsapp || "");
+  if (qrUrl && urlMap[qrUrl]) localized.qrImageUrl = urlMap[qrUrl];
+
+  return localized;
+}
+
+function readMarketingFile(file, setter, fieldFile, fieldPreview) {
+  if (!file) return;
+
+  const preview = URL.createObjectURL(file);
+
+  setter((prev) => ({
+    ...prev,
+    [fieldFile]: file,
+    [fieldPreview]: preview,
+  }));
+}
+
+async function uploadMarketingAsset(clientId, file, folder) {
+  if (!file) return "";
+
+  const safeName = file.name.replace(/[^a-zA-Z0-9._-]/g, "_");
+  const storageRef = ref(
+    storage,
+    `clients/${clientId}/marketing/${folder}/${Date.now()}_${safeName}`
+  );
+
+  const uploadTask = uploadBytesResumable(storageRef, file);
+
+  await new Promise((resolve, reject) => {
+    uploadTask.on(
+      "state_changed",
+      () => {},
+      reject,
+      resolve
+    );
+  });
+
+  return getDownloadURL(uploadTask.snapshot.ref);
+}
+
+function MarketingArtPreview({ art, compact = false, tv = false }) {
+  const marketingType = art.marketingType || art.formatType || art.type;
+  const ratio = getMarketingFormatRatio(marketingType);
+  const isFeed = marketingType === "feed";
+  const imageSrc = art.imagePreview || art.imageUrl || "";
+  const logoSrc = art.logoPreview || art.logoUrl || "";
+  const qrValue = art.qrText || art.whatsapp || "";
+  const qrUrl = art.qrImageUrl || buildQrUrl(qrValue);
+
+  const outerStyle = {
+    width: tv ? "100%" : compact ? (isFeed ? 210 : 160) : (isFeed ? "min(520px, 100%)" : "min(360px, 100%)"),
+    height: tv ? "100%" : "auto",
+    aspectRatio: tv ? "auto" : ratio.aspectRatio,
+    borderRadius: tv ? 0 : compact ? 22 : 34,
+    overflow: "hidden",
+    position: "relative",
+    color: art.textColor || "#ffffff",
+    background:
+      `radial-gradient(circle at 20% 15%, ${art.primaryColor || "#06b6d4"}66, transparent 34%),
+       radial-gradient(circle at 90% 80%, ${art.secondaryColor || "#9333ea"}66, transparent 34%),
+       linear-gradient(145deg, #020617 0%, #0f172a 46%, #111827 100%)`,
+    border: "1px solid rgba(255,255,255,0.14)",
+    boxShadow: compact ? "none" : "0 28px 80px rgba(0,0,0,0.42)",
+  };
+
+  const contentStyle = {
+    position: "absolute",
+    inset: 0,
+    display: "flex",
+    flexDirection: "column",
+    justifyContent: isFeed ? "flex-end" : "space-between",
+    padding: compact ? 16 : isFeed ? 34 : 30,
+    zIndex: 3,
+  };
+
+  const titleSize = compact ? (isFeed ? 22 : 18) : isFeed ? 54 : 48;
+
+  return (
+    <div style={outerStyle}>
+      {imageSrc ? (
+        <img
+          src={imageSrc}
+          alt={art.title || "Imagem da arte"}
+          style={{
+            position: "absolute",
+            inset: 0,
+            width: "100%",
+            height: "100%",
+            objectFit: "cover",
+            opacity: isFeed ? 0.76 : 0.82,
+          }}
+        />
+      ) : (
+        <div
+          style={{
+            position: "absolute",
+            inset: 0,
+            display: "flex",
+            alignItems: "center",
+            justifyContent: "center",
+            color: "rgba(255,255,255,0.16)",
+          }}
+        >
+          <Image size={compact ? 54 : 110} />
+        </div>
+      )}
+
+      <div
+        style={{
+          position: "absolute",
+          inset: 0,
+          background:
+            isFeed
+              ? "linear-gradient(180deg, rgba(2,6,23,0.08), rgba(2,6,23,0.88) 66%, rgba(2,6,23,0.98))"
+              : "linear-gradient(180deg, rgba(2,6,23,0.20), rgba(2,6,23,0.48) 48%, rgba(2,6,23,0.94))",
+          zIndex: 2,
+        }}
+      />
+
+      <div
+        style={{
+          position: "absolute",
+          top: compact ? 14 : 22,
+          left: compact ? 14 : 22,
+          right: compact ? 14 : 22,
+          zIndex: 4,
+          display: "flex",
+          alignItems: "center",
+          justifyContent: "space-between",
+          gap: 12,
+        }}
+      >
+        <div
+          style={{
+            padding: compact ? "6px 10px" : "8px 14px",
+            borderRadius: 999,
+            background: "rgba(15,23,42,0.72)",
+            border: "1px solid rgba(255,255,255,0.16)",
+            fontSize: compact ? 9 : 12,
+            fontWeight: 950,
+            letterSpacing: "0.08em",
+            textTransform: "uppercase",
+          }}
+        >
+          {MARKETING_TYPE_LABELS[marketingType] || "Marketing"}
+        </div>
+
+        {logoSrc ? (
+          <img
+            src={logoSrc}
+            alt="Logo"
+            style={{
+              width: compact ? 34 : 54,
+              height: compact ? 34 : 54,
+              objectFit: "contain",
+              borderRadius: 12,
+              background: "rgba(255,255,255,0.92)",
+              padding: 6,
+            }}
+          />
+        ) : (
+          <div
+            style={{
+              width: compact ? 34 : 54,
+              height: compact ? 34 : 54,
+              borderRadius: 14,
+              background: "rgba(255,255,255,0.10)",
+              border: "1px solid rgba(255,255,255,0.16)",
+              display: "flex",
+              alignItems: "center",
+              justifyContent: "center",
+              fontWeight: 1000,
+              color: art.accentColor || "#22d3ee",
+            }}
+          >
+            TP
+          </div>
+        )}
+      </div>
+
+      <div style={contentStyle}>
+        {!isFeed && <div></div>}
+
+        <div>
+          <div
+            style={{
+              width: compact ? 42 : 74,
+              height: compact ? 5 : 8,
+              borderRadius: 99,
+              background: art.accentColor || "#22d3ee",
+              marginBottom: compact ? 10 : 18,
+            }}
+          />
+
+          <h1
+            style={{
+              margin: 0,
+              fontSize: titleSize,
+              lineHeight: 0.9,
+              textTransform: marketingType === "reels" ? "uppercase" : "none",
+              letterSpacing: marketingType === "reels" ? "-0.05em" : "-0.035em",
+              maxWidth: isFeed ? "92%" : "100%",
+            }}
+          >
+            {art.title || "Seu título"}
+          </h1>
+
+          <p
+            style={{
+              margin: compact ? "8px 0 0" : "14px 0 0",
+              color: "rgba(255,255,255,0.82)",
+              fontSize: compact ? 12 : isFeed ? 20 : 18,
+              lineHeight: 1.25,
+              maxWidth: isFeed ? "86%" : "100%",
+            }}
+          >
+            {art.subtitle || "Seu subtítulo"}
+          </p>
+
+          <div
+            style={{
+              marginTop: compact ? 12 : 22,
+              display: "flex",
+              alignItems: "center",
+              justifyContent: "space-between",
+              gap: 14,
+            }}
+          >
+            <div
+              style={{
+                display: "inline-flex",
+                alignItems: "center",
+                padding: compact ? "8px 10px" : "12px 18px",
+                borderRadius: 999,
+                background: `linear-gradient(135deg, ${art.primaryColor || "#06b6d4"}, ${art.secondaryColor || "#9333ea"})`,
+                color: "#ffffff",
+                fontWeight: 1000,
+                fontSize: compact ? 10 : 16,
+                boxShadow: "0 14px 36px rgba(0,0,0,0.28)",
+              }}
+            >
+              {art.cta || "Chamada para ação"}
+            </div>
+
+            {qrUrl && (
+              <div
+                style={{
+                  width: compact ? 42 : isFeed ? 82 : 78,
+                  height: compact ? 42 : isFeed ? 82 : 78,
+                  minWidth: compact ? 42 : isFeed ? 82 : 78,
+                  borderRadius: compact ? 9 : 16,
+                  background: "#ffffff",
+                  padding: compact ? 4 : 8,
+                  display: "flex",
+                  alignItems: "center",
+                  justifyContent: "center",
+                }}
+              >
+                <img src={qrUrl} alt="QR Code" style={{ width: "100%", height: "100%" }} />
+              </div>
+            )}
+          </div>
+
+          {!compact && (art.whatsapp || art.location) && (
+            <div
+              style={{
+                marginTop: 16,
+                display: "flex",
+                flexWrap: "wrap",
+                gap: 10,
+                color: "rgba(255,255,255,0.78)",
+                fontSize: 14,
+                fontWeight: 800,
+              }}
+            >
+              {art.whatsapp && <span>WhatsApp: {art.whatsapp}</span>}
+              {art.location && <span>{art.location}</span>}
+            </div>
+          )}
+        </div>
+      </div>
+    </div>
+  );
+}
+
+function ClientMarketingPage({ client }) {
+  const [arts, setArts] = useState([]);
+  const [saving, setSaving] = useState(false);
+  const [sendingArtId, setSendingArtId] = useState("");
+  const [form, setForm] = useState(getMarketingDefaultForm());
+
+  useEffect(() => {
+    const unsubscribe = onSnapshot(
+      collection(db, "clients", client.id, "marketing"),
+      (snapshot) => {
+        setArts(
+          snapshot.docs.map((item) => ({
+            id: item.id,
+            ...item.data(),
+          }))
+        );
+      }
+    );
+
+    return () => unsubscribe();
+  }, [client.id]);
+
+  function changeMarketingType(type) {
+    setForm((prev) => ({
+      ...prev,
+      type,
+      title:
+        type === "feed"
+          ? "Promoção Especial"
+          : type === "story"
+            ? "Confira agora"
+            : "Título do Reels",
+      subtitle:
+        type === "feed"
+          ? "Uma arte pronta para divulgar sua marca"
+          : type === "story"
+            ? "Chame seu público para interagir"
+            : "Capa chamativa para seu vídeo",
+      cta:
+        type === "feed"
+          ? "Saiba mais"
+          : type === "story"
+            ? "Arraste para saber mais"
+            : "Assista agora",
+    }));
+  }
+
+  function resetMarketingForm() {
+    setForm(getMarketingDefaultForm());
+  }
+
+  async function handleSaveMarketingArt() {
+    if (!form.title.trim()) {
+      alert("Informe o título da arte.");
+      return;
+    }
+
+    try {
+      setSaving(true);
+
+      const imageUrl = form.imageFile
+        ? await uploadMarketingAsset(client.id, form.imageFile, "images")
+        : form.imageUrl || "";
+
+      const logoUrl = form.logoFile
+        ? await uploadMarketingAsset(client.id, form.logoFile, "logos")
+        : form.logoUrl || "";
+
+      const payload = {
+        type: form.type,
+        title: String(form.title || "").trim(),
+        subtitle: String(form.subtitle || "").trim(),
+        cta: String(form.cta || "").trim(),
+        whatsapp: String(form.whatsapp || "").trim(),
+        location: String(form.location || "").trim(),
+        qrText: String(form.qrText || "").trim(),
+        imageUrl,
+        logoUrl,
+        primaryColor: form.primaryColor,
+        secondaryColor: form.secondaryColor,
+        accentColor: form.accentColor,
+        textColor: form.textColor,
+        width: getMarketingFormatRatio(form.type).width,
+        height: getMarketingFormatRatio(form.type).height,
+        formatLabel: getMarketingFormatSize(form.type),
+        createdAt: serverTimestamp(),
+        updatedAt: serverTimestamp(),
+      };
+
+      await addDoc(collection(db, "clients", client.id, "marketing"), payload);
+
+      resetMarketingForm();
+      alert("Arte de marketing salva com sucesso!");
+    } catch (error) {
+      console.log(error);
+      alert("Erro ao salvar arte de marketing.");
+    } finally {
+      setSaving(false);
+    }
+  }
+
+  async function deleteMarketingArt(id) {
+    try {
+      await deleteDoc(doc(db, "clients", client.id, "marketing", id));
+    } catch (error) {
+      console.log(error);
+      alert("Erro ao excluir arte.");
+    }
+  }
+
+  async function duplicateMarketingArt(art) {
+    try {
+      const { id, createdAt, updatedAt, ...payload } = art;
+
+      await addDoc(collection(db, "clients", client.id, "marketing"), {
+        ...payload,
+        title: `${art.title || "Arte"} - cópia`,
+        createdAt: serverTimestamp(),
+        updatedAt: serverTimestamp(),
+      });
+    } catch (error) {
+      console.log(error);
+      alert("Erro ao duplicar arte.");
+    }
+  }
+
+  async function sendMarketingArtToPlaylist(art) {
+    try {
+      setSendingArtId(art.id);
+
+      const primaryColor = art.primaryColor || "#06b6d4";
+      const secondaryColor = art.secondaryColor || "#9333ea";
+      const accentColor = art.accentColor || "#22d3ee";
+      const textColor = art.textColor || "#ffffff";
+      const marketingType = art.marketingType || art.formatType || art.type || "feed";
+
+      await addDoc(collection(db, "clients", client.id, "templates"), {
+        type: "marketing_art",
+        templateType: "marketing_art",
+        marketingType,
+        formatType: marketingType,
+        sourceMarketingId: art.id,
+        name: String(art.title || "Arte de Marketing").trim(),
+        title: String(art.title || "").trim(),
+        subtitle: String(art.subtitle || "").trim(),
+        cta: String(art.cta || "").trim(),
+        imageUrl: art.imageUrl || "",
+        logoUrl: art.logoUrl || "",
+        qrText: String(art.qrText || "").trim(),
+        whatsapp: String(art.whatsapp || "").trim(),
+        location: String(art.location || "").trim(),
+        primaryColor,
+        secondaryColor,
+        accentColor,
+        textColor,
+        colors: {
+          primary: primaryColor,
+          secondary: secondaryColor,
+          accent: accentColor,
+          text: textColor,
+        },
+        duration: 15,
+        orientation: marketingType === "feed" ? "Paisagem + Retrato" : "Retrato",
+        createdAt: serverTimestamp(),
+        updatedAt: serverTimestamp(),
+      });
+
+      alert("Arte enviada para os Templates da playlist!");
+    } catch (error) {
+      console.log(error);
+      alert("Erro ao enviar a arte para a playlist.");
+    } finally {
+      setSendingArtId("");
+    }
+  }
+
+  function startFromSavedArt(art) {
+    setForm({
+      ...getMarketingDefaultForm(),
+      ...art,
+      imageFile: null,
+      imagePreview: art.imageUrl || "",
+      logoFile: null,
+      logoPreview: art.logoUrl || "",
+    });
+
+    window.scrollTo({
+      top: 0,
+      behavior: "smooth",
+    });
+  }
+
+  const selectedSize = getMarketingFormatSize(form.type);
+
+  return (
+    <>
+      <section className="templates-hero">
+        <div>
+          <div className="kicker">Marketing integrado</div>
+          <h1>Artes para Instagram, Stories e Reels</h1>
+          <p>
+            Crie peças profissionais para redes sociais e salve na biblioteca do cliente.
+            A próxima etapa será enviar essas artes direto para a playlist da TV.
+          </p>
+        </div>
+
+        <div className="templates-hero-badge">
+          <SparklineIcon />
+          {selectedSize}
+        </div>
+      </section>
+
+      <section className="templates-builder-grid">
+        <div className="templates-editor-panel">
+          <div className="playlist-editor-header">
+            <div>
+              <h2>Nova arte</h2>
+              <p>Escolha o formato, adicione imagem, logo, cores e chamada.</p>
+            </div>
+          </div>
+
+          <div className="template-type-grid">
+            <button
+              type="button"
+              className={form.type === "feed" ? "template-type-card active" : "template-type-card"}
+              onClick={() => changeMarketingType("feed")}
+            >
+              <Image size={28} />
+              <strong>Feed Instagram</strong>
+              <span>Arte quadrada 1080x1080</span>
+            </button>
+
+            <button
+              type="button"
+              className={form.type === "story" ? "template-type-card active" : "template-type-card"}
+              onClick={() => changeMarketingType("story")}
+            >
+              <Monitor size={28} />
+              <strong>Stories</strong>
+              <span>Vertical 1080x1920 para status e stories</span>
+            </button>
+
+            <button
+              type="button"
+              className={form.type === "reels" ? "template-type-card active" : "template-type-card"}
+              onClick={() => changeMarketingType("reels")}
+            >
+              <Palette size={28} />
+              <strong>Capa Reels</strong>
+              <span>Título forte para cortes e vídeos</span>
+            </button>
+          </div>
+
+          <div className="form-grid">
+            <div className="form-group">
+              <label>Título principal</label>
+              <input
+                value={form.title}
+                maxLength={80}
+                placeholder="Ex: Promoção Especial"
+                onChange={(e) => setForm({ ...form, title: e.target.value })}
+              />
+            </div>
+
+            <div className="form-group">
+              <label>Subtítulo</label>
+              <input
+                value={form.subtitle}
+                maxLength={130}
+                placeholder="Ex: Só hoje com condições especiais"
+                onChange={(e) => setForm({ ...form, subtitle: e.target.value })}
+              />
+            </div>
+
+            <div className="form-group">
+              <label>Chamada / CTA</label>
+              <input
+                value={form.cta}
+                maxLength={60}
+                placeholder="Ex: Peça agora"
+                onChange={(e) => setForm({ ...form, cta: e.target.value })}
+              />
+            </div>
+
+            <div className="form-group">
+              <label>WhatsApp</label>
+              <input
+                value={form.whatsapp}
+                placeholder="Ex: 84 99999-9999"
+                onChange={(e) => setForm({ ...form, whatsapp: e.target.value })}
+              />
+            </div>
+
+            <div className="form-group">
+              <label>Localização</label>
+              <input
+                value={form.location}
+                placeholder="Ex: João Câmara/RN"
+                onChange={(e) => setForm({ ...form, location: e.target.value })}
+              />
+            </div>
+
+            <div className="form-group">
+              <label>QR Code / Link</label>
+              <input
+                value={form.qrText}
+                placeholder="Link, WhatsApp ou texto para QR Code"
+                onChange={(e) => setForm({ ...form, qrText: e.target.value })}
+              />
+            </div>
+          </div>
+
+          <div className="template-color-panel">
+            <div className="playlist-section-title compact">
+              <div>
+                <h3>Imagem e logo</h3>
+                <p>A imagem principal ocupa o fundo da arte. A logo aparece no topo.</p>
+              </div>
+            </div>
+
+            <div className="form-grid">
+              <div className="form-group">
+                <label>Imagem principal</label>
+                <input
+                  type="file"
+                  accept="image/*"
+                  onChange={(e) =>
+                    readMarketingFile(e.target.files?.[0], setForm, "imageFile", "imagePreview")
+                  }
+                />
+              </div>
+
+              <div className="form-group">
+                <label>Logo do cliente</label>
+                <input
+                  type="file"
+                  accept="image/*"
+                  onChange={(e) =>
+                    readMarketingFile(e.target.files?.[0], setForm, "logoFile", "logoPreview")
+                  }
+                />
+              </div>
+            </div>
+          </div>
+
+          <div className="template-color-panel">
+            <div className="playlist-section-title compact">
+              <div>
+                <h3>Cores da arte</h3>
+                <p>Controle o degradê, o destaque e a cor dos textos.</p>
+              </div>
+            </div>
+
+            <div className="template-color-grid">
+              <label>
+                <span>Primária</span>
+                <input
+                  type="color"
+                  value={form.primaryColor}
+                  onChange={(e) => setForm({ ...form, primaryColor: e.target.value })}
+                />
+              </label>
+
+              <label>
+                <span>Secundária</span>
+                <input
+                  type="color"
+                  value={form.secondaryColor}
+                  onChange={(e) => setForm({ ...form, secondaryColor: e.target.value })}
+                />
+              </label>
+
+              <label>
+                <span>Destaque</span>
+                <input
+                  type="color"
+                  value={form.accentColor}
+                  onChange={(e) => setForm({ ...form, accentColor: e.target.value })}
+                />
+              </label>
+
+              <label>
+                <span>Texto</span>
+                <input
+                  type="color"
+                  value={form.textColor}
+                  onChange={(e) => setForm({ ...form, textColor: e.target.value })}
+                />
+              </label>
+            </div>
+          </div>
+
+          <div className="panel-actions">
+            <button
+              className="upload-button"
+              onClick={handleSaveMarketingArt}
+              disabled={saving}
+            >
+              <Plus size={20} />
+              {saving ? "Salvando..." : "Salvar arte"}
+            </button>
+
+            <button className="delete-button" type="button" onClick={resetMarketingForm}>
+              Limpar campos
+            </button>
+          </div>
+        </div>
+
+        <div className="templates-preview-panel">
+          <div style={{ marginBottom: 16 }}>
+            <div className="kicker">Preview</div>
+            <h2 style={{ margin: "6px 0 0" }}>
+              {MARKETING_TYPE_LABELS[form.type]} • {selectedSize}
+            </h2>
+          </div>
+
+          <MarketingArtPreview art={form} />
+        </div>
+      </section>
+
+      <section className="templates-list-panel">
+        <div className="playlist-editor-header">
+          <div>
+            <h2>Biblioteca de artes</h2>
+            <p>Artes salvas por este cliente para reaproveitar em campanhas.</p>
+          </div>
+        </div>
+
+        <div className="templates-list-grid">
+          {arts.length === 0 ? (
+            <div className="empty-library">Nenhuma arte criada ainda.</div>
+          ) : (
+            arts.map((art) => (
+              <div className="template-saved-card" key={art.id}>
+                <MarketingArtPreview art={art} compact />
+
+                <div className="template-saved-info">
+                  <div>
+                    <strong>{art.title || "Sem título"}</strong>
+                    <span>
+                      {MARKETING_TYPE_LABELS[art.type] || "Marketing"} • {art.formatLabel || getMarketingFormatSize(art.type)}
+                    </span>
+                  </div>
+
+                  <div className="template-actions-row">
+                    <button
+                      className="client-action primary"
+                      disabled={sendingArtId === art.id}
+                      onClick={() => sendMarketingArtToPlaylist(art)}
+                    >
+                      {sendingArtId === art.id ? "Enviando..." : "Enviar para Playlist"}
+                    </button>
+
+                    <button className="client-action primary" onClick={() => startFromSavedArt(art)}>
+                      Editar base
+                    </button>
+
+                    <button className="client-action" onClick={() => duplicateMarketingArt(art)}>
+                      Duplicar
+                    </button>
+
+                    <button className="client-action danger" onClick={() => deleteMarketingArt(art.id)}>
+                      <Trash2 size={15} />
+                    </button>
+                  </div>
+
+                  <small style={{ color: "rgba(255,255,255,0.48)" }}>
+                    A arte enviada ficará disponível em Playlists &gt; Templates da playlist.
+                  </small>
+                </div>
+              </div>
+            ))
+          )}
+        </div>
+      </section>
+    </>
+  );
+}
+
+
 function ClientTemplatesPage({ client }) {
   const [templates, setTemplates] = useState([]);
   const [screens, setScreens] = useState([]);
@@ -5197,6 +6173,10 @@ function TemplateVisualPreview({ template, compact = false }) {
   const orientationLabel = isPortrait ? "Retrato" : "Paisagem";
   const mainNews = news[0] || DEFAULT_NEWS_ITEMS[0];
 
+  if (realTemplateType === "marketing_art") {
+    return <MarketingArtPreview art={template} compact={compact} tv={!compact} />;
+  }
+
   const premiumFrameStyle = {
     minHeight: compact ? 160 : isPortrait ? 620 : 430,
     height: compact ? "100%" : "auto",
@@ -5665,13 +6645,74 @@ function TemplateVisualPreview({ template, compact = false }) {
   );
 }
 
+function ScreenInUseCard({ screen, loading, onBack, onTryAnother }) {
+  return (
+    <div className="tv-connect-page">
+      <div className="tv-connect-card tv-code-only-card tv-screen-in-use">
+        <div className="tv-screen-in-use-icon">
+          <Monitor size={52} />
+        </div>
 
+        <div className="tv-connect-kicker">Totem Park Player</div>
+        <h1>Tela em uso</h1>
+        <p>Este código já está conectado em outro aparelho.</p>
+
+        <div className="tv-screen-in-use-details">
+          <div>
+            <span>Nome da tela</span>
+            <strong>{screen.screenName}</strong>
+          </div>
+          <div>
+            <span>Cliente</span>
+            <strong>{screen.clientName}</strong>
+          </div>
+          <div>
+            <span>Última conexão</span>
+            <strong>{screen.lastConnection}</strong>
+          </div>
+          <div>
+            <span>Status</span>
+            <strong className="tv-screen-online-status">Online</strong>
+          </div>
+        </div>
+
+        <div className="tv-screen-in-use-actions">
+          <button
+            className="tv-change-mode-button"
+            disabled={loading}
+            onClick={onBack}
+          >
+            Voltar
+          </button>
+
+          <button
+            className="tv-connect-button"
+            disabled={loading}
+            onClick={onTryAnother}
+          >
+            Tente outro Código
+          </button>
+        </div>
+      </div>
+    </div>
+  );
+}
 
 function TVConnectPage() {
   const navigate = useNavigate();
 
   const [screenCode, setScreenCode] = useState("");
   const [loading, setLoading] = useState(false);
+  const [screenInUse, setScreenInUse] = useState(null);
+
+  function finishConnection(clientId, code, deviceId) {
+    localStorage.setItem(
+      "totempark-tv-connection",
+      JSON.stringify({ clientId, code, deviceId })
+    );
+
+    navigate(`/player/${clientId}/${code}`);
+  }
 
   async function handleConnect() {
     if (!screenCode.trim()) {
@@ -5698,6 +6739,7 @@ function TVConnectPage() {
       const codeData = codeSnap.data();
       const clientId = codeData.clientId;
       const screenId = codeData.screenId;
+      const deviceId = getTotemDeviceId();
 
       if (!clientId) {
         alert("Não foi possível identificar o cliente desta tela.");
@@ -5706,28 +6748,68 @@ function TVConnectPage() {
       }
 
       if (screenId) {
-        try {
-          await updateDoc(doc(db, "clients", clientId, "screens", screenId), {
-            remoteCommand: null,
-            lastCommandSent: "",
-            commandStatus: "connected",
-            lastConnection: new Date().toLocaleString("pt-BR"),
-            lastSeenAt: serverTimestamp(),
+        const screenRef = doc(db, "clients", clientId, "screens", screenId);
+        const connectionResult = await runTransaction(db, async (transaction) => {
+            const screenSnap = await transaction.get(screenRef);
+
+            if (!screenSnap.exists()) {
+              return { screenNotFound: true };
+            }
+
+            const screenData = screenSnap.data();
+            const lastSeenAt = screenData.lastSeenAt;
+            const lastSeenMillis = lastSeenAt?.toMillis?.()
+              ?? (lastSeenAt?.seconds ? lastSeenAt.seconds * 1000 : 0);
+            const isRecentlyOnline =
+              lastSeenMillis > 0 && Date.now() - lastSeenMillis <= 60000;
+            const connectedDeviceId = screenData.connectedDeviceId || "";
+            const belongsToAnotherDevice =
+              Boolean(connectedDeviceId) && connectedDeviceId !== deviceId;
+
+            if (isRecentlyOnline && belongsToAnotherDevice) {
+              return {
+                inUse: true,
+                screen: {
+                  clientId,
+                  screenId,
+                  code,
+                  screenName: screenData.name || codeData.screenName || "Tela",
+                  clientName: codeData.clientName || "Cliente não informado",
+                  lastConnection:
+                    screenData.lastConnection ||
+                    new Date(lastSeenMillis).toLocaleString("pt-BR"),
+                  lastSeenAt,
+                  connectedDeviceId,
+                },
+              };
+            }
+
+            transaction.update(screenRef, {
+              connectedDeviceId: deviceId,
+              activeDeviceId: deleteField(),
+              remoteCommand: null,
+              lastCommandSent: "",
+              commandStatus: "connected",
+              lastConnection: new Date().toLocaleString("pt-BR"),
+              lastSeenAt: serverTimestamp(),
+            });
+            return { inUse: false };
           });
-        } catch (error) {
-          console.log("Não foi possível limpar comando antigo:", error);
+
+        if (connectionResult?.screenNotFound) {
+          alert("Esta tela não existe mais. Tente outro código.");
+          setLoading(false);
+          return;
+        }
+
+        if (connectionResult?.inUse) {
+          setScreenInUse(connectionResult.screen);
+          setLoading(false);
+          return;
         }
       }
 
-      localStorage.setItem(
-        "totempark-tv-connection",
-        JSON.stringify({
-          clientId,
-          code,
-        })
-      );
-
-      navigate(`/player/${clientId}/${code}`);
+      finishConnection(clientId, code, deviceId);
     } catch (error) {
       console.log(error);
       alert("Erro ao conectar a TV. Verifique as regras do Firestore para leitura da coleção tv_codes.");
@@ -5751,6 +6833,24 @@ function TVConnectPage() {
       localStorage.removeItem("totempark-tv-connection");
     }
   }, [navigate]);
+
+  if (screenInUse) {
+    return (
+      <ScreenInUseCard
+        screen={screenInUse}
+        loading={loading}
+        onBack={() => {
+          setScreenInUse(null);
+          setLoading(false);
+        }}
+        onTryAnother={() => {
+          setScreenInUse(null);
+          setScreenCode("");
+          setLoading(false);
+        }}
+      />
+    );
+  }
 
   return (
     <div className="tv-connect-page">
@@ -5848,6 +6948,11 @@ function TVConnectPage() {
 
 function PlayerPage() {
   const { clientId, codigo } = useParams();
+  const hasManualScreenRotation =
+    isNativeApp() && Boolean(localStorage.getItem("totempark-screen-rotation"));
+  const offlineStorageKey = `totempark-offline-assets-${clientId}-${codigo}`;
+  const offlineReadyMessageKey = `totempark-offline-ready-shown-${clientId}-${codigo}`;
+  const offlineScope = `${clientId}-${String(codigo || "tv").toLowerCase()}`;
   const [screen, setScreen] = useState(null);
   const [defaultPlaylist, setDefaultPlaylist] = useState(null);
   const [allPlaylists, setAllPlaylists] = useState([]);
@@ -5856,6 +6961,13 @@ function PlayerPage() {
   const [activeTemplate, setActiveTemplate] = useState(null);
   const [activeMode, setActiveMode] = useState("default");
   const [mediaIndex, setMediaIndex] = useState(0);
+  const [previousMediaIndex, setPreviousMediaIndex] = useState(null);
+  const [readyMediaKey, setReadyMediaKey] = useState("");
+  const [isAndroidTv, setIsAndroidTv] = useState(null);
+  const [offlineAssetMap, setOfflineAssetMap] = useState(() =>
+    isNativeApp() ? restoreOfflineAssetMap(offlineStorageKey) : {}
+  );
+  const [offlineCacheStatus, setOfflineCacheStatus] = useState("");
   const [loading, setLoading] = useState(true);
   const [now, setNow] = useState(new Date());
   const [remoteOverlay, setRemoteOverlay] = useState(null);
@@ -5865,6 +6977,33 @@ function PlayerPage() {
   const [pauseMode, setPauseMode] = useState(false);
   const [lastCommandId, setLastCommandId] = useState(null);
   const lastCommandIdRef = useRef(null);
+  const transitionInProgressRef = useRef(false);
+  const transitionCleanupRef = useRef(null);
+  const offlineStatusTimerRef = useRef(null);
+  const cacheQueueRef = useRef(Promise.resolve());
+  const playbackTimerRef = useRef(null);
+  const playbackTimingKeyRef = useRef("");
+  const playbackRemainingRef = useRef(0);
+  const playbackStartedAtRef = useRef(0);
+
+  useEffect(() => {
+    if (!isNativeApp()) return;
+
+    TotemDevice.getDeviceType()
+      .then(({ isTelevision }) => setIsAndroidTv(Boolean(isTelevision)))
+      .catch((error) => {
+        console.log("Nao foi possivel identificar o tipo do aparelho:", error);
+        setIsAndroidTv(false);
+      });
+  }, []);
+
+  useEffect(() => {
+    return () => {
+      clearTimeout(transitionCleanupRef.current);
+      clearTimeout(offlineStatusTimerRef.current);
+      clearTimeout(playbackTimerRef.current);
+    };
+  }, []);
 
   useEffect(() => {
     const clock = setInterval(() => {
@@ -5968,41 +7107,163 @@ function PlayerPage() {
 
   const playerItems = [
     ...(activePlaylist?.items || []).map((item) => {
+      const localizedItem = applyOfflineAssetUrls(item, offlineAssetMap);
+
       if (item?.playerItemType === "template" || item?.templateType) {
         return {
-          ...item,
-          title: item.title || item.name,
-          templateType: item.templateType || item.type,
-          type: item.templateType || item.type,
-          duration: Number(item.duration || 15),
+          ...localizedItem,
+          title: localizedItem.title || localizedItem.name,
+          templateType: localizedItem.templateType || localizedItem.type,
+          type: localizedItem.templateType || localizedItem.type,
+          duration: Number(localizedItem.duration || 15),
           playerItemType: "template",
         };
       }
 
       return {
-        ...item,
+        ...localizedItem,
         playerItemType: "media",
       };
     }),
-    ...screenTemplates.map((template) => ({
-      ...template,
-      title: template.name,
-      templateType: template.type,
-      type: template.type,
-      duration: Number(template.duration || 15),
-      playerItemType: "template",
-    })),
+    ...screenTemplates.map((template) => {
+      const localizedTemplate = applyOfflineAssetUrls(template, offlineAssetMap);
+
+      return {
+        ...localizedTemplate,
+        title: localizedTemplate.name,
+        templateType: localizedTemplate.type,
+        type: localizedTemplate.type,
+        duration: Number(localizedTemplate.duration || 15),
+        playerItemType: "template",
+      };
+    }),
   ];
 
   const activeItemsKey = playerItems
     .map((item) => `${item.playerItemType}-${item.id || item.preview || item.title}-${item.updatedAt?.seconds || ""}`)
     .join("|");
 
+  const playlistsForOffline = allPlaylists.filter((playlist) => {
+    if (playlist.id === screen?.playlistId) return true;
+    if (!playlist.scheduleEnabled) return false;
+
+    return (
+      !playlist.targetScreenIds?.length ||
+      playlist.targetScreenIds.includes(screen?.id)
+    );
+  });
+  const offlineAssetUrls = collectOfflineAssetUrls([
+    defaultPlaylist,
+    activeTemplate,
+    screenTemplates,
+    playlistsForOffline,
+  ]);
+  const offlineAssetsKey = offlineAssetUrls.join("|");
+
+  useEffect(() => {
+    if (!isNativeApp() || offlineAssetUrls.length === 0) return;
+
+    let active = true;
+    clearTimeout(offlineStatusTimerRef.current);
+    setOfflineCacheStatus("downloading");
+
+    cacheQueueRef.current = cacheQueueRef.current
+      .catch(() => {})
+      .then(() => cacheOfflineAssets(
+        offlineAssetUrls,
+        offlineScope,
+        offlineStorageKey
+      ))
+      .then((result) => {
+        if (!active) return;
+
+        setOfflineAssetMap(result.urlMap);
+
+        if (result.failed > 0) {
+          setOfflineCacheStatus("partial");
+          offlineStatusTimerRef.current = setTimeout(() => {
+            setOfflineCacheStatus("");
+          }, 5000);
+          return;
+        }
+
+        const readyMessageWasShown = localStorage.getItem(offlineReadyMessageKey) === "true";
+
+        if (readyMessageWasShown) {
+          setOfflineCacheStatus("");
+          return;
+        }
+
+        localStorage.setItem(offlineReadyMessageKey, "true");
+        setOfflineCacheStatus("ready");
+        offlineStatusTimerRef.current = setTimeout(() => {
+          setOfflineCacheStatus("");
+        }, 4000);
+      })
+      .catch((error) => {
+        console.log("Erro ao preparar playlist offline:", error);
+        if (active) {
+          setOfflineCacheStatus("partial");
+          offlineStatusTimerRef.current = setTimeout(() => {
+            setOfflineCacheStatus("");
+          }, 5000);
+        }
+      });
+
+    return () => {
+      active = false;
+    };
+  }, [offlineAssetsKey, offlineReadyMessageKey, offlineScope, offlineStorageKey]);
+
+  function getPlayerItemKey(item, index) {
+    return `${activePlaylist?.id || "templates"}-${item?.id || item?.preview || item?.title || "item"}-${index}`;
+  }
+
   function goToNextMedia() {
     const items = playerItems;
 
-    if (items.length === 0) return;
+    if (items.length <= 1) return;
 
+    setMediaIndex((prev) => {
+      const safePrev = prev >= items.length ? 0 : prev;
+      const nextIndex = safePrev + 1 >= items.length ? 0 : safePrev + 1;
+
+      transitionInProgressRef.current = true;
+      setPreviousMediaIndex(safePrev);
+
+      if (items[nextIndex]?.playerItemType === "template") {
+        setReadyMediaKey(getPlayerItemKey(items[nextIndex], nextIndex));
+        clearTimeout(transitionCleanupRef.current);
+        transitionCleanupRef.current = setTimeout(() => {
+          setPreviousMediaIndex(null);
+          transitionInProgressRef.current = false;
+        }, 1800);
+      } else {
+        setReadyMediaKey("");
+      }
+
+      return nextIndex;
+    });
+  }
+
+  function markCurrentMediaReady(item, index) {
+    const itemKey = getPlayerItemKey(item, index);
+
+    if (itemKey !== getPlayerItemKey(playerItems[mediaIndex], mediaIndex)) return;
+
+    setReadyMediaKey(itemKey);
+    clearTimeout(transitionCleanupRef.current);
+    transitionCleanupRef.current = setTimeout(() => {
+      setPreviousMediaIndex(null);
+      transitionInProgressRef.current = false;
+    }, 1800);
+  }
+
+  function skipFailedMedia() {
+    const items = playerItems;
+
+    transitionInProgressRef.current = false;
+    setReadyMediaKey("");
     setMediaIndex((prev) => {
       const safePrev = prev >= items.length ? 0 : prev;
       return safePrev + 1 >= items.length ? 0 : safePrev + 1;
@@ -6010,6 +7271,9 @@ function PlayerPage() {
   }
 
   function getPlayerOrientationClass() {
+    if (hasManualScreenRotation) return "natural-mode";
+    if (isNativeApp() && isAndroidTv === false) return "natural-mode";
+
     return screen?.orientation === "Retrato" ? "portrait-mode" : "landscape-mode";
   }
 
@@ -6047,6 +7311,16 @@ function PlayerPage() {
 
       const screenDoc = snapshot.docs[0];
       const screenData = { id: screenDoc.id, ...screenDoc.data() };
+      const localDeviceId = getTotemDeviceId();
+
+      if (
+        screenData.connectedDeviceId &&
+        screenData.connectedDeviceId !== localDeviceId
+      ) {
+        localStorage.removeItem("totempark-tv-connection");
+        window.location.href = "/tv";
+        return;
+      }
 
       setScreen(screenData);
       setLoading(false);
@@ -6068,10 +7342,23 @@ function PlayerPage() {
 
     async function sendHeartbeat() {
       try {
-        await updateDoc(screenDocRef, {
-          status: "online",
-          lastConnection: new Date().toLocaleString("pt-BR"),
-          lastSeenAt: serverTimestamp(),
+        const localDeviceId = getTotemDeviceId();
+
+        await runTransaction(db, async (transaction) => {
+          const currentScreen = await transaction.get(screenDocRef);
+
+          if (!currentScreen.exists()) return;
+
+          const connectedDeviceId = currentScreen.data().connectedDeviceId;
+          if (connectedDeviceId && connectedDeviceId !== localDeviceId) return;
+
+          transaction.update(screenDocRef, {
+            connectedDeviceId: localDeviceId,
+            activeDeviceId: deleteField(),
+            status: "online",
+            lastConnection: new Date().toLocaleString("pt-BR"),
+            lastSeenAt: serverTimestamp(),
+          });
         });
       } catch (error) {
         console.log(error);
@@ -6086,6 +7373,32 @@ function PlayerPage() {
 
     return () => clearInterval(interval);
   }, [screen?.id, clientId, maintenanceMode, blackoutMode, takeoverMessage]);
+
+  async function releaseCurrentScreen() {
+    if (!screen?.id || !clientId) return;
+
+    try {
+      const screenRef = doc(db, "clients", clientId, "screens", screen.id);
+      const localDeviceId = getTotemDeviceId();
+
+      await runTransaction(db, async (transaction) => {
+        const currentScreen = await transaction.get(screenRef);
+
+        if (!currentScreen.exists()) return;
+        if (currentScreen.data().connectedDeviceId !== localDeviceId) return;
+
+        transaction.update(screenRef, {
+          connectedDeviceId: deleteField(),
+          activeDeviceId: deleteField(),
+          status: "offline",
+          lastSeenAt: null,
+          commandStatus: "disconnected",
+        });
+      });
+    } catch (error) {
+      console.log("Não foi possível liberar o vínculo da TV:", error);
+    }
+  }
 
 
   useEffect(() => {
@@ -6137,6 +7450,7 @@ function PlayerPage() {
       }
 
       if (remoteCommand.type === "exitTv") {
+        await releaseCurrentScreen();
         localStorage.removeItem("totempark-tv-connection");
         localStorage.removeItem("totempark-app-mode");
 
@@ -6260,7 +7574,7 @@ function PlayerPage() {
               ? `Template ${currentItem.type || ""}`
               : currentItem.type || "",
           nowPlayingDuration: Number(currentItem.duration || 10),
-          nowPlayingPreview: currentItem.preview || "",
+          nowPlayingPreview: currentItem.remotePreview || currentItem.preview || "",
           nowPlayingSound: currentItem.sound || false,
           nowPlayingIndex: safeIndex + 1,
           nowPlayingTotal: items.length,
@@ -6377,6 +7691,9 @@ function PlayerPage() {
     setActiveMode(selected.mode);
 
     if (nextId && nextId !== previousId) {
+      transitionInProgressRef.current = false;
+      setPreviousMediaIndex(null);
+      setReadyMediaKey("");
       setMediaIndex(0);
     }
   }, [allPlaylists, defaultPlaylist, now, screen?.id, screen?.playlistId]);
@@ -6394,26 +7711,58 @@ function PlayerPage() {
 
   useEffect(() => {
     const items = playerItems;
-
-    if (pauseMode || takeoverMessage || blackoutMode || maintenanceMode) return;
-
     if (items.length === 0) return;
 
-    const currentItem = items[mediaIndex];
+    const safeIndex = mediaIndex >= items.length ? 0 : mediaIndex;
+    const currentItem = items[safeIndex];
+    const currentKey = getPlayerItemKey(currentItem, safeIndex);
+    const durationInSeconds = Number(currentItem?.duration);
+    const fallbackDuration = currentItem?.playerItemType === "template" ? 15 : 10;
+    const durationInMs =
+      Number.isFinite(durationInSeconds) && durationInSeconds > 0
+        ? durationInSeconds * 1000
+        : fallbackDuration * 1000;
+    const timingKey = `${currentKey}-${durationInMs}`;
+    const isReady =
+      currentItem?.playerItemType === "template" || readyMediaKey === currentKey;
+    const isPlaybackBlocked =
+      pauseMode || takeoverMessage || blackoutMode || maintenanceMode;
 
-    // Todas as mídias seguem o tempo configurado na playlist.
-    // Isso evita o vídeo ficar preso esperando terminar naturalmente.
-    const duration = Number(currentItem?.duration || 10) * 1000;
+    if (playbackTimingKeyRef.current !== timingKey) {
+      clearTimeout(playbackTimerRef.current);
+      playbackTimerRef.current = null;
+      playbackTimingKeyRef.current = timingKey;
+      playbackRemainingRef.current = durationInMs;
+      playbackStartedAtRef.current = 0;
+    }
 
-    const timer = setTimeout(() => {
+    if (!isReady || isPlaybackBlocked) return;
+
+    playbackStartedAtRef.current = Date.now();
+    const remaining = Math.max(0, playbackRemainingRef.current);
+
+    playbackTimerRef.current = setTimeout(() => {
+      playbackTimerRef.current = null;
+      playbackRemainingRef.current = 0;
       goToNextMedia();
-    }, duration);
+    }, remaining);
 
-    return () => clearTimeout(timer);
-  }, [activePlaylist?.id, activeItemsKey, mediaIndex, pauseMode, takeoverMessage, blackoutMode, maintenanceMode]);
+    return () => {
+      if (!playbackTimerRef.current) return;
+
+      clearTimeout(playbackTimerRef.current);
+      playbackTimerRef.current = null;
+      playbackRemainingRef.current = Math.max(
+        0,
+        playbackRemainingRef.current - (Date.now() - playbackStartedAtRef.current)
+      );
+    };
+  }, [activePlaylist?.id, activeItemsKey, mediaIndex, readyMediaKey, pauseMode, takeoverMessage, blackoutMode, maintenanceMode]);
 
   useEffect(() => {
-    const mediaElement = document.querySelector(".player-media");
+    const mediaElement = document.querySelector(
+      ".player-buffer-layer.is-current .player-media"
+    );
 
     if (!mediaElement || mediaElement.tagName !== "VIDEO") {
       return;
@@ -6483,13 +7832,27 @@ function PlayerPage() {
   if (activeTemplate) {
     return (
       <div className={`player-screen ${getPlayerOrientationClass()}`}>
-        <TemplateVisualPreview template={activeTemplate} />
+        <TemplateVisualPreview
+          template={applyOfflineAssetUrls(activeTemplate, offlineAssetMap)}
+        />
+
+        {offlineCacheStatus && (
+          <div className={`offline-cache-status ${offlineCacheStatus}`}>
+            {offlineCacheStatus === "downloading"
+              ? "Baixando conteúdo offline..."
+              : offlineCacheStatus === "ready"
+                ? "Conteúdo disponível offline"
+                : "Cache offline parcial"}
+          </div>
+        )}
 
         <button
           className="tv-player-exit-button"
           onClick={() => {
-            localStorage.removeItem("totempark-tv-connection");
-            window.location.href = "/tv";
+            releaseCurrentScreen().finally(() => {
+              localStorage.removeItem("totempark-tv-connection");
+              window.location.href = "/tv";
+            });
           }}
         >
           Sair da TV
@@ -6513,21 +7876,112 @@ function PlayerPage() {
   const safeMediaIndex =
     mediaIndex >= playerItems.length ? 0 : mediaIndex;
   const currentMedia = playerItems[safeMediaIndex] || playerItems[0];
-  const nextMedia =
-    playerItems[
-      safeMediaIndex + 1 >= playerItems.length ? 0 : safeMediaIndex + 1
-    ];
+  const currentMediaKey = getPlayerItemKey(currentMedia, safeMediaIndex);
+  const currentMediaReady =
+    currentMedia.playerItemType === "template" || readyMediaKey === currentMediaKey;
   const transitionClass = getTransitionClass(activePlaylist?.transition || "Fade suave");
   const transitionSpeedClass = getTransitionSpeedClass(activePlaylist?.transitionSpeed || "Normal");
-  const playerOrientationClass =
-    currentMedia?.playerItemType === "template" && currentMedia.orientation === "Retrato"
+  const playerOrientationClass = hasManualScreenRotation
+    ? "natural-mode"
+    : isNativeApp() && isAndroidTv === false
+    ? "natural-mode"
+    : currentMedia?.playerItemType === "template" && currentMedia.orientation === "Retrato"
       ? "portrait-mode"
       : currentMedia?.playerItemType === "template" && currentMedia.orientation === "Paisagem"
         ? "landscape-mode"
         : getPlayerOrientationClass();
 
+  const visibleLayers = [];
+
+  if (
+    previousMediaIndex !== null &&
+    previousMediaIndex !== safeMediaIndex &&
+    playerItems[previousMediaIndex]
+  ) {
+    visibleLayers.push({
+      item: playerItems[previousMediaIndex],
+      index: previousMediaIndex,
+      state: "is-previous",
+    });
+  }
+
+  visibleLayers.push({
+    item: currentMedia,
+    index: safeMediaIndex,
+    state: currentMediaReady ? "is-current is-ready" : "is-current is-pending",
+  });
+
+  function renderPlayerItem(item, index, isCurrent) {
+    if (item.playerItemType === "template") {
+      return <TemplateVisualPreview template={item} />;
+    }
+
+    if (item.type === "Vídeo") {
+      return (
+        <video
+          src={item.preview}
+          autoPlay={!pauseMode}
+          muted={!item.sound}
+          playsInline
+          preload="auto"
+          controls={false}
+          controlsList="nodownload nofullscreen noremoteplayback"
+          disablePictureInPicture
+          className="player-media"
+          onLoadedData={(event) => {
+            if (isCurrent) markCurrentMediaReady(item, index);
+
+            if (!pauseMode) {
+              event.currentTarget.play().catch((error) => {
+                console.log("Autoplay aguardando video:", error);
+              });
+            }
+          }}
+          onCanPlay={(event) => {
+            if (isCurrent) markCurrentMediaReady(item, index);
+            if (!pauseMode) event.currentTarget.play().catch(() => {});
+          }}
+          onPlay={(event) => {
+            if (pauseMode) event.currentTarget.pause();
+          }}
+          onError={() => {
+            if (!isCurrent) return;
+            console.log("Erro ao carregar video. Pulando midia.");
+            setTimeout(skipFailedMedia, 800);
+          }}
+        />
+      );
+    }
+
+    return (
+      <img
+        src={item.preview}
+        alt={item.title}
+        className="player-media"
+        onLoad={() => {
+          if (isCurrent) markCurrentMediaReady(item, index);
+        }}
+        onError={() => {
+          if (!isCurrent) return;
+          console.log("Erro ao carregar imagem. Pulando midia.");
+          setTimeout(skipFailedMedia, 800);
+        }}
+      />
+    );
+  }
+
   return (
     <div className={`player-screen ${playerOrientationClass}`}>
+      {offlineCacheStatus && (
+        <div className={`offline-cache-status ${offlineCacheStatus}`}>
+          {offlineCacheStatus === "downloading"
+            ? "Baixando conteúdo offline..."
+            : offlineCacheStatus === "ready"
+              ? "Conteúdo disponível offline"
+              : "Cache offline parcial"}
+        </div>
+      )}
+
       {remoteOverlay && (
         <div className="tv-overlay-alert">
           <strong>{remoteOverlay.title}</strong>
@@ -6547,79 +8001,14 @@ function PlayerPage() {
         </div>
       )}
 
-      <div
-        key={`${activePlaylist?.id || "templates"}-${currentMedia.id || currentMedia.preview}-${safeMediaIndex}-${transitionClass}-${transitionSpeedClass}`}
-        className={`player-transition-layer ${transitionClass} ${transitionSpeedClass} ${currentMedia.playerItemType === "template" ? "template-layer" : ""}`}
-      >
-        {currentMedia.playerItemType === "template" ? (
-          <TemplateVisualPreview template={currentMedia} />
-        ) : currentMedia.type === "Vídeo" ? (
-          <video
-            src={currentMedia.preview}
-            autoPlay={!pauseMode}
-            muted={!currentMedia.sound}
-            playsInline
-            preload="auto"
-            controls={false}
-            controlsList="nodownload nofullscreen noremoteplayback"
-            disablePictureInPicture
-            className="player-media"
-            onLoadedData={(event) => {
-              const video = event.currentTarget;
-
-              if (!pauseMode) {
-                video.play().catch((error) => {
-                  console.log("Autoplay aguardando vídeo:", error);
-                });
-              }
-            }}
-            onCanPlay={(event) => {
-              const video = event.currentTarget;
-
-              if (!pauseMode) {
-                video.play().catch(() => {});
-              }
-            }}
-            onPlay={(event) => {
-              if (pauseMode) {
-                event.currentTarget.pause();
-              }
-            }}
-            onEnded={() => {
-              goToNextMedia();
-            }}
-            onError={() => {
-              console.log("Erro ao carregar vídeo. Pulando mídia.");
-              setTimeout(goToNextMedia, 800);
-            }}
-          />
-        ) : (
-          <img
-            src={currentMedia.preview}
-            alt={currentMedia.title}
-            className="player-media"
-            onError={() => {
-              console.log("Erro ao carregar imagem. Pulando mídia.");
-              setTimeout(goToNextMedia, 800);
-            }}
-          />
-        )}
-      </div>
-
-      {nextMedia && nextMedia.preview && (
-        <div className="player-preload-media" aria-hidden="true">
-          {nextMedia.playerItemType === "template" ? null : nextMedia.type === "Vídeo" ? (
-            <video
-              src={nextMedia.preview}
-              muted
-              playsInline
-              preload="auto"
-            />
-          ) : (
-            <img src={nextMedia.preview} alt="" />
-          )}
+      {visibleLayers.map(({ item, index, state }) => (
+        <div
+          key={getPlayerItemKey(item, index)}
+          className={`player-transition-layer player-buffer-layer ${state} ${transitionClass} ${transitionSpeedClass} ${item.playerItemType === "template" ? "template-layer" : ""}`}
+        >
+          {renderPlayerItem(item, index, index === safeMediaIndex)}
         </div>
-      )}
+      ))}
     </div>
   );
 }

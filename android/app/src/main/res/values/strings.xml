@@ -4,4 +4,5 @@
     <string name="title_activity_main">Totem Park TV</string>
     <string name="package_name">br.com.parksolutions.totempark</string>
     <string name="custom_url_scheme">br.com.parksolutions.totempark</string>
+    <string name="device_admin_description">Mantém o Totem Park ativo em modo quiosque na Android TV.</string>
 </resources>
