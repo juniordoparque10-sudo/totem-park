@@ -1,4 +1,4 @@
-const CACHE_NAME = "totem-park-tv-v1";
+const CACHE_NAME = "totem-park-tv-v2";
 const APP_SHELL = [
   "/",
   "/tv",

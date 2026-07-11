@@ -25,6 +25,18 @@ import {
   CloudSun,
   Palette,
   Clock3,
+  RefreshCw,
+  Pause,
+  Play,
+  MessageSquare,
+  TriangleAlert,
+  Wrench,
+  MonitorOff,
+  Eraser,
+  RotateCcw,
+  Eye,
+  EyeOff,
+  CheckCircle2,
 } from "lucide-react";
 
 import {
@@ -48,6 +60,7 @@ import {
   updateDoc,
   setDoc,
   getDoc,
+  getDocs,
   runTransaction,
   deleteField,
 } from "firebase/firestore";
@@ -56,6 +69,7 @@ import {
   ref,
   uploadBytesResumable,
   getDownloadURL,
+  deleteObject,
 } from "firebase/storage";
 
 import { auth, db, storage } from "./firebase";
@@ -66,6 +80,7 @@ import {
 import logo from "./assets/logo.png";
 import "./App.css";
 
+const PUBLIC_WEB_URL = "https://totempark.com.br";
 const TotemDevice = registerPlugin("TotemDevice");
 
 function isNativeApp() {
@@ -112,6 +127,12 @@ function buildLivePreviewMedia(screen, fallbackMedia) {
       preview: screen.nowPlayingPreview,
       title: screen.nowPlayingTitle || "Mídia atual",
       type: screen.nowPlayingType || "Imagem",
+      orientation: screen.nowPlayingOrientation || fallbackMedia?.orientation || "Paisagem",
+      aspectRatio: screen.nowPlayingAspectRatio || fallbackMedia?.aspectRatio || "",
+      width: screen.nowPlayingWidth || fallbackMedia?.width || null,
+      height: screen.nowPlayingHeight || fallbackMedia?.height || null,
+      templateType: screen.nowPlayingTemplateType || fallbackMedia?.templateType || "",
+      playerItemType: screen.nowPlayingItemType || fallbackMedia?.playerItemType || "",
       liveKey: `${screen.id}-${screen.nowPlayingPreview}-${screen.nowPlayingIndex || 0}-${screen.lastMediaUpdateAt?.seconds || ""}`,
     };
   }
@@ -129,30 +150,290 @@ function buildLivePreviewMedia(screen, fallbackMedia) {
 function renderLivePreviewMedia(screen, fallbackMedia, icon = null) {
   const media = buildLivePreviewMedia(screen, fallbackMedia);
 
-  if (!media?.preview) {
-    return icon || <Monitor size={48} />;
+  return (
+    <UniversalPreview
+      key={media?.liveKey || `${screen?.id || "screen"}-empty-preview`}
+      item={media}
+      className="screen-universal-preview"
+      compact
+      autoPlay
+      fallbackIcon={icon || <Monitor size={48} />}
+    />
+  );
+}
+
+function isVideoItem(item = {}) {
+  const value = String(item.type || item.mimeType || item.fileType || "").toLowerCase();
+  const normalized = value.normalize("NFD").replace(/[\u0300-\u036f]/g, "");
+  return normalized.includes("video");
+}
+
+function getTimestampMs(value) {
+  if (!value) return 0;
+  if (typeof value === "number") return value;
+  if (value instanceof Date) return value.getTime();
+  if (value.toDate) return value.toDate().getTime();
+  if (value.seconds) return value.seconds * 1000;
+  return 0;
+}
+
+function getPlaylistItemDurationMs(item = {}) {
+  const seconds = Number(item.duration || 10);
+  return Math.max(1, Number.isFinite(seconds) ? seconds : 10) * 1000;
+}
+
+function getPlaylistPreviewIndex(playlist, nowValue = Date.now(), screen = {}) {
+  const items = Array.isArray(playlist?.items) ? playlist.items : [];
+
+  if (items.length === 0) return 0;
+
+  const nowMs = getTimestampMs(nowValue) || Date.now();
+  const durations = items.map(getPlaylistItemDurationMs);
+  const totalDuration = durations.reduce((total, duration) => total + duration, 0);
+
+  if (!totalDuration) return 0;
+
+  const reportedIndex = Math.max(0, Math.min(items.length - 1, Number(screen.nowPlayingIndex || 1) - 1));
+  const anchorMs = getTimestampMs(screen.lastMediaUpdateAt) || getTimestampMs(screen.lastSeenAt) || nowMs;
+  const baseOffset = durations
+    .slice(0, reportedIndex)
+    .reduce((total, duration) => total + duration, 0);
+  const elapsed = ((baseOffset + (nowMs - anchorMs)) % totalDuration + totalDuration) % totalDuration;
+
+  let cursor = 0;
+
+  for (let index = 0; index < durations.length; index += 1) {
+    cursor += durations[index];
+
+    if (elapsed < cursor) {
+      return index;
+    }
   }
 
-  if (media.type === "Vídeo") {
+  return 0;
+}
+
+function getPreviewOrientation(item = {}) {
+  if (item.detectedOrientation === "Retrato") return "Retrato";
+  if (item.detectedOrientation === "Paisagem") return "Paisagem";
+  if (item.orientation === "Retrato") return "Retrato";
+  if (item.orientation === "Paisagem") return "Paisagem";
+
+  const width = Number(item.width || item.videoWidth || item.naturalWidth || 0);
+  const height = Number(item.height || item.videoHeight || item.naturalHeight || 0);
+
+  if (width > 0 && height > 0) {
+    return height > width ? "Retrato" : "Paisagem";
+  }
+
+  if (item.type === "story" || item.type === "reels") return "Retrato";
+  if (item.format === "story" || item.format === "reels") return "Retrato";
+  if (item.marketingType === "story" || item.marketingType === "reels") return "Retrato";
+  if (item.formatType === "story" || item.formatType === "reels") return "Retrato";
+
+  return "Paisagem";
+}
+
+function getPreviewAspectClass(item = {}) {
+  const itemType = item.templateType || item.playerItemType || item.type;
+
+  if (
+    itemType === "marketing_art" ||
+    item.playerItemType === "marketing_art" ||
+    item.templateType === "marketing_art"
+  ) {
+    if (item.type === "feed" || item.format === "feed" || item.marketingType === "feed" || item.formatType === "feed") {
+      return "square";
+    }
+
+    if (
+      item.type === "story" ||
+      item.type === "reels" ||
+      item.format === "story" ||
+      item.format === "reels" ||
+      item.marketingType === "story" ||
+      item.marketingType === "reels" ||
+      item.formatType === "story" ||
+      item.formatType === "reels"
+    ) {
+      return "portrait";
+    }
+  }
+
+  if (item.aspectRatio === "1:1") return "square";
+  if (item.aspectRatio === "9:16") return "portrait";
+  if (item.aspectRatio === "16:9") return "landscape";
+  if (item.detectedAspectRatio === "1:1") return "square";
+  if (item.detectedAspectRatio === "9:16") return "portrait";
+  if (item.detectedAspectRatio === "16:9") return "landscape";
+
+  return getPreviewOrientation(item) === "Retrato" ? "portrait" : "landscape";
+}
+
+function getPreviewOrientationLabel(item = {}) {
+  const aspectClass = getPreviewAspectClass(item);
+  if (aspectClass === "square") return "Feed";
+  return getPreviewOrientation(item);
+}
+
+function getAspectRatioLabel(width, height) {
+  if (!width || !height) return "custom";
+
+  const ratio = width / height;
+
+  if (Math.abs(ratio - 16 / 9) < 0.08) return "16:9";
+  if (Math.abs(ratio - 9 / 16) < 0.08) return "9:16";
+  if (Math.abs(ratio - 1) < 0.08) return "1:1";
+
+  return "custom";
+}
+
+function buildMediaDimensions(width, height, fallbackOrientation = "Paisagem") {
+  const cleanWidth = Number(width || 0);
+  const cleanHeight = Number(height || 0);
+  const orientation =
+    cleanWidth > 0 && cleanHeight > 0
+      ? cleanHeight > cleanWidth ? "Retrato" : "Paisagem"
+      : fallbackOrientation || "Paisagem";
+
+  return {
+    width: cleanWidth || null,
+    height: cleanHeight || null,
+    orientation,
+    aspectRatio: getAspectRatioLabel(cleanWidth, cleanHeight),
+  };
+}
+
+function detectMediaFileMetadata(file) {
+  return new Promise((resolve) => {
+    if (!file) {
+      resolve(buildMediaDimensions(0, 0));
+      return;
+    }
+
+    const objectUrl = URL.createObjectURL(file);
+    const isVideo = file.type?.startsWith("video/");
+    const element = document.createElement(isVideo ? "video" : "img");
+
+    function finish(width, height) {
+      URL.revokeObjectURL(objectUrl);
+      resolve(buildMediaDimensions(width, height));
+    }
+
+    element.onerror = () => finish(0, 0);
+
+    if (isVideo) {
+      element.preload = "metadata";
+      element.onloadedmetadata = () => finish(element.videoWidth, element.videoHeight);
+      element.src = objectUrl;
+      return;
+    }
+
+    element.onload = () => finish(element.naturalWidth, element.naturalHeight);
+    element.src = objectUrl;
+  });
+}
+
+function UniversalPreview({
+  item,
+  className = "",
+  compact = true,
+  showBadge = true,
+  controls = false,
+  autoPlay = false,
+  fallbackIcon = <Monitor size={34} />,
+}) {
+  const [detectedDimensions, setDetectedDimensions] = useState(null);
+
+  if (!item) {
     return (
+      <div className={`media-preview-frame landscape empty ${className}`.trim()}>
+        {fallbackIcon}
+      </div>
+    );
+  }
+
+  const measuredItem = detectedDimensions ? { ...item, ...detectedDimensions } : item;
+  const realType = measuredItem.templateType || measuredItem.type;
+  const isTemplate = measuredItem.playerItemType === "template" || measuredItem.templateType;
+  const isMarketingArt = realType === "marketing_art";
+  const aspectClass = getPreviewAspectClass(measuredItem);
+  const badgeLabel = getPreviewOrientationLabel(measuredItem);
+  const frameClass = `media-preview-frame ${aspectClass} ${className}`.trim();
+
+  function handleDetectedSize(width, height) {
+    const cleanWidth = Number(width || 0);
+    const cleanHeight = Number(height || 0);
+
+    if (!cleanWidth || !cleanHeight) return;
+
+    const dimensions = buildMediaDimensions(cleanWidth, cleanHeight, item.orientation || "Paisagem");
+
+    setDetectedDimensions((current) => {
+      if (
+        current?.width === dimensions.width &&
+        current?.height === dimensions.height &&
+        current?.orientation === dimensions.orientation &&
+        current?.aspectRatio === dimensions.aspectRatio
+      ) {
+        return current;
+      }
+
+      return {
+        width: dimensions.width,
+        height: dimensions.height,
+        orientation: dimensions.orientation,
+        aspectRatio: dimensions.aspectRatio,
+        detectedOrientation: dimensions.orientation,
+        detectedAspectRatio: dimensions.aspectRatio,
+      };
+    });
+  }
+
+  let content = null;
+
+  if (isMarketingArt) {
+    content = <MarketingArtPreview art={measuredItem} compact={compact} />;
+  } else if (isTemplate) {
+    content = <TemplateVisualPreview template={measuredItem} compact={compact} />;
+  } else if (measuredItem.preview) {
+    content = isVideoItem(measuredItem) ? (
       <video
-        key={media.liveKey}
-        src={media.preview}
-        muted
-        autoPlay
-        loop
+        src={measuredItem.preview}
+        muted={!controls}
+        controls={controls}
+        autoPlay={autoPlay}
+        loop={autoPlay}
         playsInline
-        preload="auto"
+        preload="metadata"
+        onLoadedMetadata={(event) => {
+          handleDetectedSize(event.currentTarget.videoWidth, event.currentTarget.videoHeight);
+        }}
       />
+    ) : (
+      <img
+        src={measuredItem.preview}
+        alt={measuredItem.title || measuredItem.name || "Preview"}
+        onLoad={(event) => {
+          handleDetectedSize(event.currentTarget.naturalWidth, event.currentTarget.naturalHeight);
+        }}
+      />
+    );
+  } else {
+    content = (
+      <div className="universal-preview-fallback">
+        {fallbackIcon}
+        <strong>{measuredItem.title || measuredItem.name || "Preview indisponível"}</strong>
+        <span>{getTemplateTypeLabel(realType)}</span>
+      </div>
     );
   }
 
   return (
-    <img
-      key={media.liveKey}
-      src={media.preview}
-      alt={media.title || "Preview da tela"}
-    />
+    <div className={frameClass}>
+      {content}
+      {showBadge && <span className="orientation-badge">{badgeLabel}</span>}
+    </div>
   );
 }
 
@@ -320,7 +601,7 @@ async function fetchWeatherByCity(cityName) {
     }
 
     const weatherResponse = await fetch(
-      `https://api.open-meteo.com/v1/forecast?latitude=${place.latitude}&longitude=${place.longitude}&current=temperature_2m,relative_humidity_2m,apparent_temperature,weather_code,wind_speed_10m&daily=temperature_2m_max,temperature_2m_min,weather_code&timezone=auto&forecast_days=3`
+      `https://api.open-meteo.com/v1/forecast?latitude=${place.latitude}&longitude=${place.longitude}&current=temperature_2m,relative_humidity_2m,apparent_temperature,weather_code,wind_speed_10m&daily=temperature_2m_max,temperature_2m_min,weather_code&timezone=auto&forecast_days=5`
     );
 
     const weatherData = await weatherResponse.json();
@@ -331,6 +612,7 @@ async function fetchWeatherByCity(cityName) {
       sensation: Math.round(weatherData?.current?.apparent_temperature ?? 0),
       humidity: Math.round(weatherData?.current?.relative_humidity_2m ?? 0),
       wind: Math.round(weatherData?.current?.wind_speed_10m ?? 0),
+      weatherCode: weatherData?.current?.weather_code ?? null,
       daily: weatherData?.daily || null,
       source: "Open-Meteo",
     };
@@ -384,11 +666,14 @@ async function fetchNewsFromRss(feedUrl) {
 }
 
 function getTemplateThemeStyle(template) {
+  const tickerSpeed = getTemplateTickerSpeed(template?.tickerSpeed);
+
   return {
     "--template-primary": template?.primaryColor || "#06b6d4",
     "--template-secondary": template?.secondaryColor || "#9333ea",
     "--template-accent": template?.accentColor || "#22d3ee",
     "--template-text": template?.textColor || "#ffffff",
+    "--template-ticker-duration": `${getTemplateTickerDuration(tickerSpeed)}s`,
   };
 }
 
@@ -399,6 +684,8 @@ function getTemplateTypeLabel(type) {
     comercial: "Comercial",
     aviso: "Aviso",
     jornal_premium: "Jornal TV Premium",
+    clima_premium_v2: "Clima Premium V2",
+    hora_certa_premium: "Hora Certa Premium",
     cardapio_premium: "Cardápio Premium",
     promocao_premium: "Promoção Premium",
     corporativo_premium: "Corporativo Premium",
@@ -410,6 +697,8 @@ function getTemplateTypeLabel(type) {
 
 function getTemplateBadge(type) {
   if (type === "jornal_premium") return "JORNAL TV";
+  if (type === "clima_premium_v2") return "CLIMA PREMIUM";
+  if (type === "hora_certa_premium") return "HORA CERTA";
   if (type === "cardapio_premium") return "CARDÁPIO";
   if (type === "promocao_premium") return "OFERTAS";
   if (type === "corporativo_premium") return "CORPORATIVO";
@@ -421,10 +710,377 @@ function getTemplateBadge(type) {
 
 const PREMIUM_TEMPLATE_TYPES = [
   "jornal_premium",
+  "clima_premium_v2",
+  "hora_certa_premium",
   "cardapio_premium",
   "promocao_premium",
   "corporativo_premium",
 ];
+
+function getTemplateTickerSpeed(value) {
+  if (value === "slow" || value === "lenta") return "slow";
+  if (value === "fast" || value === "rapida" || value === "rápida") return "fast";
+  return "normal";
+}
+
+function getTemplateTickerSpeedLabel(value) {
+  const speed = getTemplateTickerSpeed(value);
+  if (speed === "slow") return "Lenta";
+  if (speed === "fast") return "Rapida";
+  return "Normal";
+}
+
+function getTemplateTickerDuration(value) {
+  const speed = getTemplateTickerSpeed(value);
+  if (speed === "slow") return 42;
+  if (speed === "fast") return 16;
+  return 26;
+}
+
+function getTemplateNewsSources(template) {
+  if (Array.isArray(template?.selectedNewsSources) && template.selectedNewsSources.length > 0) {
+    return template.selectedNewsSources;
+  }
+
+  return [template?.newsSource || "G1 RN"];
+}
+
+function getTemplateNewsFeedUrls(template, customNewsSources = []) {
+  const sources = getTemplateNewsSources(template);
+  const customMap = customNewsSources.reduce((map, source) => {
+    map[source.name] = source.url;
+    return map;
+  }, {});
+
+  return sources
+    .map((sourceName) => {
+      if (sourceName === "Personalizado") return template?.newsFeedUrl;
+      return customMap[sourceName] || NEWS_SOURCE_PRESETS[sourceName] || "";
+    })
+    .filter(Boolean);
+}
+
+function getWeatherIcon(code) {
+  const value = Number(code);
+  if ([0, 1].includes(value)) return "☀";
+  if ([2, 3].includes(value)) return "⛅";
+  if ([45, 48].includes(value)) return "☁";
+  if ([51, 53, 55, 56, 57, 61, 63, 65, 66, 67, 80, 81, 82].includes(value)) return "🌧";
+  if ([71, 73, 75, 77, 85, 86].includes(value)) return "❄";
+  if ([95, 96, 99].includes(value)) return "⛈";
+  return "☀";
+}
+
+function getWeatherConditionLabel(code) {
+  const value = Number(code);
+  if ([0, 1].includes(value)) return "Ensolarado";
+  if ([2, 3].includes(value)) return "Parcialmente nublado";
+  if ([45, 48].includes(value)) return "Neblina";
+  if ([51, 53, 55, 56, 57].includes(value)) return "Garoa";
+  if ([61, 63, 65, 66, 67, 80, 81, 82].includes(value)) return "Chuva";
+  if ([71, 73, 75, 77, 85, 86].includes(value)) return "Frio intenso";
+  if ([95, 96, 99].includes(value)) return "Temporal";
+  return "Tempo atualizado";
+}
+
+function getWeatherForecastCards(weather) {
+  const daily = weather?.daily;
+  const dates = daily?.time || [];
+
+  return dates.slice(1, 5).map((date, index) => {
+    const parsedDate = new Date(`${date}T12:00:00`);
+    return {
+      day: parsedDate.toLocaleDateString("pt-BR", { weekday: "short" }).replace(".", "").toUpperCase(),
+      icon: getWeatherIcon(daily?.weather_code?.[index + 1]),
+      max: Math.round(daily?.temperature_2m_max?.[index + 1] ?? 0),
+      min: Math.round(daily?.temperature_2m_min?.[index + 1] ?? 0),
+    };
+  });
+}
+
+function getTemplateClockParts(template) {
+  const now = new Date();
+  const use12h = template?.timeFormat === "12h";
+
+  return {
+    time: now.toLocaleTimeString("pt-BR", {
+      hour: "2-digit",
+      minute: "2-digit",
+      hour12: use12h,
+    }),
+    weekday: now.toLocaleDateString("pt-BR", { weekday: "long" }),
+    date: now.toLocaleDateString("pt-BR", {
+      day: "2-digit",
+      month: "long",
+      year: "numeric",
+    }),
+  };
+}
+
+const TEMPLATE_VISIBILITY_OPTIONS = [
+  ["showHeader", "Cabeçalho"],
+  ["showLogo", "Logo"],
+  ["showTitle", "Título"],
+  ["showSubtitle", "Subtítulo"],
+  ["showFooter", "Rodapé"],
+];
+
+const COMMERCIAL_PLANS = {
+  Start: {
+    name: "Start",
+    price: 49.9,
+    priceLabel: "R$ 49,90",
+    screensLimit: 2,
+    premiumTemplates: false,
+    marketing: false,
+  },
+  Business: {
+    name: "Business",
+    price: 99,
+    priceLabel: "R$ 99,00",
+    screensLimit: 5,
+    premiumTemplates: true,
+    marketing: false,
+  },
+  Professional: {
+    name: "Professional",
+    price: 199,
+    priceLabel: "R$ 199,00",
+    screensLimit: 10,
+    premiumTemplates: true,
+    marketing: true,
+  },
+  Enterprise: {
+    name: "Enterprise",
+    price: 299,
+    priceLabel: "R$ 299,00",
+    screensLimit: 30,
+    premiumTemplates: true,
+    marketing: true,
+  },
+};
+
+const STORAGE_GB = 1024 ** 3;
+const STORAGE_MB = 1024 ** 2;
+
+function getPlanLimits(planName) {
+  const plan = getPlanConfig(planName);
+  const limits = {
+    Start: { storageGb: 5, videoMb: 100, imageMb: 10 },
+    Business: { storageGb: 20, videoMb: 250, imageMb: 20 },
+    Professional: { storageGb: 50, videoMb: 500, imageMb: 30 },
+    Enterprise: { storageGb: 200, videoMb: 1024, imageMb: 50 },
+  }[plan.name];
+
+  return {
+    screensLimit: plan.screensLimit,
+    storageLimitBytes: limits.storageGb * STORAGE_GB,
+    maxVideoSizeBytes: limits.videoMb * STORAGE_MB,
+    maxImageSizeBytes: limits.imageMb * STORAGE_MB,
+    marketingEnabled: plan.marketing,
+    premiumTemplatesEnabled: plan.premiumTemplates,
+  };
+}
+
+function getClientStorageLimit(client) {
+  const customLimit = Number(client?.storageLimitBytes);
+  return customLimit > 0 ? customLimit : getPlanLimits(client?.plan).storageLimitBytes;
+}
+
+function getMediaStorageUsed(mediaList = []) {
+  return mediaList.reduce((total, media) => total + Math.max(0, Number(media?.sizeBytes) || 0), 0);
+}
+
+function formatStorageSize(bytes, fractionDigits = 2) {
+  const safeBytes = Math.max(0, Number(bytes) || 0);
+  if (safeBytes < STORAGE_GB) return `${(safeBytes / STORAGE_MB).toFixed(safeBytes ? 1 : 0)} MB`;
+  return `${(safeBytes / STORAGE_GB).toFixed(fractionDigits)} GB`;
+}
+
+function formatFileSizeMb(bytes) {
+  return `${(Math.max(0, Number(bytes) || 0) / STORAGE_MB).toFixed(2)} MB`;
+}
+
+function getStorageUsage(usedBytes, limitBytes) {
+  const safeLimit = Math.max(1, Number(limitBytes) || 1);
+  const percentage = Math.min(100, (Math.max(0, Number(usedBytes) || 0) / safeLimit) * 100);
+  if (percentage >= 95) return { percentage, label: "Cheio", severity: "danger" };
+  if (percentage >= 80) return { percentage, label: "Atenção", severity: "warning" };
+  return { percentage, label: "Normal", severity: "normal" };
+}
+
+const LEGACY_PLAN_NAMES = {
+  "Básico": "Start",
+  Basico: "Start",
+  Start: "Start",
+  Business: "Business",
+  Profissional: "Professional",
+  Professional: "Professional",
+  Enterprise: "Enterprise",
+};
+
+function getPlanConfig(planName) {
+  const normalizedName = LEGACY_PLAN_NAMES[planName] || "Start";
+  return COMMERCIAL_PLANS[normalizedName];
+}
+
+function getClientScreenLimit(client) {
+  const configuredLimit = Number(client?.screensLimit);
+  return configuredLimit > 0
+    ? configuredLimit
+    : getPlanConfig(client?.plan).screensLimit;
+}
+
+function hasPremiumTemplates(client) {
+  return getPlanConfig(client?.plan).premiumTemplates;
+}
+
+function hasMarketingAccess(client) {
+  return getPlanConfig(client?.plan).marketing;
+}
+
+function isPremiumTemplate(templateOrType) {
+  const type = typeof templateOrType === "string"
+    ? templateOrType
+    : templateOrType?.templateType || templateOrType?.type;
+
+  return PREMIUM_TEMPLATE_TYPES.includes(type);
+}
+
+function parseClientDate(value, endOfDay = false) {
+  if (!value) return null;
+  if (value?.toDate) return value.toDate();
+  if (value?.seconds) return new Date(value.seconds * 1000);
+  if (value instanceof Date) return value;
+
+  const text = String(value);
+  const date = /^\d{4}-\d{2}-\d{2}$/.test(text)
+    ? new Date(`${text}T${endOfDay ? "23:59:59" : "00:00:00"}`)
+    : new Date(text);
+
+  return Number.isNaN(date.getTime()) ? null : date;
+}
+
+function formatPlanAccessDate(value) {
+  const date = parseClientDate(value);
+  if (!date) return "--";
+
+  return date.toLocaleString("pt-BR", {
+    day: "2-digit",
+    month: "2-digit",
+    year: "numeric",
+    hour: "2-digit",
+    minute: "2-digit",
+  });
+}
+
+function getClientPlanAccess(client, currentDate = new Date()) {
+  const now = currentDate instanceof Date ? currentDate : new Date(currentDate);
+  const graceUnlockUntil = parseClientDate(client?.graceUnlockUntil);
+  const hasTemporaryUnlock = Boolean(
+    graceUnlockUntil && graceUnlockUntil.getTime() > now.getTime()
+  );
+  const explicitCanceled = client?.status === "Cancelado";
+  const explicitSuspended = client?.status === "Suspenso";
+  const dueDate = parseClientDate(client?.dueDate, true);
+  const todayStart = new Date(now.getFullYear(), now.getMonth(), now.getDate());
+  const dueStart = dueDate
+    ? new Date(dueDate.getFullYear(), dueDate.getMonth(), dueDate.getDate())
+    : null;
+  const daysOverdue = dueStart && dueStart < todayStart
+    ? Math.floor((todayStart.getTime() - dueStart.getTime()) / 86400000)
+    : 0;
+
+  let statusLabel = "Ativo";
+  let severity = "success";
+  let message = "Plano ativo. Todos os recursos estão disponíveis.";
+  let canCreate = true;
+  let canEdit = true;
+  let canShowTvContent = true;
+
+  if (hasTemporaryUnlock && !explicitCanceled) {
+    statusLabel = "Liberação temporária";
+    severity = "temporary";
+    message = `Acesso liberado temporariamente até ${formatPlanAccessDate(graceUnlockUntil)}.`;
+  } else if (explicitCanceled) {
+    statusLabel = "Cancelado";
+    severity = "suspended";
+    message = "Este plano foi cancelado. Entre em contato com a Park Solutions.";
+    canCreate = false;
+    canEdit = false;
+    canShowTvContent = false;
+  } else if (explicitSuspended || daysOverdue >= 15) {
+    statusLabel = "Suspenso";
+    severity = "suspended";
+    message = "Seu plano foi temporariamente suspenso. Regularize para reativar o serviço.";
+    canCreate = false;
+    canEdit = false;
+    canShowTvContent = false;
+  } else if (daysOverdue >= 10) {
+    statusLabel = "Restrição Forte";
+    severity = "strong";
+    message = `Seu plano está vencido há ${daysOverdue} dias. O sistema está em modo de visualização. Regularize para voltar a editar.`;
+    canCreate = false;
+    canEdit = false;
+  } else if (daysOverdue >= 5) {
+    statusLabel = "Restrição Parcial";
+    severity = "partial";
+    message = `Seu plano está vencido há ${daysOverdue} dias. O conteúdo atual continua ativo, mas a criação de novos materiais está temporariamente bloqueada.`;
+    canCreate = false;
+  } else if (daysOverdue >= 1) {
+    statusLabel = "Vencido";
+    severity = "warning";
+    message = `Seu plano venceu há ${daysOverdue} dia(s). Regularize para evitar restrições.`;
+  }
+
+  const isSuspended = statusLabel === "Suspenso" || statusLabel === "Cancelado";
+  const isStrongRestriction = statusLabel === "Restrição Forte";
+  const isPartialRestriction = statusLabel === "Restrição Parcial";
+  const isOverdue = daysOverdue > 0;
+  const isActive = statusLabel === "Ativo" || hasTemporaryUnlock;
+  const canUseSystem = !isSuspended;
+
+  return {
+    statusLabel,
+    daysOverdue,
+    isActive,
+    isOverdue,
+    isPartialRestriction,
+    isStrongRestriction,
+    isSuspended,
+    hasTemporaryUnlock,
+    canUseSystem,
+    canCreate,
+    canEdit,
+    canUpload: canCreate,
+    canCreateScreens: canCreate,
+    canCreatePlaylists: canCreate,
+    canCreateTemplates: canCreate,
+    canCreateMarketing: canCreate,
+    canEditScreens: canEdit,
+    canEditPlaylists: canEdit,
+    canEditTemplates: canEdit,
+    canEditMarketing: canEdit,
+    canShowTvContent,
+    message,
+    severity,
+    graceUnlockUntil,
+  };
+}
+
+function getPlanRestrictionAlert(access, action = "editar conteúdos") {
+  if (access.isStrongRestriction || access.isSuspended) {
+    return `Plano em modo visualização. Regularize para ${action}.`;
+  }
+
+  return "Plano em restrição parcial. Regularize para criar novos conteúdos.";
+}
+
+function requirePlanPermission(access, permission, action) {
+  if (!access || access[permission] !== false) return true;
+  alert(getPlanRestrictionAlert(access, action));
+  return false;
+}
 
 const DEFAULT_MENU_ITEMS = [
   { category: "Lanches", name: "Combo Especial", description: "Sanduíche, batata e bebida", price: "R$ 29,90" },
@@ -684,10 +1340,21 @@ function AdminApp({ screenRotation, onScreenRotationChange }) {
             </div>
 
             <div className="sidebar-card">
-              <strong>{user.clientData.name}</strong>
-              <p>
-                Plano {user.clientData.plan} • {user.clientData.billing}
-              </p>
+              <div className="client-sidebar-profile">
+                <div className="client-avatar">
+                  {user.clientData.logoUrl ? (
+                    <img src={user.clientData.logoUrl} alt={`Logo de ${user.clientData.name}`} />
+                  ) : (
+                    user.clientData.name?.charAt(0)?.toUpperCase() || "C"
+                  )}
+                </div>
+                <div>
+                  <strong>{user.clientData.name}</strong>
+                  <p>
+                    Plano {getPlanConfig(user.clientData.plan).name} • {user.clientData.billing}
+                  </p>
+                </div>
+              </div>
             </div>
 
             <button
@@ -721,6 +1388,7 @@ function AdminApp({ screenRotation, onScreenRotationChange }) {
             <ClientInternalPanel
               client={user.clientData}
               hideBackButton
+              isAdmin={false}
             />
             <Footer />
           </main>
@@ -811,6 +1479,8 @@ function AdminApp({ screenRotation, onScreenRotationChange }) {
             <ClientInternalPanel
               client={selectedClient}
               onBack={() => setSelectedClient(null)}
+              isAdmin
+              adminUser={user}
             />
           )}
 
@@ -835,8 +1505,52 @@ function AppModeChoice({
     { value: "verticalInvertida", label: "Vertical invertida" },
   ];
 
+  function handleRemoteDirectionalNavigation(event) {
+    if (!["ArrowUp", "ArrowDown", "ArrowLeft", "ArrowRight"].includes(event.key)) return;
+
+    const container = event.currentTarget;
+    const current = document.activeElement;
+    const buttons = Array.from(container.querySelectorAll("button:not(:disabled)"))
+      .filter((button) => button.offsetParent !== null);
+
+    if (!buttons.includes(current)) return;
+
+    const currentRect = current.getBoundingClientRect();
+    const currentCenter = {
+      x: currentRect.left + currentRect.width / 2,
+      y: currentRect.top + currentRect.height / 2,
+    };
+
+    const direction = {
+      ArrowUp: { axis: "y", sign: -1 },
+      ArrowDown: { axis: "y", sign: 1 },
+      ArrowLeft: { axis: "x", sign: -1 },
+      ArrowRight: { axis: "x", sign: 1 },
+    }[event.key];
+
+    const candidates = buttons
+      .filter((button) => button !== current)
+      .map((button) => {
+        const rect = button.getBoundingClientRect();
+        const center = { x: rect.left + rect.width / 2, y: rect.top + rect.height / 2 };
+        const dx = center.x - currentCenter.x;
+        const dy = center.y - currentCenter.y;
+        const primary = (direction.axis === "x" ? dx : dy) * direction.sign;
+        const cross = Math.abs(direction.axis === "x" ? dy : dx);
+        return { button, primary, cross, score: primary + cross * 2.5 };
+      })
+      .filter(({ primary }) => primary > 6)
+      .sort((a, b) => a.score - b.score);
+
+    event.preventDefault();
+    event.stopPropagation();
+    if (!candidates[0]) return;
+
+    candidates[0].button.focus();
+  }
+
   return (
-    <div className="app-mode-page app-mode-native-only">
+    <div className="app-mode-page app-mode-native-only" onKeyDown={handleRemoteDirectionalNavigation}>
       <div className="app-mode-card app-mode-ultra-compact">
         <img src={logo} alt="Totem Park" />
 
@@ -860,6 +1574,7 @@ function AppModeChoice({
                   key={option.value}
                   type="button"
                   className={screenRotation === option.value ? "active" : ""}
+                  autoFocus={screenRotation === option.value}
                   onClick={() => onScreenRotationChange(option.value)}
                 >
                   {option.label}
@@ -1124,9 +1839,21 @@ function Dashboard() {
   const offlineScreens = screensData.filter((screen) => !isScreenOnline(screen));
 
   const overdueClients = clients.filter((client) => {
-    const days = getDaysToDue(client.dueDate);
-    return days !== null && days < 0;
+    return getClientPlanAccess(client).isOverdue;
   });
+
+  const clientAccessList = clients.map((client) => ({
+    client,
+    access: getClientPlanAccess(client),
+  }));
+  const activePlanClients = clientAccessList.filter(({ access }) => access.isActive);
+  const alertPlanClients = clientAccessList.filter(({ access }) => access.statusLabel === "Vencido");
+  const partialPlanClients = clientAccessList.filter(({ access }) => access.isPartialRestriction);
+  const strongPlanClients = clientAccessList.filter(({ access }) => access.isStrongRestriction);
+  const suspendedPlanClients = clientAccessList.filter(({ access }) => access.isSuspended);
+  const estimatedMrr = clientAccessList
+    .filter(({ access }) => !access.isSuspended)
+    .reduce((total, { client }) => total + getPlanConfig(client.plan).price, 0);
 
   const soonDueClients = clients.filter((client) => {
     const days = getDaysToDue(client.dueDate);
@@ -1247,6 +1974,15 @@ function Dashboard() {
           link="Ver financeiro →"
           color="green"
         />
+      </section>
+
+      <section className="admin-plan-kpis">
+        <div><span>Ativos</span><strong>{activePlanClients.length}</strong></div>
+        <div className="warning"><span>Vencidos</span><strong>{alertPlanClients.length}</strong></div>
+        <div className="partial"><span>Restrição parcial</span><strong>{partialPlanClients.length}</strong></div>
+        <div className="strong"><span>Restrição forte</span><strong>{strongPlanClients.length}</strong></div>
+        <div className="suspended"><span>Suspensos</span><strong>{suspendedPlanClients.length}</strong></div>
+        <div className="mrr"><span>MRR estimado</span><strong>{estimatedMrr.toLocaleString("pt-BR", { style: "currency", currency: "BRL" })}</strong></div>
       </section>
 
       <section className="premium-dashboard-grid">
@@ -1374,7 +2110,7 @@ function Dashboard() {
               return (
                 <div className="premium-client-row" key={client.id}>
                   <strong>{client.name}</strong>
-                  <span>{client.plan} • {client.billing}</span>
+                  <span>{getPlanConfig(client.plan).name} • {client.billing}</span>
                   <span>{status.label}</span>
                   <div className={`premium-client-status ${client.status === "Ativo" ? "active" : "inactive"}`}>
                     {client.status || "Ativo"}
@@ -1443,6 +2179,8 @@ function PremiumStatCard({ title, value, icon, status, link, color }) {
 function ClientsPage({ onOpenClient }) {
   const [clients, setClients] = useState([]);
   const [showCreateModal, setShowCreateModal] = useState(false);
+  const [editingClient, setEditingClient] = useState(null);
+  const [savingClient, setSavingClient] = useState(false);
   const [searchTerm, setSearchTerm] = useState("");
   const [statusFilter, setStatusFilter] = useState("Todos");
 
@@ -1450,11 +2188,15 @@ function ClientsPage({ onOpenClient }) {
     name: "",
     email: "",
     password: "",
-    plan: "Básico",
+    plan: "Start",
     billing: "Mensal",
     dueDate: "",
     screensLimit: "2",
+    storageLimitGb: "5",
     status: "Ativo",
+    logoFile: null,
+    logoPreview: "",
+    logoUrl: "",
   });
 
   useEffect(() => {
@@ -1481,6 +2223,7 @@ function ClientsPage({ onOpenClient }) {
   }
 
   function getDueInfo(client) {
+    const access = getClientPlanAccess(client);
     const days = getDaysToDue(client.dueDate);
 
     if (days === null) {
@@ -1490,10 +2233,10 @@ function ClientsPage({ onOpenClient }) {
       };
     }
 
-    if (days < 0) {
+    if (access.isOverdue) {
       return {
-        text: `Vencido há ${Math.abs(days)} dia(s)`,
-        className: "danger",
+        text: `Vencido há ${access.daysOverdue} dia(s)`,
+        className: access.severity === "warning" ? "warning" : "danger",
       };
     }
 
@@ -1512,18 +2255,18 @@ function ClientsPage({ onOpenClient }) {
 
   function getStatusClass(status) {
     if (status === "Ativo") return "active";
-    if (status === "Suspenso") return "warning";
-    if (status === "Vencido") return "danger";
+    if (status === "Liberação temporária") return "temporary";
+    if (status === "Vencido") return "warning";
+    if (status === "Restrição Parcial") return "partial";
+    if (status === "Restrição Forte") return "strong";
+    if (status === "Suspenso" || status === "Cancelado") return "danger";
 
     return "neutral";
   }
 
-  const activeClients = clients.filter((client) => client.status === "Ativo");
-  const suspendedClients = clients.filter((client) => client.status === "Suspenso");
-  const overdueClients = clients.filter((client) => {
-    const days = getDaysToDue(client.dueDate);
-    return days !== null && days < 0;
-  });
+  const activeClients = clients.filter((client) => getClientPlanAccess(client).isActive);
+  const suspendedClients = clients.filter((client) => getClientPlanAccess(client).isSuspended);
+  const overdueClients = clients.filter((client) => getClientPlanAccess(client).isOverdue);
 
   const filteredClients = clients.filter((client) => {
     const search = searchTerm.toLowerCase().trim();
@@ -1532,10 +2275,11 @@ function ClientsPage({ onOpenClient }) {
       !search ||
       client.name?.toLowerCase().includes(search) ||
       client.email?.toLowerCase().includes(search) ||
-      client.plan?.toLowerCase().includes(search);
+      client.plan?.toLowerCase().includes(search) ||
+      getPlanConfig(client.plan).name.toLowerCase().includes(search);
 
     const matchesStatus =
-      statusFilter === "Todos" || client.status === statusFilter;
+      statusFilter === "Todos" || getClientPlanAccess(client).statusLabel === statusFilter;
 
     return matchesSearch && matchesStatus;
   });
@@ -1566,15 +2310,79 @@ function ClientsPage({ onOpenClient }) {
       name: "",
       email: "",
       password: "",
-      plan: "Básico",
+      plan: "Start",
       billing: "Mensal",
       dueDate: "",
       screensLimit: "2",
+      storageLimitGb: "5",
       status: "Ativo",
+      logoFile: null,
+      logoPreview: "",
+      logoUrl: "",
     });
   }
 
-  async function handleCreateClient() {
+  function openCreateClientModal() {
+    setEditingClient(null);
+    resetForm();
+    setShowCreateModal(true);
+  }
+
+  function openEditClientModal(client) {
+    setEditingClient(client);
+    setForm({
+      name: client.name || "",
+      email: client.email || "",
+      password: "",
+      plan: getPlanConfig(client.plan).name,
+      billing: client.billing || "Mensal",
+      dueDate: client.dueDate || "",
+      screensLimit: String(getClientScreenLimit(client)),
+      storageLimitGb: String(getClientStorageLimit(client) / STORAGE_GB),
+      status: client.status || "Ativo",
+      logoFile: null,
+      logoPreview: client.logoUrl || "",
+      logoUrl: client.logoUrl || "",
+    });
+    setShowCreateModal(true);
+  }
+
+  function closeClientModal() {
+    setShowCreateModal(false);
+    setEditingClient(null);
+    resetForm();
+  }
+
+  function handleClientPlanChange(plan) {
+    setForm((current) => ({
+      ...current,
+      plan,
+      screensLimit: String(getPlanConfig(plan).screensLimit),
+      storageLimitGb: String(getPlanLimits(plan).storageLimitBytes / STORAGE_GB),
+    }));
+  }
+
+  function handleClientLogoFile(file) {
+    if (!file) return;
+
+    if (!file.type.startsWith("image/")) {
+      alert("Selecione uma imagem válida para a logo.");
+      return;
+    }
+
+    if (file.size > 5 * 1024 * 1024) {
+      alert("A logo deve ter no máximo 5 MB.");
+      return;
+    }
+
+    setForm((current) => ({
+      ...current,
+      logoFile: file,
+      logoPreview: URL.createObjectURL(file),
+    }));
+  }
+
+  async function handleSaveClient() {
     if (!form.name.trim()) {
       alert("Informe o nome do cliente.");
       return;
@@ -1585,12 +2393,12 @@ function ClientsPage({ onOpenClient }) {
       return;
     }
 
-    if (!form.password.trim()) {
+    if (!editingClient && !form.password.trim()) {
       alert("Informe a senha inicial do cliente.");
       return;
     }
 
-    if (form.password.length < 6) {
+    if (!editingClient && form.password.length < 6) {
       alert("A senha precisa ter no mínimo 6 caracteres.");
       return;
     }
@@ -1601,24 +2409,56 @@ function ClientsPage({ onOpenClient }) {
     }
 
     try {
-      const uid = await createClientAuthUser(form.email, form.password);
+      setSavingClient(true);
 
-      await addDoc(collection(db, "clients"), {
-        name: form.name,
-        email: form.email,
-        uid,
-        plan: form.plan,
+      const clientData = {
+        name: form.name.trim(),
+        email: form.email.trim(),
+        plan: getPlanConfig(form.plan).name,
         billing: form.billing,
         dueDate: form.dueDate,
-        screensLimit: form.screensLimit,
+        screensLimit: String(Math.max(1, Number(form.screensLimit) || 1)),
+        storageLimitBytes: Math.max(STORAGE_MB, Number(form.storageLimitGb) * STORAGE_GB || getPlanLimits(form.plan).storageLimitBytes),
         status: form.status,
-        createdAt: serverTimestamp(),
-      });
+        updatedAt: serverTimestamp(),
+      };
 
-      resetForm();
-      setShowCreateModal(false);
+      if (editingClient) {
+        let logoUrl = form.logoUrl || editingClient.logoUrl || "";
 
-      alert("Cliente cadastrado com login, senha e vencimento!");
+        if (form.logoFile) {
+          logoUrl = await uploadClientLogo(editingClient.id, form.logoFile);
+        }
+
+        await updateDoc(doc(db, "clients", editingClient.id), {
+          ...clientData,
+          logoUrl,
+        });
+
+        closeClientModal();
+        alert("Cliente atualizado com sucesso!");
+      } else {
+        const uid = await createClientAuthUser(form.email.trim(), form.password);
+        const clientRef = await addDoc(collection(db, "clients"), {
+          ...clientData,
+          uid,
+          logoUrl: "",
+          createdAt: serverTimestamp(),
+        });
+
+        if (form.logoFile) {
+          try {
+            const logoUrl = await uploadClientLogo(clientRef.id, form.logoFile);
+            await updateDoc(clientRef, { logoUrl, updatedAt: serverTimestamp() });
+          } catch (logoError) {
+            console.log("Erro ao enviar logo do cliente:", logoError);
+            alert("Cliente criado, mas não foi possível enviar a logo agora.");
+          }
+        }
+
+        closeClientModal();
+        alert("Cliente cadastrado com login, senha e vencimento!");
+      }
     } catch (error) {
       console.log(error);
 
@@ -1631,8 +2471,9 @@ function ClientsPage({ onOpenClient }) {
         alert("A senha precisa ter no mínimo 6 caracteres.");
         return;
       }
-
-      alert("Erro ao cadastrar cliente.");
+      alert(editingClient ? "Erro ao atualizar cliente." : "Erro ao cadastrar cliente.");
+    } finally {
+      setSavingClient(false);
     }
   }
 
@@ -1677,7 +2518,7 @@ function ClientsPage({ onOpenClient }) {
 
         <button
           className="clients-create-button"
-          onClick={() => setShowCreateModal(true)}
+          onClick={openCreateClientModal}
         >
           <Plus size={20} />
           Novo cliente
@@ -1721,7 +2562,7 @@ function ClientsPage({ onOpenClient }) {
         </div>
 
         <div className="clients-filter-group">
-          {["Todos", "Ativo", "Suspenso", "Vencido"].map((status) => (
+          {["Todos", "Ativo", "Vencido", "Restrição Parcial", "Restrição Forte", "Suspenso"].map((status) => (
             <button
               key={status}
               className={statusFilter === status ? "active" : ""}
@@ -1750,12 +2591,17 @@ function ClientsPage({ onOpenClient }) {
         ) : (
           filteredClients.map((client) => {
             const dueInfo = getDueInfo(client);
+            const planAccess = getClientPlanAccess(client);
 
             return (
               <div className="clients-table-row" key={client.id}>
                 <div className="client-profile-cell">
                   <div className="client-avatar">
-                    {client.name?.charAt(0)?.toUpperCase() || "C"}
+                    {client.logoUrl ? (
+                      <img src={client.logoUrl} alt={`Logo de ${client.name}`} />
+                    ) : (
+                      client.name?.charAt(0)?.toUpperCase() || "C"
+                    )}
                   </div>
 
                   <div>
@@ -1765,7 +2611,7 @@ function ClientsPage({ onOpenClient }) {
                 </div>
 
                 <div>
-                  <strong>{client.plan}</strong>
+                  <strong>{getPlanConfig(client.plan).name}</strong>
                   <span>{client.billing}</span>
                 </div>
 
@@ -1777,13 +2623,13 @@ function ClientsPage({ onOpenClient }) {
                 </div>
 
                 <div>
-                  <strong>{client.screensLimit}</strong>
+                  <strong>{getClientScreenLimit(client)}</strong>
                   <span>limite de telas</span>
                 </div>
 
                 <div>
-                  <span className={`client-status-badge ${getStatusClass(client.status)}`}>
-                    {client.status || "Ativo"}
+                  <span className={`client-status-badge ${getStatusClass(planAccess.statusLabel)}`}>
+                    {planAccess.statusLabel}
                   </span>
                 </div>
 
@@ -1800,6 +2646,13 @@ function ClientsPage({ onOpenClient }) {
                     onClick={() => resetClientPassword(client.email)}
                   >
                     Senha
+                  </button>
+
+                  <button
+                    className="client-action"
+                    onClick={() => openEditClientModal(client)}
+                  >
+                    Editar
                   </button>
 
                   <button
@@ -1820,14 +2673,18 @@ function ClientsPage({ onOpenClient }) {
           <div className="client-modal">
             <div className="client-modal-header">
               <div>
-                <div className="kicker">Novo acesso</div>
-                <h2>Cadastrar cliente</h2>
-                <p>Crie o cliente, login, senha inicial e vencimento do plano.</p>
+                <div className="kicker">{editingClient ? "Configuração" : "Novo acesso"}</div>
+                <h2>{editingClient ? "Editar cliente" : "Cadastrar cliente"}</h2>
+                <p>
+                  {editingClient
+                    ? "Atualize plano, vencimento, limite de telas e identidade visual."
+                    : "Crie o cliente, login, senha inicial e vencimento do plano."}
+                </p>
               </div>
 
               <button
                 className="modal-close-button"
-                onClick={() => setShowCreateModal(false)}
+                onClick={closeClientModal}
               >
                 <X size={22} />
               </button>
@@ -1852,19 +2709,22 @@ function ClientsPage({ onOpenClient }) {
                     type="email"
                     value={form.email}
                     placeholder="cliente@email.com"
+                    disabled={Boolean(editingClient)}
                     onChange={(e) => setForm({ ...form, email: e.target.value })}
                   />
                 </div>
 
-                <div className="form-group">
-                  <label>Senha inicial</label>
-                  <input
-                    type="password"
-                    value={form.password}
-                    placeholder="Mínimo 6 caracteres"
-                    onChange={(e) => setForm({ ...form, password: e.target.value })}
-                  />
-                </div>
+                {!editingClient && (
+                  <div className="form-group">
+                    <label>Senha inicial</label>
+                    <input
+                      type="password"
+                      value={form.password}
+                      placeholder="Mínimo 6 caracteres"
+                      onChange={(e) => setForm({ ...form, password: e.target.value })}
+                    />
+                  </div>
+                )}
 
                 <div className="form-group">
                   <label>Status</label>
@@ -1877,6 +2737,30 @@ function ClientsPage({ onOpenClient }) {
                     <option>Vencido</option>
                   </select>
                 </div>
+
+                <div className="form-group client-logo-field">
+                  <label>Logo ou foto do cliente</label>
+                  <label className="client-logo-upload" htmlFor="client-profile-logo">
+                    <span className="client-logo-preview">
+                      {form.logoPreview ? (
+                        <img src={form.logoPreview} alt="Prévia da logo" />
+                      ) : (
+                        form.name?.charAt(0)?.toUpperCase() || "C"
+                      )}
+                    </span>
+                    <span>
+                      <strong>Selecionar imagem</strong>
+                      <small>{form.logoFile?.name || "PNG, JPG ou WEBP até 5 MB"}</small>
+                    </span>
+                    <input
+                      id="client-profile-logo"
+                      className="file-input-hidden"
+                      type="file"
+                      accept="image/*"
+                      onChange={(event) => handleClientLogoFile(event.target.files?.[0])}
+                    />
+                  </label>
+                </div>
               </div>
             </div>
 
@@ -1888,11 +2772,13 @@ function ClientsPage({ onOpenClient }) {
                   <label>Plano</label>
                   <select
                     value={form.plan}
-                    onChange={(e) => setForm({ ...form, plan: e.target.value })}
+                    onChange={(e) => handleClientPlanChange(e.target.value)}
                   >
-                    <option>Básico</option>
-                    <option>Profissional</option>
-                    <option>Enterprise</option>
+                    {Object.values(COMMERCIAL_PLANS).map((plan) => (
+                      <option key={plan.name} value={plan.name}>
+                        {plan.name} — {plan.priceLabel}/mês
+                      </option>
+                    ))}
                   </select>
                 </div>
 
@@ -1927,20 +2813,39 @@ function ClientsPage({ onOpenClient }) {
                     }
                   />
                 </div>
+
+                <div className="form-group">
+                  <label>Limite de armazenamento (GB)</label>
+                  <input
+                    type="number"
+                    min="0.1"
+                    step="0.1"
+                    value={form.storageLimitGb}
+                    onChange={(e) => setForm({ ...form, storageLimitGb: e.target.value })}
+                  />
+                </div>
               </div>
             </div>
 
             <div className="client-modal-actions">
               <button
                 className="client-modal-cancel"
-                onClick={() => setShowCreateModal(false)}
+                onClick={closeClientModal}
               >
                 Cancelar
               </button>
 
-              <button className="clients-create-button" onClick={handleCreateClient}>
+              <button
+                className="clients-create-button"
+                onClick={handleSaveClient}
+                disabled={savingClient}
+              >
                 <Plus size={20} />
-                Criar cliente
+                {savingClient
+                  ? "Salvando..."
+                  : editingClient
+                    ? "Salvar alterações"
+                    : "Criar cliente"}
               </button>
             </div>
           </div>
@@ -1950,13 +2855,53 @@ function ClientsPage({ onOpenClient }) {
   );
 }
 
-function ClientInternalPanel({ client, onBack, hideBackButton = false }) {
+function ClientInternalPanel({ client, onBack, hideBackButton = false, isAdmin = false, adminUser = null }) {
   const [tab, setTab] = useState("dashboard");
+  const [currentClient, setCurrentClient] = useState(client);
+
+  useEffect(() => {
+    setCurrentClient(client);
+    if (!client?.id) return undefined;
+
+    return onSnapshot(doc(db, "clients", client.id), (snapshot) => {
+      if (snapshot.exists()) {
+        setCurrentClient({ id: snapshot.id, ...snapshot.data() });
+      }
+    });
+  }, [client]);
+
+  const planAccess = getClientPlanAccess(currentClient);
+  const operationalAccess = isAdmin
+    ? {
+        ...planAccess,
+        canUseSystem: true,
+        canCreate: true,
+        canEdit: true,
+        canUpload: true,
+        canCreateScreens: true,
+        canCreatePlaylists: true,
+        canCreateTemplates: true,
+        canCreateMarketing: true,
+        canEditScreens: true,
+        canEditPlaylists: true,
+        canEditTemplates: true,
+        canEditMarketing: true,
+      }
+    : planAccess;
 
   return (
     <>
-      <header className="header">
-        <div>
+      <header className="header client-dashboard-header">
+        <div className="client-dashboard-identity">
+          <div className="client-avatar client-avatar-dashboard">
+            {currentClient.logoUrl ? (
+              <img src={currentClient.logoUrl} alt={`Logo de ${currentClient.name}`} />
+            ) : (
+              currentClient.name?.charAt(0)?.toUpperCase() || "C"
+            )}
+          </div>
+
+          <div>
           {!hideBackButton && onBack && (
             <button className="player-back-button" onClick={onBack}>
               ← Voltar
@@ -1964,16 +2909,28 @@ function ClientInternalPanel({ client, onBack, hideBackButton = false }) {
           )}
 
           <div className="kicker">Cliente</div>
-          <h1>{client.name}</h1>
+          <h1>{currentClient.name}</h1>
           <p>
-            Plano {client.plan} • {client.billing} • Vencimento:{" "}
-            {client.dueDate || "não informado"} • Limite de telas:{" "}
-            {client.screensLimit}
+            Plano {getPlanConfig(currentClient.plan).name} • {currentClient.billing} • Vencimento:{" "}
+            {currentClient.dueDate || "não informado"} • Limite de telas:{" "}
+            {getClientScreenLimit(currentClient)}
           </p>
+          </div>
         </div>
       </header>
 
-      <div className="client-tabs">
+      <PlanStatusBanner access={planAccess} />
+
+      {isAdmin && (
+        <AdminPlanControls client={currentClient} adminUser={adminUser} />
+      )}
+
+      {!isAdmin && planAccess.isSuspended ? (
+        <SuspendedClientPanel client={currentClient} access={planAccess} />
+      ) : (
+        <>
+
+      <div className="client-tabs client-dashboard-tabs">
         <button
           className={tab === "dashboard" ? "client-tab active" : "client-tab"}
           onClick={() => setTab("dashboard")}
@@ -2017,17 +2974,19 @@ function ClientInternalPanel({ client, onBack, hideBackButton = false }) {
         </button>
       </div>
 
-      {tab === "dashboard" && <ClientDashboard client={client} />}
-      {tab === "media" && <ClientMediaPage client={client} />}
-      {tab === "playlists" && <ClientPlaylistsPage client={client} />}
-      {tab === "screens" && <ClientScreensPage client={client} />}
-      {tab === "templates" && <ClientTemplatesPage client={client} />}
-      {tab === "marketing" && <ClientMarketingPage client={client} />}
+      {tab === "dashboard" && <ClientDashboard client={currentClient} access={operationalAccess} />}
+      {tab === "media" && <ClientMediaPage client={currentClient} access={operationalAccess} />}
+      {tab === "playlists" && <ClientPlaylistsPage client={currentClient} access={operationalAccess} />}
+      {tab === "screens" && <ClientScreensPage client={currentClient} access={operationalAccess} />}
+      {tab === "templates" && <ClientTemplatesPage client={currentClient} access={operationalAccess} />}
+      {tab === "marketing" && <ClientMarketingPage client={currentClient} access={operationalAccess} />}
+        </>
+      )}
     </>
   );
 }
 
-function ClientDashboard({ client }) {
+function ClientDashboard({ client, access = getClientPlanAccess(client) }) {
   const [media, setMedia] = useState([]);
   const [playlists, setPlaylists] = useState([]);
   const [screens, setScreens] = useState([]);
@@ -2036,7 +2995,7 @@ function ClientDashboard({ client }) {
   useEffect(() => {
     const interval = setInterval(() => {
       setNow(new Date());
-    }, 5000);
+    }, 1000);
 
     return () => clearInterval(interval);
   }, []);
@@ -2160,14 +3119,74 @@ function ClientDashboard({ client }) {
     return diffInSeconds <= 20;
   }
 
+  const onlineScreensCount = screens.filter(isScreenOnline).length;
+  const dueDateLabel = client.dueDate
+    ? new Date(`${client.dueDate}T12:00:00`).toLocaleDateString("pt-BR")
+    : "--";
+  const planConfig = getPlanConfig(client.plan);
+  const screenLimit = getClientScreenLimit(client);
+  const storageUsedBytes = getMediaStorageUsed(media);
+  const storageLimitBytes = getClientStorageLimit(client);
+  const storageUsage = getStorageUsage(storageUsedBytes, storageLimitBytes);
+
   return (
     <>
-      <section className="stats">
+      <section className="stats client-dashboard-stats">
         <StatCard
-          title="Mídias"
-          value={media.length}
-          icon={<Image />}
-          status="Arquivos cadastrados"
+          title="Plano atual"
+          value={planConfig.name}
+          icon={<CreditCard />}
+          status={client.billing || "Mensal"}
+        />
+
+        <StatCard
+          title="Valor mensal"
+          value={planConfig.priceLabel}
+          icon={<CreditCard />}
+          status="Assinatura do plano"
+        />
+
+        <StatCard
+          title="Uso de telas"
+          value={`${screens.length}/${screenLimit}`}
+          icon={<Monitor />}
+          status={`${onlineScreensCount} online agora`}
+        />
+
+        <StatCard
+          title="Armazenamento"
+          value={`${formatStorageSize(storageUsedBytes)} / ${formatStorageSize(storageLimitBytes, 0)}`}
+          icon={<Upload />}
+          status={`${storageUsage.percentage.toFixed(1)}% • ${storageUsage.label}`}
+          severity={storageUsage.severity}
+        />
+
+        <StatCard
+          title="Templates Premium"
+          value={planConfig.premiumTemplates ? "Ativo" : "Bloqueado"}
+          icon={<Newspaper />}
+          status={planConfig.premiumTemplates ? "Recursos liberados" : "Disponível no Business"}
+        />
+
+        <StatCard
+          title="Marketing"
+          value={planConfig.marketing ? "Ativo" : "Bloqueado"}
+          icon={<Palette />}
+          status={planConfig.marketing ? "Criação de artes liberada" : "A partir do Professional"}
+        />
+
+        <StatCard
+          title="Vencimento"
+          value={dueDateLabel}
+          icon={<CreditCard />}
+          status={access.daysOverdue > 0 ? `${access.daysOverdue} dia(s) em atraso` : access.message}
+        />
+
+        <StatCard
+          title="Status do plano"
+          value={access.statusLabel}
+          icon={access.isActive ? <CheckCircle2 /> : <TriangleAlert />}
+          status={access.hasTemporaryUnlock ? `Até ${formatPlanAccessDate(access.graceUnlockUntil)}` : access.message}
         />
 
         <StatCard
@@ -2176,23 +3195,9 @@ function ClientDashboard({ client }) {
           icon={<ListVideo />}
           status="Campanhas criadas"
         />
-
-        <StatCard
-          title="Telas"
-          value={`${screens.length}/${client.screensLimit}`}
-          icon={<Monitor />}
-          status="Uso do plano"
-        />
-
-        <StatCard
-          title="Vencimento"
-          value={client.dueDate || "--"}
-          icon={<CreditCard />}
-          status={client.status}
-        />
       </section>
 
-      <section className="panel">
+      <section className="panel client-dashboard-preview-panel">
         <div className="playlist-editor-header">
           <div>
             <h2>Preview das telas</h2>
@@ -2211,40 +3216,39 @@ function ClientDashboard({ client }) {
             screens.map((screen) => {
               const active = getActivePlaylist(screen);
               const activePlaylist = active.playlist;
-              const previewMedia = screen.nowPlayingPreview
+              const currentIndex = getPlaylistPreviewIndex(activePlaylist, now, screen);
+              const reportedIndex = Math.max(0, Number(screen.nowPlayingIndex || 1) - 1);
+              const activeItem = activePlaylist?.items?.[currentIndex] || activePlaylist?.items?.[0];
+              const canUseLivePreview = screen.nowPlayingPreview && reportedIndex === currentIndex;
+              const previewMedia = canUseLivePreview
                 ? {
+                    ...activeItem,
                     preview: screen.nowPlayingPreview,
-                    title: screen.nowPlayingTitle || "Mídia atual",
-                    type: screen.nowPlayingType || "Imagem",
+                    title: screen.nowPlayingTitle || activeItem?.title || activeItem?.name || "Mídia atual",
+                    type: screen.nowPlayingType || activeItem?.type || "Imagem",
+                    orientation: screen.nowPlayingOrientation || activeItem?.orientation || "Paisagem",
+                    aspectRatio: screen.nowPlayingAspectRatio || activeItem?.aspectRatio || "",
+                    width: screen.nowPlayingWidth || activeItem?.width || null,
+                    height: screen.nowPlayingHeight || activeItem?.height || null,
+                    templateType: screen.nowPlayingTemplateType || activeItem?.templateType || "",
+                    playerItemType: screen.nowPlayingItemType || activeItem?.playerItemType || "",
                   }
-                : activePlaylist?.items?.[0];
+                : activeItem;
+              const previewIndexLabel = activePlaylist?.items?.length ? currentIndex + 1 : screen.nowPlayingIndex;
 
               const online = isScreenOnline(screen);
 
               return (
                 <div className="screen-live-card" key={screen.id}>
                   <div className="screen-live-preview">
-                    {previewMedia ? (
-                      previewMedia.type === "Vídeo" ? (
-                        <video
-                          key={`${screen.id}-${screen.nowPlayingPreview || previewMedia.preview}-${screen.nowPlayingIndex || 0}`}
-                          src={previewMedia.preview}
-                          muted
-                          autoPlay
-                          loop
-                          playsInline
-                          preload="auto"
-                        />
-                      ) : (
-                        <img
-                          key={`${screen.id}-${screen.nowPlayingPreview || previewMedia.preview}-${screen.nowPlayingIndex || 0}`}
-                          src={previewMedia.preview}
-                          alt={previewMedia.title}
-                        />
-                      )
-                    ) : (
-                      <Monitor size={48} />
-                    )}
+                    <UniversalPreview
+                      key={`${screen.id}-${screen.nowPlayingPreview || previewMedia?.preview || "empty"}-${screen.nowPlayingIndex || 0}`}
+                      item={previewMedia}
+                      className="screen-universal-preview"
+                      compact
+                      autoPlay
+                      fallbackIcon={<Monitor size={48} />}
+                    />
 
                     <div className={online ? "live-dot online" : "live-dot offline"}></div>
                   </div>
@@ -2275,11 +3279,11 @@ function ClientDashboard({ client }) {
 
                     <div className="now-playing-box">
                       <small>Passando agora</small>
-                      <strong>{screen.nowPlayingTitle || previewMedia?.title || "Aguardando mídia"}</strong>
+                      <strong>{previewMedia?.title || previewMedia?.name || screen.nowPlayingTitle || "Aguardando mídia"}</strong>
                       <span>
-                        {screen.nowPlayingIndex && screen.nowPlayingTotal
-                          ? `${screen.nowPlayingIndex}/${screen.nowPlayingTotal}`
-                          : "Sem progresso"} • {screen.nowPlayingType || previewMedia?.type || "Mídia"}
+                        {previewIndexLabel && (screen.nowPlayingTotal || activePlaylist?.items?.length)
+                          ? `${previewIndexLabel}/${screen.nowPlayingTotal || activePlaylist?.items?.length}`
+                          : "Sem progresso"} • {previewMedia?.type || screen.nowPlayingType || "Mídia"}
                       </span>
                     </div>
                   </div>
@@ -2294,10 +3298,16 @@ function ClientDashboard({ client }) {
 }
 
 
-function ClientMediaPage({ client }) {
+function ClientMediaPage({ client, access = getClientPlanAccess(client) }) {
   const [mediaList, setMediaList] = useState([]);
   const [uploading, setUploading] = useState(false);
   const [progress, setProgress] = useState(0);
+  const [editingMedia, setEditingMedia] = useState(null);
+
+  const storageUsedBytes = getMediaStorageUsed(mediaList);
+  const storageLimitBytes = getClientStorageLimit(client);
+  const storageUsage = getStorageUsage(storageUsedBytes, storageLimitBytes);
+  const planLimits = getPlanLimits(client.plan);
 
   const [form, setForm] = useState({
     title: "",
@@ -2306,6 +3316,10 @@ function ClientMediaPage({ client }) {
     preview: "",
     type: "",
     sound: false,
+    width: null,
+    height: null,
+    orientation: "Paisagem",
+    aspectRatio: "custom",
   });
 
   useEffect(() => {
@@ -2324,11 +3338,41 @@ function ClientMediaPage({ client }) {
     return () => unsubscribe();
   }, [client.id]);
 
-  function handleSelectedFile(file) {
-    if (!file) return;
+  function validateMediaFile(file) {
+    if (!file) return false;
 
-    const type = file.type.startsWith("video") ? "Vídeo" : "Imagem";
+    const isVideo = file.type.startsWith("video/");
+    const isImage = file.type.startsWith("image/");
+
+    if (!isVideo && !isImage) {
+      alert("Selecione uma imagem ou vídeo compatível.");
+      return false;
+    }
+
+    if (isVideo && file.size > planLimits.maxVideoSizeBytes) {
+      alert("Este vídeo excede o limite do seu plano. Compacte o arquivo ou faça upgrade.");
+      return false;
+    }
+
+    if (isImage && file.size > planLimits.maxImageSizeBytes) {
+      alert("Esta imagem excede o limite do seu plano.");
+      return false;
+    }
+
+    if (storageUsedBytes + file.size > storageLimitBytes) {
+      alert("Limite de armazenamento atingido. Remova arquivos ou faça upgrade do plano.");
+      return false;
+    }
+
+    return true;
+  }
+
+  async function handleSelectedFile(file) {
+    if (!file || !validateMediaFile(file)) return;
+
+    const type = file.type.startsWith("video/") ? "Vídeo" : "Imagem";
     const preview = URL.createObjectURL(file);
+    const dimensions = await detectMediaFileMetadata(file);
 
     setForm({
       ...form,
@@ -2336,6 +3380,7 @@ function ClientMediaPage({ client }) {
       preview,
       type,
       title: form.title || file.name,
+      ...dimensions,
       sound: type === "Vídeo" ? form.sound : false,
     });
   }
@@ -2345,18 +3390,133 @@ function ClientMediaPage({ client }) {
     handleSelectedFile(file);
   }
 
+  function resetMediaForm() {
+    setEditingMedia(null);
+    setForm({
+      title: "",
+      duration: "10",
+      file: null,
+      preview: "",
+      type: "",
+      sound: false,
+      width: null,
+      height: null,
+      orientation: "Paisagem",
+      aspectRatio: "custom",
+    });
+    setProgress(0);
+  }
+
+  function startEditMedia(media) {
+    if (!requirePlanPermission(access, "canEdit", "editar mídias")) return;
+
+    setEditingMedia(media);
+    setForm({
+      title: media.title || "",
+      duration: String(media.duration || 10),
+      file: null,
+      preview: media.preview || "",
+      type: media.type || "Imagem",
+      sound: Boolean(media.sound),
+      width: media.width || null,
+      height: media.height || null,
+      orientation: media.orientation || "Paisagem",
+      aspectRatio: media.aspectRatio || "custom",
+    });
+
+    window.scrollTo({ top: 0, behavior: "smooth" });
+  }
+
+  async function updateMediaInPlaylists(mediaId, changes) {
+    const playlistsSnapshot = await getDocs(
+      collection(db, "clients", client.id, "playlists")
+    );
+
+    await Promise.all(
+      playlistsSnapshot.docs.map(async (playlistDoc) => {
+        const playlist = playlistDoc.data();
+        const items = Array.isArray(playlist.items) ? playlist.items : [];
+        let changed = false;
+
+        const updatedItems = items.map((item) => {
+          const isTargetMedia =
+            item?.id === mediaId &&
+            item?.playerItemType !== "template" &&
+            !item?.templateType;
+
+          if (!isTargetMedia) return item;
+
+          changed = true;
+          return { ...item, ...changes };
+        });
+
+        if (!changed) return;
+
+        await updateDoc(playlistDoc.ref, {
+          items: updatedItems,
+          updatedAt: serverTimestamp(),
+        });
+      })
+    );
+  }
+
   async function handleSaveMedia() {
+    if (!form.title.trim()) {
+      alert("Informe o nome da mídia.");
+      return;
+    }
+
+    const duration = Number(form.duration);
+
+    if (!Number.isFinite(duration) || duration < 1) {
+      alert("Informe uma duração válida, a partir de 1 segundo.");
+      return;
+    }
+
+    if (editingMedia) {
+      if (!requirePlanPermission(access, "canEdit", "editar mídias")) return;
+
+      try {
+        setUploading(true);
+
+        const changes = {
+          title: form.title.trim(),
+          duration,
+          sound: form.type === "Vídeo" ? form.sound : false,
+        };
+
+        await updateDoc(
+          doc(db, "clients", client.id, "media", editingMedia.id),
+          { ...changes, updatedAt: serverTimestamp() }
+        );
+        await updateMediaInPlaylists(editingMedia.id, changes);
+
+        resetMediaForm();
+        alert("Tempo da mídia atualizado em todas as playlists!");
+      } catch (error) {
+        console.log(error);
+        alert("Erro ao atualizar a mídia.");
+      } finally {
+        setUploading(false);
+      }
+      return;
+    }
+
     if (!form.file) {
       alert("Selecione uma imagem ou vídeo.");
       return;
     }
+
+    if (!requirePlanPermission(access, "canUpload", "enviar novas mídias")) return;
+    if (!validateMediaFile(form.file)) return;
 
     try {
       setUploading(true);
       setProgress(0);
 
       const fileName = `${Date.now()}_${form.file.name}`;
-      const storageRef = ref(storage, `clients/${client.id}/media/${fileName}`);
+      const storagePath = `clients/${client.id}/media/${fileName}`;
+      const storageRef = ref(storage, storagePath);
       const uploadTask = uploadBytesResumable(storageRef, form.file);
 
       uploadTask.on(
@@ -2376,24 +3536,22 @@ function ClientMediaPage({ client }) {
           const downloadURL = await getDownloadURL(uploadTask.snapshot.ref);
 
           await addDoc(collection(db, "clients", client.id, "media"), {
-            title: form.title,
-            duration: Number(form.duration || 10),
+            title: form.title.trim(),
+            duration,
             type: form.type,
             preview: downloadURL,
+            width: form.width || null,
+            height: form.height || null,
+            orientation: form.orientation || "Paisagem",
+            aspectRatio: form.aspectRatio || "custom",
             sound: form.type === "Vídeo" ? form.sound : false,
+            sizeBytes: form.file.size,
+            fileName: form.file.name,
+            storagePath,
             createdAt: serverTimestamp(),
           });
 
-          setForm({
-            title: "",
-            duration: "10",
-            file: null,
-            preview: "",
-            type: "",
-            sound: false,
-          });
-
-          setProgress(0);
+          resetMediaForm();
           setUploading(false);
           alert("Mídia enviada com sucesso!");
         }
@@ -2405,9 +3563,19 @@ function ClientMediaPage({ client }) {
     }
   }
 
-  async function deleteMedia(id) {
+  async function deleteMedia(media) {
+    if (!requirePlanPermission(access, "canEdit", "excluir mídias")) return;
+
     try {
-      await deleteDoc(doc(db, "clients", client.id, "media", id));
+      if (media.storagePath) {
+        try {
+          await deleteObject(ref(storage, media.storagePath));
+        } catch (storageError) {
+          console.log("Não foi possível remover o arquivo do Storage:", storageError);
+        }
+      }
+
+      await deleteDoc(doc(db, "clients", client.id, "media", media.id));
     } catch (error) {
       console.log(error);
       alert("Erro ao excluir mídia.");
@@ -2418,14 +3586,26 @@ function ClientMediaPage({ client }) {
 
   return (
     <>
+      <section className={`storage-usage-card ${storageUsage.severity}`}>
+        <div className="storage-usage-header">
+          <div>
+            <span>Armazenamento usado</span>
+            <strong>{formatStorageSize(storageUsedBytes)} / {formatStorageSize(storageLimitBytes, 0)}</strong>
+          </div>
+          <b>{storageUsage.percentage.toFixed(1)}%</b>
+        </div>
+        <div className="storage-progress-track">
+          <div style={{ width: `${storageUsage.percentage}%` }} />
+        </div>
+        <p>
+          {storageUsage.label} • Vídeos até {formatStorageSize(planLimits.maxVideoSizeBytes)} • Imagens até {formatStorageSize(planLimits.maxImageSizeBytes)}
+        </p>
+      </section>
+
       <section className="upload-panel">
         <div className="upload-preview-box">
           {form.preview ? (
-            form.type === "Vídeo" ? (
-              <video src={form.preview} controls />
-            ) : (
-              <img src={form.preview} alt="Prévia" />
-            )
+            <UniversalPreview item={form} controls compact={false} />
           ) : (
             <div className="empty-upload">
               <Upload size={42} />
@@ -2435,7 +3615,14 @@ function ClientMediaPage({ client }) {
         </div>
 
         <div className="upload-form">
-          <div className="modern-upload-group">
+          {editingMedia ? (
+            <div className="editing-media-banner">
+              <div className="editing-badge">Editando mídia</div>
+              <strong>{editingMedia.title}</strong>
+              <p>Altere o nome, o tempo de exibição ou o som. O arquivo original será mantido.</p>
+            </div>
+          ) : (
+            <div className="modern-upload-group">
             <div className="modern-upload-title">
               <div className="modern-upload-icon">
                 <Upload size={22} />
@@ -2493,7 +3680,8 @@ function ClientMediaPage({ client }) {
                 <span>{form.type} selecionado</span>
               </div>
             )}
-          </div>
+            </div>
+          )}
 
           <div className="form-group media-name-group">
             <label>Nome da mídia</label>
@@ -2537,13 +3725,30 @@ function ClientMediaPage({ client }) {
           )}
 
           <div className="panel-actions">
+            {editingMedia && (
+              <button
+                type="button"
+                className="client-action"
+                onClick={resetMediaForm}
+                disabled={uploading}
+              >
+                Cancelar edição
+              </button>
+            )}
+
             <button
               className="upload-button"
               onClick={handleSaveMedia}
               disabled={uploading}
             >
               <Plus size={20} />
-              {uploading ? `Enviando ${progress}%` : "Salvar mídia"}
+              {uploading
+                ? editingMedia
+                  ? "Salvando..."
+                  : `Enviando ${progress}%`
+                : editingMedia
+                  ? "Salvar alterações"
+                  : "Salvar mídia"}
             </button>
           </div>
         </div>
@@ -2556,23 +3761,27 @@ function ClientMediaPage({ client }) {
           mediaList.map((media) => (
             <div className="media-card" key={media.id}>
               <div className="media-preview">
-                {media.type === "Vídeo" ? (
-                  <video src={media.preview} controls />
-                ) : (
-                  <img src={media.preview} alt={media.title} />
-                )}
+                <UniversalPreview item={media} controls compact={false} />
               </div>
 
               <div className="media-info">
                 <span>{media.type}</span>
                 <h3>{media.title}</h3>
                 <p>{media.duration} segundos</p>
+                <p>{getPreviewOrientationLabel(media)} • {media.aspectRatio || "custom"}</p>
                 <p>{media.sound ? "Com som" : "Sem som"}</p>
+                <p>{media.sizeBytes ? formatFileSizeMb(media.sizeBytes) : "Tamanho não informado"}</p>
 
-                <button className="delete-button" onClick={() => deleteMedia(media.id)}>
-                  <Trash2 size={16} />
-                  Excluir
-                </button>
+                <div className="media-card-actions">
+                  <button className="client-action primary" onClick={() => startEditMedia(media)}>
+                    Editar tempo
+                  </button>
+
+                  <button className="delete-button" onClick={() => deleteMedia(media)}>
+                    <Trash2 size={16} />
+                    Excluir
+                  </button>
+                </div>
               </div>
             </div>
           ))
@@ -2582,13 +3791,15 @@ function ClientMediaPage({ client }) {
   );
 }
 
-function ClientPlaylistsPage({ client }) {
+function ClientPlaylistsPage({ client, access = getClientPlanAccess(client) }) {
   const [mediaList, setMediaList] = useState([]);
   const [templates, setTemplates] = useState([]);
   const [playlists, setPlaylists] = useState([]);
   const [screens, setScreens] = useState([]);
   const [editingPlaylist, setEditingPlaylist] = useState(null);
   const [draggedMediaId, setDraggedMediaId] = useState(null);
+  const playlistEditorRef = useRef(null);
+  const canUsePremiumTemplates = hasPremiumTemplates(client);
 
   const [form, setForm] = useState({
     name: "",
@@ -2727,21 +3938,20 @@ function ClientPlaylistsPage({ client }) {
   }
 
   function toggleTemplate(templateId) {
+    const template = templates.find((item) => item.id === templateId);
+
+    if (isPremiumTemplate(template) && !canUsePremiumTemplates) {
+      alert("Templates Premium disponíveis a partir do plano Business.");
+      return;
+    }
+
     toggleItemKey(getTemplateKey(templateId));
   }
 
   function renderPlaylistMiniPreview(item) {
     if (!item) return <Monitor size={26} />;
 
-    if (item.playerItemType === "template" || item.templateType) {
-      return <TemplateVisualPreview template={item} compact />;
-    }
-
-    if (item.type === "Vídeo") {
-      return <video src={item.preview} muted playsInline preload="metadata" />;
-    }
-
-    return <img src={item.preview} alt={item.title} />;
+    return <UniversalPreview item={item} className="playlist-preview-frame" compact />;
   }
 
   function getPlaylistItemLabel(item) {
@@ -2896,6 +4106,8 @@ function ClientPlaylistsPage({ client }) {
   }
 
   function startEditPlaylist(playlist) {
+    if (!requirePlanPermission(access, "canEditPlaylists", "editar playlists")) return;
+
     setEditingPlaylist(playlist);
 
     setForm({
@@ -2912,13 +4124,19 @@ function ClientPlaylistsPage({ client }) {
       endTime: playlist.endTime || "18:00",
     });
 
-    window.scrollTo({
-      top: 0,
-      behavior: "smooth",
+    requestAnimationFrame(() => {
+      playlistEditorRef.current?.scrollIntoView({
+        behavior: "smooth",
+        block: "start",
+      });
     });
   }
 
   async function handleSavePlaylist() {
+    const permission = editingPlaylist ? "canEditPlaylists" : "canCreatePlaylists";
+    const action = editingPlaylist ? "editar playlists" : "criar novas playlists";
+    if (!requirePlanPermission(access, permission, action)) return;
+
     if (!form.name.trim()) {
       alert("Informe o nome da playlist.");
       return;
@@ -2972,12 +4190,41 @@ function ClientPlaylistsPage({ client }) {
       };
 
       if (editingPlaylist) {
+        const playlistRevision = `${Date.now()}-${Math.random().toString(36).slice(2, 8)}`;
+
         await updateDoc(
           doc(db, "clients", client.id, "playlists", editingPlaylist.id),
-          playlistData
+          { ...playlistData, playlistRevision }
         );
 
-        alert("Playlist atualizada com sucesso!");
+        const affectedScreens = screens.filter((screen) => (
+          screen.playlistId === editingPlaylist.id ||
+          (form.scheduleEnabled && form.targetScreenIds.includes(screen.id)) ||
+          (editingPlaylist.scheduleEnabled && editingPlaylist.targetScreenIds?.includes(screen.id))
+        ));
+
+        await Promise.all(
+          affectedScreens.map((screen) => updateDoc(
+            doc(db, "clients", client.id, "screens", screen.id),
+            {
+              playlistRevision,
+              playlistTransition: form.transition,
+              playlistTransitionSpeed: form.transitionSpeed,
+              remoteCommand: {
+                id: `playlist-refresh-${playlistRevision}-${screen.id}`,
+                type: "refresh",
+                sentAt: new Date().toISOString(),
+              },
+              updatedAt: serverTimestamp(),
+            }
+          ))
+        );
+
+        alert(
+          affectedScreens.length > 0
+            ? `Playlist atualizada e enviada para ${affectedScreens.length} tela(s)!`
+            : "Playlist atualizada com sucesso!"
+        );
       } else {
         await addDoc(collection(db, "clients", client.id, "playlists"), {
           ...playlistData,
@@ -2995,6 +4242,8 @@ function ClientPlaylistsPage({ client }) {
   }
 
   async function deletePlaylist(id) {
+    if (!requirePlanPermission(access, "canEditPlaylists", "excluir playlists")) return;
+
     try {
       await deleteDoc(doc(db, "clients", client.id, "playlists", id));
     } catch (error) {
@@ -3003,10 +4252,88 @@ function ClientPlaylistsPage({ client }) {
     }
   }
 
+  const availableTemplates = templates.filter((template) =>
+    canUsePremiumTemplates || !isPremiumTemplate(template)
+  );
+  const landscapeMedia = mediaList.filter((media) => getPreviewAspectClass(media) !== "portrait");
+  const portraitMedia = mediaList.filter((media) => getPreviewAspectClass(media) === "portrait");
+  const landscapeTemplates = availableTemplates.filter((template) => getPreviewAspectClass(template) !== "portrait");
+  const portraitTemplates = availableTemplates.filter((template) => getPreviewAspectClass(template) === "portrait");
+
+  function renderSelectableMediaCard(media) {
+    return (
+      <button
+        key={media.id}
+        type="button"
+        className={
+          isSelectedKey(getMediaKey(media.id))
+            ? "select-media-card selected"
+            : "select-media-card"
+        }
+        onClick={() => toggleMedia(media.id)}
+      >
+        <UniversalPreview item={media} className="playlist-preview-frame" compact />
+
+        <strong>{media.title}</strong>
+
+        <span>
+          {media.type} • {media.duration}s • {getPreviewOrientationLabel(media)}
+        </span>
+      </button>
+    );
+  }
+
+  function renderSelectableTemplateCard(template) {
+    return (
+      <button
+        key={template.id}
+        type="button"
+        className={
+          isSelectedKey(getTemplateKey(template.id))
+            ? "select-media-card selected"
+            : "select-media-card"
+        }
+        onClick={() => toggleTemplate(template.id)}
+      >
+        <UniversalPreview
+          item={{
+            ...template,
+            playerItemType: "template",
+            templateType: template.templateType || template.type,
+          }}
+          className="playlist-preview-frame"
+          compact
+        />
+
+        <strong>{template.name}</strong>
+
+        <span>
+          {getTemplateTypeLabel(template.type)} • {template.duration || 15}s • {getPreviewOrientationLabel(template)}
+        </span>
+      </button>
+    );
+  }
+
   return (
     <>
-      <section className="playlist-builder">
+      <section
+        ref={playlistEditorRef}
+        className={editingPlaylist ? "playlist-builder playlist-builder-editing" : "playlist-builder"}
+      >
         <div className="panel">
+          {editingPlaylist && (
+            <div className="playlist-edit-mode-banner">
+              <div>
+                <span>Modo de edição</span>
+                <strong>{editingPlaylist.name}</strong>
+                <p>Altere os campos abaixo e use “Salvar alterações” para atualizar esta playlist.</p>
+              </div>
+              <button type="button" className="client-action" onClick={resetPlaylistForm}>
+                Cancelar edição
+              </button>
+            </div>
+          )}
+
           <div className="playlist-editor-header">
             <div>
               <h2>
@@ -3255,39 +4582,35 @@ function ClientPlaylistsPage({ client }) {
             </span>
           </div>
 
-          <div className="media-selector">
+          <div className="media-selector grouped">
             {mediaList.length === 0 ? (
               <div className="empty-library">
                 Cadastre mídias primeiro.
               </div>
             ) : (
-              mediaList.map((media) => (
-                <button
-                  key={media.id}
-                  type="button"
-                  className={
-                    isSelectedKey(getMediaKey(media.id))
-                      ? "select-media-card selected"
-                      : "select-media-card"
-                  }
-                  onClick={() => toggleMedia(media.id)}
-                >
-                  <div className="select-media-thumb">
-                    {media.type === "Vídeo" ? (
-                      <video src={media.preview} muted playsInline preload="metadata" />
+              <>
+                <div className="preview-library-group">
+                  <h4>Conteúdo Paisagem</h4>
+                  <div className="preview-library-grid">
+                    {landscapeMedia.length > 0 ? (
+                      landscapeMedia.map(renderSelectableMediaCard)
                     ) : (
-                      <img src={media.preview} alt={media.title} />
+                      <div className="empty-library compact">Nenhuma mídia paisagem.</div>
                     )}
                   </div>
+                </div>
 
-                  <strong>{media.title}</strong>
-
-                  <span>
-                    {media.type} • {media.duration}s •{" "}
-                    {media.sound ? "Com som" : "Sem som"}
-                  </span>
-                </button>
-              ))
+                <div className="preview-library-group">
+                  <h4>Conteúdo Retrato</h4>
+                  <div className="preview-library-grid">
+                    {portraitMedia.length > 0 ? (
+                      portraitMedia.map(renderSelectableMediaCard)
+                    ) : (
+                      <div className="empty-library compact">Nenhuma mídia retrato.</div>
+                    )}
+                  </div>
+                </div>
+              </>
             )}
           </div>
 
@@ -3302,34 +4625,41 @@ function ClientPlaylistsPage({ client }) {
             </span>
           </div>
 
-          <div className="media-selector">
-            {templates.length === 0 ? (
+          {!canUsePremiumTemplates && templates.some(isPremiumTemplate) && (
+            <div className="playlist-access-note">
+              Templates Premium estão bloqueados no plano Start. Faça upgrade para adicioná-los à playlist.
+            </div>
+          )}
+
+          <div className="media-selector grouped">
+            {availableTemplates.length === 0 ? (
               <div className="empty-library">
-                Cadastre templates primeiro na aba Templates.
+                Cadastre templates simples primeiro na aba Templates.
               </div>
             ) : (
-              templates.map((template) => (
-                <button
-                  key={template.id}
-                  type="button"
-                  className={
-                    isSelectedKey(getTemplateKey(template.id))
-                      ? "select-media-card selected"
-                      : "select-media-card"
-                  }
-                  onClick={() => toggleTemplate(template.id)}
-                >
-                  <div className="select-media-thumb">
-                    <TemplateVisualPreview template={template} compact />
+              <>
+                <div className="preview-library-group">
+                  <h4>Templates Paisagem</h4>
+                  <div className="preview-library-grid">
+                    {landscapeTemplates.length > 0 ? (
+                      landscapeTemplates.map(renderSelectableTemplateCard)
+                    ) : (
+                      <div className="empty-library compact">Nenhum template paisagem.</div>
+                    )}
                   </div>
+                </div>
 
-                  <strong>{template.name}</strong>
-
-                  <span>
-                    {getTemplateTypeLabel(template.type)} • {template.duration || 15}s
-                  </span>
-                </button>
-              ))
+                <div className="preview-library-group">
+                  <h4>Templates Retrato</h4>
+                  <div className="preview-library-grid">
+                    {portraitTemplates.length > 0 ? (
+                      portraitTemplates.map(renderSelectableTemplateCard)
+                    ) : (
+                      <div className="empty-library compact">Nenhum template retrato.</div>
+                    )}
+                  </div>
+                </div>
+              </>
             )}
           </div>
 
@@ -3521,11 +4851,12 @@ function ClientPlaylistsPage({ client }) {
 
 
 
-function ClientScreensPage({ client }) {
+function ClientScreensPage({ client, access = getClientPlanAccess(client) }) {
   const [screens, setScreens] = useState([]);
   const [playlists, setPlaylists] = useState([]);
   const [now, setNow] = useState(Date.now());
   const [editingScreen, setEditingScreen] = useState(null);
+  const screenEditorRef = useRef(null);
 
   const [form, setForm] = useState({
     name: "",
@@ -3537,7 +4868,7 @@ function ClientScreensPage({ client }) {
   useEffect(() => {
     const interval = setInterval(() => {
       setNow(Date.now());
-    }, 10000);
+    }, 1000);
 
     return () => clearInterval(interval);
   }, []);
@@ -3738,6 +5069,8 @@ function ClientScreensPage({ client }) {
   }
 
   function startEditScreen(screen) {
+    if (!requirePlanPermission(access, "canEditScreens", "editar telas")) return;
+
     setEditingScreen(screen);
 
     setForm({
@@ -3747,20 +5080,28 @@ function ClientScreensPage({ client }) {
       playlistId: screen.playlistId || "",
     });
 
-    window.scrollTo({
-      top: 0,
-      behavior: "smooth",
+    requestAnimationFrame(() => {
+      requestAnimationFrame(() => {
+        screenEditorRef.current?.scrollIntoView({
+          behavior: "smooth",
+          block: "start",
+        });
+      });
     });
   }
 
   async function handleSaveScreen() {
+    const permission = editingScreen ? "canEditScreens" : "canCreateScreens";
+    const action = editingScreen ? "editar telas" : "criar novas telas";
+    if (!requirePlanPermission(access, permission, action)) return;
+
     if (!form.name.trim()) {
       alert("Informe o nome da tela.");
       return;
     }
 
-    if (!editingScreen && screens.length >= Number(client.screensLimit || 0)) {
-      alert("Este cliente atingiu o limite de telas do plano.");
+    if (!editingScreen && screens.length >= getClientScreenLimit(client)) {
+      alert("Limite de telas atingido para este plano. Faça upgrade para adicionar novas telas.");
       return;
     }
 
@@ -3812,9 +5153,16 @@ function ClientScreensPage({ client }) {
   }
 
   async function deleteScreen(id) {
-    try {
-      const screenToDelete = screens.find((screen) => screen.id === id);
+    if (!requirePlanPermission(access, "canEditScreens", "excluir telas")) return;
 
+    const screenToDelete = screens.find((screen) => screen.id === id);
+    const confirmed = window.confirm(
+      `Tem certeza que deseja excluir a tela "${screenToDelete?.name || "sem nome"}"?\n\nEsta ação não poderá ser desfeita.`
+    );
+
+    if (!confirmed) return;
+
+    try {
       await deleteDoc(doc(db, "clients", client.id, "screens", id));
 
       if (screenToDelete?.code) {
@@ -3828,6 +5176,8 @@ function ClientScreensPage({ client }) {
 
 
   async function sendRemoteCommand(screenId, command) {
+    if (!requirePlanPermission(access, "canEditScreens", "controlar telas")) return;
+
     try {
       const commandId = `${Date.now()}-${Math.random().toString(36).slice(2)}`;
 
@@ -3841,6 +5191,13 @@ function ClientScreensPage({ client }) {
         lastCommandSentAt: serverTimestamp(),
         commandStatus: "sent",
       };
+
+      if (command.type === "exitTv") {
+        payload.connectedDeviceId = deleteField();
+        payload.activeDeviceId = deleteField();
+        payload.status = "offline";
+        payload.lastSeenAt = null;
+      }
 
       if (command.type === "maintenance") {
         payload.lastCommandExecuted = "maintenance";
@@ -3890,12 +5247,12 @@ function ClientScreensPage({ client }) {
 
   return (
     <>
-      <section className="panel">
+      <section className="panel screen-editor-panel" ref={screenEditorRef}>
         <div className="playlist-editor-header">
           <div>
             <h2>{editingScreen ? "Editar tela" : "Nova tela"}</h2>
             <p className="stat-status">
-              Uso atual: {screens.length}/{client.screensLimit} telas
+              Uso atual: {screens.length}/{getClientScreenLimit(client)} telas
             </p>
           </div>
 
@@ -3955,7 +5312,7 @@ function ClientScreensPage({ client }) {
         </div>
 
         <div className="screen-schedule-note">
-          <strong>Como funciona:</strong> a playlist padrão roda normalmente. Quando uma playlist agendada entrar no período configurado, ela assume temporariamente a TV. Ao terminar, a TV volta para a playlist padrão desta tela. Para conectar uma TV, abra /tv e digite apenas o código da tela.
+          <strong>Como funciona:</strong> a playlist padrão roda normalmente. Quando uma playlist agendada entrar no período configurado, ela assume temporariamente a TV. Ao terminar, a TV volta para a playlist padrão desta tela. Para conectar uma TV, abra {PUBLIC_WEB_URL}/tv e digite apenas o código da tela.
         </div>
 
         <div className="panel-actions">
@@ -3980,38 +5337,37 @@ function ClientScreensPage({ client }) {
             const online = isScreenOnline(screen);
             const active = getActivePlaylist(screen);
             const activePlaylist = active.playlist;
-            const previewMedia = screen.nowPlayingPreview
+            const currentIndex = getPlaylistPreviewIndex(activePlaylist, now, screen);
+            const reportedIndex = Math.max(0, Number(screen.nowPlayingIndex || 1) - 1);
+            const activeItem = activePlaylist?.items?.[currentIndex] || activePlaylist?.items?.[0];
+            const canUseLivePreview = screen.nowPlayingPreview && reportedIndex === currentIndex;
+            const previewMedia = canUseLivePreview
               ? {
+                  ...activeItem,
                   preview: screen.nowPlayingPreview,
-                  title: screen.nowPlayingTitle || "Mídia atual",
-                  type: screen.nowPlayingType || "Imagem",
+                  title: screen.nowPlayingTitle || activeItem?.title || activeItem?.name || "Mídia atual",
+                  type: screen.nowPlayingType || activeItem?.type || "Imagem",
+                  orientation: screen.nowPlayingOrientation || activeItem?.orientation || "Paisagem",
+                  aspectRatio: screen.nowPlayingAspectRatio || activeItem?.aspectRatio || "",
+                  width: screen.nowPlayingWidth || activeItem?.width || null,
+                  height: screen.nowPlayingHeight || activeItem?.height || null,
+                  templateType: screen.nowPlayingTemplateType || activeItem?.templateType || "",
+                  playerItemType: screen.nowPlayingItemType || activeItem?.playerItemType || "",
                 }
-              : activePlaylist?.items?.[0];
+              : activeItem;
+            const previewIndexLabel = activePlaylist?.items?.length ? currentIndex + 1 : screen.nowPlayingIndex;
 
             return (
               <div className="media-card" key={screen.id}>
                 <div className="media-preview screen-preview">
-                  {previewMedia ? (
-                    previewMedia.type === "Vídeo" ? (
-                      <video
-                        key={`${screen.id}-${screen.nowPlayingPreview || previewMedia.preview}-${screen.nowPlayingIndex || 0}`}
-                        src={previewMedia.preview}
-                        muted
-                        autoPlay
-                        loop
-                        playsInline
-                        preload="auto"
-                      />
-                    ) : (
-                      <img
-                          key={`${screen.id}-${screen.nowPlayingPreview || previewMedia.preview}-${screen.nowPlayingIndex || 0}`}
-                          src={previewMedia.preview}
-                          alt={previewMedia.title}
-                        />
-                    )
-                  ) : (
-                    <Monitor size={54} />
-                  )}
+                  <UniversalPreview
+                    key={`${screen.id}-${screen.nowPlayingPreview || previewMedia?.preview || "empty"}-${screen.nowPlayingIndex || 0}`}
+                    item={previewMedia}
+                    className="screen-universal-preview"
+                    compact
+                    autoPlay
+                    fallbackIcon={<Monitor size={54} />}
+                  />
 
                   <div className={online ? "live-dot online" : "live-dot offline"}></div>
                 </div>
@@ -4041,24 +5397,24 @@ function ClientScreensPage({ client }) {
 
                     <div className="screen-now-playing">
                       <small>Mídia atual</small>
-                      <strong>{screen.nowPlayingTitle || previewMedia?.title || "Aguardando mídia"}</strong>
+                      <strong>{previewMedia?.title || previewMedia?.name || screen.nowPlayingTitle || "Aguardando mídia"}</strong>
                       <span>
-                        {screen.nowPlayingIndex && screen.nowPlayingTotal
-                          ? `${screen.nowPlayingIndex}/${screen.nowPlayingTotal}`
-                          : "Sem progresso"} • {screen.nowPlayingType || previewMedia?.type || "Mídia"}
+                        {previewIndexLabel && (screen.nowPlayingTotal || activePlaylist?.items?.length)
+                          ? `${previewIndexLabel}/${screen.nowPlayingTotal || activePlaylist?.items?.length}`
+                          : "Sem progresso"} • {previewMedia?.type || screen.nowPlayingType || "Mídia"}
                       </span>
                     </div>
                   </div>
 
                   <div className="screen-code-box">
-                    <small>Código para conectar no /tv</small>
+                    <small>Código para conectar em {PUBLIC_WEB_URL}/tv</small>
                     <strong>{screen.code}</strong>
                   </div>
 
                   <p>
                     Player direto:
                     <br />
-                    <strong>/player/{client.id}/{screen.code}</strong>
+                    <strong>{PUBLIC_WEB_URL}/player/{client.id}/{screen.code}</strong>
                   </p>
 
                   <div className="last-seen-card">
@@ -4067,8 +5423,12 @@ function ClientScreensPage({ client }) {
                   </div>
 
                   <div className="remote-control-panel-inline">
-                    <div className="remote-control-title">
-                      Controle remoto
+                    <div className="remote-control-heading">
+                      <div className="remote-control-title">
+                        <Monitor size={16} />
+                        Controle remoto
+                      </div>
+                      <span className="remote-live-label">Tempo real</span>
                     </div>
 
                     <div className="remote-control-grid-inline">
@@ -4076,39 +5436,44 @@ function ClientScreensPage({ client }) {
                         className="remote-mini-button info"
                         onClick={() => sendRemoteCommand(screen.id, { type: "refresh" })}
                       >
-                        Atualizar
+                        <RefreshCw size={16} />
+                        <span>Atualizar</span>
                       </button>
 
                       <button
                         className="remote-mini-button"
                         onClick={() => sendRemoteCommand(screen.id, { type: "pause" })}
                       >
-                        Pausar
+                        <Pause size={16} />
+                        <span>Pausar</span>
                       </button>
 
                       <button
-                        className="remote-mini-button"
+                        className="remote-mini-button play"
                         onClick={() => sendRemoteCommand(screen.id, { type: "play" })}
                       >
-                        Play
+                        <Play size={16} />
+                        <span>Play</span>
                       </button>
 
                       <button
                         className="remote-mini-button warning"
                         onClick={() => sendOverlayCommand(screen.id)}
                       >
-                        Overlay
+                        <MessageSquare size={16} />
+                        <span>Overlay</span>
                       </button>
 
                       <button
                         className="remote-mini-button danger"
                         onClick={() => sendTakeoverCommand(screen.id)}
                       >
-                        Takeover
+                        <TriangleAlert size={16} />
+                        <span>Takeover</span>
                       </button>
 
                       <button
-                        className="remote-mini-button"
+                        className="remote-mini-button maintenance"
                         onClick={() =>
                           sendRemoteCommand(
                             screen.id,
@@ -4121,30 +5486,36 @@ function ClientScreensPage({ client }) {
                           )
                         }
                       >
-                        {screen.lastCommandExecuted === "maintenance"
-                          ? "Sair manutenção"
-                          : "Manutenção"}
+                        <Wrench size={16} />
+                        <span>
+                          {screen.lastCommandExecuted === "maintenance"
+                            ? "Sair manutenção"
+                            : "Manutenção"}
+                        </span>
                       </button>
 
                       <button
-                        className="remote-mini-button"
+                        className="remote-mini-button blackout"
                         onClick={() => sendRemoteCommand(screen.id, { type: "blackout" })}
                       >
-                        Tela preta
+                        <MonitorOff size={16} />
+                        <span>Tela preta</span>
                       </button>
 
                       <button
                         className="remote-mini-button success"
                         onClick={() => sendRemoteCommand(screen.id, { type: "clear" })}
                       >
-                        Limpar
+                        <Eraser size={16} />
+                        <span>Limpar</span>
                       </button>
 
                       <button
                         className="remote-mini-button danger"
                         onClick={() => sendRemoteCommand(screen.id, { type: "reload" })}
                       >
-                        Reiniciar
+                        <RotateCcw size={16} />
+                        <span>Reiniciar</span>
                       </button>
 
                       <button
@@ -4159,7 +5530,8 @@ function ClientScreensPage({ client }) {
                           sendRemoteCommand(screen.id, { type: "exitTv" });
                         }}
                       >
-                        Sair da TV
+                        <LogOut size={16} />
+                        <span>Sair da TV</span>
                       </button>
                     </div>
                   </div>
@@ -4194,6 +5566,25 @@ const MARKETING_TYPE_LABELS = {
   story: "Stories",
   reels: "Capa Reels",
 };
+
+const MARKETING_VISIBILITY_OPTIONS = [
+  ["showFormatLabel", "Formato"],
+  ["showImage", "Imagem"],
+  ["showLogo", "Logo"],
+  ["showAccent", "Destaque"],
+  ["showTitle", "Título"],
+  ["showSubtitle", "Subtítulo"],
+  ["showCta", "Botão CTA"],
+  ["showQr", "QR Code"],
+  ["showWhatsapp", "WhatsApp"],
+  ["showLocation", "Localização"],
+];
+
+function getMarketingVisibility(values) {
+  return Object.fromEntries(
+    MARKETING_VISIBILITY_OPTIONS.map(([field]) => [field, values[field] !== false])
+  );
+}
 
 function getMarketingFormatSize(type) {
   if (type === "feed") return "1080x1080";
@@ -4235,6 +5626,16 @@ function getMarketingDefaultForm() {
     logoFile: null,
     logoPreview: "",
     logoUrl: "",
+    showFormatLabel: true,
+    showImage: true,
+    showLogo: true,
+    showAccent: true,
+    showTitle: true,
+    showSubtitle: true,
+    showCta: true,
+    showQr: true,
+    showWhatsapp: true,
+    showLocation: true,
   };
 }
 
@@ -4335,6 +5736,19 @@ async function uploadMarketingAsset(clientId, file, folder) {
   return getDownloadURL(uploadTask.snapshot.ref);
 }
 
+async function uploadClientLogo(clientId, file) {
+  if (!file) return "";
+
+  const storageRef = ref(storage, `clients/${clientId}/profile/logo`);
+  const uploadTask = uploadBytesResumable(storageRef, file);
+
+  await new Promise((resolve, reject) => {
+    uploadTask.on("state_changed", () => {}, reject, resolve);
+  });
+
+  return getDownloadURL(uploadTask.snapshot.ref);
+}
+
 function MarketingArtPreview({ art, compact = false, tv = false }) {
   const marketingType = art.marketingType || art.formatType || art.type;
   const ratio = getMarketingFormatRatio(marketingType);
@@ -4343,235 +5757,111 @@ function MarketingArtPreview({ art, compact = false, tv = false }) {
   const logoSrc = art.logoPreview || art.logoUrl || "";
   const qrValue = art.qrText || art.whatsapp || "";
   const qrUrl = art.qrImageUrl || buildQrUrl(qrValue);
+  const isVisible = (field) => art[field] !== false;
+  const showTopRow = isVisible("showFormatLabel") || isVisible("showLogo");
+  const showActions = isVisible("showCta") || (isVisible("showQr") && qrUrl);
+  const showContacts = !compact && (
+    (isVisible("showWhatsapp") && art.whatsapp) ||
+    (isVisible("showLocation") && art.location)
+  );
+  const titleSize = compact ? (isFeed ? 22 : 18) : isFeed ? 54 : 48;
 
   const outerStyle = {
-    width: tv ? "100%" : compact ? (isFeed ? 210 : 160) : (isFeed ? "min(520px, 100%)" : "min(360px, 100%)"),
-    height: tv ? "100%" : "auto",
-    aspectRatio: tv ? "auto" : ratio.aspectRatio,
+    width: tv && isFeed ? "min(100vw, 100vh)" : tv ? "100%" : compact ? (isFeed ? 210 : 160) : (isFeed ? "min(520px, 100%)" : "min(360px, 100%)"),
+    height: tv && isFeed ? "min(100vw, 100vh)" : tv ? "100%" : "auto",
+    aspectRatio: tv && isFeed ? "1 / 1" : tv ? "auto" : ratio.aspectRatio,
     borderRadius: tv ? 0 : compact ? 22 : 34,
     overflow: "hidden",
-    position: "relative",
+    position: tv && isFeed ? "absolute" : "relative",
+    left: tv && isFeed ? "50%" : undefined,
+    top: tv && isFeed ? "50%" : undefined,
+    transform: tv && isFeed ? "translate(-50%, -50%)" : undefined,
     color: art.textColor || "#ffffff",
-    background:
-      `radial-gradient(circle at 20% 15%, ${art.primaryColor || "#06b6d4"}66, transparent 34%),
-       radial-gradient(circle at 90% 80%, ${art.secondaryColor || "#9333ea"}66, transparent 34%),
-       linear-gradient(145deg, #020617 0%, #0f172a 46%, #111827 100%)`,
+    background: `radial-gradient(circle at 20% 15%, ${art.primaryColor || "#06b6d4"}66, transparent 34%), radial-gradient(circle at 90% 80%, ${art.secondaryColor || "#9333ea"}66, transparent 34%), linear-gradient(145deg, #020617 0%, #0f172a 46%, #111827 100%)`,
     border: "1px solid rgba(255,255,255,0.14)",
     boxShadow: compact ? "none" : "0 28px 80px rgba(0,0,0,0.42)",
   };
 
-  const contentStyle = {
-    position: "absolute",
-    inset: 0,
-    display: "flex",
-    flexDirection: "column",
-    justifyContent: isFeed ? "flex-end" : "space-between",
-    padding: compact ? 16 : isFeed ? 34 : 30,
-    zIndex: 3,
-  };
-
-  const titleSize = compact ? (isFeed ? 22 : 18) : isFeed ? 54 : 48;
-
   return (
-    <div style={outerStyle}>
-      {imageSrc ? (
+    <div className={`marketing-art-preview format-${marketingType} ${compact ? "is-compact" : ""} ${tv ? "is-tv" : ""}`} style={outerStyle}>
+      {isVisible("showImage") && (imageSrc ? (
         <img
           src={imageSrc}
           alt={art.title || "Imagem da arte"}
-          style={{
-            position: "absolute",
-            inset: 0,
-            width: "100%",
-            height: "100%",
-            objectFit: "cover",
-            opacity: isFeed ? 0.76 : 0.82,
-          }}
+          style={{ position: "absolute", inset: 0, width: "100%", height: "100%", objectFit: "cover", opacity: isFeed ? 0.76 : 0.82 }}
         />
       ) : (
-        <div
-          style={{
-            position: "absolute",
-            inset: 0,
-            display: "flex",
-            alignItems: "center",
-            justifyContent: "center",
-            color: "rgba(255,255,255,0.16)",
-          }}
-        >
+        <div style={{ position: "absolute", inset: 0, display: "grid", placeItems: "center", color: "rgba(255,255,255,0.16)" }}>
           <Image size={compact ? 54 : 110} />
         </div>
-      )}
+      ))}
 
       <div
         style={{
           position: "absolute",
           inset: 0,
-          background:
-            isFeed
-              ? "linear-gradient(180deg, rgba(2,6,23,0.08), rgba(2,6,23,0.88) 66%, rgba(2,6,23,0.98))"
-              : "linear-gradient(180deg, rgba(2,6,23,0.20), rgba(2,6,23,0.48) 48%, rgba(2,6,23,0.94))",
+          background: isFeed
+            ? "linear-gradient(180deg, rgba(2,6,23,0.08), rgba(2,6,23,0.88) 66%, rgba(2,6,23,0.98))"
+            : "linear-gradient(180deg, rgba(2,6,23,0.20), rgba(2,6,23,0.48) 48%, rgba(2,6,23,0.94))",
           zIndex: 2,
         }}
       />
 
-      <div
-        style={{
-          position: "absolute",
-          top: compact ? 14 : 22,
-          left: compact ? 14 : 22,
-          right: compact ? 14 : 22,
-          zIndex: 4,
-          display: "flex",
-          alignItems: "center",
-          justifyContent: "space-between",
-          gap: 12,
-        }}
-      >
-        <div
-          style={{
-            padding: compact ? "6px 10px" : "8px 14px",
-            borderRadius: 999,
-            background: "rgba(15,23,42,0.72)",
-            border: "1px solid rgba(255,255,255,0.16)",
-            fontSize: compact ? 9 : 12,
-            fontWeight: 950,
-            letterSpacing: "0.08em",
-            textTransform: "uppercase",
-          }}
-        >
-          {MARKETING_TYPE_LABELS[marketingType] || "Marketing"}
-        </div>
-
-        {logoSrc ? (
-          <img
-            src={logoSrc}
-            alt="Logo"
-            style={{
-              width: compact ? 34 : 54,
-              height: compact ? 34 : 54,
-              objectFit: "contain",
-              borderRadius: 12,
-              background: "rgba(255,255,255,0.92)",
-              padding: 6,
-            }}
-          />
-        ) : (
-          <div
-            style={{
-              width: compact ? 34 : 54,
-              height: compact ? 34 : 54,
-              borderRadius: 14,
-              background: "rgba(255,255,255,0.10)",
-              border: "1px solid rgba(255,255,255,0.16)",
-              display: "flex",
-              alignItems: "center",
-              justifyContent: "center",
-              fontWeight: 1000,
-              color: art.accentColor || "#22d3ee",
-            }}
-          >
-            TP
-          </div>
-        )}
-      </div>
-
-      <div style={contentStyle}>
-        {!isFeed && <div></div>}
-
-        <div>
-          <div
-            style={{
-              width: compact ? 42 : 74,
-              height: compact ? 5 : 8,
-              borderRadius: 99,
-              background: art.accentColor || "#22d3ee",
-              marginBottom: compact ? 10 : 18,
-            }}
-          />
-
-          <h1
-            style={{
-              margin: 0,
-              fontSize: titleSize,
-              lineHeight: 0.9,
-              textTransform: marketingType === "reels" ? "uppercase" : "none",
-              letterSpacing: marketingType === "reels" ? "-0.05em" : "-0.035em",
-              maxWidth: isFeed ? "92%" : "100%",
-            }}
-          >
-            {art.title || "Seu título"}
-          </h1>
-
-          <p
-            style={{
-              margin: compact ? "8px 0 0" : "14px 0 0",
-              color: "rgba(255,255,255,0.82)",
-              fontSize: compact ? 12 : isFeed ? 20 : 18,
-              lineHeight: 1.25,
-              maxWidth: isFeed ? "86%" : "100%",
-            }}
-          >
-            {art.subtitle || "Seu subtítulo"}
-          </p>
-
-          <div
-            style={{
-              marginTop: compact ? 12 : 22,
-              display: "flex",
-              alignItems: "center",
-              justifyContent: "space-between",
-              gap: 14,
-            }}
-          >
-            <div
-              style={{
-                display: "inline-flex",
-                alignItems: "center",
-                padding: compact ? "8px 10px" : "12px 18px",
-                borderRadius: 999,
-                background: `linear-gradient(135deg, ${art.primaryColor || "#06b6d4"}, ${art.secondaryColor || "#9333ea"})`,
-                color: "#ffffff",
-                fontWeight: 1000,
-                fontSize: compact ? 10 : 16,
-                boxShadow: "0 14px 36px rgba(0,0,0,0.28)",
-              }}
-            >
-              {art.cta || "Chamada para ação"}
+      {showTopRow && (
+        <div style={{ position: "absolute", top: compact ? 14 : 22, left: compact ? 14 : 22, right: compact ? 14 : 22, zIndex: 4, display: "flex", alignItems: "center", justifyContent: "space-between", gap: 12 }}>
+          {isVisible("showFormatLabel") ? (
+            <div style={{ padding: compact ? "6px 10px" : "8px 14px", borderRadius: 999, background: "rgba(15,23,42,0.72)", border: "1px solid rgba(255,255,255,0.16)", fontSize: compact ? 9 : 12, fontWeight: 950, letterSpacing: "0.08em", textTransform: "uppercase" }}>
+              {MARKETING_TYPE_LABELS[marketingType] || "Marketing"}
             </div>
+          ) : <div />}
 
-            {qrUrl && (
-              <div
-                style={{
-                  width: compact ? 42 : isFeed ? 82 : 78,
-                  height: compact ? 42 : isFeed ? 82 : 78,
-                  minWidth: compact ? 42 : isFeed ? 82 : 78,
-                  borderRadius: compact ? 9 : 16,
-                  background: "#ffffff",
-                  padding: compact ? 4 : 8,
-                  display: "flex",
-                  alignItems: "center",
-                  justifyContent: "center",
-                }}
-              >
-                <img src={qrUrl} alt="QR Code" style={{ width: "100%", height: "100%" }} />
-              </div>
-            )}
-          </div>
+          {isVisible("showLogo") && (logoSrc ? (
+            <img src={logoSrc} alt="Logo" style={{ width: compact ? 34 : 54, height: compact ? 34 : 54, objectFit: "contain", borderRadius: 12, background: "rgba(255,255,255,0.92)", padding: 6 }} />
+          ) : (
+            <div style={{ width: compact ? 34 : 54, height: compact ? 34 : 54, borderRadius: 14, background: "rgba(255,255,255,0.10)", border: "1px solid rgba(255,255,255,0.16)", display: "grid", placeItems: "center", fontWeight: 1000, color: art.accentColor || "#22d3ee" }}>
+              TP
+            </div>
+          ))}
+        </div>
+      )}
 
-          {!compact && (art.whatsapp || art.location) && (
-            <div
-              style={{
-                marginTop: 16,
-                display: "flex",
-                flexWrap: "wrap",
-                gap: 10,
-                color: "rgba(255,255,255,0.78)",
-                fontSize: 14,
-                fontWeight: 800,
-              }}
-            >
-              {art.whatsapp && <span>WhatsApp: {art.whatsapp}</span>}
-              {art.location && <span>{art.location}</span>}
+      <div style={{ position: "absolute", inset: 0, display: "flex", flexDirection: "column", justifyContent: isFeed ? "flex-end" : "space-between", padding: compact ? 16 : isFeed ? 34 : 30, zIndex: 3 }}>
+        {!isFeed && <div />}
+        <div>
+          {isVisible("showAccent") && <div style={{ width: compact ? 42 : 74, height: compact ? 5 : 8, borderRadius: 99, background: art.accentColor || "#22d3ee", marginBottom: compact ? 10 : 18 }} />}
+
+          {isVisible("showTitle") && (
+            <h1 style={{ margin: 0, fontSize: titleSize, lineHeight: 0.9, textTransform: marketingType === "reels" ? "uppercase" : "none", letterSpacing: marketingType === "reels" ? "-0.05em" : "-0.035em", maxWidth: isFeed ? "92%" : "100%" }}>
+              {art.title || "Seu título"}
+            </h1>
+          )}
+
+          {isVisible("showSubtitle") && (
+            <p style={{ margin: compact ? "8px 0 0" : "14px 0 0", color: "rgba(255,255,255,0.82)", fontSize: compact ? 12 : isFeed ? 20 : 18, lineHeight: 1.25, maxWidth: isFeed ? "86%" : "100%" }}>
+              {art.subtitle || "Seu subtítulo"}
+            </p>
+          )}
+
+          {showActions && (
+            <div style={{ marginTop: compact ? 12 : 22, display: "flex", alignItems: "center", justifyContent: "space-between", gap: 14 }}>
+              {isVisible("showCta") && (
+                <div style={{ display: "inline-flex", alignItems: "center", padding: compact ? "8px 10px" : "12px 18px", borderRadius: 999, background: `linear-gradient(135deg, ${art.primaryColor || "#06b6d4"}, ${art.secondaryColor || "#9333ea"})`, color: "#ffffff", fontWeight: 1000, fontSize: compact ? 10 : 16, boxShadow: "0 14px 36px rgba(0,0,0,0.28)" }}>
+                  {art.cta || "Chamada para ação"}
+                </div>
+              )}
+
+              {isVisible("showQr") && qrUrl && (
+                <div style={{ width: compact ? 42 : isFeed ? 82 : 78, height: compact ? 42 : isFeed ? 82 : 78, minWidth: compact ? 42 : isFeed ? 82 : 78, borderRadius: compact ? 9 : 16, background: "#ffffff", padding: compact ? 4 : 8, display: "grid", placeItems: "center" }}>
+                  <img src={qrUrl} alt="QR Code" style={{ width: "100%", height: "100%" }} />
+                </div>
+              )}
+            </div>
+          )}
+
+          {showContacts && (
+            <div style={{ marginTop: 16, display: "flex", flexWrap: "wrap", gap: 10, color: "rgba(255,255,255,0.78)", fontSize: 14, fontWeight: 800 }}>
+              {isVisible("showWhatsapp") && art.whatsapp && <span>WhatsApp: {art.whatsapp}</span>}
+              {isVisible("showLocation") && art.location && <span>{art.location}</span>}
             </div>
           )}
         </div>
@@ -4580,11 +5870,16 @@ function MarketingArtPreview({ art, compact = false, tv = false }) {
   );
 }
 
-function ClientMarketingPage({ client }) {
+function ClientMarketingPage({ client, access = getClientPlanAccess(client) }) {
   const [arts, setArts] = useState([]);
   const [saving, setSaving] = useState(false);
   const [sendingArtId, setSendingArtId] = useState("");
-  const [form, setForm] = useState(getMarketingDefaultForm());
+  const [editingArt, setEditingArt] = useState(null);
+  const [form, setForm] = useState(() => ({
+    ...getMarketingDefaultForm(),
+    logoUrl: client.logoUrl || "",
+    logoPreview: client.logoUrl || "",
+  }));
 
   useEffect(() => {
     const unsubscribe = onSnapshot(
@@ -4628,10 +5923,19 @@ function ClientMarketingPage({ client }) {
   }
 
   function resetMarketingForm() {
-    setForm(getMarketingDefaultForm());
+    setEditingArt(null);
+    setForm({
+      ...getMarketingDefaultForm(),
+      logoUrl: client.logoUrl || "",
+      logoPreview: client.logoUrl || "",
+    });
   }
 
   async function handleSaveMarketingArt() {
+    const permission = editingArt ? "canEditMarketing" : "canCreateMarketing";
+    const action = editingArt ? "editar artes" : "criar novas artes";
+    if (!requirePlanPermission(access, permission, action)) return;
+
     if (!form.title.trim()) {
       alert("Informe o título da arte.");
       return;
@@ -4646,9 +5950,10 @@ function ClientMarketingPage({ client }) {
 
       const logoUrl = form.logoFile
         ? await uploadMarketingAsset(client.id, form.logoFile, "logos")
-        : form.logoUrl || "";
+        : form.logoUrl || client.logoUrl || "";
 
       const payload = {
+        ...getMarketingVisibility(form),
         type: form.type,
         title: String(form.title || "").trim(),
         subtitle: String(form.subtitle || "").trim(),
@@ -4665,14 +5970,20 @@ function ClientMarketingPage({ client }) {
         width: getMarketingFormatRatio(form.type).width,
         height: getMarketingFormatRatio(form.type).height,
         formatLabel: getMarketingFormatSize(form.type),
-        createdAt: serverTimestamp(),
         updatedAt: serverTimestamp(),
       };
 
-      await addDoc(collection(db, "clients", client.id, "marketing"), payload);
+      if (editingArt) {
+        await updateDoc(doc(db, "clients", client.id, "marketing", editingArt.id), payload);
+      } else {
+        await addDoc(collection(db, "clients", client.id, "marketing"), {
+          ...payload,
+          createdAt: serverTimestamp(),
+        });
+      }
 
       resetMarketingForm();
-      alert("Arte de marketing salva com sucesso!");
+      alert(editingArt ? "Arte atualizada com sucesso!" : "Arte de marketing salva com sucesso!");
     } catch (error) {
       console.log(error);
       alert("Erro ao salvar arte de marketing.");
@@ -4682,6 +5993,8 @@ function ClientMarketingPage({ client }) {
   }
 
   async function deleteMarketingArt(id) {
+    if (!requirePlanPermission(access, "canEditMarketing", "excluir artes")) return;
+
     try {
       await deleteDoc(doc(db, "clients", client.id, "marketing", id));
     } catch (error) {
@@ -4691,6 +6004,8 @@ function ClientMarketingPage({ client }) {
   }
 
   async function duplicateMarketingArt(art) {
+    if (!requirePlanPermission(access, "canCreateMarketing", "duplicar artes")) return;
+
     try {
       const { id, createdAt, updatedAt, ...payload } = art;
 
@@ -4707,6 +6022,8 @@ function ClientMarketingPage({ client }) {
   }
 
   async function sendMarketingArtToPlaylist(art) {
+    if (!requirePlanPermission(access, "canEditMarketing", "enviar artes para a playlist")) return;
+
     try {
       setSendingArtId(art.id);
 
@@ -4717,10 +6034,15 @@ function ClientMarketingPage({ client }) {
       const marketingType = art.marketingType || art.formatType || art.type || "feed";
 
       await addDoc(collection(db, "clients", client.id, "templates"), {
+        ...getMarketingVisibility(art),
         type: "marketing_art",
         templateType: "marketing_art",
         marketingType,
         formatType: marketingType,
+        format: marketingType,
+        aspectRatio: marketingType === "feed" ? "1:1" : "9:16",
+        width: marketingType === "feed" ? 1080 : 1080,
+        height: marketingType === "feed" ? 1080 : 1920,
         sourceMarketingId: art.id,
         name: String(art.title || "Arte de Marketing").trim(),
         title: String(art.title || "").trim(),
@@ -4757,13 +6079,17 @@ function ClientMarketingPage({ client }) {
   }
 
   function startFromSavedArt(art) {
+    if (!requirePlanPermission(access, "canEditMarketing", "editar artes")) return;
+
+    setEditingArt(art);
     setForm({
       ...getMarketingDefaultForm(),
       ...art,
       imageFile: null,
       imagePreview: art.imageUrl || "",
       logoFile: null,
-      logoPreview: art.logoUrl || "",
+      logoUrl: art.logoUrl || client.logoUrl || "",
+      logoPreview: art.logoUrl || client.logoUrl || "",
     });
 
     window.scrollTo({
@@ -4773,9 +6099,20 @@ function ClientMarketingPage({ client }) {
   }
 
   const selectedSize = getMarketingFormatSize(form.type);
+  const marketingImageInputId = `marketing-image-${client.id}`;
+  const marketingLogoInputId = `marketing-logo-${client.id}`;
+
+  if (!hasMarketingAccess(client)) {
+    return (
+      <UpgradeAccessCard
+        title="Marketing bloqueado"
+        message="Marketing disponível a partir do plano Professional."
+      />
+    );
+  }
 
   return (
-    <>
+    <div className="marketing-page">
       <section className="templates-hero">
         <div>
           <div className="kicker">Marketing integrado</div>
@@ -4892,6 +6229,16 @@ function ClientMarketingPage({ client }) {
             </div>
           </div>
 
+          <VisibilityControls
+            title="Elementos visíveis na arte"
+            options={MARKETING_VISIBILITY_OPTIONS}
+            values={form}
+            onChange={(field, visible) => setForm((current) => ({
+              ...current,
+              [field]: visible,
+            }))}
+          />
+
           <div className="template-color-panel">
             <div className="playlist-section-title compact">
               <div>
@@ -4900,27 +6247,45 @@ function ClientMarketingPage({ client }) {
               </div>
             </div>
 
-            <div className="form-grid">
-              <div className="form-group">
+            <div className="form-grid marketing-assets-grid">
+              <div className="form-group marketing-file-field">
                 <label>Imagem principal</label>
-                <input
-                  type="file"
-                  accept="image/*"
-                  onChange={(e) =>
-                    readMarketingFile(e.target.files?.[0], setForm, "imageFile", "imagePreview")
-                  }
-                />
+
+                <label className="marketing-file-picker" htmlFor={marketingImageInputId}>
+                  <span className="marketing-file-icon"><Image size={22} /></span>
+                  <strong>Selecionar imagem</strong>
+                  <small>{form.imageFile?.name || (form.imageUrl ? "Imagem salva" : "JPG, PNG ou WEBP")}</small>
+
+                  <input
+                    id={marketingImageInputId}
+                    className="file-input-hidden"
+                    type="file"
+                    accept="image/*"
+                    onChange={(e) =>
+                      readMarketingFile(e.target.files?.[0], setForm, "imageFile", "imagePreview")
+                    }
+                  />
+                </label>
               </div>
 
-              <div className="form-group">
+              <div className="form-group marketing-file-field">
                 <label>Logo do cliente</label>
-                <input
-                  type="file"
-                  accept="image/*"
-                  onChange={(e) =>
-                    readMarketingFile(e.target.files?.[0], setForm, "logoFile", "logoPreview")
-                  }
-                />
+
+                <label className="marketing-file-picker" htmlFor={marketingLogoInputId}>
+                  <span className="marketing-file-icon"><Upload size={22} /></span>
+                  <strong>Selecionar logo</strong>
+                  <small>{form.logoFile?.name || (form.logoUrl ? "Logo salva" : "Preferencialmente PNG")}</small>
+
+                  <input
+                    id={marketingLogoInputId}
+                    className="file-input-hidden"
+                    type="file"
+                    accept="image/*"
+                    onChange={(e) =>
+                      readMarketingFile(e.target.files?.[0], setForm, "logoFile", "logoPreview")
+                    }
+                  />
+                </label>
               </div>
             </div>
           </div>
@@ -4979,7 +6344,7 @@ function ClientMarketingPage({ client }) {
               disabled={saving}
             >
               <Plus size={20} />
-              {saving ? "Salvando..." : "Salvar arte"}
+              {saving ? "Salvando..." : editingArt ? "Salvar alterações" : "Salvar arte"}
             </button>
 
             <button className="delete-button" type="button" onClick={resetMarketingForm}>
@@ -4996,7 +6361,9 @@ function ClientMarketingPage({ client }) {
             </h2>
           </div>
 
-          <MarketingArtPreview art={form} />
+          <div className={`marketing-preview-stage format-${form.type}`}>
+            <MarketingArtPreview art={form} />
+          </div>
         </div>
       </section>
 
@@ -5014,7 +6381,9 @@ function ClientMarketingPage({ client }) {
           ) : (
             arts.map((art) => (
               <div className="template-saved-card" key={art.id}>
-                <MarketingArtPreview art={art} compact />
+                <div className={`template-saved-preview-shell marketing format-${art.type}`}>
+                  <MarketingArtPreview art={art} compact />
+                </div>
 
                 <div className="template-saved-info">
                   <div>
@@ -5055,15 +6424,19 @@ function ClientMarketingPage({ client }) {
           )}
         </div>
       </section>
-    </>
+    </div>
   );
 }
 
 
-function ClientTemplatesPage({ client }) {
+function ClientTemplatesPage({ client, access = getClientPlanAccess(client) }) {
   const [templates, setTemplates] = useState([]);
   const [screens, setScreens] = useState([]);
   const [saving, setSaving] = useState(false);
+  const [upgradeMessage, setUpgradeMessage] = useState("");
+  const [previewOrientation, setPreviewOrientation] = useState("Paisagem");
+  const [editingTemplate, setEditingTemplate] = useState(null);
+  const canUsePremiumTemplates = hasPremiumTemplates(client);
   const [customNewsSources, setCustomNewsSources] = useState(() =>
     getSavedCustomNewsSources()
   );
@@ -5076,6 +6449,10 @@ function ClientTemplatesPage({ client }) {
     city: "João Câmara",
     newsSource: "G1 RN",
     newsFeedUrl: NEWS_SOURCE_PRESETS["G1 RN"],
+    selectedNewsSources: ["G1 RN"],
+    tickerSpeed: "normal",
+    timeFormat: "24h",
+    showWeather: true,
     title: "Informação ao vivo",
     subtitle: "Atualização automática para sua TV",
     primaryColor: "#06b6d4",
@@ -5091,6 +6468,12 @@ function ClientTemplatesPage({ client }) {
     indicatorItems: DEFAULT_INDICATOR_ITEMS.map((item) => ({ ...item })),
     footerText: "Desenvolvido por Park Solutions",
     callToAction: "Aponte a câmera e saiba mais",
+    logoUrl: client.logoUrl || "",
+    showHeader: true,
+    showLogo: true,
+    showTitle: true,
+    showSubtitle: true,
+    showFooter: true,
   });
 
   useEffect(() => {
@@ -5114,7 +6497,20 @@ function ClientTemplatesPage({ client }) {
     };
   }, [client.id]);
 
+  useEffect(() => {
+    if (form.orientation === "Paisagem" || form.orientation === "Retrato") {
+      setPreviewOrientation(form.orientation);
+    }
+  }, [form.orientation]);
+
   function changeType(type) {
+    if (isPremiumTemplate(type) && !canUsePremiumTemplates) {
+      setUpgradeMessage("Templates Premium disponíveis a partir do plano Business.");
+      return;
+    }
+
+    setUpgradeMessage("");
+
     const presets = {
       clima: {
         name: "Clima ao vivo",
@@ -5147,6 +6543,28 @@ function ClientTemplatesPage({ client }) {
         subtitle: "Notícias, clima e hora em layout profissional",
         duration: "20",
         city: "João Câmara",
+      },
+      clima_premium_v2: {
+        name: "Clima Premium V2",
+        title: "Clima Premium",
+        subtitle: "Previsao de 4 dias com noticias ao vivo",
+        duration: "20",
+        city: "Joao Camara",
+        selectedNewsSources: ["G1 RN"],
+        tickerSpeed: "normal",
+        showFooter: true,
+      },
+      hora_certa_premium: {
+        name: "Hora Certa Premium",
+        title: "Hora Certa",
+        subtitle: "Relogio, data, clima e noticias ao vivo",
+        duration: "20",
+        city: "Joao Camara",
+        selectedNewsSources: ["G1 RN"],
+        tickerSpeed: "normal",
+        timeFormat: "24h",
+        showWeather: true,
+        showFooter: true,
       },
       cardapio_premium: {
         name: "Cardápio Premium",
@@ -5184,13 +6602,17 @@ function ClientTemplatesPage({ client }) {
       ...preset,
       type,
       newsSource:
-        type === "noticias" || type === "jornal_premium"
+        ["noticias", "jornal_premium", "clima_premium_v2", "hora_certa_premium"].includes(type)
           ? prev.newsSource || "G1 RN"
           : prev.newsSource,
       newsFeedUrl:
-        type === "noticias" || type === "jornal_premium"
+        ["noticias", "jornal_premium", "clima_premium_v2", "hora_certa_premium"].includes(type)
           ? prev.newsFeedUrl || NEWS_SOURCE_PRESETS["G1 RN"]
           : prev.newsFeedUrl,
+      selectedNewsSources:
+        ["jornal_premium", "clima_premium_v2", "hora_certa_premium"].includes(type)
+          ? preset.selectedNewsSources || prev.selectedNewsSources || ["G1 RN"]
+          : prev.selectedNewsSources,
     }));
   }
 
@@ -5209,6 +6631,32 @@ function ClientTemplatesPage({ client }) {
     }));
   }
 
+  function toggleNewsSource(sourceName) {
+    setForm((prev) => {
+      const current = Array.isArray(prev.selectedNewsSources)
+        ? prev.selectedNewsSources
+        : [prev.newsSource || "G1 RN"];
+      const next = current.includes(sourceName)
+        ? current.filter((source) => source !== sourceName)
+        : [...current, sourceName];
+      const safeNext = next.length > 0 ? next : ["G1 RN"];
+      const firstSource = safeNext[0];
+      const customSource = customNewsSources.find(
+        (source) => source.name === firstSource
+      );
+
+      return {
+        ...prev,
+        selectedNewsSources: safeNext,
+        newsSource: firstSource,
+        newsFeedUrl:
+          firstSource === "Personalizado"
+            ? prev.newsFeedUrl
+            : customSource?.url || NEWS_SOURCE_PRESETS[firstSource] || prev.newsFeedUrl,
+      };
+    });
+  }
+
   function handleCustomNewsUrlChange(url) {
     const source = saveCustomNewsSource(url);
 
@@ -5218,6 +6666,10 @@ function ClientTemplatesPage({ client }) {
       ...prev,
       newsSource: source?.name || "Personalizado",
       newsFeedUrl: url,
+      selectedNewsSources: Array.from(new Set([
+        ...(Array.isArray(prev.selectedNewsSources) ? prev.selectedNewsSources : []),
+        source?.name || "Personalizado",
+      ])),
     }));
   }
 
@@ -5289,6 +6741,7 @@ function ClientTemplatesPage({ client }) {
   }
 
   function resetForm() {
+    setEditingTemplate(null);
     setForm({
       name: "Clima ao vivo",
       type: "clima",
@@ -5297,6 +6750,10 @@ function ClientTemplatesPage({ client }) {
       city: "João Câmara",
       newsSource: "G1 RN",
       newsFeedUrl: NEWS_SOURCE_PRESETS["G1 RN"],
+      selectedNewsSources: ["G1 RN"],
+      tickerSpeed: "normal",
+      timeFormat: "24h",
+      showWeather: true,
       title: "Informação ao vivo",
       subtitle: "Atualização automática para sua TV",
       primaryColor: "#06b6d4",
@@ -5312,10 +6769,33 @@ function ClientTemplatesPage({ client }) {
       indicatorItems: DEFAULT_INDICATOR_ITEMS.map((item) => ({ ...item })),
       footerText: "Desenvolvido por Park Solutions",
       callToAction: "Aponte a câmera e saiba mais",
+      logoUrl: client.logoUrl || "",
+      showHeader: true,
+      showLogo: true,
+      showTitle: true,
+      showSubtitle: true,
+      showFooter: true,
     });
   }
 
+  function getTemplateTypeCardClass(type) {
+    return [
+      "template-type-card",
+      form.type === type ? "active" : "",
+      isPremiumTemplate(type) && !canUsePremiumTemplates ? "locked" : "",
+    ].filter(Boolean).join(" ");
+  }
+
   async function handleSaveTemplate() {
+    const permission = editingTemplate ? "canEditTemplates" : "canCreateTemplates";
+    const action = editingTemplate ? "editar templates" : "criar novos templates";
+    if (!requirePlanPermission(access, permission, action)) return;
+
+    if (isPremiumTemplate(form.type) && !canUsePremiumTemplates) {
+      setUpgradeMessage("Templates Premium disponíveis a partir do plano Business.");
+      return;
+    }
+
     if (!form.name.trim()) {
       alert("Informe o nome do template.");
       return;
@@ -5329,15 +6809,27 @@ function ClientTemplatesPage({ client }) {
     try {
       setSaving(true);
 
-      await addDoc(collection(db, "clients", client.id, "templates"), {
+      const templateData = {
         ...form,
+        logoUrl: form.logoUrl || client.logoUrl || "",
         duration: Number(form.duration || 15),
-        createdAt: serverTimestamp(),
         updatedAt: serverTimestamp(),
-      });
+      };
+
+      if (editingTemplate) {
+        await updateDoc(
+          doc(db, "clients", client.id, "templates", editingTemplate.id),
+          templateData
+        );
+      } else {
+        await addDoc(collection(db, "clients", client.id, "templates"), {
+          ...templateData,
+          createdAt: serverTimestamp(),
+        });
+      }
 
       resetForm();
-      alert("Template criado com sucesso!");
+      alert(editingTemplate ? "Template atualizado com sucesso!" : "Template criado com sucesso!");
     } catch (error) {
       console.log(error);
       alert("Erro ao salvar template.");
@@ -5346,7 +6838,35 @@ function ClientTemplatesPage({ client }) {
     }
   }
 
+  function startEditTemplate(template) {
+    if (!requirePlanPermission(access, "canEditTemplates", "editar templates")) return;
+    if ((template.templateType || template.type) === "marketing_art") return;
+
+    const { id, createdAt, updatedAt, ...savedData } = template;
+    setEditingTemplate(template);
+    setForm((current) => ({
+      ...current,
+      ...savedData,
+      duration: String(template.duration || 15),
+      targetScreenIds: Array.isArray(template.targetScreenIds) ? [...template.targetScreenIds] : [],
+      menuItems: getTemplateMenuItems(template).map((item) => ({ ...item })),
+      promoItems: getTemplatePromoItems(template).map((item) => ({ ...item })),
+      corporateItems: [...getTemplateCorporateItems(template)],
+      agendaItems: getTemplateAgendaItems(template).map((item) => ({ ...item })),
+      indicatorItems: getTemplateIndicatorItems(template).map((item) => ({ ...item })),
+      logoUrl: template.logoUrl || client.logoUrl || "",
+      selectedNewsSources: getTemplateNewsSources(template),
+      tickerSpeed: getTemplateTickerSpeed(template.tickerSpeed),
+      timeFormat: template.timeFormat || "24h",
+      showWeather: template.showWeather !== false,
+    }));
+    setPreviewOrientation(template.orientation === "Retrato" ? "Retrato" : "Paisagem");
+    window.scrollTo({ top: 0, behavior: "smooth" });
+  }
+
   async function deleteTemplate(id) {
+    if (!requirePlanPermission(access, "canEditTemplates", "excluir templates")) return;
+
     try {
       await deleteDoc(doc(db, "clients", client.id, "templates", id));
     } catch (error) {
@@ -5356,6 +6876,13 @@ function ClientTemplatesPage({ client }) {
   }
 
   async function toggleTemplate(template) {
+    if (!requirePlanPermission(access, "canEditTemplates", "editar templates")) return;
+
+    if (isPremiumTemplate(template) && !canUsePremiumTemplates) {
+      setUpgradeMessage("Faça upgrade para gerenciar Templates Premium.");
+      return;
+    }
+
     try {
       await updateDoc(doc(db, "clients", client.id, "templates", template.id), {
         enabled: !template.enabled,
@@ -5368,6 +6895,13 @@ function ClientTemplatesPage({ client }) {
   }
 
   async function applyTemplateToScreens(template) {
+    if (!requirePlanPermission(access, "canEditTemplates", "aplicar templates")) return;
+
+    if (isPremiumTemplate(template) && !canUsePremiumTemplates) {
+      setUpgradeMessage("Faça upgrade para o plano Business ou superior para aplicar Templates Premium.");
+      return;
+    }
+
     const targetScreens =
       template.targetScreenIds && template.targetScreenIds.length > 0
         ? screens.filter((screen) => template.targetScreenIds.includes(screen.id))
@@ -5417,18 +6951,26 @@ function ClientTemplatesPage({ client }) {
         </div>
       </section>
 
+      {upgradeMessage && (
+        <UpgradeAccessCard
+          title="Templates Premium bloqueados"
+          message={upgradeMessage}
+          onClose={() => setUpgradeMessage("")}
+        />
+      )}
+
       <section className="templates-builder-grid">
         <div className="templates-editor-panel">
           <div className="playlist-editor-header">
             <div>
-              <h2>Novo template</h2>
-              <p>Configure o visual, duração e origem do conteúdo.</p>
+              <h2>{editingTemplate ? "Editar template" : "Novo template"}</h2>
+              <p>{editingTemplate ? `Atualizando ${editingTemplate.name || "template salvo"}.` : "Configure o visual, duração e origem do conteúdo."}</p>
             </div>
           </div>
 
           <div className="template-type-grid">
             <button
-              className={form.type === "clima" ? "template-type-card active" : "template-type-card"}
+              className={getTemplateTypeCardClass("clima")}
               onClick={() => changeType("clima")}
               type="button"
             >
@@ -5438,7 +6980,7 @@ function ClientTemplatesPage({ client }) {
             </button>
 
             <button
-              className={form.type === "noticias" ? "template-type-card active" : "template-type-card"}
+              className={getTemplateTypeCardClass("noticias")}
               onClick={() => changeType("noticias")}
               type="button"
             >
@@ -5448,7 +6990,7 @@ function ClientTemplatesPage({ client }) {
             </button>
 
             <button
-              className={form.type === "comercial" ? "template-type-card active" : "template-type-card"}
+              className={getTemplateTypeCardClass("comercial")}
               onClick={() => changeType("comercial")}
               type="button"
             >
@@ -5458,7 +7000,7 @@ function ClientTemplatesPage({ client }) {
             </button>
 
             <button
-              className={form.type === "aviso" ? "template-type-card active" : "template-type-card"}
+              className={getTemplateTypeCardClass("aviso")}
               onClick={() => changeType("aviso")}
               type="button"
             >
@@ -5468,7 +7010,7 @@ function ClientTemplatesPage({ client }) {
             </button>
 
             <button
-              className={form.type === "jornal_premium" ? "template-type-card active" : "template-type-card"}
+              className={getTemplateTypeCardClass("jornal_premium")}
               onClick={() => changeType("jornal_premium")}
               type="button"
             >
@@ -5478,7 +7020,27 @@ function ClientTemplatesPage({ client }) {
             </button>
 
             <button
-              className={form.type === "cardapio_premium" ? "template-type-card active" : "template-type-card"}
+              className={getTemplateTypeCardClass("clima_premium_v2")}
+              onClick={() => changeType("clima_premium_v2")}
+              type="button"
+            >
+              <CloudSun size={28} />
+              <strong>Clima Premium V2</strong>
+              <span>Previsao 4 dias + ticker RSS</span>
+            </button>
+
+            <button
+              className={getTemplateTypeCardClass("hora_certa_premium")}
+              onClick={() => changeType("hora_certa_premium")}
+              type="button"
+            >
+              <Clock3 size={28} />
+              <strong>Hora Certa Premium</strong>
+              <span>Hora, data, clima e RSS</span>
+            </button>
+
+            <button
+              className={getTemplateTypeCardClass("cardapio_premium")}
               onClick={() => changeType("cardapio_premium")}
               type="button"
             >
@@ -5488,7 +7050,7 @@ function ClientTemplatesPage({ client }) {
             </button>
 
             <button
-              className={form.type === "promocao_premium" ? "template-type-card active" : "template-type-card"}
+              className={getTemplateTypeCardClass("promocao_premium")}
               onClick={() => changeType("promocao_premium")}
               type="button"
             >
@@ -5498,7 +7060,7 @@ function ClientTemplatesPage({ client }) {
             </button>
 
             <button
-              className={form.type === "corporativo_premium" ? "template-type-card active" : "template-type-card"}
+              className={getTemplateTypeCardClass("corporativo_premium")}
               onClick={() => changeType("corporativo_premium")}
               type="button"
             >
@@ -5507,6 +7069,16 @@ function ClientTemplatesPage({ client }) {
               <span>Avisos, agenda, indicadores e comunicação interna</span>
             </button>
           </div>
+
+          <VisibilityControls
+            title="Elementos visíveis no template"
+            options={TEMPLATE_VISIBILITY_OPTIONS}
+            values={form}
+            onChange={(field, visible) => setForm((current) => ({
+              ...current,
+              [field]: visible,
+            }))}
+          />
 
           <div className="form-grid">
             <div className="form-group">
@@ -5555,7 +7127,7 @@ function ClientTemplatesPage({ client }) {
               />
             </div>
 
-            {(form.type === "clima" || form.type === "jornal_premium") && (
+            {["clima", "jornal_premium", "clima_premium_v2", "hora_certa_premium"].includes(form.type) && (
               <div className="form-group">
                 <label>Cidade do clima</label>
                 <input
@@ -5566,7 +7138,7 @@ function ClientTemplatesPage({ client }) {
               </div>
             )}
 
-            {(form.type === "noticias" || form.type === "jornal_premium") && (
+            {["noticias", "jornal_premium", "clima_premium_v2", "hora_certa_premium"].includes(form.type) && (
               <>
                 <div className="form-group">
                   <label>Fonte de notícias</label>
@@ -5594,7 +7166,71 @@ function ClientTemplatesPage({ client }) {
                 </div>
               </>
             )}
+
+            {form.type === "hora_certa_premium" && (
+              <>
+                <div className="form-group">
+                  <label>Formato da hora</label>
+                  <select
+                    value={form.timeFormat || "24h"}
+                    onChange={(e) => setForm({ ...form, timeFormat: e.target.value })}
+                  >
+                    <option value="24h">24 horas</option>
+                    <option value="12h">12 horas</option>
+                  </select>
+                </div>
+
+                <div className="form-group">
+                  <label>Mostrar clima</label>
+                  <select
+                    value={form.showWeather === false ? "nao" : "sim"}
+                    onChange={(e) => setForm({ ...form, showWeather: e.target.value === "sim" })}
+                  >
+                    <option value="sim">Sim</option>
+                    <option value="nao">Nao</option>
+                  </select>
+                </div>
+              </>
+            )}
+
+            {["clima", "noticias", "jornal_premium", "clima_premium_v2", "hora_certa_premium"].includes(form.type) && (
+              <div className="form-group">
+                <label>Velocidade do rodape</label>
+                <select
+                  value={getTemplateTickerSpeed(form.tickerSpeed)}
+                  onChange={(e) => setForm({ ...form, tickerSpeed: e.target.value })}
+                >
+                  <option value="slow">Lenta</option>
+                  <option value="normal">Normal</option>
+                  <option value="fast">Rapida</option>
+                </select>
+              </div>
+            )}
           </div>
+
+          {["jornal_premium", "clima_premium_v2", "hora_certa_premium"].includes(form.type) && (
+            <div className="template-color-panel">
+              <div className="playlist-section-title compact">
+                <div>
+                  <h3>Fontes RSS do rodape</h3>
+                  <p>Escolha uma ou mais fontes para alternar no ticker.</p>
+                </div>
+              </div>
+
+              <div className="template-rss-source-grid">
+                {[...Object.keys(NEWS_SOURCE_PRESETS), ...customNewsSources.map((source) => source.name)].map((sourceName) => (
+                  <button
+                    type="button"
+                    key={sourceName}
+                    className={(form.selectedNewsSources || []).includes(sourceName) ? "rss-source-chip active" : "rss-source-chip"}
+                    onClick={() => toggleNewsSource(sourceName)}
+                  >
+                    {sourceName}
+                  </button>
+                ))}
+              </div>
+            </div>
+          )}
 
           {form.type === "cardapio_premium" && (
             <div className="template-color-panel">
@@ -6035,15 +7671,46 @@ function ClientTemplatesPage({ client }) {
           </div>
 
           <div className="panel-actions">
+            {editingTemplate && (
+              <button className="client-action" type="button" onClick={resetForm} disabled={saving}>
+                Cancelar edição
+              </button>
+            )}
             <button className="upload-button" onClick={handleSaveTemplate} disabled={saving}>
               <Plus size={20} />
-              {saving ? "Salvando..." : "Salvar template"}
+              {saving ? "Salvando..." : editingTemplate ? "Salvar alterações" : "Salvar template"}
             </button>
           </div>
         </div>
 
         <div className="templates-preview-panel">
-          <TemplateVisualPreview template={form} compact={false} />
+          <div className="template-preview-heading">
+            <div>
+              <div className="kicker">Resultado final</div>
+              <h2>{previewOrientation}</h2>
+            </div>
+            <div className="template-orientation-switch">
+              <button
+                type="button"
+                className={previewOrientation === "Paisagem" ? "active" : ""}
+                onClick={() => setPreviewOrientation("Paisagem")}
+                disabled={form.orientation === "Retrato"}
+              >
+                Paisagem
+              </button>
+              <button
+                type="button"
+                className={previewOrientation === "Retrato" ? "active" : ""}
+                onClick={() => setPreviewOrientation("Retrato")}
+                disabled={form.orientation === "Paisagem"}
+              >
+                Retrato
+              </button>
+            </div>
+          </div>
+          <div className={`template-preview-stage ${previewOrientation === "Retrato" ? "portrait" : "landscape"}`}>
+            <TemplateVisualPreview template={{ ...form, orientation: previewOrientation }} compact={false} />
+          </div>
         </div>
       </section>
 
@@ -6061,7 +7728,9 @@ function ClientTemplatesPage({ client }) {
           ) : (
             templates.map((template) => (
               <div className="template-saved-card" key={template.id}>
-                <TemplateVisualPreview template={template} compact />
+                <div className={`template-saved-preview-shell ${template.orientation === "Retrato" ? "portrait" : "landscape"}`}>
+                  <TemplateVisualPreview template={template} />
+                </div>
 
                 <div className="template-saved-info">
                   <div>
@@ -6072,6 +7741,14 @@ function ClientTemplatesPage({ client }) {
                   </div>
 
                   <div className="template-actions-row">
+                    {(template.templateType || template.type) !== "marketing_art" && (
+                      <button
+                        className="client-action"
+                        onClick={() => startEditTemplate(template)}
+                      >
+                        Editar
+                      </button>
+                    )}
                     <button
                       className={template.enabled ? "client-action primary" : "client-action"}
                       onClick={() => toggleTemplate(template)}
@@ -6113,7 +7790,7 @@ function SparklineIcon() {
   );
 }
 
-function TemplateVisualPreview({ template, compact = false }) {
+function TemplateVisualPreview({ template, compact = false, tv = false }) {
   const [weather, setWeather] = useState(null);
   const [news, setNews] = useState(DEFAULT_NEWS_ITEMS);
   const [loading, setLoading] = useState(false);
@@ -6127,19 +7804,25 @@ function TemplateVisualPreview({ template, compact = false }) {
 
         const realTemplateType = template.templateType || template.type;
 
-        if (realTemplateType === "clima" || realTemplateType === "jornal_premium") {
+        if (["clima", "jornal_premium", "clima_premium_v2", "hora_certa_premium"].includes(realTemplateType)) {
           const data = await fetchWeatherByCity(template.city);
           if (!cancelled) setWeather(data);
         }
 
-        if (realTemplateType === "noticias" || realTemplateType === "jornal_premium") {
-          const data = await fetchNewsFromRss(template.newsFeedUrl);
-          if (!cancelled) setNews(data);
+        if (["noticias", "jornal_premium", "clima_premium_v2", "hora_certa_premium"].includes(realTemplateType)) {
+          const feedUrls = getTemplateNewsFeedUrls(template);
+          const newsLists = await Promise.all(
+            (feedUrls.length ? feedUrls : [template.newsFeedUrl]).map((feedUrl) =>
+              fetchNewsFromRss(feedUrl)
+            )
+          );
+          const data = newsLists.flat().filter((item) => item?.title).slice(0, 12);
+          if (!cancelled) setNews(data.length ? data : DEFAULT_NEWS_ITEMS);
         }
       } catch (error) {
         console.log(error);
 
-        if (((template.templateType || template.type) === "clima" || (template.templateType || template.type) === "jornal_premium") && !cancelled) {
+        if (["clima", "jornal_premium", "clima_premium_v2", "hora_certa_premium"].includes(template.templateType || template.type) && !cancelled) {
           setWeather({
             city: template.city || "Sua cidade",
             temperature: "--",
@@ -6150,7 +7833,7 @@ function TemplateVisualPreview({ template, compact = false }) {
           });
         }
 
-        if (((template.templateType || template.type) === "noticias" || (template.templateType || template.type) === "jornal_premium") && !cancelled) {
+        if (["noticias", "jornal_premium", "clima_premium_v2", "hora_certa_premium"].includes(template.templateType || template.type) && !cancelled) {
           setNews(DEFAULT_NEWS_ITEMS);
         }
       } finally {
@@ -6166,20 +7849,44 @@ function TemplateVisualPreview({ template, compact = false }) {
       cancelled = true;
       clearInterval(interval);
     };
-  }, [template.type, template.templateType, template.city, template.newsFeedUrl]);
+  }, [template.type, template.templateType, template.city, template.newsFeedUrl, JSON.stringify(template.selectedNewsSources || [])]);
 
   const realTemplateType = template.templateType || template.type;
   const isPortrait = template.orientation === "Retrato";
   const orientationLabel = isPortrait ? "Retrato" : "Paisagem";
   const mainNews = news[0] || DEFAULT_NEWS_ITEMS[0];
+  const mainNewsTitle = getNewsItemTitle(mainNews);
+  const mainNewsTitleSize = compact
+    ? 18
+    : isPortrait
+      ? mainNewsTitle.length > 95
+        ? 22
+        : mainNewsTitle.length > 65
+          ? 26
+          : mainNewsTitle.length > 42
+            ? 30
+            : 34
+      : mainNewsTitle.length > 95
+        ? 30
+      : mainNewsTitle.length > 60
+        ? 35
+        : 42;
+  const forecastCards = getWeatherForecastCards(weather);
+  const clockParts = getTemplateClockParts(template);
+  const tickerSpeed = getTemplateTickerSpeed(template.tickerSpeed);
+  const isLiveCompactTemplate = ["clima", "noticias", "jornal_premium", "clima_premium_v2", "hora_certa_premium"].includes(realTemplateType);
+  const isTemplateVisible = (field) => template[field] !== false;
 
   if (realTemplateType === "marketing_art") {
-    return <MarketingArtPreview art={template} compact={compact} tv={!compact} />;
+    return <MarketingArtPreview art={template} compact={compact} tv={tv} />;
   }
 
   const premiumFrameStyle = {
-    minHeight: compact ? 160 : isPortrait ? 620 : 430,
-    height: compact ? "100%" : "auto",
+    minHeight: 0,
+    height: "100%",
+    boxSizing: "border-box",
+    padding: compact ? "40px 8px 26px" : isPortrait ? "86px 24px 58px" : "78px 32px 58px",
+    overflow: "hidden",
     display: "flex",
     flexDirection: "column",
     gap: compact ? 10 : 18,
@@ -6190,32 +7897,40 @@ function TemplateVisualPreview({ template, compact = false }) {
   const premiumGridStyle = {
     display: "grid",
     gridTemplateColumns: isPortrait || compact ? "1fr" : "1.25fr 0.75fr",
+    gridTemplateRows: isPortrait && !compact ? "minmax(0, 1.05fr) minmax(0, 0.95fr)" : undefined,
     gap: compact ? 10 : 18,
     flex: 1,
+    minHeight: 0,
+    overflow: "hidden",
   };
 
   return (
     <div
-      className={`template-tv-preview template-${realTemplateType} template-orientation-${isPortrait ? "portrait" : "landscape"} ${compact ? "compact" : ""}`}
+      className={`template-tv-preview template-${realTemplateType} template-orientation-${isPortrait ? "portrait" : "landscape"} ticker-${tickerSpeed} ${isLiveCompactTemplate ? "template-live-compact" : ""} ${compact ? "compact" : ""}`}
       style={getTemplateThemeStyle(template)}
     >
       <div className="template-orb one"></div>
       <div className="template-orb two"></div>
 
-      <div className="template-tv-topbar">
-        <span>{template.title || "Totem Park"} • {orientationLabel}</span>
+      {isTemplateVisible("showHeader") && <div className="template-tv-topbar">
+        <div className="template-client-brand">
+          {isTemplateVisible("showLogo") && template.logoUrl && (
+            <img src={template.logoUrl} alt="Logo do cliente" />
+          )}
+          <span>{template.title || "Totem Park"} • {orientationLabel}</span>
+        </div>
         <strong>{new Date().toLocaleTimeString("pt-BR", { hour: "2-digit", minute: "2-digit" })}</strong>
-      </div>
+      </div>}
 
       {(template.templateType || template.type) === "clima" && (
         <div className="template-weather-layout">
           <div>
             <small>Agora em</small>
             <h2>{weather?.city || template.city || "Sua cidade"}</h2>
-            <p>
+            {isTemplateVisible("showSubtitle") && <p>
               {template.subtitle || "Previsão atualizada automaticamente"}
               {weather?.source ? ` • ${weather.source}` : ""}
-            </p>
+            </p>}
           </div>
 
           <div className="template-weather-temp">
@@ -6235,7 +7950,7 @@ function TemplateVisualPreview({ template, compact = false }) {
           className="template-news-layout"
           style={{
             display: "grid",
-            gridTemplateColumns: compact ? "1fr" : "1.05fr 0.95fr",
+            gridTemplateColumns: isPortrait || compact ? "1fr" : "1.05fr 0.95fr",
             gap: compact ? 12 : 30,
             alignItems: "center",
           }}
@@ -6245,8 +7960,8 @@ function TemplateVisualPreview({ template, compact = false }) {
               {template.newsSource || "AO VIVO"}
             </div>
 
-            <h2>{template.title || "Últimas notícias"}</h2>
-            <p>{template.subtitle || "Manchetes atualizadas automaticamente"}</p>
+            {isTemplateVisible("showTitle") && <h2>{template.title || "Últimas notícias"}</h2>}
+            {isTemplateVisible("showSubtitle") && <p>{template.subtitle || "Manchetes atualizadas automaticamente"}</p>}
 
             <div className="template-news-list">
               {news.slice(0, compact ? 2 : 3).map((item, index) => (
@@ -6347,14 +8062,70 @@ function TemplateVisualPreview({ template, compact = false }) {
         </div>
       )}
 
+      {realTemplateType === "clima_premium_v2" && (
+        <div className="template-premium-weather-v2">
+          <div className="premium-weather-hero">
+            <div>
+              <div className="template-breaking">{getTemplateBadge(realTemplateType)}</div>
+              {isTemplateVisible("showTitle") && <h2>{weather?.city || template.city || "Sua cidade"}</h2>}
+              <p>{new Date().toLocaleDateString("pt-BR", { weekday: "long", day: "2-digit", month: "long", year: "numeric" })}</p>
+            </div>
+
+            <div className="premium-weather-current">
+              <span className="premium-weather-icon">{getWeatherIcon(weather?.weatherCode)}</span>
+              <strong>{loading && !weather ? "--" : `${weather?.temperature ?? "--"}°C`}</strong>
+              <small>{getWeatherConditionLabel(weather?.weatherCode)}</small>
+              <em>Sensacao {weather?.sensation ?? "--"}°C</em>
+            </div>
+          </div>
+
+          <div className="premium-weather-forecast">
+            {(forecastCards.length ? forecastCards : [
+              { day: "SEG", icon: "☀", max: 32, min: 24 },
+              { day: "TER", icon: "⛅", max: 31, min: 23 },
+              { day: "QUA", icon: "🌧", max: 29, min: 22 },
+              { day: "QUI", icon: "☁", max: 30, min: 23 },
+            ]).map((item, index) => (
+              <div className="premium-weather-day" key={`${item.day}-${index}`}>
+                <strong>{item.day}</strong>
+                <span>{item.icon}</span>
+                <small>{item.max}° / {item.min}°</small>
+              </div>
+            ))}
+          </div>
+        </div>
+      )}
+
+      {realTemplateType === "hora_certa_premium" && (
+        <div className="template-premium-clock">
+          <div className="premium-clock-main">
+            <div className="template-breaking">{getTemplateBadge(realTemplateType)}</div>
+            <strong>{clockParts.time}</strong>
+            <span>{clockParts.weekday}</span>
+            <p>{clockParts.date}</p>
+          </div>
+
+          {template.showWeather !== false && (
+            <div className="premium-clock-weather">
+              <span>{getWeatherIcon(weather?.weatherCode)}</span>
+              <strong>{weather?.temperature ?? "--"}°C</strong>
+              <small>{weather?.city || template.city || "Sua cidade"}</small>
+              <em>{getWeatherConditionLabel(weather?.weatherCode)}</em>
+            </div>
+          )}
+        </div>
+      )}
+
       {realTemplateType === "jornal_premium" && (
-        <div style={premiumFrameStyle}>
+        <div className="template-premium-frame" style={premiumFrameStyle}>
           <div style={premiumGridStyle}>
             <div
+              className="template-journal-main"
               style={{
                 borderRadius: compact ? 18 : 30,
                 overflow: "hidden",
-                minHeight: compact ? 120 : isPortrait ? 300 : 360,
+                minHeight: compact ? 120 : isPortrait ? 0 : 360,
+                height: isPortrait && !compact ? "100%" : undefined,
                 background: "rgba(255,255,255,0.07)",
                 border: "1px solid rgba(255,255,255,0.14)",
                 position: "relative",
@@ -6373,19 +8144,22 @@ function TemplateVisualPreview({ template, compact = false }) {
               )}
 
               <div
+                className="template-journal-overlay"
                 style={{
                   position: "absolute",
                   inset: "auto 0 0 0",
-                  padding: compact ? 12 : 26,
+                  maxHeight: isPortrait && !compact ? "88%" : "92%",
+                  padding: compact ? 12 : isPortrait ? 20 : 26,
+                  overflow: "hidden",
                   background: "linear-gradient(180deg, transparent, rgba(0,0,0,0.94))",
                 }}
               >
                 <div className="template-breaking">{template.newsSource || getNewsItemSource(mainNews, "Notícias")}</div>
-                <h2 style={{ margin: "8px 0 0", fontSize: compact ? 18 : isPortrait ? 34 : 42, lineHeight: 1.02 }}>
-                  {getNewsItemTitle(mainNews)}
+                <h2 style={{ margin: "8px 0 0", fontSize: mainNewsTitleSize, lineHeight: 1.02, overflowWrap: "anywhere" }}>
+                  {mainNewsTitle}
                 </h2>
                 {!compact && (
-                  <p style={{ marginTop: 12, color: "rgba(255,255,255,0.78)", fontSize: isPortrait ? 16 : 18 }}>
+                  <p style={{ marginTop: 10, color: "rgba(255,255,255,0.78)", fontSize: isPortrait ? 13 : 17, lineHeight: 1.25, display: "-webkit-box", WebkitLineClamp: isPortrait ? 4 : 3, WebkitBoxOrient: "vertical", overflow: "hidden" }}>
                     {getNewsItemDescription(mainNews) || template.subtitle}
                   </p>
                 )}
@@ -6393,19 +8167,23 @@ function TemplateVisualPreview({ template, compact = false }) {
             </div>
 
             <div
+              className="template-journal-sidebar"
               style={{
                 display: "grid",
                 gridTemplateColumns: isPortrait || compact ? "1fr 1fr" : "1fr",
+                gridTemplateRows: isPortrait && !compact ? "auto minmax(0, 1fr)" : undefined,
                 gap: compact ? 8 : 14,
+                minHeight: 0,
+                overflow: "hidden",
               }}
             >
-              <div style={{ borderRadius: 24, padding: compact ? 12 : 22, background: "rgba(255,255,255,0.08)", border: "1px solid rgba(255,255,255,0.14)" }}>
+              <div className="template-journal-stat" style={{ borderRadius: 24, padding: compact ? 12 : 22, background: "rgba(255,255,255,0.08)", border: "1px solid rgba(255,255,255,0.14)" }}>
                 <small>Clima</small>
                 <h2 style={{ margin: "6px 0", fontSize: compact ? 22 : 42 }}>{weather?.temperature ?? "--"}°</h2>
                 <p style={{ margin: 0 }}>{weather?.city || template.city || "Sua cidade"}</p>
               </div>
 
-              <div style={{ borderRadius: 24, padding: compact ? 12 : 22, background: "rgba(255,255,255,0.08)", border: "1px solid rgba(255,255,255,0.14)" }}>
+              <div className="template-journal-stat" style={{ borderRadius: 24, padding: compact ? 12 : 22, background: "rgba(255,255,255,0.08)", border: "1px solid rgba(255,255,255,0.14)" }}>
                 <small>Agora</small>
                 <h2 style={{ margin: "6px 0", fontSize: compact ? 22 : 42 }}>
                   {new Date().toLocaleTimeString("pt-BR", { hour: "2-digit", minute: "2-digit" })}
@@ -6414,10 +8192,10 @@ function TemplateVisualPreview({ template, compact = false }) {
               </div>
 
               {!compact && (
-                <div style={{ borderRadius: 24, padding: 22, background: "rgba(255,255,255,0.08)", border: "1px solid rgba(255,255,255,0.14)", gridColumn: isPortrait ? "1 / -1" : "auto" }}>
+                <div className="template-journal-headlines" style={{ borderRadius: 24, padding: 22, background: "rgba(255,255,255,0.08)", border: "1px solid rgba(255,255,255,0.14)", gridColumn: isPortrait ? "1 / -1" : "auto" }}>
                   <small>Manchetes</small>
                   {news.slice(1, isPortrait ? 4 : 5).map((item, index) => (
-                    <p key={`${getNewsItemTitle(item)}-${index}`} style={{ margin: "10px 0 0", fontWeight: 800 }}>
+                    <p className="template-journal-headline" key={`${getNewsItemTitle(item)}-${index}`} style={{ margin: "10px 0 0", fontWeight: 800 }}>
                       {String(index + 1).padStart(2, "0")} • {getNewsItemTitle(item)}
                     </p>
                   ))}
@@ -6429,7 +8207,7 @@ function TemplateVisualPreview({ template, compact = false }) {
       )}
 
       {realTemplateType === "cardapio_premium" && (
-        <div style={premiumFrameStyle}>
+        <div className="template-premium-frame" style={premiumFrameStyle}>
           <div
             style={{
               borderRadius: compact ? 18 : 30,
@@ -6439,8 +8217,8 @@ function TemplateVisualPreview({ template, compact = false }) {
             }}
           >
             <div className="template-breaking">CARDÁPIO DIGITAL</div>
-            <h2 style={{ margin: "8px 0 0", fontSize: compact ? 22 : isPortrait ? 42 : 54 }}>{template.title || "Cardápio Digital"}</h2>
-            <p style={{ margin: "8px 0 0", color: "rgba(255,255,255,0.74)" }}>{template.subtitle || "Produtos e preços em destaque"}</p>
+            {isTemplateVisible("showTitle") && <h2 style={{ margin: "8px 0 0", fontSize: compact ? 22 : isPortrait ? 42 : 54 }}>{template.title || "Cardápio Digital"}</h2>}
+            {isTemplateVisible("showSubtitle") && <p style={{ margin: "8px 0 0", color: "rgba(255,255,255,0.74)" }}>{template.subtitle || "Produtos e preços em destaque"}</p>}
           </div>
 
           <div
@@ -6478,7 +8256,7 @@ function TemplateVisualPreview({ template, compact = false }) {
             ))}
           </div>
 
-          {!compact && (
+          {!compact && isTemplateVisible("showFooter") && (
             <div style={{ marginTop: "auto", borderRadius: 22, padding: 18, background: "rgba(0,0,0,0.26)", display: "flex", alignItems: "center", justifyContent: "space-between", gap: 14 }}>
               <span>{template.callToAction || "Peça pelo QR Code ou no balcão"}</span>
               <strong style={{ color: "var(--template-accent)" }}>{template.footerText || "Totem Park Menu"}</strong>
@@ -6488,7 +8266,7 @@ function TemplateVisualPreview({ template, compact = false }) {
       )}
 
       {realTemplateType === "promocao_premium" && (
-        <div style={premiumFrameStyle}>
+        <div className="template-premium-frame" style={premiumFrameStyle}>
           <div
             style={{
               borderRadius: compact ? 18 : 32,
@@ -6499,8 +8277,8 @@ function TemplateVisualPreview({ template, compact = false }) {
             }}
           >
             <div className="template-breaking">OFERTA ESPECIAL</div>
-            <h2 style={{ margin: "8px 0", fontSize: compact ? 24 : isPortrait ? 46 : 64 }}>{template.title || "Ofertas da Semana"}</h2>
-            <p style={{ margin: 0, color: "rgba(255,255,255,0.78)" }}>{template.subtitle || "Promoções em destaque para sua TV"}</p>
+            {isTemplateVisible("showTitle") && <h2 style={{ margin: "8px 0", fontSize: compact ? 24 : isPortrait ? 46 : 64 }}>{template.title || "Ofertas da Semana"}</h2>}
+            {isTemplateVisible("showSubtitle") && <p style={{ margin: 0, color: "rgba(255,255,255,0.78)" }}>{template.subtitle || "Promoções em destaque para sua TV"}</p>}
           </div>
 
           <div
@@ -6542,7 +8320,7 @@ function TemplateVisualPreview({ template, compact = false }) {
       )}
 
       {realTemplateType === "corporativo_premium" && (
-        <div style={premiumFrameStyle}>
+        <div className="template-premium-frame" style={premiumFrameStyle}>
           <div style={premiumGridStyle}>
             <div
               style={{
@@ -6558,8 +8336,8 @@ function TemplateVisualPreview({ template, compact = false }) {
             >
               <div>
                 <div className="template-breaking">COMUNICAÇÃO INTERNA</div>
-                <h2 style={{ margin: "10px 0 0", fontSize: compact ? 22 : isPortrait ? 42 : 56 }}>{template.title || "Comunicação Corporativa"}</h2>
-                <p style={{ color: "rgba(255,255,255,0.76)" }}>{template.subtitle || "Avisos, agenda e indicadores em tempo real"}</p>
+                {isTemplateVisible("showTitle") && <h2 style={{ margin: "10px 0 0", fontSize: compact ? 22 : isPortrait ? 42 : 56 }}>{template.title || "Comunicação Corporativa"}</h2>}
+                {isTemplateVisible("showSubtitle") && <p style={{ color: "rgba(255,255,255,0.76)" }}>{template.subtitle || "Avisos, agenda e indicadores em tempo real"}</p>}
               </div>
 
               {!compact && (
@@ -6616,19 +8394,19 @@ function TemplateVisualPreview({ template, compact = false }) {
             {getTemplateBadge(realTemplateType)}
           </div>
 
-          <h2>{template.title || template.name}</h2>
-          <p>{template.subtitle || "Mensagem personalizada para sua TV."}</p>
+          {isTemplateVisible("showTitle") && <h2>{template.title || template.name}</h2>}
+          {isTemplateVisible("showSubtitle") && <p>{template.subtitle || "Mensagem personalizada para sua TV."}</p>}
 
-          <div className="template-generic-footer">
+          {isTemplateVisible("showFooter") && <div className="template-generic-footer">
             <span>Totem Park</span>
             <strong>{template.duration || 15}s</strong>
-          </div>
+          </div>}
         </div>
       )}
 
-      <div className="template-tv-ticker">
+      {isTemplateVisible("showFooter") && <div className="template-tv-ticker">
         <span>
-          {realTemplateType === "noticias" || realTemplateType === "jornal_premium"
+          {["noticias", "jornal_premium", "clima_premium_v2", "hora_certa_premium"].includes(realTemplateType)
             ? `${getNewsItemSource(news[0], template.newsSource || "Notícias")} • ${getNewsItemTitle(news[0])}`
             : realTemplateType === "clima"
               ? `Clima em ${weather?.city || template.city || "sua cidade"} • Atualização automática`
@@ -6640,7 +8418,7 @@ function TemplateVisualPreview({ template, compact = false }) {
                     ? `${template.title || "Comunicação Corporativa"} • Avisos, agenda e indicadores`
                     : template.subtitle || "Template profissional para TV"}
         </span>
-      </div>
+      </div>}
     </div>
   );
 }
@@ -6954,6 +8732,8 @@ function PlayerPage() {
   const offlineReadyMessageKey = `totempark-offline-ready-shown-${clientId}-${codigo}`;
   const offlineScope = `${clientId}-${String(codigo || "tv").toLowerCase()}`;
   const [screen, setScreen] = useState(null);
+  const [playerClient, setPlayerClient] = useState(null);
+  const [clientLoading, setClientLoading] = useState(true);
   const [defaultPlaylist, setDefaultPlaylist] = useState(null);
   const [allPlaylists, setAllPlaylists] = useState([]);
   const [screenTemplates, setScreenTemplates] = useState([]);
@@ -6985,6 +8765,8 @@ function PlayerPage() {
   const playbackTimingKeyRef = useRef("");
   const playbackRemainingRef = useRef(0);
   const playbackStartedAtRef = useRef(0);
+  const advancingRef = useRef(false);
+  const isAndroidSmartTv = isNativeApp() && isAndroidTv === true;
 
   useEffect(() => {
     if (!isNativeApp()) return;
@@ -7139,9 +8921,16 @@ function PlayerPage() {
     }),
   ];
 
-  const activeItemsKey = playerItems
-    .map((item) => `${item.playerItemType}-${item.id || item.preview || item.title}-${item.updatedAt?.seconds || ""}`)
-    .join("|");
+  const activePlaylistRevision = [
+    activePlaylist?.playlistRevision || "",
+    activePlaylist?.transition || "Fade suave",
+    activePlaylist?.transitionSpeed || "Normal",
+    activePlaylist?.updatedAt?.seconds || "",
+    activePlaylist?.updatedAt?.nanoseconds || "",
+  ].join("-");
+  const activeItemsKey = `${activePlaylistRevision}|${playerItems
+    .map((item) => `${item.playerItemType}-${item.id || item.preview || item.title}-${Number(item.duration || 0)}-${item.updatedAt?.seconds || ""}`)
+    .join("|")}`;
 
   const playlistsForOffline = allPlaylists.filter((playlist) => {
     if (playlist.id === screen?.playlistId) return true;
@@ -7216,13 +9005,19 @@ function PlayerPage() {
   }, [offlineAssetsKey, offlineReadyMessageKey, offlineScope, offlineStorageKey]);
 
   function getPlayerItemKey(item, index) {
-    return `${activePlaylist?.id || "templates"}-${item?.id || item?.preview || item?.title || "item"}-${index}`;
+    return `${activePlaylist?.id || "templates"}-${activePlaylistRevision}-${item?.id || item?.preview || item?.title || "item"}-${index}`;
   }
 
   function goToNextMedia() {
+    if (advancingRef.current) return;
+
     const items = playerItems;
 
     if (items.length <= 1) return;
+
+    advancingRef.current = true;
+    clearTimeout(playbackTimerRef.current);
+    playbackTimerRef.current = null;
 
     setMediaIndex((prev) => {
       const safePrev = prev >= items.length ? 0 : prev;
@@ -7260,14 +9055,9 @@ function PlayerPage() {
   }
 
   function skipFailedMedia() {
-    const items = playerItems;
-
     transitionInProgressRef.current = false;
     setReadyMediaKey("");
-    setMediaIndex((prev) => {
-      const safePrev = prev >= items.length ? 0 : prev;
-      return safePrev + 1 >= items.length ? 0 : safePrev + 1;
-    });
+    goToNextMedia();
   }
 
   function getPlayerOrientationClass() {
@@ -7304,8 +9094,8 @@ function PlayerPage() {
 
     const unsubscribe = onSnapshot(screenQuery, (snapshot) => {
       if (snapshot.empty) {
-        setScreen(null);
-        setLoading(false);
+        localStorage.removeItem("totempark-tv-connection");
+        window.location.replace("/tv");
         return;
       }
 
@@ -7330,6 +9120,22 @@ function PlayerPage() {
   }, [clientId, codigo]);
 
   useEffect(() => {
+    if (!clientId) return undefined;
+
+    return onSnapshot(
+      doc(db, "clients", clientId),
+      (snapshot) => {
+        setPlayerClient(snapshot.exists() ? { id: snapshot.id, ...snapshot.data() } : null);
+        setClientLoading(false);
+      },
+      (error) => {
+        console.log("Erro ao carregar cliente do player:", error);
+        setClientLoading(false);
+      }
+    );
+  }, [clientId]);
+
+  useEffect(() => {
     if (!screen?.id || !clientId) return;
 
     const screenDocRef = doc(
@@ -7349,7 +9155,13 @@ function PlayerPage() {
 
           if (!currentScreen.exists()) return;
 
-          const connectedDeviceId = currentScreen.data().connectedDeviceId;
+          const screenData = currentScreen.data();
+          const connectedDeviceId = screenData.connectedDeviceId;
+          const pendingExit =
+            screenData.remoteCommand?.type === "exitTv" &&
+            screenData.commandStatus === "sent";
+
+          if (pendingExit) return;
           if (connectedDeviceId && connectedDeviceId !== localDeviceId) return;
 
           transaction.update(screenDocRef, {
@@ -7385,7 +9197,8 @@ function PlayerPage() {
         const currentScreen = await transaction.get(screenRef);
 
         if (!currentScreen.exists()) return;
-        if (currentScreen.data().connectedDeviceId !== localDeviceId) return;
+        const connectedDeviceId = currentScreen.data().connectedDeviceId;
+        if (connectedDeviceId && connectedDeviceId !== localDeviceId) return;
 
         transaction.update(screenRef, {
           connectedDeviceId: deleteField(),
@@ -7425,12 +9238,17 @@ function PlayerPage() {
         return;
       }
 
-      if (firstSnapshot) {
+      const isPendingExit =
+        remoteCommand.type === "exitTv" && data.commandStatus === "sent";
+
+      if (firstSnapshot && !isPendingExit) {
         lastCommandIdRef.current = remoteCommand.id;
         setLastCommandId(remoteCommand.id);
         firstSnapshot = false;
         return;
       }
+
+      firstSnapshot = false;
 
       if (lastCommandIdRef.current === remoteCommand.id) {
         return;
@@ -7438,16 +9256,6 @@ function PlayerPage() {
 
       lastCommandIdRef.current = remoteCommand.id;
       setLastCommandId(remoteCommand.id);
-
-      try {
-        await updateDoc(screenDocRef, {
-          lastCommandExecuted: remoteCommand.type || "",
-          lastCommandExecutedAt: serverTimestamp(),
-          commandStatus: "executed",
-        });
-      } catch (error) {
-        console.log(error);
-      }
 
       if (remoteCommand.type === "exitTv") {
         await releaseCurrentScreen();
@@ -7461,6 +9269,16 @@ function PlayerPage() {
         }
 
         return;
+      }
+
+      try {
+        await updateDoc(screenDocRef, {
+          lastCommandExecuted: remoteCommand.type || "",
+          lastCommandExecutedAt: serverTimestamp(),
+          commandStatus: "executed",
+        });
+      } catch (error) {
+        console.log(error);
       }
 
       if (remoteCommand.type === "reload") {
@@ -7575,6 +9393,12 @@ function PlayerPage() {
               : currentItem.type || "",
           nowPlayingDuration: Number(currentItem.duration || 10),
           nowPlayingPreview: currentItem.remotePreview || currentItem.preview || "",
+          nowPlayingOrientation: getPreviewOrientation(currentItem),
+          nowPlayingAspectRatio: currentItem.aspectRatio || "",
+          nowPlayingWidth: currentItem.width || null,
+          nowPlayingHeight: currentItem.height || null,
+          nowPlayingTemplateType: currentItem.templateType || "",
+          nowPlayingItemType: currentItem.playerItemType || "",
           nowPlayingSound: currentItem.sound || false,
           nowPlayingIndex: safeIndex + 1,
           nowPlayingTotal: items.length,
@@ -7723,10 +9547,12 @@ function PlayerPage() {
         ? durationInSeconds * 1000
         : fallbackDuration * 1000;
     const timingKey = `${currentKey}-${durationInMs}`;
-    const isReady =
-      currentItem?.playerItemType === "template" || readyMediaKey === currentKey;
     const isPlaybackBlocked =
       pauseMode || takeoverMessage || blackoutMode || maintenanceMode;
+    const isWaitingForAndroidTvVideo =
+      isAndroidSmartTv &&
+      currentItem?.type === "Vídeo" &&
+      readyMediaKey !== currentKey;
 
     if (playbackTimingKeyRef.current !== timingKey) {
       clearTimeout(playbackTimerRef.current);
@@ -7734,9 +9560,10 @@ function PlayerPage() {
       playbackTimingKeyRef.current = timingKey;
       playbackRemainingRef.current = durationInMs;
       playbackStartedAtRef.current = 0;
+      advancingRef.current = false;
     }
 
-    if (!isReady || isPlaybackBlocked) return;
+    if (isPlaybackBlocked || advancingRef.current || isWaitingForAndroidTvVideo) return;
 
     playbackStartedAtRef.current = Date.now();
     const remaining = Math.max(0, playbackRemainingRef.current);
@@ -7757,7 +9584,7 @@ function PlayerPage() {
         playbackRemainingRef.current - (Date.now() - playbackStartedAtRef.current)
       );
     };
-  }, [activePlaylist?.id, activeItemsKey, mediaIndex, readyMediaKey, pauseMode, takeoverMessage, blackoutMode, maintenanceMode]);
+  }, [activePlaylist?.id, activeItemsKey, mediaIndex, readyMediaKey, pauseMode, takeoverMessage, blackoutMode, maintenanceMode, isAndroidSmartTv]);
 
   useEffect(() => {
     const mediaElement = document.querySelector(
@@ -7777,6 +9604,22 @@ function PlayerPage() {
       console.log("Autoplay bloqueado ao retomar vídeo:", error);
     });
   }, [pauseMode, mediaIndex, activePlaylist?.id]);
+
+  const playerPlanAccess = getClientPlanAccess(playerClient);
+
+  if (loading || clientLoading) {
+    return <div className="player-screen">Carregando player...</div>;
+  }
+
+  if (playerClient && !playerPlanAccess.canShowTvContent) {
+    return (
+      <TvSuspensionScreen
+        client={playerClient}
+        access={playerPlanAccess}
+        orientationClass={getPlayerOrientationClass()}
+      />
+    );
+  }
 
   if (blackoutMode) {
     return (
@@ -7821,10 +9664,6 @@ function PlayerPage() {
     );
   }
 
-  if (loading) {
-    return <div className="player-screen">Carregando player...</div>;
-  }
-
   if (!screen) {
     return <div className="player-screen">Tela não encontrada.</div>;
   }
@@ -7834,6 +9673,7 @@ function PlayerPage() {
       <div className={`player-screen ${getPlayerOrientationClass()}`}>
         <TemplateVisualPreview
           template={applyOfflineAssetUrls(activeTemplate, offlineAssetMap)}
+          tv
         />
 
         {offlineCacheStatus && (
@@ -7878,7 +9718,9 @@ function PlayerPage() {
   const currentMedia = playerItems[safeMediaIndex] || playerItems[0];
   const currentMediaKey = getPlayerItemKey(currentMedia, safeMediaIndex);
   const currentMediaReady =
-    currentMedia.playerItemType === "template" || readyMediaKey === currentMediaKey;
+    currentMedia.playerItemType === "template" ||
+    readyMediaKey === currentMediaKey;
+  const currentTransitionReady = currentMediaReady;
   const transitionClass = getTransitionClass(activePlaylist?.transition || "Fade suave");
   const transitionSpeedClass = getTransitionSpeedClass(activePlaylist?.transitionSpeed || "Normal");
   const playerOrientationClass = hasManualScreenRotation
@@ -7908,18 +9750,21 @@ function PlayerPage() {
   visibleLayers.push({
     item: currentMedia,
     index: safeMediaIndex,
-    state: currentMediaReady ? "is-current is-ready" : "is-current is-pending",
+    state: currentMediaReady
+      ? `is-current is-ready ${currentTransitionReady ? "transition-active" : ""}`
+      : "is-current is-pending",
   });
 
   function renderPlayerItem(item, index, isCurrent) {
     if (item.playerItemType === "template") {
-      return <TemplateVisualPreview template={item} />;
+      return <TemplateVisualPreview template={item} tv />;
     }
 
     if (item.type === "Vídeo") {
       return (
         <video
           src={item.preview}
+          poster={isAndroidSmartTv ? "data:image/gif;base64,R0lGODlhAQABAAD/ACwAAAAAAQABAAACADs=" : undefined}
           autoPlay={!pauseMode}
           muted={!item.sound}
           playsInline
@@ -7927,9 +9772,16 @@ function PlayerPage() {
           controls={false}
           controlsList="nodownload nofullscreen noremoteplayback"
           disablePictureInPicture
+          disableRemotePlayback
+          tabIndex={-1}
+          aria-hidden="true"
           className="player-media"
+          onLoadedMetadata={(event) => {
+            if (isCurrent && !isAndroidSmartTv) markCurrentMediaReady(item, index);
+            if (!pauseMode) event.currentTarget.play().catch(() => {});
+          }}
           onLoadedData={(event) => {
-            if (isCurrent) markCurrentMediaReady(item, index);
+            if (isCurrent && !isAndroidSmartTv) markCurrentMediaReady(item, index);
 
             if (!pauseMode) {
               event.currentTarget.play().catch((error) => {
@@ -7938,16 +9790,25 @@ function PlayerPage() {
             }
           }}
           onCanPlay={(event) => {
-            if (isCurrent) markCurrentMediaReady(item, index);
+            if (isCurrent && !isAndroidSmartTv) markCurrentMediaReady(item, index);
             if (!pauseMode) event.currentTarget.play().catch(() => {});
+          }}
+          onPlaying={() => {
+            if (isCurrent && isAndroidSmartTv) markCurrentMediaReady(item, index);
           }}
           onPlay={(event) => {
             if (pauseMode) event.currentTarget.pause();
           }}
+          onEnded={() => {
+            if (!isCurrent || pauseMode) return;
+            goToNextMedia();
+          }}
+          onWaiting={() => {}}
+          onStalled={() => {}}
           onError={() => {
             if (!isCurrent) return;
             console.log("Erro ao carregar video. Pulando midia.");
-            setTimeout(skipFailedMedia, 800);
+            skipFailedMedia();
           }}
         />
       );
@@ -7964,14 +9825,14 @@ function PlayerPage() {
         onError={() => {
           if (!isCurrent) return;
           console.log("Erro ao carregar imagem. Pulando midia.");
-          setTimeout(skipFailedMedia, 800);
+          skipFailedMedia();
         }}
       />
     );
   }
 
   return (
-    <div className={`player-screen ${playerOrientationClass}`}>
+    <div className={`player-screen ${playerOrientationClass} ${isAndroidSmartTv ? "android-tv-player" : ""}`}>
       {offlineCacheStatus && (
         <div className={`offline-cache-status ${offlineCacheStatus}`}>
           {offlineCacheStatus === "downloading"
@@ -8003,7 +9864,7 @@ function PlayerPage() {
 
       {visibleLayers.map(({ item, index, state }) => (
         <div
-          key={getPlayerItemKey(item, index)}
+          key={`${getPlayerItemKey(item, index)}-${activePlaylistRevision}`}
           className={`player-transition-layer player-buffer-layer ${state} ${transitionClass} ${transitionSpeedClass} ${item.playerItemType === "template" ? "template-layer" : ""}`}
         >
           {renderPlayerItem(item, index, index === safeMediaIndex)}
@@ -8025,39 +9886,27 @@ function PlansPage() {
         </div>
       </header>
 
-      <section className="cards-grid">
-        <div className="plan-card">
-          <h3>Básico</h3>
-          <div className="plan-price">R$ 49 <span>/mês</span></div>
-          <p className="plan-annual">R$ 490 no anual</p>
-          <div className="features">
-            <Feature text="Até 2 telas" />
-            <Feature text="Modo paisagem" />
-            <Feature text="Playlists básicas" />
+      <section className="cards-grid plans-commercial-grid">
+        {Object.values(COMMERCIAL_PLANS).map((plan) => (
+          <div
+            className={plan.name === "Professional" ? "plan-card featured" : "plan-card"}
+            key={plan.name}
+          >
+            {plan.name === "Professional" && (
+              <div className="plan-recommended">Mais recomendado</div>
+            )}
+            <h3>{plan.name}</h3>
+            <div className="plan-price">
+              {plan.priceLabel} <span>/mês</span>
+            </div>
+            <p className="plan-annual">Até {plan.screensLimit} telas</p>
+            <div className="features">
+              <Feature text={`${plan.screensLimit} telas incluídas`} />
+              <Feature text={plan.premiumTemplates ? "Templates Premium" : "Templates simples"} />
+              <Feature text={plan.marketing ? "Marketing integrado" : "Playlists e mídias"} />
+            </div>
           </div>
-        </div>
-
-        <div className="plan-card">
-          <h3>Profissional</h3>
-          <div className="plan-price">R$ 129 <span>/mês</span></div>
-          <p className="plan-annual">R$ 1.290 no anual</p>
-          <div className="features">
-            <Feature text="Até 10 telas" />
-            <Feature text="Paisagem e retrato" />
-            <Feature text="Campanhas avançadas" />
-          </div>
-        </div>
-
-        <div className="plan-card">
-          <h3>Enterprise</h3>
-          <div className="plan-price">R$ 299 <span>/mês</span></div>
-          <p className="plan-annual">R$ 2.990 no anual</p>
-          <div className="features">
-            <Feature text="Telas personalizadas" />
-            <Feature text="Multiunidades" />
-            <Feature text="Suporte prioritário" />
-          </div>
-        </div>
+        ))}
       </section>
     </>
   );
@@ -8087,9 +9936,9 @@ function MenuItem({ icon, text, active, onClick }) {
   );
 }
 
-function StatCard({ title, value, icon, status }) {
+function StatCard({ title, value, icon, status, severity = "" }) {
   return (
-    <div className="stat-card">
+    <div className={`stat-card ${severity ? `storage-${severity}` : ""}`}>
       <div className="stat-top">
         <span>{title}</span>
         <div className="stat-icon">{icon}</div>
@@ -8098,6 +9947,294 @@ function StatCard({ title, value, icon, status }) {
       <div className="stat-value">{value}</div>
       <div className="stat-status">{status}</div>
     </div>
+  );
+}
+
+function UpgradeAccessCard({ title, message, onClose }) {
+  return (
+    <section className="upgrade-access-card">
+      <div className="upgrade-access-icon">
+        <CreditCard size={28} />
+      </div>
+      <div>
+        <div className="kicker">Recurso do plano</div>
+        <h2>{title}</h2>
+        <p>{message}</p>
+      </div>
+      {onClose && (
+        <button type="button" className="client-action" onClick={onClose}>
+          Fechar
+        </button>
+      )}
+    </section>
+  );
+}
+
+function PlanStatusBanner({ access }) {
+  if (!access || (access.statusLabel === "Ativo" && !access.hasTemporaryUnlock)) {
+    return null;
+  }
+
+  const titles = {
+    warning: "Plano vencido",
+    partial: "Restrição parcial ativa",
+    strong: "Modo visualização",
+    suspended: "Plano temporariamente suspenso",
+    temporary: "Liberação temporária ativa",
+  };
+
+  return (
+    <section className={`plan-status-banner ${access.severity}`}>
+      <div className="plan-status-banner-icon">
+        {access.hasTemporaryUnlock ? <Clock3 size={22} /> : <TriangleAlert size={22} />}
+      </div>
+      <div>
+        <strong>{titles[access.severity] || access.statusLabel}</strong>
+        <p>{access.message}</p>
+      </div>
+    </section>
+  );
+}
+
+function SuspendedClientPanel({ client, access }) {
+  const whatsappUrl = "https://wa.me/5584991346016?text=Olá,%20quero%20solicitar%20a%20renovação%20do%20Totem%20Park.";
+
+  return (
+    <section className="client-suspension-panel">
+      <div className="client-suspension-icon"><CreditCard size={34} /></div>
+      <div className="kicker">Acesso ao painel</div>
+      <h2>Plano temporariamente suspenso</h2>
+      <p>{access.message}</p>
+      <div className="client-suspension-details">
+        <span>Cliente <strong>{client.name}</strong></span>
+        <span>Plano <strong>{getPlanConfig(client.plan).name}</strong></span>
+        <span>Dias vencidos <strong>{access.daysOverdue}</strong></span>
+      </div>
+      <p>Entre em contato com a Park Solutions para reativar.</p>
+      <a className="upload-button" href={whatsappUrl} target="_blank" rel="noreferrer">
+        Solicitar renovação • 84 99134-6016
+      </a>
+    </section>
+  );
+}
+
+function TvSuspensionScreen({ client, access, orientationClass }) {
+  return (
+    <div className={`player-screen tv-plan-suspension-screen ${orientationClass || ""}`}>
+      <div className="tv-plan-suspension-card">
+        <div className="tv-plan-suspension-brands">
+          <img src={logo} alt="Totem Park" />
+          {client.logoUrl && <img src={client.logoUrl} alt={`Logo de ${client.name}`} />}
+        </div>
+        <div className="kicker">Totem Park Player</div>
+        <h1>Plano temporariamente suspenso</h1>
+        <p>A exibição desta tela foi pausada até a regularização do plano.</p>
+        <div className="tv-plan-suspension-details">
+          <span>Cliente <strong>{client.name}</strong></span>
+          <span>Plano atual <strong>{getPlanConfig(client.plan).name}</strong></span>
+          <span>Vencimento <strong>{client.dueDate || "Não informado"}</strong></span>
+          <span>Dias vencidos <strong>{access.daysOverdue}</strong></span>
+        </div>
+        <div className="tv-plan-suspension-footer">
+          <strong>Entre em contato com a Park Solutions</strong>
+          <span>WhatsApp: 84 99134-6016</span>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+function AdminPlanControls({ client, adminUser }) {
+  const [form, setForm] = useState({
+    plan: getPlanConfig(client.plan).name,
+    billing: client.billing || "Mensal",
+    dueDate: client.dueDate || "",
+    status: client.status || "Ativo",
+    screensLimit: String(getClientScreenLimit(client)),
+    storageLimitGb: String(getClientStorageLimit(client) / STORAGE_GB),
+  });
+  const [saving, setSaving] = useState(false);
+  const access = getClientPlanAccess(client);
+
+  useEffect(() => {
+    setForm({
+      plan: getPlanConfig(client.plan).name,
+      billing: client.billing || "Mensal",
+      dueDate: client.dueDate || "",
+      status: client.status || "Ativo",
+      screensLimit: String(getClientScreenLimit(client)),
+      storageLimitGb: String(getClientStorageLimit(client) / STORAGE_GB),
+    });
+  }, [client]);
+
+  async function unlockForOneDay() {
+    try {
+      setSaving(true);
+      const graceUnlockUntil = new Date(Date.now() + 24 * 60 * 60 * 1000).toISOString();
+      await updateDoc(doc(db, "clients", client.id), {
+        graceUnlockUntil,
+        updatedAt: serverTimestamp(),
+      });
+      alert("Cliente liberado temporariamente por 24 horas.");
+    } catch (error) {
+      console.log(error);
+      alert("Erro ao liberar o cliente temporariamente.");
+    } finally {
+      setSaving(false);
+    }
+  }
+
+  async function removeTemporaryUnlock() {
+    try {
+      setSaving(true);
+      await updateDoc(doc(db, "clients", client.id), {
+        graceUnlockUntil: deleteField(),
+        updatedAt: serverTimestamp(),
+      });
+      alert("Liberação temporária removida.");
+    } catch (error) {
+      console.log(error);
+      alert("Erro ao remover a liberação temporária.");
+    } finally {
+      setSaving(false);
+    }
+  }
+
+  async function renewPlan() {
+    if (!form.dueDate) {
+      alert("Informe a nova data de vencimento.");
+      return;
+    }
+
+    try {
+      setSaving(true);
+      await updateDoc(doc(db, "clients", client.id), {
+        plan: getPlanConfig(form.plan).name,
+        billing: form.billing,
+        dueDate: form.dueDate,
+        status: "Ativo",
+        screensLimit: String(Math.max(1, Number(form.screensLimit) || 1)),
+        storageLimitBytes: Math.max(STORAGE_MB, Number(form.storageLimitGb) * STORAGE_GB || getPlanLimits(form.plan).storageLimitBytes),
+        graceUnlockUntil: deleteField(),
+        suspendedAt: deleteField(),
+        suspensionReason: deleteField(),
+        lastRenewedAt: serverTimestamp(),
+        lastRenewedBy: adminUser?.email || adminUser?.uid || "Gestor Park Solutions",
+        updatedAt: serverTimestamp(),
+      });
+      alert("Plano renovado com sucesso.");
+    } catch (error) {
+      console.log(error);
+      alert("Erro ao renovar o plano.");
+    } finally {
+      setSaving(false);
+    }
+  }
+
+  return (
+    <section className="admin-plan-controls">
+      <div className="admin-plan-controls-header">
+        <div>
+          <div className="kicker">Gestão do plano</div>
+          <h2>Liberação e renovação</h2>
+          <p>Status calculado: <strong>{access.statusLabel}</strong></p>
+        </div>
+        <div className="admin-plan-quick-actions">
+          <button className="client-action primary" onClick={unlockForOneDay} disabled={saving}>
+            Liberar por 1 dia
+          </button>
+          {access.hasTemporaryUnlock && (
+            <button className="client-action" onClick={removeTemporaryUnlock} disabled={saving}>
+              Remover liberação temporária
+            </button>
+          )}
+        </div>
+      </div>
+
+      <div className="form-grid">
+        <div className="form-group">
+          <label>Novo plano</label>
+          <select
+            value={form.plan}
+            onChange={(event) => {
+              const plan = event.target.value;
+              setForm((current) => ({
+                ...current,
+                plan,
+                screensLimit: String(getPlanConfig(plan).screensLimit),
+                storageLimitGb: String(getPlanLimits(plan).storageLimitBytes / STORAGE_GB),
+              }));
+            }}
+          >
+            {Object.values(COMMERCIAL_PLANS).map((plan) => (
+              <option key={plan.name}>{plan.name}</option>
+            ))}
+          </select>
+        </div>
+        <div className="form-group">
+          <label>Tipo de cobrança</label>
+          <select value={form.billing} onChange={(event) => setForm({ ...form, billing: event.target.value })}>
+            <option>Mensal</option>
+            <option>Anual</option>
+          </select>
+        </div>
+        <div className="form-group">
+          <label>Nova data de vencimento</label>
+          <input type="date" value={form.dueDate} onChange={(event) => setForm({ ...form, dueDate: event.target.value })} />
+        </div>
+        <div className="form-group">
+          <label>Status após renovação</label>
+          <input value="Ativo" disabled />
+        </div>
+        <div className="form-group">
+          <label>Limite de telas</label>
+          <input type="number" min="1" value={form.screensLimit} onChange={(event) => setForm({ ...form, screensLimit: event.target.value })} />
+        </div>
+        <div className="form-group">
+          <label>Limite de armazenamento (GB)</label>
+          <input type="number" min="0.1" step="0.1" value={form.storageLimitGb} onChange={(event) => setForm({ ...form, storageLimitGb: event.target.value })} />
+        </div>
+      </div>
+
+      <div className="panel-actions">
+        <button className="upload-button" onClick={renewPlan} disabled={saving}>
+          <CreditCard size={18} />
+          {saving ? "Salvando..." : "Renovar plano"}
+        </button>
+      </div>
+    </section>
+  );
+}
+
+function VisibilityControls({ title, options, values, onChange }) {
+  return (
+    <section className="visibility-controls">
+      <div className="visibility-controls-header">
+        <div>
+          <h3>{title}</h3>
+          <p>Escolha o que aparece no preview e no Player TV.</p>
+        </div>
+      </div>
+
+      <div className="visibility-controls-grid">
+        {options.map(([field, label]) => {
+          const visible = values[field] !== false;
+
+          return (
+            <button
+              type="button"
+              className={visible ? "visibility-control active" : "visibility-control"}
+              key={field}
+              onClick={() => onChange(field, !visible)}
+            >
+              {visible ? <Eye size={16} /> : <EyeOff size={16} />}
+              <span>{label}</span>
+              <strong>{visible ? "Visível" : "Oculto"}</strong>
+            </button>
+          );
+        })}
+      </div>
+    </section>
   );
 }
 

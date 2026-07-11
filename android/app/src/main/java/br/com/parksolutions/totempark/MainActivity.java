@@ -26,6 +26,12 @@ public class MainActivity extends BridgeActivity {
         getWindow().addFlags(WindowManager.LayoutParams.FLAG_KEEP_SCREEN_ON);
         getWindow().addFlags(WindowManager.LayoutParams.FLAG_FULLSCREEN);
 
+        if (isTelevision()) {
+            getBridge().getWebView().getSettings().setMediaPlaybackRequiresUserGesture(false);
+            getBridge().getWebView().setWebChromeClient(new TvWebChromeClient(getBridge()));
+            getBridge().getWebView().setLayerType(View.LAYER_TYPE_HARDWARE, null);
+        }
+
         enableFullscreenMode();
         configureTvKioskMode();
     }

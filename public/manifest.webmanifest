@@ -1,7 +1,8 @@
 {
-  "name": "Totem Park TV",
-  "short_name": "Totem TV",
-  "description": "Player profissional Totem Park para TVs e totens digitais.",
+  "name": "Totem Park | TVs Corporativas e Digital Signage",
+  "short_name": "Totem Park",
+  "description": "Sistema profissional para TVs corporativas, cardápios digitais, comunicação interna, notícias, marketing digital, playlists e digital signage.",
+  "id": "/tv",
   "start_url": "/tv",
   "scope": "/",
   "display": "standalone",
