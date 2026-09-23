@@ -12,11 +12,13 @@
     <uses-permission android:name="android.permission.INTERNET" />
     <uses-permission android:name="android.permission.WAKE_LOCK" />
     <uses-permission android:name="android.permission.RECEIVE_BOOT_COMPLETED" />
+    <uses-permission android:name="android.permission.FOREGROUND_SERVICE" />
 
     <application
         android:allowBackup="true"
+        android:banner="@drawable/tv_banner"
         android:icon="@mipmap/ic_launcher"
-        android:label="Totem Park"
+        android:label="${appLabel}"
         android:roundIcon="@mipmap/ic_launcher_round"
         android:supportsRtl="true"
         android:theme="@style/AppTheme"
@@ -24,6 +26,7 @@
 
         <activity
             android:name=".MainActivity"
+            android:banner="@drawable/tv_banner"
             android:configChanges="orientation|keyboardHidden|keyboard|screenSize|locale|smallestScreenSize|screenLayout|uiMode|navigation"
             android:exported="true"
             android:launchMode="singleTask">
@@ -39,10 +42,11 @@
         <activity-alias
             android:name=".TvLauncherActivity"
             android:targetActivity=".MainActivity"
-            android:enabled="false"
+            android:enabled="${tvLauncherEnabled}"
             android:exported="true"
+            android:banner="@drawable/tv_banner"
             android:icon="@mipmap/ic_launcher"
-            android:label="Totem Park TV">
+            android:label="${appLabel}">
 
             <intent-filter>
                 <action android:name="android.intent.action.MAIN" />
@@ -55,7 +59,7 @@
             android:name=".TotemDeviceAdminReceiver"
             android:description="@string/device_admin_description"
             android:exported="true"
-            android:label="Totem Park TV"
+            android:label="${appLabel}"
             android:permission="android.permission.BIND_DEVICE_ADMIN">
 
             <meta-data
@@ -69,14 +73,25 @@
 
         <receiver
             android:name=".BootReceiver"
+            android:directBootAware="true"
             android:enabled="true"
             android:exported="true">
 
             <intent-filter>
                 <action android:name="android.intent.action.BOOT_COMPLETED" />
+                <action android:name="android.intent.action.LOCKED_BOOT_COMPLETED" />
                 <action android:name="android.intent.action.QUICKBOOT_POWERON" />
+                <action android:name="android.intent.action.MY_PACKAGE_REPLACED" />
+                <action android:name="android.intent.action.SCREEN_ON" />
+                <action android:name="android.intent.action.USER_PRESENT" />
+                <action android:name="android.intent.action.DREAMING_STOPPED" />
             </intent-filter>
         </receiver>
+
+        <service
+            android:name=".PlayerBootService"
+            android:enabled="true"
+            android:exported="false" />
 
     </application>
 </manifest>

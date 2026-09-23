@@ -15,6 +15,135 @@ android {
              // Default: https://android.googlesource.com/platform/frameworks/base/+/282e181b58cf72b6ca770dc7ca5f91f135444502/tools/aapt/AaptAssets.cpp#61
             ignoreAssetsPattern = '!.svn:!.git:!.ds_store:!*.scc:.*:!CVS:!thumbs.db:!picasa.ini:!*~'
         }
+        manifestPlaceholders = [
+            appLabel: "Totem Park",
+            tvLauncherEnabled: "false"
+        ]
+    }
+    flavorDimensions "appMode"
+    productFlavors {
+        web {
+            dimension "appMode"
+            applicationIdSuffix ".manager"
+            versionNameSuffix "-manager"
+            manifestPlaceholders = [
+                appLabel: "Totem Park Gestor",
+                tvLauncherEnabled: "false"
+            ]
+        }
+        player {
+            dimension "appMode"
+            versionNameSuffix "-player"
+            manifestPlaceholders = [
+                appLabel: "Totem Park Player",
+                tvLauncherEnabled: "true"
+            ]
+        }
+        playerTest {
+            dimension "appMode"
+            applicationIdSuffix ".playertest"
+            versionNameSuffix "-player-test"
+            manifestPlaceholders = [
+                appLabel: "Totem Park Player Teste",
+                tvLauncherEnabled: "true"
+            ]
+        }
+        playerLab {
+            dimension "appMode"
+            applicationIdSuffix ".player.lab"
+            versionNameSuffix "-player-lab-2a2-a"
+            manifestPlaceholders = [
+                appLabel: "Totem Park Player LAB 2A.2-A",
+                tvLauncherEnabled: "true"
+            ]
+        }
+        playerCanary {
+            dimension "appMode"
+            applicationIdSuffix ".player.canary"
+            versionNameSuffix "-player-canary-2a2-a"
+            manifestPlaceholders = [
+                appLabel: "Totem Park Player CANARY 2A.2-A",
+                tvLauncherEnabled: "true"
+            ]
+        }
+        playerRc {
+            dimension "appMode"
+            versionCode 8
+            versionName "1.0.0-2a2-ab-link-loop-rc4"
+            manifestPlaceholders = [
+                appLabel: "Totem Park Player",
+                tvLauncherEnabled: "true"
+            ]
+        }
+        playerPhaseB {
+            dimension "appMode"
+            applicationIdSuffix ".player.phaseb"
+            versionCode 2
+            versionName "1.0-player-2a2-b-audit2"
+            manifestPlaceholders = [
+                appLabel: "Totem Park Player 2A.2-B",
+                tvLauncherEnabled: "true"
+            ]
+        }
+        playerLinkFix {
+            dimension "appMode"
+            applicationIdSuffix ".player.linkfix"
+            versionCode 1
+            versionName "1.0-player-link-fix-audit"
+            manifestPlaceholders = [
+                appLabel: "Totem Park Player LINK-FIX AUDIT",
+                tvLauncherEnabled: "true"
+            ]
+        }
+        playerLoopAudit {
+            dimension "appMode"
+            applicationIdSuffix ".player.loopaudit"
+            versionCode 1
+            versionName "1.0-player-single-loop-audit"
+            manifestPlaceholders = [
+                appLabel: "Totem Park Player LOOP AUDIT",
+                tvLauncherEnabled: "true"
+            ]
+        }
+        playerTelemetry {
+            dimension "appMode"
+            applicationIdSuffix ".player.telemetry"
+            versionCode 1
+            versionName "1.0-player-2a2-c-telemetry-pilot"
+            manifestPlaceholders = [
+                appLabel: "Totem Park Player TELEMETRIA",
+                tvLauncherEnabled: "true"
+            ]
+        }
+        playerJumpDiag {
+            dimension "appMode"
+            applicationIdSuffix ".player.jumpdiag"
+            versionCode 1
+            versionName "1.0-player-jump-diagnostic"
+            manifestPlaceholders = [
+                appLabel: "Totem Park Player JUMP DIAG",
+                tvLauncherEnabled: "true"
+            ]
+        }
+        playerDecoderExperiment {
+            dimension "appMode"
+            applicationIdSuffix ".player.decoderexperiment"
+            versionCode 2
+            versionName "1.0-player-decoder-experiment-export2"
+            manifestPlaceholders = [
+                appLabel: "Totem Park Player DECODER EXP",
+                tvLauncherEnabled: "true"
+            ]
+        }
+        playerRollback {
+            dimension "appMode"
+            versionCode 9
+            versionName "1.0.0-2a2-ab-link-rollback-rc4"
+            manifestPlaceholders = [
+                appLabel: "Totem Park Player",
+                tvLauncherEnabled: "true"
+            ]
+        }
     }
     buildTypes {
         release {

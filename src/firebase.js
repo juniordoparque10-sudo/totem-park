@@ -1,9 +1,12 @@
+import { Capacitor } from "@capacitor/core";
+import { usePersistentFirestoreCache } from "./firestore-cache-policy";
 import { initializeApp } from "firebase/app";
 
 import { getAuth } from "firebase/auth";
 
 import {
   initializeFirestore,
+  memoryLocalCache,
   persistentLocalCache,
   persistentMultipleTabManager,
 } from "firebase/firestore";
@@ -23,9 +26,14 @@ const app = initializeApp(firebaseConfig);
 
 export const auth = getAuth(app);
 export const db = initializeFirestore(app, {
-  localCache: persistentLocalCache({
+  experimentalAutoDetectLongPolling: true,
+  localCache: usePersistentFirestoreCache({
+    native: Capacitor.isNativePlatform(),
+    mode: import.meta.env.VITE_APP_MODE,
+    pathname: typeof window !== "undefined" ? window.location.pathname : "/",
+  }) ? persistentLocalCache({
     tabManager: persistentMultipleTabManager(),
-  }),
+  }) : memoryLocalCache(),
 });
 export const storage = getStorage(app);
 

@@ -1,0 +1,50 @@
+rules_version = '2';
+
+service firebase.storage {
+  match /b/{bucket}/o {
+    function signedIn() {
+      return request.auth != null;
+    }
+
+    function isMaster() {
+      return signedIn()
+        && (
+          (
+            firestore.exists(/databases/(default)/documents/settings/masterAccess)
+            && request.auth.token.email in firestore.get(/databases/(default)/documents/settings/masterAccess).data.emails
+          )
+          || (
+            !firestore.exists(/databases/(default)/documents/settings/masterAccess)
+            && request.auth.token.email in [
+              "admin@parksolutions.com",
+              "juniordoparque10@gmail.com"
+            ]
+          )
+        );
+    }
+
+    function isClientOwner(clientId) {
+      return signedIn()
+        && (
+          firestore.get(/databases/(default)/documents/clients/$(clientId)).data.get("uid", "") == request.auth.uid
+          || firestore.get(/databases/(default)/documents/clients/$(clientId)).data.get("email", "") == request.auth.token.get("email", "missing-email")
+        )
+        && firestore.get(/databases/(default)/documents/clients/$(clientId)).data.get("accountStatus", "active") != "pending_commercial_validation";
+    }
+
+    match /clients/{clientId}/media/{fileName} {
+      allow read: if true;
+      allow create, update: if isMaster() || isClientOwner(clientId);
+      allow delete: if isMaster() || isClientOwner(clientId);
+    }
+
+    match /clients/{clientId}/{allPaths=**} {
+      allow read: if true;
+      allow write: if isMaster() || isClientOwner(clientId);
+    }
+
+    match /{allPaths=**} {
+      allow read, write: if isMaster();
+    }
+  }
+}

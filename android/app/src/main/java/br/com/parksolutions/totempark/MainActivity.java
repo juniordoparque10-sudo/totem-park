@@ -15,12 +15,20 @@ import android.view.View;
 import android.view.WindowManager;
 
 import com.getcapacitor.BridgeActivity;
+import com.getcapacitor.Plugin;
 
 public class MainActivity extends BridgeActivity {
-
     @Override
     protected void onCreate(Bundle savedInstanceState) {
         registerPlugin(TotemDevicePlugin.class);
+        if ("br.com.parksolutions.totempark.player.decoderexperiment".equals(getPackageName())) {
+            try {
+                Class<?> diagnosticClass = Class.forName("br.com.parksolutions.totempark.DiagnosticExportPlugin");
+                registerPlugin(diagnosticClass.asSubclass(Plugin.class));
+            } catch (ClassNotFoundException error) {
+                throw new IllegalStateException("Plugin de exportação pública ausente no build experimental", error);
+            }
+        }
         super.onCreate(savedInstanceState);
 
         getWindow().addFlags(WindowManager.LayoutParams.FLAG_KEEP_SCREEN_ON);
@@ -77,7 +85,7 @@ public class MainActivity extends BridgeActivity {
     }
 
     private void configureTvKioskMode() {
-        if (!isTelevision()) return;
+        if (!isPlayerFlavor()) return;
 
         PackageManager packageManager = getPackageManager();
         ComponentName tvLauncher = new ComponentName(
@@ -85,11 +93,15 @@ public class MainActivity extends BridgeActivity {
             getPackageName() + ".TvLauncherActivity"
         );
 
-        packageManager.setComponentEnabledSetting(
-            tvLauncher,
-            PackageManager.COMPONENT_ENABLED_STATE_ENABLED,
-            PackageManager.DONT_KILL_APP
-        );
+        try {
+            packageManager.setComponentEnabledSetting(
+                tvLauncher,
+                PackageManager.COMPONENT_ENABLED_STATE_ENABLED,
+                PackageManager.DONT_KILL_APP
+            );
+        } catch (IllegalArgumentException error) {
+            return;
+        }
 
         DevicePolicyManager devicePolicyManager = (DevicePolicyManager) getSystemService(
             Context.DEVICE_POLICY_SERVICE
@@ -121,5 +133,13 @@ public class MainActivity extends BridgeActivity {
         if (!alreadyLocked && devicePolicyManager.isLockTaskPermitted(getPackageName())) {
             startLockTask();
         }
+    }
+
+    private boolean isPlayerFlavor() {
+        return "br.com.parksolutions.totempark".equals(getPackageName())
+            || "br.com.parksolutions.totempark.playertest".equals(getPackageName())
+            || "br.com.parksolutions.totempark.player.lab".equals(getPackageName())
+            || "br.com.parksolutions.totempark.player.linkfix".equals(getPackageName())
+            || "br.com.parksolutions.totempark.player.loopaudit".equals(getPackageName());
     }
 }

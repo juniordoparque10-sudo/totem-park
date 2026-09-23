@@ -1,5 +1,8 @@
-import { useEffect, useRef, useState } from "react";
-import { Routes, Route, useParams, useNavigate } from "react-router-dom";
+import UploadLimitDialog from "./UploadLimitDialog";
+import { uploadLimitBytes, uploadSizeNotice } from "./upload-plan-policy";
+import TelemetryDashboard from "./TelemetryDashboard";
+﻿import { useEffect, useLayoutEffect, useRef, useState } from "react";
+import { Routes, Route, Navigate, useParams, useNavigate } from "react-router-dom";
 import { initializeApp, deleteApp } from "firebase/app";
 import { registerPlugin } from "@capacitor/core";
 
@@ -37,6 +40,10 @@ import {
   Eye,
   EyeOff,
   CheckCircle2,
+  Trophy,
+  Coffee,
+  Sparkles,
+  Megaphone,
 } from "lucide-react";
 
 import {
@@ -46,6 +53,7 @@ import {
   signOut,
   sendPasswordResetEmail,
   getAuth,
+  updatePassword,
 } from "firebase/auth";
 
 import {
@@ -61,33 +69,197 @@ import {
   setDoc,
   getDoc,
   getDocs,
+  getDocsFromServer,
   runTransaction,
   deleteField,
 } from "firebase/firestore";
 
+import firebaseApp, { auth, db } from "./firebase";
 import {
-  ref,
-  uploadBytesResumable,
-  getDownloadURL,
-  deleteObject,
-} from "firebase/storage";
-
-import { auth, db, storage } from "./firebase";
-import {
+  buildMediaCacheManifest,
   cacheOfflineAssets,
+  cachePlaylistMedia,
+  clearScreenMediaCache,
+  getMediaCacheKey,
+  getMediaCacheStats,
+  isCacheableMediaItem,
+  removeUnusedCachedMedia,
   restoreOfflineAssetMap,
 } from "./offline-player-cache";
+import {
+  exportLabReport,
+  getLabReport,
+  labEnabled,
+  recordPlayback,
+  recordSourceAssigned,
+  shareLastDecoderDiagnostic,
+} from "./android-diagnostics";
+import {
+  getJumpEvents,
+  jumpDiagnosticEnabled,
+  mediaElementSnapshot,
+  recordCurrentTimeAssignment,
+  recordJumpEvent,
+  recordSrcChange,
+  recordVideoEvent,
+  registerVideoElement,
+} from "./jump-diagnostics";
+import { isVideoToVideoTransition, releaseVideoElement } from "./decoder-lifecycle";
+import {
+  isAndroidLocalMediaSource,
+  resolveAndroidMediaSource,
+} from "./android-media-source";
+import {
+  LINK_STATES,
+  classifyLinkValidation,
+  clearTvConnection,
+  logLinkEvent,
+  persistTvConnection,
+  readTvConnection,
+  updateTvConnectionScreenId,
+} from "./android-link-lifecycle";
+import {
+  isSingleImagePlaylist,
+  isSingleVideoPlaylist,
+  restartSingleVideo,
+} from "./single-item-loop";
+import { createPlayerTelemetry, readPlayerTelemetryReport, TELEMETRY_DEFAULT_CONFIG } from "./player-telemetry";
+import {
+  claimPlayerBinding,
+  classifyPlayerIdentityFailure,
+  PLAYER_IDENTITY_STATES,
+  revokeOwnPlayerBinding,
+} from "./player-identity";
+import { deleteStoredAsset, uploadStorageAsset } from "./storage-service";
 import logo from "./assets/logo.png";
 import "./App.css";
 
 const PUBLIC_WEB_URL = "https://totempark.com.br";
+const BOOTSTRAP_MASTER_EMAILS = [
+  "admin@parksolutions.com",
+  "juniordoparque10@gmail.com",
+];
+const MASTER_ACCESS_DOC = ["settings", "masterAccess"];
+const ACCOUNT_REQUESTS_COLLECTION = "account_requests";
+const DEVELOPER_MODE_PASSWORD = "654";
+const COMMERCIAL_WHATSAPP = "5584991346016";
+const ACCOUNT_REQUEST_STATUS = {
+  new: "Nova solicitação",
+  waitingContact: "Aguardando contato",
+  contacted: "Contato realizado",
+  proposalSent: "Proposta enviada",
+  waitingConfirmation: "Aguardando confirmação",
+  approved: "Aprovada",
+  activated: "Conta ativada",
+  rejected: "Não aprovada",
+};
+const ACCOUNT_REQUEST_STATUS_OPTIONS = Object.values(ACCOUNT_REQUEST_STATUS);
+const PENDING_ACCOUNT_STATUS = "pending_commercial_validation";
 const TotemDevice = registerPlugin("TotemDevice");
 
+function normalizeEmail(email = "") {
+  return String(email || "").trim().toLowerCase();
+}
+
+async function loadMasterEmails() {
+  const snapshot = await getDoc(doc(db, ...MASTER_ACCESS_DOC));
+  const savedEmails = snapshot.exists() && Array.isArray(snapshot.data().emails)
+    ? snapshot.data().emails.map(normalizeEmail).filter(Boolean)
+    : [];
+
+  return snapshot.exists()
+    ? Array.from(new Set(savedEmails))
+    : BOOTSTRAP_MASTER_EMAILS;
+}
+
+function getAccountRequestDocId(email = "") {
+  const normalized = normalizeEmail(email);
+  return encodeURIComponent(normalized).replaceAll(".", "%2E");
+}
+
+function formatFirestoreDateTime(value) {
+  if (!value) return "Não informado";
+
+  const date = typeof value.toDate === "function"
+    ? value.toDate()
+    : new Date(value);
+
+  if (Number.isNaN(date.getTime())) return "Não informado";
+
+  return date.toLocaleString("pt-BR");
+}
+
+function onlyDigits(value = "") {
+  return String(value || "").replace(/\D/g, "");
+}
+
+function isValidEmail(value = "") {
+  return /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(String(value || "").trim());
+}
+
+function validateCnpj(value = "") {
+  const digits = onlyDigits(value);
+  if (!digits) return true;
+  if (digits.length !== 14 || /^(\d)\1+$/.test(digits)) return false;
+
+  const calcCheck = (base) => {
+    const weights = base.length === 12
+      ? [5, 4, 3, 2, 9, 8, 7, 6, 5, 4, 3, 2]
+      : [6, 5, 4, 3, 2, 9, 8, 7, 6, 5, 4, 3, 2];
+    const sum = base.split("").reduce((total, digit, index) => (
+      total + Number(digit) * weights[index]
+    ), 0);
+    const rest = sum % 11;
+    return rest < 2 ? "0" : String(11 - rest);
+  };
+
+  const first = calcCheck(digits.slice(0, 12));
+  const second = calcCheck(digits.slice(0, 12) + first);
+  return digits.endsWith(first + second);
+}
+
+function getWhatsappUrl(phone = COMMERCIAL_WHATSAPP, message = "") {
+  const text = encodeURIComponent(
+    message || "Olá! Acabei de solicitar a criação de uma conta na Totem Park e gostaria de mais informações."
+  );
+  return `https://wa.me/${onlyDigits(phone) || COMMERCIAL_WHATSAPP}?text=${text}`;
+}
+
+function getCommercialWhatsappUrl(message = "") {
+  return getWhatsappUrl(COMMERCIAL_WHATSAPP, message);
+}
+
+async function trySendAccountRequestEmail(requestData) {
+  const endpoint = import.meta.env.VITE_ACCOUNT_REQUEST_EMAIL_ENDPOINT;
+  if (!endpoint) return { skipped: true };
+
+  const response = await fetch(endpoint, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({
+      subject: "Recebemos sua solicitação de cadastro na Totem Park",
+      to: requestData.email,
+      name: requestData.responsibleName,
+      companyName: requestData.companyName,
+      status: "Aguardando validação comercial",
+    }),
+  });
+
+  if (!response.ok) {
+    throw new Error(`Falha no serviço de e-mail (${response.status})`);
+  }
+
+  return { sent: true };
+}
+
 function isNativeApp() {
+  const capacitor = typeof window !== "undefined" ? window.Capacitor : null;
+
   return (
     typeof window !== "undefined" &&
     (
-      window.Capacitor?.isNativePlatform?.() ||
+      capacitor?.isNativePlatform?.() ||
+      (typeof capacitor?.getPlatform === "function" && capacitor.getPlatform() !== "web") ||
       window.location.protocol === "capacitor:"
     )
   );
@@ -168,6 +340,22 @@ function isVideoItem(item = {}) {
   return normalized.includes("video");
 }
 
+function isMediaTypeName(type) {
+  const normalized = String(type || "")
+    .normalize("NFD")
+    .replace(/[\u0300-\u036f]/g, "")
+    .toLowerCase();
+
+  return normalized === "imagem" || normalized === "video";
+}
+
+function isTemplatePreviewItem(item = {}) {
+  if (item.playerItemType === "template") return true;
+  if (!item.templateType) return false;
+  if (isMediaTypeName(item.templateType)) return false;
+  return true;
+}
+
 function getTimestampMs(value) {
   if (!value) return 0;
   if (typeof value === "number") return value;
@@ -175,6 +363,254 @@ function getTimestampMs(value) {
   if (value.toDate) return value.toDate().getTime();
   if (value.seconds) return value.seconds * 1000;
   return 0;
+}
+
+const SCREEN_ONLINE_WINDOW_SECONDS = 90;
+const SCREEN_LOCATION_CACHE_KEY = "totempark-screen-location-cache";
+const SCREEN_LOCATION_CACHE_TTL_MS = 30 * 60 * 1000;
+let screenLocationRetryAfter = 0;
+
+function getScreenDeviceLabel(screen = {}) {
+  const deviceId = screen.connectedDeviceId || screen.activeDeviceId || "";
+
+  if (!deviceId) return "Nenhum dispositivo";
+
+  return screen.deviceName
+    || screen.connectedDeviceName
+    || `Dispositivo ${String(deviceId).slice(-6).toUpperCase()}`;
+}
+
+function getScreenLastSeenDate(screen = {}) {
+  // Only timestamps written by the player count as proof of connectivity.
+  const timestamp = Math.max(
+    getTimestampMs(screen.lastSeenAt),
+    getTimestampMs(screen.lastCommandExecutedAt),
+    getTimestampMs(screen.lastMediaUpdateAt)
+  );
+  return timestamp ? new Date(timestamp) : null;
+}
+
+function getScreenConnectionStatus(screen = {}, nowValue = Date.now()) {
+  const nowMs = getTimestampMs(nowValue) || Date.now();
+  const lastSeenDate = getScreenLastSeenDate(screen);
+  const lastSeenMs = lastSeenDate?.getTime?.() || 0;
+  const diffInSeconds = lastSeenMs ? (nowMs - lastSeenMs) / 1000 : Infinity;
+  const hasDevice = Boolean(screen.connectedDeviceId || screen.activeDeviceId);
+  const isOnline = hasDevice && diffInSeconds <= SCREEN_ONLINE_WINDOW_SECONDS;
+
+  if (isOnline) {
+    return {
+      key: "online",
+      className: "online",
+      label: "Online",
+      detail: "Sinal ativo",
+      isOnline: true,
+      hasDevice,
+      deviceLabel: getScreenDeviceLabel(screen),
+      lastSeenDate,
+      lastConnection: screen.lastConnection || "Data não informada",
+    };
+  }
+
+  if (hasDevice) {
+    return {
+      key: "logged-offline",
+      className: "logged-offline",
+      label: "Logada mas Offline",
+      detail: "Sem sinal recente",
+      isOnline: false,
+      hasDevice,
+      deviceLabel: getScreenDeviceLabel(screen),
+      lastSeenDate,
+      lastConnection: screen.lastConnection || "Data não informada",
+    };
+  }
+
+  return {
+    key: "not-logged",
+    className: "not-logged",
+    label: "Não está logada",
+    detail: "Nenhum dispositivo vinculado",
+    isOnline: false,
+    hasDevice,
+    deviceLabel: "Nenhum dispositivo",
+    lastSeenDate,
+    lastConnection: screen.lastConnection || "Ainda não conectou",
+  };
+}
+
+function formatScreenConnectionDate(value) {
+  const timestamp = getTimestampMs(value);
+
+  if (!timestamp) return "Sem registro";
+
+  return new Date(timestamp).toLocaleString("pt-BR");
+}
+
+function getScreenDeviceLocation(screen = {}) {
+  const location = screen.deviceLocation || {};
+  const city = screen.deviceLocationCity
+    || location.cityLabel
+    || location.displayName
+    || [location.city, location.regionCode || location.region].filter(Boolean).join("/")
+    || "";
+
+  return {
+    city: city || "Sem registro",
+    detail: location.source === "gps"
+      ? `GPS${location.accuracy ? ` • precisão ${Math.round(Number(location.accuracy))}m` : ""}`
+      : location.source === "ip"
+        ? "Localização aproximada por internet"
+        : "Localização ainda não registrada",
+    updatedAt: screen.deviceLocationUpdatedAt || location.capturedAt || null,
+  };
+}
+
+function getScreenDisplayLocation(screen = {}) {
+  const location = screen.deviceLocation || {};
+  const registeredLocation = typeof screen.location === "string"
+    ? screen.location.trim()
+    : "";
+  const detectedCity = screen.deviceLocationCity
+    || location.cityLabel
+    || location.displayName
+    || [location.city, location.regionCode || location.region].filter(Boolean).join("/")
+    || "";
+  const city = detectedCity || registeredLocation || "";
+
+  return {
+    city: city || "Sem registro",
+    detail: detectedCity && location.source === "gps"
+      ? `GPS${location.accuracy ? ` - precisao ${Math.round(Number(location.accuracy))}m` : ""}`
+      : detectedCity && location.source === "ip"
+        ? "Localizacao aproximada por internet"
+        : registeredLocation
+          ? "Local informado no cadastro"
+          : "Localizacao ainda nao registrada",
+    updatedAt: screen.deviceLocationUpdatedAt || location.capturedAt || null,
+    detected: Boolean(detectedCity),
+  };
+}
+
+function readCachedScreenLocation() {
+  if (typeof window === "undefined") return null;
+
+  try {
+    const raw = window.localStorage.getItem(SCREEN_LOCATION_CACHE_KEY);
+    if (!raw) return null;
+
+    const parsed = JSON.parse(raw);
+    const capturedAt = getTimestampMs(parsed?.capturedAt);
+
+    if (!capturedAt || Date.now() - capturedAt > SCREEN_LOCATION_CACHE_TTL_MS) return null;
+
+    return parsed;
+  } catch (error) {
+    return null;
+  }
+}
+
+function saveCachedScreenLocation(location) {
+  if (typeof window === "undefined" || !location) return;
+
+  try {
+    window.localStorage.setItem(SCREEN_LOCATION_CACHE_KEY, JSON.stringify(location));
+  } catch (error) {
+    // Cache local é opcional; o player não deve quebrar se a TV bloquear storage.
+  }
+}
+
+async function fetchIpScreenLocation() {
+  if (typeof fetch === "undefined") return null;
+
+  const controller = typeof AbortController !== "undefined" ? new AbortController() : null;
+  const timeoutId = controller ? setTimeout(() => controller.abort(), 3500) : null;
+
+  try {
+    const response = await fetch("https://ipapi.co/json/", {
+      cache: "no-store",
+      signal: controller?.signal,
+    });
+
+    if (!response.ok) return null;
+
+    const data = await response.json();
+    const city = data?.city || "";
+    const regionCode = data?.region_code || data?.region || "";
+
+    if (!city && !regionCode) return null;
+
+    return {
+      source: "ip",
+      city,
+      region: data?.region || "",
+      regionCode,
+      country: data?.country_name || data?.country || "",
+      cityLabel: [city, regionCode].filter(Boolean).join("/"),
+      latitude: data?.latitude || data?.lat || null,
+      longitude: data?.longitude || data?.lon || null,
+      capturedAt: new Date().toISOString(),
+    };
+  } catch (error) {
+    return null;
+  } finally {
+    if (timeoutId) clearTimeout(timeoutId);
+  }
+}
+
+async function getBrowserScreenLocationIfAllowed() {
+  if (typeof navigator === "undefined" || !navigator.geolocation) return null;
+
+  try {
+    if (navigator.permissions?.query) {
+      const permission = await navigator.permissions.query({ name: "geolocation" });
+      if (permission.state !== "granted") return null;
+    } else {
+      return null;
+    }
+
+    return await new Promise((resolve) => {
+      navigator.geolocation.getCurrentPosition(
+        (position) => {
+          resolve({
+            source: "gps",
+            latitude: position.coords.latitude,
+            longitude: position.coords.longitude,
+            accuracy: position.coords.accuracy,
+            capturedAt: new Date().toISOString(),
+          });
+        },
+        () => resolve(null),
+        { enableHighAccuracy: false, maximumAge: SCREEN_LOCATION_CACHE_TTL_MS, timeout: 3500 }
+      );
+    });
+  } catch (error) {
+    return null;
+  }
+}
+
+async function resolveScreenLocationSnapshot() {
+  if (screenLocationRetryAfter && Date.now() < screenLocationRetryAfter) return null;
+
+  const cached = readCachedScreenLocation();
+  if (cached) return cached;
+
+  const ipLocation = await fetchIpScreenLocation();
+  const gpsLocation = await getBrowserScreenLocationIfAllowed();
+  const location = ipLocation || gpsLocation
+    ? {
+        ...(ipLocation || {}),
+        ...(gpsLocation || {}),
+        source: gpsLocation ? "gps" : "ip",
+        cityLabel: ipLocation?.cityLabel || ipLocation?.city || "Coordenadas detectadas",
+        capturedAt: new Date().toISOString(),
+      }
+    : null;
+
+  if (location) saveCachedScreenLocation(location);
+  if (!location) screenLocationRetryAfter = Date.now() + SCREEN_LOCATION_CACHE_TTL_MS;
+
+  return location;
 }
 
 function getPlaylistItemDurationMs(item = {}) {
@@ -276,6 +712,24 @@ function getPreviewOrientationLabel(item = {}) {
   return getPreviewOrientation(item);
 }
 
+function getPlayableOrientation(item = {}, fallbackOrientation = "Paisagem") {
+  const aspectClass = getPreviewAspectClass(item);
+  if (aspectClass === "portrait") return "Retrato";
+  if (aspectClass === "landscape") return "Paisagem";
+
+  if (item.resolvedOrientation === "Retrato") return "Retrato";
+  if (item.resolvedOrientation === "Paisagem") return "Paisagem";
+  if (item.orientation === "Retrato") return "Retrato";
+  if (item.orientation === "Paisagem") return "Paisagem";
+
+  return fallbackOrientation === "Retrato" ? "Retrato" : "Paisagem";
+}
+
+function isOrientationCompatible(item = {}, targetOrientation = "Paisagem") {
+  if (!targetOrientation || targetOrientation === "Paisagem + Retrato") return true;
+  return getPlayableOrientation(item, targetOrientation) === targetOrientation;
+}
+
 function getAspectRatioLabel(width, height) {
   if (!width || !height) return "custom";
 
@@ -304,6 +758,71 @@ function buildMediaDimensions(width, height, fallbackOrientation = "Paisagem") {
   };
 }
 
+const VIDEO_FILE_EXTENSIONS = new Set(["mp4", "mov", "m4v", "webm", "mkv", "avi", "3gp"]);
+const IMAGE_FILE_EXTENSIONS = new Set(["jpg", "jpeg", "png", "webp", "gif", "bmp"]);
+
+function getUploadFileKind(file) {
+  const mimeType = String(file?.type || "").toLowerCase();
+  const extension = String(file?.name || "")
+    .split(".")
+    .pop()
+    ?.toLowerCase();
+
+  if (mimeType.startsWith("video/") || VIDEO_FILE_EXTENSIONS.has(extension)) return "video";
+  if (mimeType.startsWith("image/") || IMAGE_FILE_EXTENSIONS.has(extension)) return "image";
+
+  return "";
+}
+
+function getUploadContentType(file) {
+  const mimeType = String(file?.type || "").toLowerCase();
+  if (mimeType.includes("/")) return mimeType;
+
+  const extension = String(file?.name || "")
+    .split(".")
+    .pop()
+    ?.toLowerCase();
+
+  const fallbackTypes = {
+    mp4: "video/mp4",
+    mov: "video/quicktime",
+    m4v: "video/mp4",
+    webm: "video/webm",
+    mkv: "video/x-matroska",
+    avi: "video/x-msvideo",
+    "3gp": "video/3gpp",
+    jpg: "image/jpeg",
+    jpeg: "image/jpeg",
+    png: "image/png",
+    webp: "image/webp",
+    gif: "image/gif",
+    bmp: "image/bmp",
+  };
+
+  return fallbackTypes[extension] || "application/octet-stream";
+}
+
+function sanitizeStorageFileName(fileName = "midia") {
+  return (
+    String(fileName || "midia")
+      .replace(/[\\/#?%*:|"<>]/g, "-")
+      .replace(/\s+/g, " ")
+      .trim()
+      .slice(0, 120) || "midia"
+  );
+}
+
+function getUploadErrorMessage(error) {
+  if (error?.code === "storage/unauthorized") {
+    return "Sem permissão para enviar arquivo. Verifique se este usuário está vinculado ao cliente correto.";
+  }
+
+  if (error?.code === "permission-denied") {
+    return "Arquivo enviado, mas sem permissão para salvar a mídia neste cliente.";
+  }
+
+  return error?.message || "Erro ao enviar mídia.";
+}
 function detectMediaFileMetadata(file) {
   return new Promise((resolve) => {
     if (!file) {
@@ -312,26 +831,172 @@ function detectMediaFileMetadata(file) {
     }
 
     const objectUrl = URL.createObjectURL(file);
-    const isVideo = file.type?.startsWith("video/");
+    const isVideo = getUploadFileKind(file) === "video";
     const element = document.createElement(isVideo ? "video" : "img");
+    let done = false;
+    let timeoutId = null;
 
-    function finish(width, height) {
+    function finish(width, height, durationSeconds = null) {
+      if (done) return;
+      done = true;
+      if (timeoutId) clearTimeout(timeoutId);
       URL.revokeObjectURL(objectUrl);
-      resolve(buildMediaDimensions(width, height));
+      resolve({
+        ...buildMediaDimensions(width, height),
+        naturalDuration: durationSeconds,
+      });
     }
 
+    timeoutId = setTimeout(() => finish(0, 0), isVideo ? 4500 : 2500);
     element.onerror = () => finish(0, 0);
 
     if (isVideo) {
       element.preload = "metadata";
-      element.onloadedmetadata = () => finish(element.videoWidth, element.videoHeight);
+      element.onloadedmetadata = () => {
+        const durationSeconds = Number.isFinite(element.duration)
+          ? Math.max(1, Math.round(element.duration))
+          : null;
+        finish(element.videoWidth, element.videoHeight, durationSeconds);
+      };
+      element.onloadeddata = () => {
+        if (element.videoWidth || element.videoHeight) {
+          const durationSeconds = Number.isFinite(element.duration)
+            ? Math.max(1, Math.round(element.duration))
+            : null;
+          finish(element.videoWidth, element.videoHeight, durationSeconds);
+        }
+      };
       element.src = objectUrl;
+      element.load?.();
       return;
     }
 
     element.onload = () => finish(element.naturalWidth, element.naturalHeight);
     element.src = objectUrl;
   });
+}
+
+function VideoPreviewMedia({ src, title, compact, onDetectedSize }) {
+  const [thumbnail, setThumbnail] = useState("");
+  const [failed, setFailed] = useState(false);
+  const [directVideoFailed, setDirectVideoFailed] = useState(false);
+
+  useEffect(() => {
+    if (!src) {
+      setThumbnail("");
+      setFailed(true);
+      setDirectVideoFailed(true);
+      return undefined;
+    }
+
+    let active = true;
+    setThumbnail("");
+    setFailed(false);
+    setDirectVideoFailed(false);
+
+    const video = document.createElement("video");
+    video.crossOrigin = "anonymous";
+    video.muted = true;
+    video.playsInline = true;
+    video.preload = "metadata";
+
+    function fail() {
+      if (!active) return;
+      setFailed(true);
+    }
+
+    function captureFrame() {
+      if (!active) return;
+
+      try {
+        const width = video.videoWidth || 0;
+        const height = video.videoHeight || 0;
+
+        if (!width || !height) {
+          fail();
+          return;
+        }
+
+        onDetectedSize?.(width, height);
+
+        const canvas = document.createElement("canvas");
+        canvas.width = width;
+        canvas.height = height;
+        const context = canvas.getContext("2d");
+        context.drawImage(video, 0, 0, width, height);
+        const dataUrl = canvas.toDataURL("image/jpeg", compact ? 0.68 : 0.78);
+
+        setThumbnail(dataUrl);
+        setFailed(false);
+      } catch {
+        fail();
+      }
+    }
+
+    video.onloadedmetadata = () => {
+      if (!active) return;
+
+      onDetectedSize?.(video.videoWidth, video.videoHeight);
+
+      if (Number.isFinite(video.duration) && video.duration > 0.25) {
+        try {
+          recordCurrentTimeAssignment(video, Math.min(0.2, video.duration / 2), "preview-frame");
+          video.currentTime = Math.min(0.2, video.duration / 2);
+          return;
+        } catch {}
+      }
+
+      captureFrame();
+    };
+    video.onseeked = captureFrame;
+    video.onloadeddata = () => {
+      if (!thumbnail) captureFrame();
+    };
+    video.onerror = fail;
+    video.src = src;
+    video.load();
+
+    return () => {
+      active = false;
+      video.removeAttribute("src");
+      video.load();
+    };
+  }, [src, compact]);
+
+  if (thumbnail) {
+    return <img src={thumbnail} alt={title || "Preview do vídeo"} />;
+  }
+
+  if (failed && src && !directVideoFailed) {
+    return (
+      <video
+        src={src}
+        muted
+        autoPlay
+        loop
+        playsInline
+        preload="metadata"
+        className={compact ? "preview-video is-compact" : "preview-video"}
+        onLoadedMetadata={(event) => {
+          onDetectedSize?.(
+            event.currentTarget.videoWidth,
+            event.currentTarget.videoHeight
+          );
+        }}
+        onCanPlay={(event) => {
+          event.currentTarget.play().catch(() => {});
+        }}
+        onError={() => setDirectVideoFailed(true)}
+      />
+    );
+  }
+
+  return (
+    <div className="video-preview-fallback">
+      <div className="video-preview-play"></div>
+      <span>{failed ? "Preview do vídeo indisponível" : "Carregando preview"}</span>
+    </div>
+  );
 }
 
 function UniversalPreview({
@@ -344,6 +1009,11 @@ function UniversalPreview({
   fallbackIcon = <Monitor size={34} />,
 }) {
   const [detectedDimensions, setDetectedDimensions] = useState(null);
+  const [sourceFallbackIndex, setSourceFallbackIndex] = useState(0);
+
+  useEffect(() => {
+    setSourceFallbackIndex(0);
+  }, [item?.id, item?.preview, item?.remotePreview, item?.imageUrl, item?.logoUrl]);
 
   if (!item) {
     return (
@@ -355,11 +1025,34 @@ function UniversalPreview({
 
   const measuredItem = detectedDimensions ? { ...item, ...detectedDimensions } : item;
   const realType = measuredItem.templateType || measuredItem.type;
-  const isTemplate = measuredItem.playerItemType === "template" || measuredItem.templateType;
+  const isTemplate = isTemplatePreviewItem(measuredItem);
   const isMarketingArt = realType === "marketing_art";
   const aspectClass = getPreviewAspectClass(measuredItem);
   const badgeLabel = getPreviewOrientationLabel(measuredItem);
   const frameClass = `media-preview-frame ${aspectClass} ${className}`.trim();
+  const useDirectMediaPreview =
+    className.includes("playlist-preview-frame") ||
+    className.includes("playlist-created-item-preview") ||
+    className.includes("playlist-order");
+  const mediaSources = [
+    measuredItem.preview,
+    measuredItem.sourcePreview,
+    measuredItem.remotePreview,
+    measuredItem.sourceRemotePreview,
+    measuredItem.imageUrl,
+    measuredItem.sourceImageUrl,
+    measuredItem.logoUrl,
+  ].filter((value, index, list) => value && list.indexOf(value) === index);
+  const mediaSrc = mediaSources[sourceFallbackIndex] || mediaSources[0] || "";
+
+  function tryNextPreviewSource() {
+    if (sourceFallbackIndex < mediaSources.length - 1) {
+      setSourceFallbackIndex((current) => current + 1);
+      return true;
+    }
+
+    return false;
+  }
 
   function handleDetectedSize(width, height) {
     const cleanWidth = Number(width || 0);
@@ -396,26 +1089,52 @@ function UniversalPreview({
     content = <MarketingArtPreview art={measuredItem} compact={compact} />;
   } else if (isTemplate) {
     content = <TemplateVisualPreview template={measuredItem} compact={compact} />;
-  } else if (measuredItem.preview) {
-    content = isVideoItem(measuredItem) ? (
+  } else if (mediaSrc) {
+    content = isVideoItem(measuredItem) && (compact || (!useDirectMediaPreview && !(controls && !compact))) ? (
+      <VideoPreviewMedia
+        src={mediaSrc}
+        title={measuredItem.title || measuredItem.name}
+        compact={compact}
+        onDetectedSize={handleDetectedSize}
+      />
+    ) : isVideoItem(measuredItem) ? (
       <video
-        src={measuredItem.preview}
-        muted={!controls}
-        controls={controls}
-        autoPlay={autoPlay}
-        loop={autoPlay}
+        src={mediaSrc}
+        muted
+        controls={controls && !compact}
+        autoPlay={autoPlay || compact}
+        loop={autoPlay || compact}
         playsInline
         preload="metadata"
+        className={compact ? "preview-video is-compact" : "preview-video"}
         onLoadedMetadata={(event) => {
           handleDetectedSize(event.currentTarget.videoWidth, event.currentTarget.videoHeight);
+          if (compact && event.currentTarget.duration > 0.2) {
+            try {
+              recordCurrentTimeAssignment(event.currentTarget, Math.min(0.15, event.currentTarget.duration / 2), "preview-frame");
+              event.currentTarget.currentTime = Math.min(0.15, event.currentTarget.duration / 2);
+            } catch {}
+          }
+        }}
+        onCanPlay={(event) => {
+          if (compact) {
+            event.currentTarget.play().catch(() => {});
+          }
+        }}
+        onError={() => {
+          tryNextPreviewSource();
         }}
       />
     ) : (
       <img
-        src={measuredItem.preview}
+        src={mediaSrc}
         alt={measuredItem.title || measuredItem.name || "Preview"}
+        loading="lazy"
         onLoad={(event) => {
           handleDetectedSize(event.currentTarget.naturalWidth, event.currentTarget.naturalHeight);
+        }}
+        onError={() => {
+          tryNextPreviewSource();
         }}
       />
     );
@@ -472,10 +1191,48 @@ const NEWS_SOURCE_PRESETS = {
   "UOL Notícias": "https://rss.uol.com.br/feed/noticias.xml",
   "Globo": "https://g1.globo.com/rss/g1/",
   "Metrópoles": "https://www.metropoles.com/feed",
+  "Metrópoles Celebridades": "https://www.metropoles.com/celebridades/feed",
+  "Metrópoles Vida & Estilo": "https://www.metropoles.com/vida-e-estilo/feed",
   "Jovem Pan": "https://jovempan.com.br/feed",
   "GE": "https://ge.globo.com/rss/ge/",
+  "Steal The Look": "https://stealthelook.com.br/feed/",
+  "Beauty Buzz": "https://beautybuzz.com.br/feed/",
+  "Saudável Receita": "https://saudavelreceita.com.br/feed/",
   "Personalizado": "",
 };
+
+const BEAUTY_TEMPLATE_ALLOWED_SOURCES = ["Steal The Look", "Beauty Buzz", "Personalizado"];
+const BEAUTY_TEMPLATE_KEYWORDS = [
+  "beleza",
+  "beauty",
+  "skincare",
+  "skin care",
+  "maquiagem",
+  "make",
+  "cabelo",
+  "cabelos",
+  "unha",
+  "unhas",
+  "esmalte",
+  "estetica",
+  "estetico",
+  "autocuidado",
+  "cosmetico",
+  "cosmeticos",
+  "dermocosmetico",
+  "dermocosmeticos",
+  "perfume",
+  "perfumaria",
+  "moda",
+  "look",
+  "looks",
+  "tendencia",
+  "tendencias",
+  "salon",
+  "salao",
+  "botox",
+  "spa",
+];
 
 function getSavedCustomNewsSources() {
   try {
@@ -524,9 +1281,51 @@ function stripHtml(value) {
     .replace(/&nbsp;/g, " ")
     .replace(/&amp;/g, "&")
     .replace(/&quot;/g, '"')
+    .replace(/&ldquo;|&rdquo;/g, '"')
+    .replace(/&lsquo;|&rsquo;/g, "'")
+    .replace(/&aacute;/g, "á")
+    .replace(/&eacute;/g, "é")
+    .replace(/&iacute;/g, "í")
+    .replace(/&oacute;/g, "ó")
+    .replace(/&uacute;/g, "ú")
+    .replace(/&atilde;/g, "ã")
+    .replace(/&otilde;/g, "õ")
+    .replace(/&ccedil;/g, "ç")
+    .replace(/&Aacute;/g, "Á")
+    .replace(/&Eacute;/g, "É")
+    .replace(/&Iacute;/g, "Í")
+    .replace(/&Oacute;/g, "Ó")
+    .replace(/&Uacute;/g, "Ú")
+    .replace(/&Atilde;/g, "Ã")
+    .replace(/&Otilde;/g, "Õ")
+    .replace(/&Ccedil;/g, "Ç")
     .replace(/&#39;/g, "'")
+    .replace(/&#(\d+);/g, (_, code) => String.fromCharCode(Number(code)))
     .replace(/\s+/g, " ")
     .trim();
+}
+
+function normalizeSearchText(value = "") {
+  return String(value || "")
+    .normalize("NFD")
+    .replace(/[\u0300-\u036f]/g, "")
+    .toLowerCase();
+}
+
+function isBeautyNewsItem(item = {}) {
+  const text = normalizeSearchText([
+    item.title,
+    item.description,
+    item.source,
+    item.link,
+  ].filter(Boolean).join(" "));
+
+  return BEAUTY_TEMPLATE_KEYWORDS.some((keyword) => text.includes(keyword));
+}
+
+function filterBeautyNewsItems(items = []) {
+  const filtered = (Array.isArray(items) ? items : []).filter(isBeautyNewsItem);
+  return filtered.length ? filtered : [];
 }
 
 function getNewsItemTitle(item) {
@@ -542,6 +1341,45 @@ function getNewsItemDescription(item) {
 function getNewsItemImage(item) {
   if (typeof item === "string") return "";
   return item?.image || "";
+}
+
+function findImageUrlDeep(value, depth = 0) {
+  if (!value || depth > 4) return "";
+
+  if (typeof value === "string") {
+    const cleanValue = value.trim();
+    if (/^https?:\/\/.+\.(?:jpg|jpeg|png|webp)(?:\?.*)?$/i.test(cleanValue)) {
+      return cleanValue;
+    }
+
+    const htmlMatch = cleanValue.match(/<img[^>]+(?:src|data-src|data-lazy-src)=["']([^"']+)["']/i)
+      || cleanValue.match(/https?:\/\/[^"'<>\s]+\.(?:jpg|jpeg|png|webp)(?:\?[^"'<>\s]*)?/i);
+    return htmlMatch?.[1] || htmlMatch?.[0] || "";
+  }
+
+  if (Array.isArray(value)) {
+    for (const nestedItem of value) {
+      const found = findImageUrlDeep(nestedItem, depth + 1);
+      if (found) return found;
+    }
+    return "";
+  }
+
+  if (typeof value === "object") {
+    const preferredKeys = ["image", "thumbnail", "thumbnailUrl", "url", "link", "source_url", "guid", "content", "description", "encoded"];
+
+    for (const key of preferredKeys) {
+      const found = findImageUrlDeep(value[key], depth + 1);
+      if (found) return found;
+    }
+
+    for (const nestedValue of Object.values(value)) {
+      const found = findImageUrlDeep(nestedValue, depth + 1);
+      if (found) return found;
+    }
+  }
+
+  return "";
 }
 
 function getNewsItemSource(item, fallback = "Notícias") {
@@ -573,6 +1411,15 @@ function getNewsItemTime(item) {
 }
 
 function getNewsItemImageFromRss(item) {
+  const htmlSource = [
+    item?.description,
+    item?.content,
+    item?.content_encoded,
+    item?.["content:encoded"],
+  ].filter(Boolean).join(" ");
+  const imageMatch = String(htmlSource).match(/<img[^>]+src=["']([^"']+)["']/i)
+    || String(htmlSource).match(/https?:\/\/[^"'<>\s]+\.(?:jpg|jpeg|png|webp)(?:\?[^"'<>\s]*)?/i);
+
   return (
     item?.thumbnail ||
     item?.enclosure?.link ||
@@ -581,11 +1428,106 @@ function getNewsItemImageFromRss(item) {
     item?.media?.thumbnail?.url ||
     item?.["media:content"]?.url ||
     item?.["media:thumbnail"]?.url ||
+    findImageUrlDeep(item) ||
+    imageMatch?.[1] ||
+    imageMatch?.[0] ||
     ""
   );
 }
 
-async function fetchWeatherByCity(cityName) {
+const WEATHER_COORDINATE_PRESETS = {
+  "joao camara/rn": { name: "João Câmara", admin1: "RN", displayName: "João Câmara/RN", latitude: -5.5376, longitude: -35.8197 },
+  "joao camara": { name: "João Câmara", admin1: "RN", displayName: "João Câmara/RN", latitude: -5.5376, longitude: -35.8197 },
+  "natal/rn": { name: "Natal", admin1: "RN", displayName: "Natal/RN", latitude: -5.7945, longitude: -35.2110 },
+  "natal": { name: "Natal", admin1: "RN", displayName: "Natal/RN", latitude: -5.7945, longitude: -35.2110 },
+  "jandaira/rn": { name: "Jandaira", admin1: "RN", displayName: "Jandaira/RN", latitude: -5.3544, longitude: -36.1278 },
+  "macau/rn": { name: "Macau", admin1: "RN", displayName: "Macau/RN", latitude: -5.1150, longitude: -36.6347 },
+  "guamare/rn": { name: "Guamare", admin1: "RN", displayName: "Guamare/RN", latitude: -5.1078, longitude: -36.3228 },
+  "galinhos/rn": { name: "Galinhos", admin1: "RN", displayName: "Galinhos/RN", latitude: -5.0919, longitude: -36.2758 },
+  "parazinho/rn": { name: "Parazinho", admin1: "RN", displayName: "Parazinho/RN", latitude: -5.2222, longitude: -35.8392 },
+  "bento fernandes/rn": { name: "Bento Fernandes", admin1: "RN", displayName: "Bento Fernandes/RN", latitude: -5.6992, longitude: -35.8158 },
+  "jardim de angicos/rn": { name: "Jardim de Angicos", admin1: "RN", displayName: "Jardim de Angicos/RN", latitude: -5.6497, longitude: -35.9717 },
+  "pedra preta/rn": { name: "Pedra Preta", admin1: "RN", displayName: "Pedra Preta/RN", latitude: -5.5817, longitude: -36.1036 },
+  "ceara mirim/rn": { name: "Ceara-Mirim", admin1: "RN", displayName: "Ceara-Mirim/RN", latitude: -5.6344, longitude: -35.4256 },
+  "currais novos/rn": { name: "Currais Novos", admin1: "RN", displayName: "Currais Novos/RN", latitude: -6.2608, longitude: -36.5178 },
+  "parnamirim/rn": { name: "Parnamirim", admin1: "RN", displayName: "Parnamirim/RN", latitude: -5.9156, longitude: -35.2628 },
+  "mossoro/rn": { name: "Mossoro", admin1: "RN", displayName: "Mossoro/RN", latitude: -5.1875, longitude: -37.3442 },
+  "recife/pe": { name: "Recife", admin1: "PE", displayName: "Recife/PE", latitude: -8.0476, longitude: -34.8770 },
+  "fortaleza/ce": { name: "Fortaleza", admin1: "CE", displayName: "Fortaleza/CE", latitude: -3.7319, longitude: -38.5267 },
+  "joao pessoa/pb": { name: "João Pessoa", admin1: "PB", displayName: "João Pessoa/PB", latitude: -7.1195, longitude: -34.8450 },
+  "salvador/ba": { name: "Salvador", admin1: "BA", displayName: "Salvador/BA", latitude: -12.9777, longitude: -38.5016 },
+  "sao paulo/sp": { name: "São Paulo", admin1: "SP", displayName: "São Paulo/SP", latitude: -23.5505, longitude: -46.6333 },
+  "rio de janeiro/rj": { name: "Rio de Janeiro", admin1: "RJ", displayName: "Rio de Janeiro/RJ", latitude: -22.9068, longitude: -43.1729 },
+};
+
+function repairWeatherText(value = "") {
+  return String(value || "")
+    .replace(/JoÃ£o/g, "Jo\u00e3o")
+    .replace(/CÃ¢mara/g, "C\u00e2mara")
+    .replace(/SÃ£o/g, "S\u00e3o")
+    .replace(/TambaÃº/g, "Tamba\u00fa")
+    .replace(/CearÃ¡/g, "Cear\u00e1")
+    .replace(/atualizaÃ§Ã£o/g, "atualiza\u00e7\u00e3o")
+    .replace(/nÃ£o/g, "n\u00e3o")
+    .replace(/cÃ³digo/g, "c\u00f3digo");
+}
+
+function repairWeatherTextSafe(value = "") {
+  return repairWeatherText(value)
+    .replace(/Jo(?:\u00c3\u0192\u00c2\u00a3|\u00c3\u00a3)o/g, "Jo\u00e3o")
+    .replace(/C(?:\u00c3\u0192\u00c2\u00a2|\u00c3\u00a2)mara/g, "C\u00e2mara")
+    .replace(/S(?:\u00c3\u0192\u00c2\u00a3|\u00c3\u00a3)o/g, "S\u00e3o")
+    .replace(/Tamba(?:\u00c3\u0192\u00c2\u00ba|\u00c3\u00ba)/g, "Tamba\u00fa")
+    .replace(/Cear(?:\u00c3\u0192\u00c2\u00a1|\u00c3\u00a1)/g, "Cear\u00e1")
+    .replace(/atualiza(?:\u00c3\u0192\u00c2\u00a7|\u00c3\u00a7)(?:\u00c3\u0192\u00c2\u00a3|\u00c3\u00a3)o/g, "atualiza\u00e7\u00e3o")
+    .replace(/n(?:\u00c3\u0192\u00c2\u00a3|\u00c3\u00a3)o/g, "n\u00e3o")
+    .replace(/c(?:\u00c3\u0192\u00c2\u00b3|\u00c3\u00b3)digo/g, "c\u00f3digo");
+}
+
+function normalizeWeatherKey(value = "") {
+  return repairWeatherTextSafe(value)
+    .normalize("NFD")
+    .replace(/[\u0300-\u036f]/g, "")
+    .replace(/\s+/g, " ")
+    .trim()
+    .toLowerCase();
+}
+
+function normalizeWeatherCityName(value = "") {
+  return String(value || "João Câmara/RN").split("/")[0].trim() || "João Câmara";
+}
+
+function pickBestWeatherPlace(results = [], originalCity = "") {
+  const state = String(originalCity).split("/")[1]?.trim().toLowerCase();
+
+  if (state) {
+    const byState = results.find((place) => normalizeWeatherKey(place.admin1 || place.admin2 || "").includes(state));
+    if (byState) return byState;
+  }
+
+  return results[0] || null;
+}
+
+function toRoundedWeatherValue(value, fallback = "--") {
+  const number = Number(value);
+  return Number.isFinite(number) ? Math.round(number) : fallback;
+}
+
+function buildFallbackWeatherDaily() {
+  const today = new Date();
+  return {
+    time: Array.from({ length: 5 }, (_, index) => {
+      const date = new Date(today);
+      date.setDate(today.getDate() + index);
+      return date.toISOString().slice(0, 10);
+    }),
+    weather_code: [2, 2, 3, 61, 2],
+    temperature_2m_max: [30, 31, 31, 29, 30],
+    temperature_2m_min: [23, 24, 24, 22, 23],
+  };
+}
+
+async function fetchWeatherByCityLegacy(cityName) {
   const city = (cityName || "João Câmara").trim();
 
   try {
@@ -631,6 +1573,147 @@ async function fetchWeatherByCity(cityName) {
   }
 }
 
+async function fetchWeatherByCity(cityName) {
+  const city = (cityName || "João Câmara/RN").trim();
+  const repairedCity = repairWeatherTextSafe(city);
+  const normalizedCity = normalizeWeatherCityName(repairedCity);
+
+  try {
+    let place = WEATHER_COORDINATE_PRESETS[normalizeWeatherKey(repairedCity)]
+      || WEATHER_COORDINATE_PRESETS[normalizeWeatherKey(normalizedCity)];
+
+    if (!place) {
+      const geoResponse = await fetch(
+        `https://geocoding-api.open-meteo.com/v1/search?name=${encodeURIComponent(normalizedCity)}&count=5&language=pt&format=json`
+      );
+
+      if (!geoResponse.ok) {
+        throw new Error("Falha ao consultar cidade.");
+      }
+
+      const geoData = await geoResponse.json();
+      place = pickBestWeatherPlace(geoData?.results || [], repairedCity);
+    }
+
+    if (!place) {
+      throw new Error("Cidade nao encontrada.");
+    }
+
+    const weatherResponse = await fetch(
+      `https://api.open-meteo.com/v1/forecast?latitude=${place.latitude}&longitude=${place.longitude}&current=temperature_2m,relative_humidity_2m,apparent_temperature,weather_code,wind_speed_10m&daily=temperature_2m_max,temperature_2m_min,weather_code&timezone=auto&forecast_days=5`
+    );
+
+    if (!weatherResponse.ok) {
+      throw new Error("Falha ao consultar clima.");
+    }
+
+    const weatherData = await weatherResponse.json();
+    const current = weatherData?.current || {};
+
+    return {
+      city: repairWeatherTextSafe(place.displayName || `${place.name}${place.admin1 ? `/${place.admin1}` : ""}`),
+      temperature: toRoundedWeatherValue(current.temperature_2m),
+      sensation: toRoundedWeatherValue(current.apparent_temperature),
+      humidity: toRoundedWeatherValue(current.relative_humidity_2m),
+      wind: toRoundedWeatherValue(current.wind_speed_10m),
+      weatherCode: current.weather_code ?? null,
+      daily: weatherData?.daily || null,
+      source: "Open-Meteo",
+      updatedAt: current.time || new Date().toISOString(),
+    };
+  } catch (error) {
+    console.log("Erro ao buscar clima:", error);
+
+    return {
+      city: repairedCity,
+      temperature: "--",
+      sensation: "--",
+      humidity: "--",
+      wind: "--",
+      weatherCode: null,
+      daily: buildFallbackWeatherDaily(),
+      source: "Aguardando atualização",
+    };
+  }
+}
+
+async function fetchHealthyRecipePostsFromWordPress(feedUrl) {
+  const sourceUrl = String(feedUrl || "").trim();
+  if (!sourceUrl.includes("saudavelreceita.com.br")) return [];
+
+  try {
+    const response = await fetch("https://saudavelreceita.com.br/wp-json/wp/v2/posts?per_page=12&_embed=1");
+    if (!response.ok) throw new Error("Falha ao consultar receitas.");
+
+    const posts = await response.json();
+    return (Array.isArray(posts) ? posts : [])
+      .map((post) => {
+        const embeddedMedia = post?._embedded?.["wp:featuredmedia"]?.[0];
+        const image = embeddedMedia?.media_details?.sizes?.large?.source_url
+          || embeddedMedia?.media_details?.sizes?.medium_large?.source_url
+          || embeddedMedia?.media_details?.sizes?.medium?.source_url
+          || embeddedMedia?.source_url
+          || findImageUrlDeep(post);
+
+        return {
+          title: stripHtml(post?.title?.rendered || post?.title || ""),
+          description: stripHtml(post?.excerpt?.rendered || post?.content?.rendered || "").slice(0, 160),
+          image,
+          source: "Saudável Receita",
+          pubDate: post?.date || post?.modified || "",
+          link: post?.link || "",
+        };
+      })
+      .filter((item) => item.title);
+  } catch (error) {
+    console.log("Erro ao buscar receitas fitness:", error);
+    return [];
+  }
+}
+
+async function fetchBeautyPostsFromWordPress(feedUrl) {
+  const sourceUrl = String(feedUrl || "").trim();
+  const isBeautyBuzz = sourceUrl.includes("beautybuzz.com.br");
+  const isStealTheLook = sourceUrl.includes("stealthelook.com.br");
+  if (!isBeautyBuzz && !isStealTheLook) return [];
+
+  const endpoint = isStealTheLook
+    ? "https://stealthelook.com.br/wp-json/wp/v2/posts?per_page=16&_embed=1"
+    : "https://beautybuzz.com.br/wp-json/wp/v2/posts?per_page=16&_embed=1";
+  const sourceName = isStealTheLook ? "Steal The Look" : "Beauty Buzz";
+
+  try {
+    const response = await fetch(endpoint);
+    if (!response.ok) throw new Error(`Falha ao consultar ${sourceName}.`);
+
+    const posts = await response.json();
+    const items = (Array.isArray(posts) ? posts : [])
+      .map((post) => {
+        const embeddedMedia = post?._embedded?.["wp:featuredmedia"]?.[0];
+        const image = embeddedMedia?.media_details?.sizes?.large?.source_url
+          || embeddedMedia?.media_details?.sizes?.medium_large?.source_url
+          || embeddedMedia?.media_details?.sizes?.medium?.source_url
+          || embeddedMedia?.source_url
+          || findImageUrlDeep(post);
+
+        return {
+          title: stripHtml(post?.title?.rendered || post?.title || ""),
+          description: stripHtml(post?.excerpt?.rendered || post?.content?.rendered || "").slice(0, 160),
+          image,
+          source: sourceName,
+          pubDate: post?.date || post?.modified || "",
+          link: post?.link || "",
+        };
+      })
+      .filter((item) => item.title);
+
+    return filterBeautyNewsItems(items);
+  } catch (error) {
+    console.log("Erro ao buscar tendencias de beleza:", error);
+    return [];
+  }
+}
+
 async function fetchNewsFromRss(feedUrl) {
   const url = (feedUrl || "").trim();
 
@@ -639,6 +1722,12 @@ async function fetchNewsFromRss(feedUrl) {
   }
 
   try {
+    const recipeItems = await fetchHealthyRecipePostsFromWordPress(url);
+    if (recipeItems.length) return recipeItems;
+
+    const beautyItems = await fetchBeautyPostsFromWordPress(url);
+    if (beautyItems.length) return beautyItems;
+
     const response = await fetch(
       `https://api.rss2json.com/v1/api.json?rss_url=${encodeURIComponent(url)}`
     );
@@ -665,15 +1754,28 @@ async function fetchNewsFromRss(feedUrl) {
   }
 }
 
-function getTemplateThemeStyle(template) {
+function getTemplateTickerDurationForText(value, text = "") {
+  const speed = getTemplateTickerSpeed(value);
+  const length = String(text || "").length;
+
+  if (speed === "slow") return Math.max(42, Math.min(150, Math.round(32 + length * 0.22)));
+  if (speed === "fast") return Math.max(16, Math.min(90, Math.round(12 + length * 0.12)));
+
+  return Math.max(26, Math.min(120, Math.round(18 + length * 0.17)));
+}
+
+function getTemplateThemeStyle(template, tickerText = "") {
   const tickerSpeed = getTemplateTickerSpeed(template?.tickerSpeed);
+  const backgroundTheme = getTemplateBackgroundTheme(template);
+  const fallbackTextColor = backgroundTheme === "light_premium" ? "#0f172a" : "#ffffff";
 
   return {
     "--template-primary": template?.primaryColor || "#06b6d4",
     "--template-secondary": template?.secondaryColor || "#9333ea",
     "--template-accent": template?.accentColor || "#22d3ee",
-    "--template-text": template?.textColor || "#ffffff",
-    "--template-ticker-duration": `${getTemplateTickerDuration(tickerSpeed)}s`,
+    "--template-text": template?.textColor || fallbackTextColor,
+    "--template-main-text": template?.mainTextColor || template?.textColor || fallbackTextColor,
+    "--template-ticker-duration": `${getTemplateTickerDurationForText(tickerSpeed, tickerText)}s`,
   };
 }
 
@@ -686,6 +1788,11 @@ function getTemplateTypeLabel(type) {
     jornal_premium: "Jornal TV Premium",
     clima_premium_v2: "Clima Premium V2",
     hora_certa_premium: "Hora Certa Premium",
+    resultados_esportivos_premium: "Resultados Esportivos Premium",
+    tela_corporativa_personalizada: "Tela Corporativa Personalizada",
+    receitas_fitness_premium: "Receitas Fitness Premium",
+    tendencia_beleza_premium: "Tendência de Beleza Premium",
+    fofocas_premium: "Fofocas Brasil Premium",
     cardapio_premium: "Cardápio Premium",
     promocao_premium: "Promoção Premium",
     corporativo_premium: "Corporativo Premium",
@@ -699,6 +1806,11 @@ function getTemplateBadge(type) {
   if (type === "jornal_premium") return "JORNAL TV";
   if (type === "clima_premium_v2") return "CLIMA PREMIUM";
   if (type === "hora_certa_premium") return "HORA CERTA";
+  if (type === "resultados_esportivos_premium") return "PLACAR";
+  if (type === "tela_corporativa_personalizada") return "CORPORATIVO";
+  if (type === "receitas_fitness_premium") return "RECEITAS";
+  if (type === "tendencia_beleza_premium") return "BELEZA";
+  if (type === "fofocas_premium") return "FOFOCAS BR";
   if (type === "cardapio_premium") return "CARDÁPIO";
   if (type === "promocao_premium") return "OFERTAS";
   if (type === "corporativo_premium") return "CORPORATIVO";
@@ -712,6 +1824,11 @@ const PREMIUM_TEMPLATE_TYPES = [
   "jornal_premium",
   "clima_premium_v2",
   "hora_certa_premium",
+  "resultados_esportivos_premium",
+  "tela_corporativa_personalizada",
+  "receitas_fitness_premium",
+  "tendencia_beleza_premium",
+  "fofocas_premium",
   "cardapio_premium",
   "promocao_premium",
   "corporativo_premium",
@@ -726,7 +1843,7 @@ function getTemplateTickerSpeed(value) {
 function getTemplateTickerSpeedLabel(value) {
   const speed = getTemplateTickerSpeed(value);
   if (speed === "slow") return "Lenta";
-  if (speed === "fast") return "Rapida";
+  if (speed === "fast") return "Rápida";
   return "Normal";
 }
 
@@ -746,18 +1863,105 @@ function getTemplateNewsSources(template) {
 }
 
 function getTemplateNewsFeedUrls(template, customNewsSources = []) {
+  const templateType = template?.templateType || template?.type || "";
   const sources = getTemplateNewsSources(template);
   const customMap = customNewsSources.reduce((map, source) => {
     map[source.name] = source.url;
     return map;
   }, {});
+  const resolvedSources = templateType === "tendencia_beleza_premium"
+    ? sources.filter((sourceName) =>
+        BEAUTY_TEMPLATE_ALLOWED_SOURCES.includes(sourceName) || Boolean(customMap[sourceName])
+      )
+    : sources;
+  const safeSources = templateType === "tendencia_beleza_premium"
+    ? Array.from(new Set([
+        ...(resolvedSources.includes("Beauty Buzz") ? ["Steal The Look"] : []),
+        ...(resolvedSources.length ? resolvedSources : ["Steal The Look", "Beauty Buzz"]),
+      ]))
+    : resolvedSources;
 
-  return sources
+  return safeSources
     .map((sourceName) => {
       if (sourceName === "Personalizado") return template?.newsFeedUrl;
       return customMap[sourceName] || NEWS_SOURCE_PRESETS[sourceName] || "";
     })
     .filter(Boolean);
+}
+
+function isRssTemplateType(type) {
+  return [
+    "noticias",
+    "jornal_premium",
+    "clima_premium_v2",
+    "hora_certa_premium",
+    "receitas_fitness_premium",
+    "tendencia_beleza_premium",
+    "fofocas_premium",
+    "tela_corporativa_personalizada",
+  ].includes(type);
+}
+
+function isDefaultNewsItem(item) {
+  const title = getNewsItemTitle(item);
+  return DEFAULT_NEWS_ITEMS.some((defaultItem) => defaultItem.title === title);
+}
+
+function getTemplateNewsRotationSeconds(template) {
+  const value = Number(template?.newsRotationInterval || template?.liveRotationInterval || 12);
+  return Number.isFinite(value) && value >= 5 ? value : 12;
+}
+
+function getRotatingNewsIndex(items, template) {
+  const length = Array.isArray(items) ? items.length : 0;
+  if (length <= 1) return 0;
+  const intervalMs = getTemplateNewsRotationSeconds(template) * 1000;
+  return Math.floor(Date.now() / intervalMs) % length;
+}
+
+function rotateNewsItems(items, startIndex = 0) {
+  if (!Array.isArray(items) || items.length === 0) return DEFAULT_NEWS_ITEMS;
+  const index = Math.max(0, Math.min(startIndex, items.length - 1));
+  return [...items.slice(index), ...items.slice(0, index)];
+}
+
+function buildSequentialNewsTicker(items, template = {}) {
+  const newsItems = (Array.isArray(items) && items.length > 0 ? items : DEFAULT_NEWS_ITEMS)
+    .filter((item) => getNewsItemTitle(item));
+
+  if (newsItems.length === 0) return "Notícias em atualização";
+
+  const grouped = newsItems.reduce((groups, item) => {
+    const source = getNewsItemSource(item, template.newsSource || "Notícias");
+    const key = source || "Notícias";
+
+    if (!groups[key]) groups[key] = [];
+    groups[key].push(item);
+
+    return groups;
+  }, {});
+
+  const selectedSources = getTemplateNewsSources(template);
+  const sourceOrder = [
+    ...selectedSources,
+    ...Object.keys(grouped).filter((source) => !selectedSources.includes(source)),
+  ];
+  const groups = sourceOrder
+    .map((source) => grouped[source])
+    .filter((group) => Array.isArray(group) && group.length > 0);
+  const interleaved = [];
+  const maxGroupLength = Math.max(...groups.map((group) => group.length), 0);
+
+  for (let index = 0; index < maxGroupLength; index += 1) {
+    groups.forEach((group) => {
+      if (group[index]) interleaved.push(group[index]);
+    });
+  }
+
+  return (interleaved.length ? interleaved : newsItems)
+    .slice(0, 14)
+    .map((item) => `${getNewsItemSource(item, template.newsSource || "Notícias")} — ${getNewsItemTitle(item)}`)
+    .join("     •     ");
 }
 
 function getWeatherIcon(code) {
@@ -771,9 +1975,21 @@ function getWeatherIcon(code) {
   return "☀";
 }
 
-function getWeatherConditionLabel(code) {
+function getWeatherReferenceDate(weather) {
+  const updatedAt = weather?.updatedAt;
+  const parsed = updatedAt ? new Date(updatedAt) : null;
+
+  return parsed && Number.isFinite(parsed.getTime()) ? parsed : new Date();
+}
+
+function isNightFromDate(date) {
+  const hour = date.getHours();
+  return hour < 5 || hour >= 18;
+}
+
+function getWeatherConditionLabel(code, referenceDate = new Date()) {
   const value = Number(code);
-  if ([0, 1].includes(value)) return "Ensolarado";
+  if ([0, 1].includes(value)) return isNightFromDate(referenceDate) ? "Ceu limpo" : "Ensolarado";
   if ([2, 3].includes(value)) return "Parcialmente nublado";
   if ([45, 48].includes(value)) return "Neblina";
   if ([51, 53, 55, 56, 57].includes(value)) return "Garoa";
@@ -783,23 +1999,241 @@ function getWeatherConditionLabel(code) {
   return "Tempo atualizado";
 }
 
+function getWeatherIconSafe(code, referenceDate = new Date()) {
+  const value = Number(code);
+  if ([0, 1].includes(value)) return isNightFromDate(referenceDate) ? "\ud83c\udf19" : "\u2600";
+  if ([2, 3].includes(value)) return "\u26c5";
+  if ([45, 48].includes(value)) return "\u2601";
+  if ([51, 53, 55, 56, 57, 61, 63, 65, 66, 67, 80, 81, 82].includes(value)) return "\ud83c\udf27";
+  if ([71, 73, 75, 77, 85, 86].includes(value)) return "\u2744";
+  if ([95, 96, 99].includes(value)) return "\u26c8";
+  return "\u2600";
+}
+
 function getWeatherForecastCards(weather) {
   const daily = weather?.daily;
   const dates = daily?.time || [];
 
-  return dates.slice(1, 5).map((date, index) => {
+  return dates.slice(0, 4).map((date, index) => {
     const parsedDate = new Date(`${date}T12:00:00`);
     return {
       day: parsedDate.toLocaleDateString("pt-BR", { weekday: "short" }).replace(".", "").toUpperCase(),
-      icon: getWeatherIcon(daily?.weather_code?.[index + 1]),
-      max: Math.round(daily?.temperature_2m_max?.[index + 1] ?? 0),
-      min: Math.round(daily?.temperature_2m_min?.[index + 1] ?? 0),
+      icon: getWeatherIconSafe(daily?.weather_code?.[index]),
+      max: Math.round(daily?.temperature_2m_max?.[index] ?? 0),
+      min: Math.round(daily?.temperature_2m_min?.[index] ?? 0),
     };
   });
 }
 
-function getTemplateClockParts(template) {
-  const now = new Date();
+const WEATHER_CITY_PRESETS = [
+  "João Câmara/RN",
+  "Natal/RN",
+  "Jandaira/RN",
+  "Macau/RN",
+  "Guamare/RN",
+  "Galinhos/RN",
+  "Parazinho/RN",
+  "Bento Fernandes/RN",
+  "Jardim de Angicos/RN",
+  "Pedra Preta/RN",
+  "Ceara-Mirim/RN",
+  "Currais Novos/RN",
+  "Parnamirim/RN",
+  "Mossoro/RN",
+  "Recife/PE",
+  "Fortaleza/CE",
+  "João Pessoa/PB",
+  "Salvador/BA",
+  "São Paulo/SP",
+  "Rio de Janeiro/RJ",
+];
+
+const TIDE_BEACH_PRESETS = [
+  { name: "Ponta Negra/RN", city: "Natal/RN", tideStation: "Natal" },
+  { name: "Touros/RN", city: "Touros/RN", tideStation: "Touros", latitude: -5.1989, longitude: -35.4608 },
+  { name: "Caicara do Norte/RN", city: "Caicara do Norte/RN", tideStation: "Macau", latitude: -5.0708, longitude: -36.0717 },
+  { name: "Sao Bento do Norte/RN", city: "Sao Bento do Norte/RN", tideStation: "Macau", latitude: -5.0922, longitude: -35.9583 },
+  { name: "Marcos/RN", city: "Marcos/RN", tideStation: "Macau", latitude: -5.1300, longitude: -36.1500 },
+  { name: "Areia Branca/RN", city: "Areia Branca/RN", tideStation: "Areia Branca", latitude: -4.9561, longitude: -37.1369 },
+  { name: "Galinhos/RN", city: "Galinhos/RN", tideStation: "Macau", latitude: -5.0919, longitude: -36.2758 },
+  { name: "Baia Formosa/RN", city: "Baia Formosa/RN", tideStation: "Natal", latitude: -6.3719, longitude: -35.0036 },
+  { name: "Genipabu/RN", city: "Extremoz/RN", tideStation: "Natal" },
+  { name: "Maracajau/RN", city: "Maxaranguape/RN", tideStation: "Touros" },
+  { name: "São Miguel do Gostoso/RN", city: "São Miguel do Gostoso/RN", tideStation: "Touros" },
+  { name: "Pipa/RN", city: "Tibau do Sul/RN", tideStation: "Natal" },
+  { name: "Boa Viagem/PE", city: "Recife/PE", tideStation: "Recife" },
+  { name: "Iracema/CE", city: "Fortaleza/CE", tideStation: "Fortaleza" },
+  { name: "Tambaú/PB", city: "João Pessoa/PB", tideStation: "Cabedelo" },
+];
+
+function getTemplateWeatherCity(template = {}) {
+  return String(template.weatherCity || template.city || "João Câmara/RN").trim();
+}
+
+function getTemplateTideBeach(template = {}) {
+  return String(template.tideBeach || template.beach || "Ponta Negra/RN").trim();
+}
+
+function getTemplateTideStation(template = {}) {
+  const beach = getTemplateTideBeach(template);
+  return (
+    TIDE_BEACH_PRESETS.find((item) => item.name === beach)?.tideStation ||
+    template.tideStation ||
+    beach
+  );
+}
+
+function parseTemplateListField(value, fallback = []) {
+  const parsed = (Array.isArray(value) ? value : String(value || "").split(/[,;\n]/))
+    .map((item) => String(item || "").trim())
+    .filter(Boolean)
+    .filter((item, index, list) => list.indexOf(item) === index);
+  return parsed.length ? parsed : fallback;
+}
+
+function getTemplateWeatherCities(template = {}) {
+  return parseTemplateListField(template.weatherCities, [getTemplateWeatherCity(template)]);
+}
+
+function getTemplateTideBeaches(template = {}) {
+  return parseTemplateListField(template.tideBeaches, [getTemplateTideBeach(template)]);
+}
+
+function getTemplateLocationRotationSeconds(template = {}) {
+  const value = Number(template.locationRotationInterval || template.tideRotationInterval || 30);
+  return Number.isFinite(value) && value >= 10 ? value : 30;
+}
+
+function getRotatingLocationIndex(items = [], template = {}, nowValue = Date.now()) {
+  if (!Array.isArray(items) || items.length <= 1) return 0;
+  const intervalMs = getTemplateLocationRotationSeconds(template) * 1000;
+  return Math.floor(Number(nowValue || Date.now()) / intervalMs) % items.length;
+}
+
+function getActiveTemplateWeatherCity(template = {}, nowValue = Date.now()) {
+  const cities = getTemplateWeatherCities(template);
+  return cities[getRotatingLocationIndex(cities, template, nowValue)] || getTemplateWeatherCity(template);
+}
+
+function getActiveTemplateTideBeach(template = {}, nowValue = Date.now()) {
+  const beaches = getTemplateTideBeaches(template);
+  return beaches[getRotatingLocationIndex(beaches, template, nowValue)] || getTemplateTideBeach(template);
+}
+
+function getTideBeachConfig(beachName = "") {
+  const beach = String(beachName || "").trim();
+  return TIDE_BEACH_PRESETS.find((item) => normalizeWeatherKey(item.name) === normalizeWeatherKey(beach)) || {
+    name: beach || "Ponta Negra/RN",
+    city: beach || "Natal/RN",
+    tideStation: beach || "Natal",
+  };
+}
+
+function getTideForecastForTemplate(template = {}) {
+  const beach = getActiveTemplateTideBeach(template);
+  const beachConfig = getTideBeachConfig(beach);
+  const station = beachConfig.tideStation || getTemplateTideStation({ ...template, tideBeach: beach });
+  const seed = Array.from(`${beach}-${station}`).reduce((sum, char) => sum + char.charCodeAt(0), 0);
+  const lowA = 3 + (seed % 3);
+  const highA = 9 + (seed % 2);
+  const lowB = 15 + (seed % 4);
+  const highB = 21 + (seed % 3);
+
+  return {
+    beach,
+    station,
+    source: "Previsão de maré configurável",
+    items: [
+      { time: `${String(lowA).padStart(2, "0")}:18`, label: "Baixa", height: `${(0.3 + (seed % 4) / 10).toFixed(1)}m`, level: 28 + (seed % 10) },
+      { time: `${String(highA).padStart(2, "0")}:36`, label: "Alta", height: `${(1.8 + (seed % 6) / 10).toFixed(1)}m`, level: 78 + (seed % 14) },
+      { time: `${String(lowB).padStart(2, "0")}:52`, label: "Baixa", height: `${(0.4 + (seed % 5) / 10).toFixed(1)}m`, level: 30 + (seed % 12) },
+      { time: `${String(highB).padStart(2, "0")}:04`, label: "Alta", height: `${(1.7 + (seed % 7) / 10).toFixed(1)}m`, level: 74 + (seed % 16) },
+    ],
+  };
+}
+
+async function fetchTideForecastForTemplate(template = {}) {
+  const beach = getActiveTemplateTideBeach(template);
+  const beachConfig = getTideBeachConfig(beach);
+  const latitude = Number(beachConfig.latitude);
+  const longitude = Number(beachConfig.longitude);
+
+  if (!Number.isFinite(latitude) || !Number.isFinite(longitude)) {
+    return getTideForecastForTemplate({ ...template, tideBeach: beach });
+  }
+
+  try {
+    const response = await fetch(
+      `https://marine-api.open-meteo.com/v1/marine?latitude=${latitude}&longitude=${longitude}&hourly=sea_level_height_msl&timezone=auto&forecast_days=1`
+    );
+
+    if (!response.ok) throw new Error("Falha ao consultar mare.");
+
+    const data = await response.json();
+    const times = data?.hourly?.time || [];
+    const heights = data?.hourly?.sea_level_height_msl || [];
+    const points = times
+      .map((time, index) => ({ time, height: Number(heights[index]) }))
+      .filter((item) => Number.isFinite(item.height));
+
+    if (points.length < 4) {
+      return getTideForecastForTemplate({ ...template, tideBeach: beach });
+    }
+
+    const extremes = [];
+    for (let index = 1; index < points.length - 1; index += 1) {
+      const previous = points[index - 1].height;
+      const current = points[index].height;
+      const next = points[index + 1].height;
+      if (current >= previous && current >= next) {
+        extremes.push({ ...points[index], label: "Alta" });
+      } else if (current <= previous && current <= next) {
+        extremes.push({ ...points[index], label: "Baixa" });
+      }
+    }
+
+    const selected = (extremes.length ? extremes : points.filter((_, index) => index % 6 === 0)).slice(0, 4);
+    const minHeight = Math.min(...points.map((item) => item.height));
+    const maxHeight = Math.max(...points.map((item) => item.height));
+    const range = Math.max(0.1, maxHeight - minHeight);
+
+    return {
+      beach: beachConfig.name || beach,
+      station: beachConfig.tideStation || beachConfig.city || beach,
+      source: "Open-Meteo Marine",
+      items: selected.map((item) => ({
+        time: new Date(item.time).toLocaleTimeString("pt-BR", { hour: "2-digit", minute: "2-digit" }),
+        label: item.label || "Nivel",
+        height: `${item.height.toFixed(1)}m`,
+        level: Math.max(12, Math.min(92, Math.round(((item.height - minHeight) / range) * 80) + 12)),
+      })),
+    };
+  } catch (error) {
+    console.log("Erro ao buscar mare:", error);
+    return getTideForecastForTemplate({ ...template, tideBeach: beach });
+  }
+}
+
+const TEMPLATE_BACKGROUND_THEMES = [
+  { value: "neon_gradient", label: "Neon degradê" },
+  { value: "corporate_dark", label: "Corporativo escuro" },
+  { value: "glass_panels", label: "Vidro premium" },
+  { value: "light_premium", label: "Claro premium" },
+  { value: "sunset", label: "Sunset" },
+  { value: "nature", label: "Natureza" },
+  { value: "arena", label: "Arena esportiva" },
+  { value: "minimal", label: "Minimal limpo" },
+];
+
+function getTemplateBackgroundTheme(template = {}) {
+  const selectedTheme = String(template.backgroundTheme || "neon_gradient").trim();
+  return TEMPLATE_BACKGROUND_THEMES.some((theme) => theme.value === selectedTheme)
+    ? selectedTheme
+    : "neon_gradient";
+}
+
+function getTemplateClockParts(template, referenceDate = new Date()) {
+  const now = referenceDate;
   const use12h = template?.timeFormat === "12h";
 
   return {
@@ -820,63 +2254,142 @@ function getTemplateClockParts(template) {
 const TEMPLATE_VISIBILITY_OPTIONS = [
   ["showHeader", "Cabeçalho"],
   ["showLogo", "Logo"],
+  ["showBadge", "Selo"],
   ["showTitle", "Título"],
   ["showSubtitle", "Subtítulo"],
   ["showFooter", "Rodapé"],
 ];
 
+const STORAGE_GB = 1024 ** 3;
+const STORAGE_MB = 1024 ** 2;
+const DEFAULT_DEMO_TICKER_TEXT =
+  "Demonstração Totem Park • Telas corporativas, playlists e comunicação visual em tempo real";
+
 const COMMERCIAL_PLANS = {
+  Demonstracao: {
+    key: "demonstracao",
+    name: "Demonstração",
+    price: 0,
+    priceMonthly: 0,
+    priceLabel: "R$ 0,00",
+    screensLimit: 1,
+    storageLimitBytes: 500 * STORAGE_MB,
+    maxVideoSizeBytes: 50 * STORAGE_MB,
+    maxImageSizeBytes: 10 * STORAGE_MB,
+    premiumTemplates: false,
+    premiumTemplatesEnabled: false,
+    marketing: false,
+    marketingEnabled: false,
+    isDemo: true,
+    defaultTrialDays: 7,
+    watermarkEnabled: true,
+    trafficSoftLimitBytes: 5 * STORAGE_GB,
+    trafficWarningLimitBytes: 4 * STORAGE_GB,
+    recommendedMaxPlaylistWeightBytes: 500 * STORAGE_MB,
+    recommendedMaxVideoSizeBytes: 50 * STORAGE_MB,
+    badge: "Demonstração",
+  },
   Start: {
+    key: "start",
     name: "Start",
     price: 49.9,
+    priceMonthly: 49.9,
     priceLabel: "R$ 49,90",
-    screensLimit: 2,
+    screensLimit: 1,
+    storageLimitBytes: 5 * STORAGE_GB,
+    maxVideoSizeBytes: (import.meta.env.VITE_APP_MODE === "player" ? 100 : 50) * STORAGE_MB,
+    maxImageSizeBytes: (import.meta.env.VITE_APP_MODE === "player" ? 10 : 5) * STORAGE_MB,
     premiumTemplates: false,
+    premiumTemplatesEnabled: false,
     marketing: false,
+    marketingEnabled: false,
+    isDemo: false,
+    defaultTrialDays: 0,
+    watermarkEnabled: false,
+    trafficSoftLimitBytes: 30 * STORAGE_GB,
+    trafficWarningLimitBytes: 24 * STORAGE_GB,
+    recommendedMaxPlaylistWeightBytes: 1 * STORAGE_GB,
+    recommendedMaxVideoSizeBytes: 100 * STORAGE_MB,
   },
   Business: {
+    key: "business",
     name: "Business",
     price: 99,
+    priceMonthly: 99,
     priceLabel: "R$ 99,00",
     screensLimit: 5,
+    storageLimitBytes: 20 * STORAGE_GB,
+    maxVideoSizeBytes: (import.meta.env.VITE_APP_MODE === "player" ? 150 : 100) * STORAGE_MB,
+    maxImageSizeBytes: (import.meta.env.VITE_APP_MODE === "player" ? 20 : 10) * STORAGE_MB,
     premiumTemplates: true,
+    premiumTemplatesEnabled: true,
     marketing: false,
+    marketingEnabled: false,
+    isDemo: false,
+    defaultTrialDays: 0,
+    watermarkEnabled: false,
+    trafficSoftLimitBytes: 120 * STORAGE_GB,
+    trafficWarningLimitBytes: 96 * STORAGE_GB,
+    recommendedMaxPlaylistWeightBytes: 3 * STORAGE_GB,
+    recommendedMaxVideoSizeBytes: 150 * STORAGE_MB,
   },
   Professional: {
+    key: "professional",
     name: "Professional",
     price: 199,
+    priceMonthly: 199,
     priceLabel: "R$ 199,00",
     screensLimit: 10,
+    storageLimitBytes: 50 * STORAGE_GB,
+    maxVideoSizeBytes: (import.meta.env.VITE_APP_MODE === "player" ? 200 : 150) * STORAGE_MB,
+    maxImageSizeBytes: (import.meta.env.VITE_APP_MODE === "player" ? 30 : 15) * STORAGE_MB,
     premiumTemplates: true,
+    premiumTemplatesEnabled: true,
     marketing: true,
+    marketingEnabled: true,
+    isDemo: false,
+    defaultTrialDays: 0,
+    watermarkEnabled: false,
+    trafficSoftLimitBytes: 300 * STORAGE_GB,
+    trafficWarningLimitBytes: 240 * STORAGE_GB,
+    recommendedMaxPlaylistWeightBytes: 6 * STORAGE_GB,
+    recommendedMaxVideoSizeBytes: 200 * STORAGE_MB,
   },
   Enterprise: {
+    key: "enterprise",
     name: "Enterprise",
     price: 299,
+    priceMonthly: 299,
     priceLabel: "R$ 299,00",
     screensLimit: 30,
+    storageLimitBytes: 200 * STORAGE_GB,
+    maxVideoSizeBytes: (import.meta.env.VITE_APP_MODE === "player" ? 250 : 200) * STORAGE_MB,
+    maxImageSizeBytes: (import.meta.env.VITE_APP_MODE === "player" ? 50 : 20) * STORAGE_MB,
     premiumTemplates: true,
+    premiumTemplatesEnabled: true,
     marketing: true,
+    marketingEnabled: true,
+    isDemo: false,
+    defaultTrialDays: 0,
+    watermarkEnabled: false,
+    trafficSoftLimitBytes: null,
+    trafficWarningLimitBytes: null,
+    recommendedMaxPlaylistWeightBytes: null,
+    recommendedMaxVideoSizeBytes: 250 * STORAGE_MB,
   },
 };
 
-const STORAGE_GB = 1024 ** 3;
-const STORAGE_MB = 1024 ** 2;
-
 function getPlanLimits(planName) {
   const plan = getPlanConfig(planName);
-  const limits = {
-    Start: { storageGb: 5, videoMb: 100, imageMb: 10 },
-    Business: { storageGb: 20, videoMb: 250, imageMb: 20 },
-    Professional: { storageGb: 50, videoMb: 500, imageMb: 30 },
-    Enterprise: { storageGb: 200, videoMb: 1024, imageMb: 50 },
-  }[plan.name];
-
   return {
     screensLimit: plan.screensLimit,
-    storageLimitBytes: limits.storageGb * STORAGE_GB,
-    maxVideoSizeBytes: limits.videoMb * STORAGE_MB,
-    maxImageSizeBytes: limits.imageMb * STORAGE_MB,
+    storageLimitBytes: plan.storageLimitBytes,
+    maxVideoSizeBytes: plan.maxVideoSizeBytes,
+    maxImageSizeBytes: plan.maxImageSizeBytes,
+    trafficSoftLimitBytes: plan.trafficSoftLimitBytes,
+    trafficWarningLimitBytes: plan.trafficWarningLimitBytes,
+    recommendedMaxPlaylistWeightBytes: plan.recommendedMaxPlaylistWeightBytes,
+    recommendedMaxVideoSizeBytes: plan.recommendedMaxVideoSizeBytes,
     marketingEnabled: plan.marketing,
     premiumTemplatesEnabled: plan.premiumTemplates,
   };
@@ -887,8 +2400,84 @@ function getClientStorageLimit(client) {
   return customLimit > 0 ? customLimit : getPlanLimits(client?.plan).storageLimitBytes;
 }
 
+function getClientMaxVideoSize(client) {
+  const planLimit = uploadLimitBytes(getPlanConfig(client?.plan).name, "video");
+  if (!IS_PLAYER_BUILD && planLimit) return planLimit;
+  const customLimit = Number(client?.maxVideoSizeBytes);
+  return customLimit > 0 ? customLimit : getPlanLimits(client?.plan).maxVideoSizeBytes;
+}
+
+function getClientMaxImageSize(client) {
+  const planLimit = uploadLimitBytes(getPlanConfig(client?.plan).name, "image");
+  if (!IS_PLAYER_BUILD && planLimit) return planLimit;
+  const customLimit = Number(client?.maxImageSizeBytes);
+  return customLimit > 0 ? customLimit : getPlanLimits(client?.plan).maxImageSizeBytes;
+}
+
+function getClientUploadLimits(client) {
+  return {
+    ...getPlanLimits(client?.plan),
+    storageLimitBytes: getClientStorageLimit(client),
+    maxVideoSizeBytes: getClientMaxVideoSize(client),
+    maxImageSizeBytes: getClientMaxImageSize(client),
+  };
+}
+
 function getMediaStorageUsed(mediaList = []) {
   return mediaList.reduce((total, media) => total + Math.max(0, Number(media?.sizeBytes) || 0), 0);
+}
+
+function getPlaylistWeightBytes(playlist = {}) {
+  return (playlist?.items || []).reduce((total, item) => total + Math.max(0, Number(item?.sizeBytes) || 0), 0);
+}
+
+function getClientScreensByStatus(screens = [], nowValue = Date.now()) {
+  return screens.reduce(
+    (groups, screen) => {
+      const connection = getScreenConnectionStatus(screen, nowValue);
+      groups[connection.key].push(screen);
+      return groups;
+    },
+    { online: [], "logged-offline": [], "not-logged": [] }
+  );
+}
+
+function getClientCacheRisk({ client, screens = [], activePlaylistWeightBytes = 0, estimatedMonthlyTrafficBytes = 0 } = {}) {
+  const plan = getPlanConfig(client?.plan);
+  const hasCacheError = screens.some((screen) => ["erro", "preparando"].includes(screen.cacheStatus));
+  const hasInternetSource = screens.some((screen) => !["cache"].includes(screen.currentMediaSource));
+  const hasPartialCache = screens.some((screen) => screen.cacheStatus === "parcial");
+  const overRecommendedPlaylist =
+    Number(plan.recommendedMaxPlaylistWeightBytes || 0) > 0 &&
+    activePlaylistWeightBytes > plan.recommendedMaxPlaylistWeightBytes;
+  const overSoftTraffic =
+    Number(plan.trafficSoftLimitBytes || 0) > 0 &&
+    estimatedMonthlyTrafficBytes > plan.trafficSoftLimitBytes;
+  const overWarningTraffic =
+    Number(plan.trafficWarningLimitBytes || 0) > 0 &&
+    estimatedMonthlyTrafficBytes > plan.trafficWarningLimitBytes;
+
+  if (hasCacheError || overSoftTraffic || (overRecommendedPlaylist && hasInternetSource)) {
+    return {
+      key: "high",
+      label: "Alto",
+      message: "Cliente com alto risco de custo por download de mídia.",
+    };
+  }
+
+  if (hasPartialCache || overWarningTraffic || overRecommendedPlaylist || hasInternetSource) {
+    return {
+      key: "medium",
+      label: "Médio",
+      message: "Acompanhar cache e peso da playlist.",
+    };
+  }
+
+  return {
+    key: "low",
+    label: "Baixo",
+    message: "Cache e playlists dentro do esperado.",
+  };
 }
 
 function formatStorageSize(bytes, fractionDigits = 2) {
@@ -897,14 +2486,103 @@ function formatStorageSize(bytes, fractionDigits = 2) {
   return `${(safeBytes / STORAGE_GB).toFixed(fractionDigits)} GB`;
 }
 
+function getCacheStatusLabel(screen = {}) {
+  const status = screen.cacheStatus || "";
+  const cached = Number(screen.cachedItems || 0);
+  const total = Number(screen.totalCacheableItems || 0);
+
+  if (status === "preparando") return `Preparando ${cached}/${total}`;
+  if (status === "pronto") return `Pronto ${cached}/${total}`;
+  if (status === "parcial") return `Parcial ${cached}/${total}`;
+  if (status === "erro") return "Erro";
+  if (total > 0) return `${cached}/${total}`;
+  return "Sem mídias";
+}
+
+function getMediaSourceLabel(source) {
+  if (source === "cache") return "Cache local";
+  if (source === "mixed") return "Misto";
+  if (source === "remote" || source === "internet") return "Internet";
+  return "Internet";
+}
+
+function getCacheSyncLabel(screen = {}) {
+  const downloaded = Number(screen.cacheDownloadedItems || 0);
+  const removed = Number(screen.cacheRemovedItems || 0);
+  const downloadedBytes = Number(screen.lastMediaDownloadBytes || 0);
+  const status = screen.cacheStatus || "";
+  const cached = Number(screen.cachedItems || 0);
+  const total = Number(screen.totalCacheableItems || 0);
+  const failed = Number(screen.failedCacheItems || 0);
+
+  if (downloaded > 0 && removed > 0) {
+    return `Última sinc.: ${downloaded} baixada(s), ${removed} removida(s)`;
+  }
+
+  if (downloaded > 0) {
+    return `Última sinc.: ${downloaded} baixada(s) • ${formatStorageSize(downloadedBytes)}`;
+  }
+
+  if (removed > 0) {
+    return `Última sinc.: ${removed} removida(s)`;
+  }
+
+  if (status === "preparando" && total > 0) {
+    return `Sincronizando mídias: ${cached}/${total}`;
+  }
+
+  if (status === "parcial" && total > 0) {
+    const pending = Math.max(0, total - cached);
+    return `Sincronização parcial: ${cached}/${total}${failed ? ` • ${failed} falha(s)` : pending ? ` • ${pending} pendente(s)` : ""}`;
+  }
+
+  if (status === "erro" && total > 0) {
+    return `Falha ao sincronizar: ${failed || total} mídia(s)`;
+  }
+
+  if (status === "pronto" && total > 0) {
+    return "Última sinc.: nenhuma mídia nova";
+  }
+
+  return "";
+}
+
+function formatFirestoreDate(value) {
+  const ms = getTimestampMs(value);
+  if (!ms) return "--";
+  return new Date(ms).toLocaleString("pt-BR");
+}
+
+function getFirestoreReadErrorMessage(error) {
+  if (error?.code === "permission-denied") {
+    return "Sem permissão para carregar clientes. Verifique se este login está como administrador.";
+  }
+
+  if (error?.code === "unavailable") {
+    return "Não foi possível conectar ao Firestore agora. Verifique a internet e tente atualizar.";
+  }
+
+  return error?.message || "Não foi possível carregar os clientes.";
+}
+
 function formatFileSizeMb(bytes) {
   return `${(Math.max(0, Number(bytes) || 0) / STORAGE_MB).toFixed(2)} MB`;
+}
+
+function formatDurationLabel(seconds) {
+  const totalSeconds = Math.max(0, Math.round(Number(seconds) || 0));
+  const minutes = Math.floor(totalSeconds / 60);
+  const remainingSeconds = totalSeconds % 60;
+
+  if (minutes <= 0) return `${remainingSeconds}s`;
+  return `${minutes}:${String(remainingSeconds).padStart(2, "0")} min`;
 }
 
 function getStorageUsage(usedBytes, limitBytes) {
   const safeLimit = Math.max(1, Number(limitBytes) || 1);
   const percentage = Math.min(100, (Math.max(0, Number(usedBytes) || 0) / safeLimit) * 100);
   if (percentage >= 95) return { percentage, label: "Cheio", severity: "danger" };
+  if (percentage >= 90) return { percentage, label: "Quase cheio", severity: "danger" };
   if (percentage >= 80) return { percentage, label: "Atenção", severity: "warning" };
   return { percentage, label: "Normal", severity: "normal" };
 }
@@ -912,16 +2590,83 @@ function getStorageUsage(usedBytes, limitBytes) {
 const LEGACY_PLAN_NAMES = {
   "Básico": "Start",
   Basico: "Start",
+  Demo: "Demonstracao",
+  Demonstracao: "Demonstracao",
+  "Demonstração": "Demonstracao",
+  "DemonstraÃ§Ã£o": "Demonstracao",
+  demonstracao: "Demonstracao",
   Start: "Start",
+  start: "Start",
   Business: "Business",
+  business: "Business",
   Profissional: "Professional",
   Professional: "Professional",
+  professional: "Professional",
   Enterprise: "Enterprise",
+  enterprise: "Enterprise",
 };
 
 function getPlanConfig(planName) {
-  const normalizedName = LEGACY_PLAN_NAMES[planName] || "Start";
+  const planText = String(planName || "").trim();
+  const normalizedName = LEGACY_PLAN_NAMES[planName] || LEGACY_PLAN_NAMES[planText] || LEGACY_PLAN_NAMES[planText.toLowerCase()] || "Start";
   return COMMERCIAL_PLANS[normalizedName];
+}
+
+function formatCurrencyBr(value) {
+  return Number(value || 0).toLocaleString("pt-BR", {
+    style: "currency",
+    currency: "BRL",
+  });
+}
+
+function parseOptionalMoney(value) {
+  if (value === null || value === undefined || String(value).trim() === "") return null;
+  const normalized = String(value)
+    .replace(/[^\d,.-]/g, "")
+    .replace(/\.(?=\d{3}(?:\D|$))/g, "")
+    .replace(",", ".");
+  const amount = Number(normalized);
+  return Number.isFinite(amount) && amount >= 0 ? amount : null;
+}
+
+function formatSetupFee(client) {
+  const value = parseOptionalMoney(client?.setupFee);
+  return value === null ? "Valor da adesão não informado" : formatCurrencyBr(value);
+}
+
+function getSetupInfo(client = {}) {
+  const setupEnabled = client.setupEnabled === true;
+  const setupStatus = client.setupStatus || "Não informada";
+  const setupPaidStatus = client.setupPaidStatus || "Não informado";
+  const setupFee = parseOptionalMoney(client.setupFee);
+
+  return {
+    setupEnabled,
+    setupStatus,
+    setupPaidStatus,
+    setupFee,
+    isInProgress: setupEnabled && ["Pendente", "Em implantação"].includes(setupStatus),
+    isPending: setupEnabled && setupPaidStatus === "Pendente",
+    isCompleted: setupEnabled && setupStatus === "Concluída",
+    isPaidRevenue: setupPaidStatus === "Pago" && setupFee !== null,
+  };
+}
+
+function getTodayDateInput(offsetDays = 0) {
+  const date = new Date();
+  date.setDate(date.getDate() + offsetDays);
+  return `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, "0")}-${String(date.getDate()).padStart(2, "0")}`;
+}
+
+function getDefaultVisiblePlanKeys() {
+  return Object.values(COMMERCIAL_PLANS)
+    .filter((plan) => !plan.isDemo)
+    .map((plan) => plan.key);
+}
+
+function isPlanVisibleForClients(plan, visiblePlanKeys) {
+  const keys = Array.isArray(visiblePlanKeys) ? visiblePlanKeys : getDefaultVisiblePlanKeys();
+  return keys.includes(plan.key);
 }
 
 function getClientScreenLimit(client) {
@@ -932,10 +2677,18 @@ function getClientScreenLimit(client) {
 }
 
 function hasPremiumTemplates(client) {
+  if (getPlanConfig(client?.plan).isDemo && typeof client?.premiumTemplatesEnabled === "boolean") {
+    return client.premiumTemplatesEnabled;
+  }
+
   return getPlanConfig(client?.plan).premiumTemplates;
 }
 
 function hasMarketingAccess(client) {
+  if (getPlanConfig(client?.plan).isDemo && typeof client?.marketingEnabled === "boolean") {
+    return client.marketingEnabled;
+  }
+
   return getPlanConfig(client?.plan).marketing;
 }
 
@@ -945,6 +2698,33 @@ function isPremiumTemplate(templateOrType) {
     : templateOrType?.templateType || templateOrType?.type;
 
   return PREMIUM_TEMPLATE_TYPES.includes(type);
+}
+
+function normalizeSavedTemplate(template = {}) {
+  const type = template.templateType || template.type || template.category || "aviso";
+  const numericDuration = Number(template.duration || template.seconds || 15);
+  const orientation =
+    template.orientation === "Retrato" || template.format === "story" || template.format === "reels"
+      ? "Retrato"
+      : "Paisagem";
+  const label = getTemplateTypeLabel(type);
+
+  return {
+    ...template,
+    type,
+    templateType: template.templateType || type,
+    name: template.name || template.title || label,
+    title: template.title || template.name || label,
+    duration: Number.isFinite(numericDuration) && numericDuration > 0 ? numericDuration : 15,
+    orientation,
+    enabled: template.enabled !== false,
+  };
+}
+
+function timeToMinutes(time) {
+  if (!time) return 0;
+  const [hours, minutes] = time.split(":").map(Number);
+  return hours * 60 + minutes;
 }
 
 function parseClientDate(value, endOfDay = false) {
@@ -1082,6 +2862,108 @@ function requirePlanPermission(access, permission, action) {
   return false;
 }
 
+const TV_MANAGER_FOCUSABLE_SELECTOR = [
+  "button:not(:disabled)",
+  "a[href]",
+  "input:not(:disabled):not([type='hidden'])",
+  "select:not(:disabled)",
+  "textarea:not(:disabled)",
+  "[tabindex]:not([tabindex='-1'])",
+].join(",");
+
+function getVisibleFocusableElements(container) {
+  return Array.from(container.querySelectorAll(TV_MANAGER_FOCUSABLE_SELECTOR))
+    .filter((element) => {
+      const rect = element.getBoundingClientRect();
+      const style = window.getComputedStyle(element);
+      return (
+        rect.width > 0 &&
+        rect.height > 0 &&
+        style.visibility !== "hidden" &&
+        style.display !== "none"
+      );
+    });
+}
+
+function focusNativeManagerElement(element) {
+  if (!element) return;
+
+  element.focus({ preventScroll: true });
+  element.scrollIntoView({
+    behavior: "smooth",
+    block: "center",
+    inline: "nearest",
+  });
+}
+
+function handleNativeManagerDirectionalNavigation(event) {
+  if (!isNativeApp()) return;
+  if (!["ArrowUp", "ArrowDown", "ArrowLeft", "ArrowRight"].includes(event.key)) return;
+
+  const container = event.currentTarget;
+  const focusableElements = getVisibleFocusableElements(container);
+
+  if (focusableElements.length === 0) return;
+
+  const current = document.activeElement;
+
+  if (!focusableElements.includes(current)) {
+    event.preventDefault();
+    event.stopPropagation();
+    focusNativeManagerElement(focusableElements[0]);
+    return;
+  }
+
+  const currentRect = current.getBoundingClientRect();
+  const currentCenter = {
+    x: currentRect.left + currentRect.width / 2,
+    y: currentRect.top + currentRect.height / 2,
+  };
+  const direction = {
+    ArrowUp: { axis: "y", sign: -1 },
+    ArrowDown: { axis: "y", sign: 1 },
+    ArrowLeft: { axis: "x", sign: -1 },
+    ArrowRight: { axis: "x", sign: 1 },
+  }[event.key];
+
+  const candidates = focusableElements
+    .filter((element) => element !== current)
+    .map((element) => {
+      const rect = element.getBoundingClientRect();
+      const center = {
+        x: rect.left + rect.width / 2,
+        y: rect.top + rect.height / 2,
+      };
+      const dx = center.x - currentCenter.x;
+      const dy = center.y - currentCenter.y;
+      const primary = (direction.axis === "x" ? dx : dy) * direction.sign;
+      const cross = Math.abs(direction.axis === "x" ? dy : dx);
+      const distance = Math.hypot(dx, dy);
+      return {
+        element,
+        primary,
+        score: primary + cross * 2.2 + distance * 0.08,
+      };
+    })
+    .filter(({ primary }) => primary > 6)
+    .sort((a, b) => a.score - b.score);
+
+  event.preventDefault();
+  event.stopPropagation();
+
+  if (candidates[0]) {
+    focusNativeManagerElement(candidates[0].element);
+    return;
+  }
+
+  if (event.key === "ArrowDown" || event.key === "ArrowUp") {
+    container.scrollBy({
+      top: event.key === "ArrowDown" ? window.innerHeight * 0.55 : -window.innerHeight * 0.55,
+      behavior: "smooth",
+    });
+  }
+}
+
 const DEFAULT_MENU_ITEMS = [
   { category: "Lanches", name: "Combo Especial", description: "Sanduíche, batata e bebida", price: "R$ 29,90" },
   { category: "Bebidas", name: "Refrigerante", description: "Lata ou copo", price: "R$ 7,00" },
@@ -1114,6 +2996,82 @@ const DEFAULT_INDICATOR_ITEMS = [
   { label: "Status", value: "OK", note: "Operação" },
 ];
 
+const DEFAULT_FOOTBALL_COMPETITIONS = [
+  { id: "brasileirao_a", name: "Campeonato Brasileiro Serie A", category: "Brasil", enabled: true, priority: 1, sportsDbLeagueId: "4351", gender: "Male" },
+  { id: "brasileirao_b", name: "Campeonato Brasileiro Serie B", category: "Brasil", enabled: false, priority: 2, gender: "Male" },
+  { id: "brasileirao_c", name: "Campeonato Brasileiro Serie C", category: "Brasil", enabled: false, priority: 3, gender: "Male" },
+  { id: "brasileirao_d", name: "Campeonato Brasileiro Serie D", category: "Brasil", enabled: false, priority: 3, sportsDbLeagueId: "5079", gender: "Male" },
+  { id: "brasileirao_feminino", name: "Brasileirao Feminino A1", category: "Brasil", enabled: false, priority: 2, sportsDbLeagueId: "5201", gender: "Female" },
+  { id: "copa_do_brasil", name: "Copa do Brasil", category: "Brasil", enabled: false, priority: 2 },
+  { id: "supercopa_brasil", name: "Supercopa do Brasil", category: "Brasil", enabled: false, priority: 3 },
+  { id: "estaduais", name: "Estaduais", category: "Brasil", enabled: false, priority: 3 },
+  { id: "acreano", name: "Campeonato Acreano", category: "Brasil", enabled: false, priority: 4, sportsDbLeagueId: "5676" },
+  { id: "alagoano", name: "Campeonato Alagoano", category: "Brasil", enabled: false, priority: 4, sportsDbLeagueId: "5677" },
+  { id: "amapaense", name: "Campeonato Amapaense", category: "Brasil", enabled: false, priority: 4, sportsDbLeagueId: "5678" },
+  { id: "copa_do_nordeste", name: "Copa do Nordeste", category: "Brasil", enabled: false, priority: 2 },
+  { id: "libertadores", name: "Libertadores", category: "America do Sul", enabled: false, priority: 2 },
+  { id: "sul_americana", name: "Copa Sul-Americana", category: "America do Sul", enabled: false, priority: 2 },
+  { id: "recopa_sul_americana", name: "Recopa Sul-Americana", category: "America do Sul", enabled: false, priority: 3 },
+  { id: "champions_league", name: "Champions League", category: "Europa", enabled: false, priority: 1 },
+  { id: "europa_league", name: "Europa League", category: "Europa", enabled: false, priority: 2 },
+  { id: "conference_league", name: "Conference League", category: "Europa", enabled: false, priority: 3 },
+  { id: "premier_league", name: "Premier League", category: "Europa", enabled: false, priority: 1 },
+  { id: "la_liga", name: "La Liga", category: "Europa", enabled: false, priority: 2 },
+  { id: "serie_a_italiana", name: "Serie A Italiana", category: "Europa", enabled: false, priority: 2 },
+  { id: "bundesliga", name: "Bundesliga", category: "Europa", enabled: false, priority: 2 },
+  { id: "ligue_1", name: "Ligue 1", category: "Europa", enabled: false, priority: 3 },
+  { id: "liga_portugal", name: "Liga Portugal", category: "Europa", enabled: false, priority: 3 },
+  { id: "copa_do_mundo", name: "Copa do Mundo", category: "Internacional", enabled: false, priority: 1 },
+  { id: "mundial_de_clubes", name: "Mundial de Clubes", category: "Internacional", enabled: false, priority: 1 },
+  { id: "eliminatorias", name: "Eliminatorias", category: "Internacional", enabled: false, priority: 2 },
+  { id: "amistosos", name: "Amistosos Internacionais", category: "Internacional", enabled: false, priority: 4 },
+];
+
+const SPORTSDB_API_KEY = "123";
+const SPORTSDB_API_BASE = `https://www.thesportsdb.com/api/v1/json/${SPORTSDB_API_KEY}`;
+const SPORTSDB_CACHE_TTL_MS = 3 * 60 * 1000;
+const sportsDbMemoryCache = new Map();
+
+const DEFAULT_SPORTS_MATCHES = [
+  { id: "demo-live-1", sport: "football", competitionId: "brasileirao_a", competitionName: "Campeonato Brasileiro Serie A", status: "live", homeTeam: "Natal FC", awayTeam: "Arena Clube", homeScore: 2, awayScore: 1, startTime: "20:30", matchTime: "68'", period: "2 tempo", venue: "Arena das Dunas", lastEvent: "Gol de Natal FC aos 66'", priority: 1 },
+  { id: "demo-live-2", sport: "football", competitionId: "libertadores", competitionName: "Libertadores", status: "live", homeTeam: "Atletico Sul", awayTeam: "Deportivo Norte", homeScore: 0, awayScore: 0, startTime: "21:00", matchTime: "31'", period: "1 tempo", venue: "Estadio Central", lastEvent: "Pressao do mandante", priority: 2 },
+  { id: "demo-finished-1", sport: "football", competitionId: "copa_do_brasil", competitionName: "Copa do Brasil", status: "finished", homeTeam: "Litoral", awayTeam: "Serrano", homeScore: 3, awayScore: 2, startTime: "18:00", period: "Encerrado", venue: "Estadio Municipal", lastEvent: "Fim de jogo", priority: 2 },
+  { id: "demo-upcoming-1", sport: "football", competitionId: "brasileirao_a", competitionName: "Campeonato Brasileiro Serie A", status: "scheduled", homeTeam: "Parque EC", awayTeam: "Uniao RN", startTime: "22:00", venue: "Arena Park", lastEvent: "Proximo jogo", priority: 1 },
+];
+
+const DEFAULT_OTHER_SPORTS_EVENTS = [
+  { id: "basket-demo", sport: "Basquete", status: "live", title: "Liga Nacional", score: "72 x 68", detail: "4 quarto", priority: "Media" },
+  { id: "volley-demo", sport: "Volei", status: "scheduled", title: "Superliga", score: "21:30", detail: "Proxima partida", priority: "Baixa" },
+  { id: "f1-demo", sport: "Formula 1", status: "finished", title: "Classificacao", score: "P1", detail: "Volta mais rapida", priority: "Alta" },
+];
+
+const DEFAULT_SPORTS_TABLE_ROWS = [
+  { position: 1, team: "America/RN", points: 31 },
+  { position: 2, team: "Sousa", points: 29 },
+  { position: 3, team: "Santa Cruz/RN", points: 26 },
+  { position: 4, team: "Treze", points: 24 },
+];
+
+const DEFAULT_BRASILEIRAO_SERIE_A_TABLE_ROWS = [
+  { position: 1, team: "Flamengo", points: "-" },
+  { position: 2, team: "Palmeiras", points: "-" },
+  { position: 3, team: "Cruzeiro", points: "-" },
+  { position: 4, team: "Botafogo", points: "-" },
+  { position: 5, team: "Bahia", points: "-" },
+  { position: 6, team: "Sao Paulo", points: "-" },
+  { position: 7, team: "Fluminense", points: "-" },
+  { position: 8, team: "Atletico Mineiro", points: "-" },
+];
+
+const DEFAULT_OTHER_SPORTS_OPTIONS = [
+  { id: "basquete", name: "Basquete", sportsDbSport: "Basketball", enabled: true, priority: "Media" },
+  { id: "volei", name: "Volei", sportsDbSport: "Volleyball", enabled: true, priority: "Baixa" },
+  { id: "tenis", name: "Tenis", sportsDbSport: "Tennis", enabled: false, priority: "Baixa" },
+  { id: "formula_1", name: "Formula 1", sportsDbSport: "Motorsport", enabled: true, priority: "Alta" },
+  { id: "futsal", name: "Futsal", enabled: false, priority: "Media" },
+  { id: "outros", name: "Outros", enabled: false, priority: "Baixa" },
+];
+
 function getTemplateMenuItems(template) {
   return Array.isArray(template?.menuItems) && template.menuItems.length > 0
     ? template.menuItems
@@ -1144,6 +3102,599 @@ function getTemplateIndicatorItems(template) {
     : DEFAULT_INDICATOR_ITEMS;
 }
 
+function getSportsFootballCompetitions(template = {}) {
+  const saved = Array.isArray(template.footballCompetitions)
+    ? template.footballCompetitions
+    : [];
+
+  return DEFAULT_FOOTBALL_COMPETITIONS.map((competition) => ({
+    ...competition,
+    ...(saved.find((item) => item.id === competition.id) || {}),
+  }));
+}
+
+function isWomenFootballText(value = "") {
+  return /\b(women|woman|feminino|feminina|femininas|femininos)\b/i.test(String(value || ""));
+}
+
+function isMaleProfessionalFootballCompetition(competition = {}) {
+  if (competition.gender === "Female") return false;
+  if (competition.id === "brasileirao_feminino") return false;
+  return !isWomenFootballText(`${competition.name || ""} ${competition.strLeague || ""}`);
+}
+
+function isMaleProfessionalFootballMatch(match = {}) {
+  return !isWomenFootballText([
+    match.competitionName,
+    match.homeTeam,
+    match.awayTeam,
+    match.title,
+    match.detail,
+  ].filter(Boolean).join(" "));
+}
+
+function getSportsFootballMode(template = {}) {
+  const mode = String(template.footballMode || template.sportsDataMode || "brasileirao_a").trim();
+  return ["brasileirao_a", "selected", "manual"].includes(mode) ? mode : "brasileirao_a";
+}
+
+function getEnabledFootballCompetitions(template = {}) {
+  const competitions = getSportsFootballCompetitions(template).filter(isMaleProfessionalFootballCompetition);
+  const footballMode = getSportsFootballMode(template);
+
+  if (footballMode === "brasileirao_a" || footballMode === "manual") {
+    return competitions.filter((competition) => competition.id === "brasileirao_a");
+  }
+
+  const enabled = competitions.filter((competition) => competition.enabled);
+
+  return enabled.length
+    ? enabled
+    : competitions.filter((competition) => competition.id === "brasileirao_a");
+}
+
+function getSportsMatches(template = {}) {
+  return Array.isArray(template.sportsMatches) && template.sportsMatches.length > 0
+    ? template.sportsMatches
+    : DEFAULT_SPORTS_MATCHES;
+}
+
+function getOtherSportsOptions(template = {}) {
+  const saved = Array.isArray(template.otherSports)
+    ? template.otherSports
+    : [];
+
+  return DEFAULT_OTHER_SPORTS_OPTIONS.map((sport) => ({
+    ...sport,
+    ...(saved.find((item) => item.id === sport.id) || {}),
+  }));
+}
+
+function getSportsData(templateConfig = {}) {
+  const enabledCompetitionIds = new Set(
+    getEnabledFootballCompetitions(templateConfig).map((competition) => competition.id)
+  );
+  const matches = getSportsMatches(templateConfig)
+    .filter((match) => match.sport === "football")
+    .filter((match) => !match.competitionId || enabledCompetitionIds.has(match.competitionId))
+    .filter(isMaleProfessionalFootballMatch)
+    .sort((a, b) => Number(a.priority || 9) - Number(b.priority || 9));
+  const liveFootball = matches.filter((match) => ["live", "halftime"].includes(match.status));
+  const finishedFootball = matches.filter((match) => match.status === "finished");
+  const upcomingFootball = matches.filter((match) => match.status === "scheduled");
+  const selectedOtherSports = getOtherSportsOptions(templateConfig).filter((sport) => sport.enabled);
+  const enabledOtherNames = new Set(selectedOtherSports.map((sport) => sport.name));
+  const otherSportsEvents = DEFAULT_OTHER_SPORTS_EVENTS.filter((event) => enabledOtherNames.has(event.sport));
+
+  return {
+    source: "demo_manual",
+    competitions: getEnabledFootballCompetitions(templateConfig),
+    liveFootball,
+    finishedFootball,
+    upcomingFootball,
+    otherSportsEvents,
+    selectedOtherSports,
+    primaryMatch: liveFootball[0] || finishedFootball[0] || upcomingFootball[0] || null,
+  };
+}
+
+function getMatchStatusLabel(status) {
+  if (status === "live") return "AO VIVO";
+  if (status === "halftime") return "INTERVALO";
+  if (status === "finished") return "ENCERRADO";
+  if (status === "postponed") return "ADIADO";
+  return "PROXIMO";
+}
+
+function getTeamInitials(name = "") {
+  return String(name || "TP")
+    .split(/\s+/)
+    .filter(Boolean)
+    .slice(0, 2)
+    .map((word) => word[0]?.toUpperCase())
+    .join("") || "TP";
+}
+
+function getSportsMatchScoreLabel(match = {}) {
+  if (match.status === "scheduled") return "x";
+  return `${match.homeScore ?? 0} x ${match.awayScore ?? 0}`;
+}
+
+function getSportsMatchLine(match = {}) {
+  return `${match.homeTeam || "Mandante"} ${getSportsMatchScoreLabel(match)} ${match.awayTeam || "Visitante"}`;
+}
+
+function buildSportsTableRows(sportsData = {}, template = {}) {
+  if (getSportsFootballMode(template) === "manual" && Array.isArray(template.sportsTableRows) && template.sportsTableRows.length) {
+    return template.sportsTableRows.slice(0, 8);
+  }
+
+  if (Array.isArray(sportsData.tableRows) && sportsData.tableRows.length) {
+    return sportsData.tableRows.slice(0, 8);
+  }
+
+  const standings = new Map();
+  const finishedMatches = Array.isArray(sportsData.finishedFootball)
+    ? sportsData.finishedFootball
+    : [];
+
+  finishedMatches.forEach((match) => {
+    const homeTeam = String(match.homeTeam || "").trim();
+    const awayTeam = String(match.awayTeam || "").trim();
+    const homeScore = Number(match.homeScore ?? 0);
+    const awayScore = Number(match.awayScore ?? 0);
+
+    if (!homeTeam || !awayTeam) return;
+
+    if (!standings.has(homeTeam)) standings.set(homeTeam, { team: homeTeam, points: 0, played: 0 });
+    if (!standings.has(awayTeam)) standings.set(awayTeam, { team: awayTeam, points: 0, played: 0 });
+
+    const home = standings.get(homeTeam);
+    const away = standings.get(awayTeam);
+    home.played += 1;
+    away.played += 1;
+
+    if (homeScore > awayScore) {
+      home.points += 3;
+    } else if (awayScore > homeScore) {
+      away.points += 3;
+    } else {
+      home.points += 1;
+      away.points += 1;
+    }
+  });
+
+  const rows = Array.from(standings.values())
+    .sort((a, b) => Number(b.points || 0) - Number(a.points || 0) || String(a.team).localeCompare(String(b.team)))
+    .map((row, index) => ({ ...row, position: index + 1 }));
+
+  if (rows.length >= 3) return rows.slice(0, 8);
+
+  const upcomingTeams = (sportsData.upcomingFootball || [])
+    .flatMap((match) => [match.homeTeam, match.awayTeam])
+    .filter(Boolean)
+    .filter((team, index, list) => list.indexOf(team) === index)
+    .slice(0, 6)
+    .map((team, index) => ({ position: index + 1, team, points: "-" }));
+
+  if (upcomingTeams.length >= 3) return upcomingTeams;
+
+  return getSportsFootballMode(template) === "brasileirao_a"
+    ? DEFAULT_BRASILEIRAO_SERIE_A_TABLE_ROWS
+    : DEFAULT_SPORTS_TABLE_ROWS;
+}
+
+function buildSportsTickerText(template = {}, sportsData = {}, primaryMatch = {}) {
+  const upcoming = (sportsData.upcomingFootball || []).slice(0, 2).map((match) => {
+    const when = [match.dateEvent, match.startTime || match.matchTime].filter(Boolean).join(" ");
+    return `${getSportsMatchLine(match)}${when ? ` em ${when}` : ""}`;
+  });
+  const finished = (sportsData.finishedFootball || []).slice(0, 2).map((match) => getSportsMatchLine(match));
+  const other = (sportsData.otherSportsEvents || []).slice(0, 2).map((event) => {
+    const teams = [event.homeTeam, event.awayTeam].filter(Boolean).join(" x ");
+    return `${event.sport || "Esporte"}: ${teams || event.detail || event.title || "evento"} ${event.score || ""}`.trim();
+  });
+
+  const parts = [...upcoming, ...finished, ...other].filter(Boolean);
+  const source = sportsData.source === "TheSportsDB" ? "TheSportsDB" : "dados cadastrados";
+
+  if (parts.length) return `Fonte ${source} - ${parts.join(" - ")}`;
+
+  return `${template.title || "Resultados Esportivos"} - ${getSportsMatchLine(primaryMatch)} - agenda e resultados atualizados automaticamente`;
+}
+
+function getSportsDbLeagueId(competition = {}) {
+  return competition.sportsDbLeagueId || null;
+}
+
+function getDefaultSportsDbCompetitions() {
+  return DEFAULT_FOOTBALL_COMPETITIONS
+    .filter(isMaleProfessionalFootballCompetition)
+    .filter((competition) => getSportsDbLeagueId(competition))
+    .sort((a, b) => Number(a.priority || 9) - Number(b.priority || 9))
+    .slice(0, 4);
+}
+
+function getSportsDbCompetitions(templateConfig = {}) {
+  const selected = getEnabledFootballCompetitions(templateConfig)
+    .filter(isMaleProfessionalFootballCompetition)
+    .filter((competition) => getSportsDbLeagueId(competition))
+    .sort((a, b) => Number(a.priority || 9) - Number(b.priority || 9));
+
+  return (selected.length ? selected : getDefaultSportsDbCompetitions()).slice(0, 4);
+}
+
+function normalizeSportsDbTime(event = {}) {
+  const time = String(event.strTime || event.strTimestamp || "").trim();
+  if (!time) return "Horario a definir";
+
+  if (time.includes("T")) {
+    const date = new Date(time);
+    if (!Number.isNaN(date.getTime())) {
+      return date.toLocaleTimeString("pt-BR", { hour: "2-digit", minute: "2-digit" });
+    }
+  }
+
+  return time.slice(0, 5);
+}
+
+function mapSportsDbEvent(event = {}, competition = {}, status = "scheduled") {
+  const homeScore = event.intHomeScore !== null && event.intHomeScore !== undefined && event.intHomeScore !== ""
+    ? Number(event.intHomeScore)
+    : null;
+  const awayScore = event.intAwayScore !== null && event.intAwayScore !== undefined && event.intAwayScore !== ""
+    ? Number(event.intAwayScore)
+    : null;
+  const isFinished = status === "finished" || homeScore !== null || awayScore !== null;
+
+  return {
+    id: event.idEvent || `${competition.id}-${event.strEvent || Date.now()}`,
+    sport: "football",
+    competitionId: competition.id,
+    competitionName: event.strLeague || competition.name,
+    status: isFinished ? "finished" : "scheduled",
+    homeTeam: event.strHomeTeam || "Mandante",
+    awayTeam: event.strAwayTeam || "Visitante",
+    homeScore,
+    awayScore,
+    startTime: normalizeSportsDbTime(event),
+    matchTime: isFinished ? "FT" : normalizeSportsDbTime(event),
+    period: isFinished ? "Encerrado" : "Proximo jogo",
+    venue: event.strVenue || "Local a definir",
+    lastEvent: isFinished ? "Resultado oficial" : "Agenda oficial",
+    priority: Number(competition.priority || 9),
+    dateEvent: event.dateEvent || "",
+    source: "TheSportsDB",
+    homeLogo: event.strHomeTeamBadge || "",
+    awayLogo: event.strAwayTeamBadge || "",
+    leagueLogo: event.strLeagueBadge || "",
+  };
+}
+
+function getLocalDateValue(offsetDays = 0) {
+  const date = new Date();
+  date.setDate(date.getDate() + offsetDays);
+  const year = date.getFullYear();
+  const month = String(date.getMonth() + 1).padStart(2, "0");
+  const day = String(date.getDate()).padStart(2, "0");
+
+  return `${year}-${month}-${day}`;
+}
+
+function mapSportsDbOtherEvent(event = {}, selectedSport = {}) {
+  const hasScore = event.intHomeScore !== null && event.intHomeScore !== undefined && event.intHomeScore !== "";
+  const homeScore = hasScore ? event.intHomeScore : "";
+  const awayScore = event.intAwayScore !== null && event.intAwayScore !== undefined && event.intAwayScore !== ""
+    ? event.intAwayScore
+    : "";
+  const score = hasScore
+    ? `${homeScore} x ${awayScore}`
+    : normalizeSportsDbTime(event);
+
+  return {
+    id: event.idEvent || `${selectedSport.id}-${event.strEvent || Date.now()}`,
+    sport: selectedSport.name || event.strSport || "Esporte",
+    status: hasScore || event.strStatus === "FT" ? "finished" : "scheduled",
+    title: event.strLeague || event.strSport || selectedSport.name || "Evento",
+    score,
+    detail: event.strEvent || `${event.strHomeTeam || ""} ${event.strAwayTeam || ""}`.trim() || event.strVenue || "Agenda",
+    priority: selectedSport.priority || "Media",
+    dateEvent: event.dateEvent || "",
+    homeTeam: event.strHomeTeam || "",
+    awayTeam: event.strAwayTeam || "",
+    homeLogo: event.strHomeTeamBadge || "",
+    awayLogo: event.strAwayTeamBadge || "",
+    leagueLogo: event.strLeagueBadge || "",
+    source: "TheSportsDB",
+  };
+}
+
+function mapSportsDbStandingRow(row = {}, index = 0) {
+  return {
+    position: Number(row.intRank || row.intPosition || index + 1),
+    team: row.strTeam || row.strTeamShort || "Time",
+    points: row.intPoints ?? row.intPts ?? "-",
+    played: row.intPlayed ?? row.intFormedYear ?? "",
+    badge: row.strTeamBadge || row.strBadge || "",
+  };
+}
+
+async function fetchSportsDbJson(endpoint, signal) {
+  const response = await fetch(`${SPORTSDB_API_BASE}/${endpoint}`, { signal });
+  if (!response.ok) throw new Error(`TheSportsDB ${response.status}`);
+  return response.json();
+}
+
+async function fetchSportsDbStandings(competition = {}, signal) {
+  const leagueId = getSportsDbLeagueId(competition);
+  if (!leagueId) return [];
+
+  const currentYear = new Date().getFullYear();
+  const seasons = [`${currentYear}`, `${currentYear - 1}`, `${currentYear}-${currentYear + 1}`, `${currentYear - 1}-${currentYear}`];
+
+  for (const season of seasons) {
+    try {
+      const data = await fetchSportsDbJson(
+        `lookuptable.php?l=${encodeURIComponent(leagueId)}&s=${encodeURIComponent(season)}`,
+        signal
+      );
+      const rows = (data?.table || [])
+        .map(mapSportsDbStandingRow)
+        .filter((row) => row.team && !isWomenFootballText(row.team));
+
+      if (rows.length) return rows;
+    } catch (error) {
+      if (signal?.aborted) throw error;
+    }
+  }
+
+  return [];
+}
+
+async function fetchSportsFromTheSportsDB(templateConfig = {}) {
+  if (getSportsFootballMode(templateConfig) === "manual") return null;
+
+  const competitions = getSportsDbCompetitions(templateConfig);
+
+  if (!competitions.length) return null;
+
+  const cacheKey = competitions.map((competition) => getSportsDbLeagueId(competition)).join("-");
+  const cached = sportsDbMemoryCache.get(cacheKey);
+
+  if (cached && Date.now() - cached.cachedAt < SPORTSDB_CACHE_TTL_MS) {
+    return cached.data;
+  }
+
+  const controller = new AbortController();
+  const timeoutId = setTimeout(() => controller.abort(), 9000);
+
+  try {
+    const primaryCompetition = competitions.find((competition) => competition.id === "brasileirao_a") || competitions[0];
+    const standingsPromise = fetchSportsDbStandings(primaryCompetition, controller.signal);
+    const settled = await Promise.allSettled(
+      competitions.flatMap((competition) => {
+        const leagueId = getSportsDbLeagueId(competition);
+        return [
+          fetchSportsDbJson(`eventspastleague.php?id=${encodeURIComponent(leagueId)}`, controller.signal)
+            .then((data) => ({ competition, status: "finished", events: data?.events || [] })),
+          fetchSportsDbJson(`eventsnextleague.php?id=${encodeURIComponent(leagueId)}`, controller.signal)
+            .then((data) => ({ competition, status: "scheduled", events: data?.events || [] })),
+        ];
+      })
+    );
+
+    const matches = settled
+      .filter((result) => result.status === "fulfilled")
+      .flatMap((result) =>
+        result.value.events
+          .slice(0, 5)
+          .map((event) => mapSportsDbEvent(event, result.value.competition, result.value.status))
+      )
+      .filter((match) => match.homeTeam && match.awayTeam)
+      .filter(isMaleProfessionalFootballMatch)
+      .sort((a, b) => {
+        const dateA = new Date(`${a.dateEvent || ""}T${a.startTime || "00:00"}`).getTime();
+        const dateB = new Date(`${b.dateEvent || ""}T${b.startTime || "00:00"}`).getTime();
+
+        if (!Number.isNaN(dateA) && !Number.isNaN(dateB) && dateA !== dateB) {
+          return dateA - dateB;
+        }
+
+        return Number(a.priority || 9) - Number(b.priority || 9);
+      });
+
+    const finishedFootball = matches.filter((match) => match.status === "finished").reverse();
+    const upcomingFootball = matches.filter((match) => match.status === "scheduled");
+    const selectedOtherSports = getOtherSportsOptions(templateConfig).filter((sport) => sport.enabled);
+    const otherSportsSettled = await Promise.allSettled(
+      selectedOtherSports
+        .filter((sport) => sport.sportsDbSport)
+        .slice(0, 4)
+        .map((sport) =>
+          fetchSportsDbJson(
+            `eventsday.php?d=${getLocalDateValue(0)}&s=${encodeURIComponent(sport.sportsDbSport)}`,
+            controller.signal
+          ).then((data) => ({
+            sport,
+            events: data?.events || [],
+          }))
+        )
+    );
+    const realOtherSportsEvents = otherSportsSettled
+      .filter((result) => result.status === "fulfilled")
+      .flatMap((result) =>
+        result.value.events
+          .slice(0, 2)
+          .map((event) => mapSportsDbOtherEvent(event, result.value.sport))
+      )
+      .slice(0, 6);
+    const standingsResult = await Promise.allSettled([standingsPromise]);
+    const tableRows = standingsResult[0]?.status === "fulfilled" && standingsResult[0].value.length
+      ? standingsResult[0].value
+      : (primaryCompetition?.id === "brasileirao_a" ? DEFAULT_BRASILEIRAO_SERIE_A_TABLE_ROWS : []);
+
+    if (!matches.length && !tableRows.length) return null;
+
+    const realData = {
+      source: "TheSportsDB",
+      sourceSyncedAt: new Date().toLocaleTimeString("pt-BR", { hour: "2-digit", minute: "2-digit" }),
+      competitions,
+      liveFootball: [],
+      finishedFootball,
+      upcomingFootball,
+      otherSportsEvents: realOtherSportsEvents.length
+        ? realOtherSportsEvents
+        : getSportsData(templateConfig).otherSportsEvents,
+      selectedOtherSports,
+      tableRows,
+      primaryMatch: upcomingFootball[0]
+        || finishedFootball[0]
+        || matches[0]
+        || getSportsData(templateConfig).primaryMatch,
+    };
+
+    sportsDbMemoryCache.set(cacheKey, {
+      cachedAt: Date.now(),
+      data: realData,
+    });
+
+    return realData;
+  } catch (error) {
+    console.log("Erro ao buscar esportes na TheSportsDB:", error);
+    return null;
+  } finally {
+    clearTimeout(timeoutId);
+  }
+}
+
+const TEMPLATE_LIVE_CONTENT_CACHE_TTL_MS = 4 * 60 * 1000;
+const templateLiveContentCache = new Map();
+
+function isWeatherLiveTemplate(type) {
+  return ["clima", "jornal_premium", "clima_premium_v2", "hora_certa_premium", "tela_corporativa_personalizada"].includes(type);
+}
+
+function isTemplateLiveContentType(type) {
+  return isWeatherLiveTemplate(type) || isRssTemplateType(type) || type === "resultados_esportivos_premium";
+}
+
+function getTemplateLiveContentCacheKey(template = {}) {
+  const type = template.templateType || template.type || "";
+  const activeCity = getActiveTemplateWeatherCity(template);
+  const activeTideBeach = getActiveTemplateTideBeach(template);
+  return JSON.stringify({
+    type,
+    city: activeCity || template.city || template.weatherCity || "",
+    weatherCities: template.weatherCities || "",
+    tideBeach: activeTideBeach || template.tideBeach || "",
+    tideBeaches: template.tideBeaches || "",
+    tideStation: template.tideStation || "",
+    locationRotationInterval: template.locationRotationInterval || "",
+    newsFeedUrl: template.newsFeedUrl || "",
+    selectedNewsSources: template.selectedNewsSources || [],
+    footballMode: template.footballMode || "",
+    footballCompetitions: template.footballCompetitions || [],
+    otherSports: template.otherSports || [],
+  });
+}
+
+function getCachedTemplateLiveContent(template = {}) {
+  const cached = templateLiveContentCache.get(getTemplateLiveContentCacheKey(template));
+  if (!cached?.data) return null;
+  if (Date.now() - cached.cachedAt > TEMPLATE_LIVE_CONTENT_CACHE_TTL_MS) return null;
+  return cached.data;
+}
+
+async function fetchTemplateLiveContent(template = {}) {
+  const realTemplateType = template.templateType || template.type;
+  const result = {};
+  const tasks = [];
+
+  if (isWeatherLiveTemplate(realTemplateType)) {
+    tasks.push(
+      fetchWeatherByCity(getActiveTemplateWeatherCity(template))
+        .then((weather) => {
+          result.weather = weather;
+        })
+    );
+  }
+
+  if (realTemplateType === "clima_premium_v2") {
+    tasks.push(
+      fetchTideForecastForTemplate(template)
+        .then((tideForecast) => {
+          result.tideForecast = tideForecast;
+        })
+    );
+  }
+
+  if (isRssTemplateType(realTemplateType)) {
+    tasks.push(
+      Promise.all(
+        (getTemplateNewsFeedUrls(template).length ? getTemplateNewsFeedUrls(template) : [template.newsFeedUrl])
+          .map((feedUrl) => fetchNewsFromRss(feedUrl))
+      ).then((newsLists) => {
+        const collectedNews = newsLists.flat().filter((item) => item?.title);
+        const realNews = collectedNews.filter((item) => !isDefaultNewsItem(item));
+        const topicalNews = realTemplateType === "tendencia_beleza_premium"
+          ? filterBeautyNewsItems(realNews.length ? realNews : collectedNews)
+          : (realNews.length ? realNews : collectedNews);
+        const news = topicalNews.slice(0, 12);
+        result.news = news.length ? news : DEFAULT_NEWS_ITEMS;
+      })
+    );
+  }
+
+  if (realTemplateType === "resultados_esportivos_premium") {
+    tasks.push(
+      fetchSportsFromTheSportsDB(template)
+        .then((sportsData) => {
+          result.sportsData = sportsData;
+        })
+    );
+  }
+
+  await Promise.all(tasks);
+  return result;
+}
+
+function primeTemplateLiveContent(template = {}, options = {}) {
+  const type = template.templateType || template.type;
+  if (!isTemplateLiveContentType(type)) return Promise.resolve(null);
+
+  const cacheKey = getTemplateLiveContentCacheKey(template);
+  const cached = templateLiveContentCache.get(cacheKey);
+
+  if (!options.force && cached) {
+    if (cached.data && Date.now() - cached.cachedAt < TEMPLATE_LIVE_CONTENT_CACHE_TTL_MS) {
+      return Promise.resolve(cached.data);
+    }
+
+    if (cached.promise) return cached.promise;
+  }
+
+  const promise = fetchTemplateLiveContent(template)
+    .then((data) => {
+      templateLiveContentCache.set(cacheKey, {
+        cachedAt: Date.now(),
+        data,
+      });
+      return data;
+    })
+    .catch((error) => {
+      templateLiveContentCache.delete(cacheKey);
+      throw error;
+    });
+
+  templateLiveContentCache.set(cacheKey, {
+    cachedAt: Date.now(),
+    data: cached?.data || null,
+    promise,
+  });
+
+  return promise;
+}
+
 const firebaseConfig = {
   apiKey: "AIzaSyBk775KTH959oIIEqnWiJRFW7Fo-1AX5AY",
   authDomain: "totem-park.firebaseapp.com",
@@ -1153,8 +3704,258 @@ const firebaseConfig = {
   appId: "1:442546117681:web:10106346df8cd91d198910",
 };
 
+const APP_BUILD_MODE = import.meta.env.VITE_APP_MODE || "web";
+const IS_PLAYER_BUILD = ["player", "playerLab", "playerCanary", "playerRc", "playerPhaseB", "playerLinkFix", "playerLoopAudit", "playerTelemetry", "playerJumpDiag", "playerDecoderExperiment"].includes(APP_BUILD_MODE);
+const IS_PLAYER_LAB_BUILD = APP_BUILD_MODE === "playerLab";
+const IS_PLAYER_CANARY_BUILD = APP_BUILD_MODE === "playerCanary";
+const IS_PLAYER_RC_BUILD = APP_BUILD_MODE === "playerRc";
+const IS_PLAYER_TELEMETRY_BUILD = APP_BUILD_MODE === "playerTelemetry";
+const IS_PLAYER_JUMP_DIAG_BUILD = APP_BUILD_MODE === "playerJumpDiag";
+const IS_PLAYER_DECODER_EXPERIMENT_BUILD = APP_BUILD_MODE === "playerDecoderExperiment";
+const IS_PLAYER_PHASE_B_BUILD = APP_BUILD_MODE === "playerPhaseB";
+const IS_PLAYER_LINK_FIX_BUILD = APP_BUILD_MODE === "playerLinkFix";
+
+function PlayerOnlySplash() {
+  return (
+    <div className="player-only-splash">
+      <div className="player-only-splash-card">
+        <img src={logo} alt="Totem Park Player" />
+        <span>Totem Park Player</span>
+        <strong>Preparando player da TV</strong>
+      </div>
+    </div>
+  );
+}
+
+function PlayerOnlyOrientationChoice({ screenRotation, onScreenRotationChange, onContinue }) {
+  const rotationOptions = [
+    { value: "horizontal", label: "Horizontal" },
+    { value: "vertical", label: "Vertical" },
+    { value: "horizontalInvertida", label: "Horizontal invertida" },
+    { value: "verticalInvertida", label: "Vertical invertida" },
+  ];
+
+  function handleRemoteDirectionalNavigation(event) {
+    if (!["ArrowUp", "ArrowDown", "ArrowLeft", "ArrowRight"].includes(event.key)) return;
+
+    const container = event.currentTarget;
+    const current = document.activeElement;
+    const buttons = Array.from(container.querySelectorAll("button:not(:disabled)"))
+      .filter((button) => button.offsetParent !== null);
+
+    if (!buttons.includes(current)) return;
+
+    const currentRect = current.getBoundingClientRect();
+    const currentCenter = {
+      x: currentRect.left + currentRect.width / 2,
+      y: currentRect.top + currentRect.height / 2,
+    };
+
+    const direction = {
+      ArrowUp: { axis: "y", sign: -1 },
+      ArrowDown: { axis: "y", sign: 1 },
+      ArrowLeft: { axis: "x", sign: -1 },
+      ArrowRight: { axis: "x", sign: 1 },
+    }[event.key];
+
+    const candidates = buttons
+      .filter((button) => button !== current)
+      .map((button) => {
+        const rect = button.getBoundingClientRect();
+        const center = { x: rect.left + rect.width / 2, y: rect.top + rect.height / 2 };
+        const dx = center.x - currentCenter.x;
+        const dy = center.y - currentCenter.y;
+        const primary = (direction.axis === "x" ? dx : dy) * direction.sign;
+        const cross = Math.abs(direction.axis === "x" ? dy : dx);
+        return { button, primary, cross, score: primary + cross * 2.5 };
+      })
+      .filter(({ primary }) => primary > 6)
+      .sort((a, b) => a.score - b.score);
+
+    event.preventDefault();
+    event.stopPropagation();
+    candidates[0]?.button.focus();
+  }
+
+  return (
+    <div className="player-only-orientation-page" onKeyDown={handleRemoteDirectionalNavigation}>
+      <div className="player-only-orientation-card">
+        <img src={logo} alt="Totem Park" />
+        <span className="player-only-kicker">Totem Park Player</span>
+        <h1>Orientação da tela</h1>
+        <p>Escolha como esta Smart TV está instalada antes de conectar o código.</p>
+
+        <div className="app-rotation-grid player-only-rotation-grid">
+          {rotationOptions.map((option) => (
+            <button
+              key={option.value}
+              type="button"
+              className={screenRotation === option.value ? "active" : ""}
+              autoFocus={screenRotation === option.value}
+              onClick={() => onScreenRotationChange(option.value)}
+            >
+              {option.label}
+            </button>
+          ))}
+        </div>
+
+        <button className="tv-connect-button player-only-continue-button" onClick={onContinue}>
+          Continuar
+        </button>
+      </div>
+    </div>
+  );
+}
+
+function PlayerOnlyApp() {
+  const navigate = useNavigate();
+  const [savedTvConnection] = useState(() => readTvConnection());
+  const [screenRotation, setScreenRotation] = useState(getSavedScreenRotation);
+  const [showSplash, setShowSplash] = useState(true);
+  const [orientationReady, setOrientationReady] = useState(() =>
+    Boolean(localStorage.getItem("totempark-screen-rotation")) || Boolean(savedTvConnection)
+  );
+
+  useEffect(() => {
+    const timeoutId = setTimeout(() => setShowSplash(false), 900);
+    return () => clearTimeout(timeoutId);
+  }, []);
+
+  function handleScreenRotation(rotation) {
+    if (!Object.hasOwn(SCREEN_ROTATIONS, rotation)) return;
+
+    localStorage.setItem("totempark-screen-rotation", rotation);
+    setScreenRotation(rotation);
+  }
+
+  function handleOrientationContinue() {
+    if (!localStorage.getItem("totempark-screen-rotation")) {
+      localStorage.setItem("totempark-screen-rotation", screenRotation);
+    }
+
+    setOrientationReady(true);
+    navigate("/tv", { replace: true });
+  }
+
+  const routes = (
+    <Routes>
+      <Route
+        path="/"
+        element={(
+          <Navigate
+            to={
+              savedTvConnection
+                ? `/player/${savedTvConnection.clientId}/${savedTvConnection.code}`
+                : orientationReady
+                  ? "/tv"
+                  : "/orientacao"
+            }
+            replace
+          />
+        )}
+      />
+      <Route
+        path="/orientacao"
+        element={(
+          <PlayerOnlyOrientationChoice
+            screenRotation={screenRotation}
+            onScreenRotationChange={handleScreenRotation}
+            onContinue={handleOrientationContinue}
+          />
+        )}
+      />
+      <Route path="/tv" element={<TVConnectPage playerOnly />} />
+      <Route path="/player/:clientId/:codigo" element={<PlayerPage />} />
+      {IS_PLAYER_LAB_BUILD && <Route path="/diagnostico-lab" element={<PlayerLabDiagnostics />} />}
+      {IS_PLAYER_CANARY_BUILD && <Route path="/diagnostico-canary" element={<PlayerLabDiagnostics />} />}
+      {IS_PLAYER_RC_BUILD && <Route path="/diagnostico-rc" element={<PlayerLabDiagnostics />} />}
+      {IS_PLAYER_PHASE_B_BUILD && <Route path="/diagnostico-2a2-b" element={<PlayerLabDiagnostics />} />}
+      {IS_PLAYER_LINK_FIX_BUILD && <Route path="/diagnostico-link-fix" element={<PlayerLabDiagnostics />} />}
+      {IS_PLAYER_TELEMETRY_BUILD && <Route path="/diagnostico-telemetria" element={<PlayerLabDiagnostics />} />}
+      {(IS_PLAYER_JUMP_DIAG_BUILD || IS_PLAYER_DECODER_EXPERIMENT_BUILD) && <Route path="/diagnostico-salto" element={<PlayerLabDiagnostics />} />}
+      <Route path="*" element={<Navigate to="/tv" replace />} />
+    </Routes>
+  );
+
+  return (
+    <div className={`native-rotation-shell player-only-shell rotation-${screenRotation}`}>
+      <div className="native-rotation-content">
+        {showSplash ? <PlayerOnlySplash /> : routes}
+      </div>
+    </div>
+  );
+}
+
+function PlayerLabDiagnostics() {
+  const navigate = useNavigate();
+  const [report, setReport] = useState(() => getLabReport());
+  const [exportStatus, setExportStatus] = useState("");
+  const [exportedDiagnostic, setExportedDiagnostic] = useState(null);
+  useEffect(() => {
+    const refresh = () => setReport(getLabReport());
+    window.addEventListener("totempark-lab-diagnostic", refresh);
+    window.addEventListener("totempark-jump-diagnostic", refresh);
+    const interval = setInterval(refresh, 2000);
+    return () => { window.removeEventListener("totempark-lab-diagnostic", refresh); window.removeEventListener("totempark-jump-diagnostic", refresh); clearInterval(interval); };
+  }, []);
+  if (!labEnabled() || !report) return <Navigate to="/" replace />;
+  const latest = report.events.at(-1);
+  const current = Object.values(report.media).find((entry) => entry.currentSource !== "UNKNOWN");
+  const operational = readPlayerTelemetryReport();
+  return (
+    <main className="player-lab-diagnostics">
+      <header><div><span>{IS_PLAYER_DECODER_EXPERIMENT_BUILD ? "DECODER EXPERIMENTAL" : IS_PLAYER_JUMP_DIAG_BUILD ? "Somente JUMP DIAG" : IS_PLAYER_TELEMETRY_BUILD ? "Piloto 2A.2-C" : IS_PLAYER_LINK_FIX_BUILD ? "Somente LINK-FIX" : IS_PLAYER_PHASE_B_BUILD ? "Somente 2A.2-B" : IS_PLAYER_RC_BUILD ? "Somente RC" : IS_PLAYER_CANARY_BUILD ? "Somente CANARY" : "Somente LAB"}</span><h1>Diagnóstico Android 2A.2</h1></div><button onClick={() => navigate(-1)}>Voltar</button></header>
+      <section className="player-lab-grid">
+        <article><small>Sessão</small><strong>{report.session.id.slice(0, 8)}</strong><p>{report.session.startedAt}</p></article>
+        <article><small>Downloads concluídos</small><strong>{report.totals.fileTransferCompleted}</strong><p>{report.totals.bytesDownloaded.toLocaleString("pt-BR")} bytes</p></article>
+        <article><small>Cache</small><strong>{report.totals.cacheHits} hits / {report.totals.cacheMisses} misses</strong><p>{report.totals.fileTransferFailed} falhas · {report.totals.fileTransferTimeouts} timeouts</p></article>
+        <article><small>Reprodução</small><strong>{report.totals.localPlaybackCount} local / {report.totals.remotePlaybackCount} remota</strong><p>Origem: {current?.currentSource || "UNKNOWN"}</p></article>
+      </section>
+      <section className="player-lab-current"><h2>Mídia atual/recente</h2><p>{current?.mediaName || current?.mediaId || "Nenhuma mídia registrada"}</p><p>{current?.finalFileSizeBytes?.toLocaleString("pt-BR") || 0} bytes · {current?.currentSource || "UNKNOWN"}</p></section>
+      <section className="player-lab-current"><h2>Último evento</h2><p>{latest?.type || "Nenhum"} · {latest?.at || ""}</p><p>{latest?.message || "Sem erro registrado"}</p></section>
+      <section className="player-lab-current"><h2>Telemetria passiva 2A.2-C</h2><p>{operational ? `${operational.lastPlayerEvents?.length || 0} eventos · ${operational.transitions?.length || 0} transições` : "Desativada ou sem dados"}</p><p>{operational?.current?.lastPlayerEvent || "Nenhum evento operacional"}</p></section>
+      <button className="player-lab-export" onClick={async () => {
+        setExportedDiagnostic(null);
+        setExportStatus("Exportando diagnóstico...");
+        try {
+          const result = await exportLabReport();
+          if (IS_PLAYER_DECODER_EXPERIMENT_BUILD) {
+            setExportedDiagnostic(result);
+            setExportStatus("DIAGNÓSTICO EXPORTADO");
+          } else {
+            setExportStatus(`Salvo em: ${result}`);
+          }
+        } catch (error) {
+          setExportStatus(`ERRO DE EXPORTAÇÃO: ${error?.message || error}`);
+        }
+      }}>Exportar diagnóstico JSON</button>
+      {IS_PLAYER_DECODER_EXPERIMENT_BUILD && <section className="player-lab-current">
+        <h2>{exportStatus || "Exportação pública do diagnóstico"}</h2>
+        {exportedDiagnostic && <>
+          <p>Arquivo: {exportedDiagnostic.fileName}</p>
+          <p>Local: {exportedDiagnostic.fallback ? "FALLBACK: " : ""}{exportedDiagnostic.folder}</p>
+          <p>Tamanho: {(exportedDiagnostic.sizeBytes / 1024).toFixed(1)} KB</p>
+          <p>Sessão: {exportedDiagnostic.sessionId.slice(0, 8)}</p>
+          <p>Versão: {exportedDiagnostic.appVersion}</p>
+          <button className="player-lab-export" onClick={async () => {
+            try { await shareLastDecoderDiagnostic(); }
+            catch (error) { setExportStatus(`Compartilhamento falhou: ${error?.message || error}`); }
+          }}>Compartilhar JSON</button>
+        </>}
+        <details><summary>Ver eventos</summary><pre>{JSON.stringify(getJumpEvents(), null, 2)}</pre></details>
+      </section>}
+      {IS_PLAYER_JUMP_DIAG_BUILD && <section className="player-lab-current"><h2>Salto · últimos {getJumpEvents().length} eventos</h2><p>{exportStatus || "Os eventos ficam salvos localmente e visíveis aqui."}</p><button className="player-lab-export" onClick={async () => { const json = JSON.stringify({ diagnostic: getLabReport(), jumpEvents: getJumpEvents() }, null, 2); try { await navigator.clipboard.writeText(json); setExportStatus("JSON copiado."); } catch (error) { setExportStatus(`Cópia indisponível: ${error?.message || error}`); } }}>Copiar JSON</button><button className="player-lab-export" onClick={async () => { const json = JSON.stringify({ diagnostic: getLabReport(), jumpEvents: getJumpEvents() }, null, 2); const file = new File([json], "totempark-jump-diagnostic.json", { type: "application/json" }); try { if (!navigator.canShare?.({ files: [file] })) throw new Error("Compartilhamento de arquivo indisponível nesta TV"); await navigator.share({ files: [file], title: "Diagnóstico do salto" }); setExportStatus("JSON compartilhado."); } catch (error) { setExportStatus(`Compartilhamento indisponível: ${error?.message || error}`); } }}>Compartilhar JSON</button><details><summary>Ver eventos</summary><pre>{JSON.stringify(getJumpEvents(), null, 2)}</pre></details></section>}
+      <details><summary>Relatório por mídia</summary><pre>{JSON.stringify(report.media, null, 2)}</pre></details>
+    </main>
+  );
+}
+
 
 export default function App() {
+  return IS_PLAYER_BUILD ? <PlayerOnlyApp /> : <FullApp />;
+}
+
+function FullApp() {
   const [screenRotation, setScreenRotation] = useState(getSavedScreenRotation);
 
   function handleScreenRotation(rotation) {
@@ -1175,6 +3976,7 @@ export default function App() {
           />
         )}
       />
+      <Route path="/solicitar-conta" element={<AccountRequestPage />} />
       <Route path="/tv" element={<TVConnectPage />} />
       <Route path="/player/:clientId/:codigo" element={<PlayerPage />} />
     </Routes>
@@ -1199,13 +4001,13 @@ function AdminApp({ screenRotation, onScreenRotationChange }) {
   const [appMode, setAppMode] = useState(() => {
     if (!isNativeApp()) return "web";
 
-    return localStorage.getItem("totempark-app-mode") || "";
+    return "";
   });
 
   useEffect(() => {
     let unsubscribeClient = null;
 
-    const unsubscribeAuth = onAuthStateChanged(auth, (firebaseUser) => {
+    const unsubscribeAuth = onAuthStateChanged(auth, async (firebaseUser) => {
       if (unsubscribeClient) {
         unsubscribeClient();
         unsubscribeClient = null;
@@ -1217,15 +4019,23 @@ function AdminApp({ screenRotation, onScreenRotationChange }) {
         return;
       }
 
-      if (firebaseUser.email === "admin@parksolutions.com") {
-        setUser({
-          uid: firebaseUser.uid,
-          email: firebaseUser.email,
-          role: "admin",
-        });
+      const userEmail = normalizeEmail(firebaseUser.email);
 
-        setLoadingAuth(false);
-        return;
+      try {
+        const masterEmails = await loadMasterEmails();
+
+        if (masterEmails.includes(userEmail)) {
+          setUser({
+            uid: firebaseUser.uid,
+            email: userEmail,
+            role: "admin",
+          });
+
+          setLoadingAuth(false);
+          return;
+        }
+      } catch (error) {
+        console.log("Nao foi possivel carregar masters do sistema:", error);
       }
 
       const clientQuery = query(
@@ -1237,23 +4047,63 @@ function AdminApp({ screenRotation, onScreenRotationChange }) {
         clientQuery,
         (snapshot) => {
           if (snapshot.empty) {
-            setUser({
-              uid: firebaseUser.uid,
-              email: firebaseUser.email,
-              role: "client",
-              clientData: null,
-            });
+            getDoc(doc(db, ACCOUNT_REQUESTS_COLLECTION, getAccountRequestDocId(userEmail)))
+              .then((requestSnapshot) => {
+                if (requestSnapshot.exists()) {
+                  setUser({
+                    uid: firebaseUser.uid,
+                    email: userEmail,
+                    role: "pending",
+                    requestData: {
+                      id: requestSnapshot.id,
+                      ...requestSnapshot.data(),
+                    },
+                  });
+                } else {
+                  setUser({
+                    uid: firebaseUser.uid,
+                    email: userEmail,
+                    role: "client",
+                    clientData: null,
+                  });
+                }
+
+                setLoadingAuth(false);
+              })
+              .catch((error) => {
+                console.log("Nao foi possivel verificar solicitacao pendente:", error);
+                setUser({
+                  uid: firebaseUser.uid,
+                  email: userEmail,
+                  role: "client",
+                  clientData: null,
+                });
+                setLoadingAuth(false);
+              });
+            return;
           } else {
             const clientDoc = snapshot.docs[0];
+            const clientData = {
+              id: clientDoc.id,
+              ...clientDoc.data(),
+            };
+
+            if (clientData.accountStatus === PENDING_ACCOUNT_STATUS) {
+              setUser({
+                uid: firebaseUser.uid,
+                email: userEmail,
+                role: "pending",
+                requestData: clientData,
+              });
+              setLoadingAuth(false);
+              return;
+            }
 
             setUser({
               uid: firebaseUser.uid,
-              email: firebaseUser.email,
+              email: userEmail,
               role: "client",
-              clientData: {
-                id: clientDoc.id,
-                ...clientDoc.data(),
-              },
+              clientData,
             });
           }
 
@@ -1276,6 +4126,20 @@ function AdminApp({ screenRotation, onScreenRotationChange }) {
     };
   }, []);
 
+  useEffect(() => {
+    if (!isNativeApp() || appMode === "tv" || !user) return undefined;
+
+    const timeoutId = setTimeout(() => {
+      const managerApp = document.querySelector(".native-manager-app");
+      if (!managerApp) return;
+      if (managerApp.contains(document.activeElement) && document.activeElement !== document.body) return;
+
+      focusNativeManagerElement(getVisibleFocusableElements(managerApp)[0]);
+    }, 180);
+
+    return () => clearTimeout(timeoutId);
+  }, [user?.uid, appMode, activePage, selectedClient?.id]);
+
   if (loadingAuth) {
     return (
       <div className="login-page">
@@ -1287,6 +4151,10 @@ function AdminApp({ screenRotation, onScreenRotationChange }) {
   }
 
   if (!user) return <LoginPage />;
+
+  if (user.role === "pending") {
+    return <PendingAccountPanel onBack={() => signOut(auth)} />;
+  }
 
   if (user.role === "client") {
     if (!user.clientData) {
@@ -1325,7 +4193,10 @@ function AdminApp({ screenRotation, onScreenRotationChange }) {
     }
 
     return (
-      <div className="app">
+      <div
+        className={isNativeApp() ? "app native-manager-app" : "app"}
+        onKeyDown={isNativeApp() ? handleNativeManagerDirectionalNavigation : undefined}
+      >
         <div className="layout">
           <aside className="sidebar">
             <div className="logo-area">
@@ -1398,7 +4269,10 @@ function AdminApp({ screenRotation, onScreenRotationChange }) {
   }
 
   return (
-    <div className="app">
+    <div
+      className={isNativeApp() ? "app native-manager-app" : "app"}
+      onKeyDown={isNativeApp() ? handleNativeManagerDirectionalNavigation : undefined}
+    >
       <div className="layout">
         <aside className="sidebar">
           <div className="logo-area">
@@ -1424,12 +4298,32 @@ function AdminApp({ screenRotation, onScreenRotationChange }) {
             />
 
             <MenuItem
+              icon={<Monitor size={20} />}
+              text="Telemetria"
+              active={activePage === "telemetry" && !selectedClient}
+              onClick={() => {
+                setSelectedClient(null);
+                setActivePage("telemetry");
+              }}
+            />
+
+            <MenuItem
               icon={<Users size={20} />}
               text="Clientes"
               active={activePage === "clients" && !selectedClient}
               onClick={() => {
                 setSelectedClient(null);
                 setActivePage("clients");
+              }}
+            />
+
+            <MenuItem
+              icon={<MessageSquare size={20} />}
+              text="Solicitações"
+              active={activePage === "accountRequests" && !selectedClient}
+              onClick={() => {
+                setSelectedClient(null);
+                setActivePage("accountRequests");
               }}
             />
 
@@ -1467,8 +4361,12 @@ function AdminApp({ screenRotation, onScreenRotationChange }) {
 
         <main className="content">
           {!selectedClient && activePage === "dashboard" && <Dashboard />}
+          {!selectedClient && activePage === "telemetry" && <TelemetryDashboard />}
           {!selectedClient && activePage === "clients" && (
             <ClientsPage onOpenClient={setSelectedClient} />
+          )}
+          {!selectedClient && activePage === "accountRequests" && (
+            <AccountRequestsPage />
           )}
           {!selectedClient && activePage === "plans" && <PlansPage />}
           {!selectedClient && activePage === "settings" && (
@@ -1630,35 +4528,35 @@ function AppModeChoice({
 
 
 function LoginPage() {
-  const [mode, setMode] = useState("login");
+  const navigate = useNavigate();
+  const mode = "login";
   const [form, setForm] = useState({ email: "", password: "" });
 
-  async function handleAuth() {
-    if (!form.email || !form.password) {
+  async function handleAuth(event) {
+    event?.preventDefault?.();
+    const email = form.email.trim().toLowerCase();
+
+    if (!email || !form.password) {
       alert("Preencha e-mail e senha.");
       return;
     }
 
     try {
-      if (mode === "login") {
-        await signInWithEmailAndPassword(auth, form.email, form.password);
-      } else {
-        await createUserWithEmailAndPassword(auth, form.email, form.password);
-      }
+      await signInWithEmailAndPassword(auth, email, form.password);
     } catch (error) {
       console.log(error);
-      alert("Erro ao autenticar.");
+      alert("Não foi possível entrar. Confira seus dados ou fale com nossa equipe.");
     }
   }
 
   return (
     <div className="login-page">
-      <div className="login-card">
+      <form className="login-card" onSubmit={handleAuth}>
         <div className="login-logo-image">
           <img src={logo} alt="Totem Park" />
         </div>
 
-        <p>Sistema profissional de TVs e totens digitais.</p>
+        <p>Transforme telas em experiências que conectam.</p>
 
         <div className="form-group">
           <label>E-mail</label>
@@ -1680,16 +4578,378 @@ function LoginPage() {
           />
         </div>
 
-        <button className="login-button" onClick={handleAuth}>
-          {mode === "login" ? "Entrar" : "Criar conta"}
+        <button className="login-button" type="submit">
+          Entrar
         </button>
 
         <button
+          type="button"
           className="login-button secondary"
-          onClick={() => setMode(mode === "login" ? "register" : "login")}
+          onClick={() => navigate("/solicitar-conta")}
         >
           {mode === "login" ? "Criar nova conta" : "Já tenho conta"}
         </button>
+      </form>
+    </div>
+  );
+}
+
+function AccountRequestPage() {
+  const navigate = useNavigate();
+  const [form, setForm] = useState({
+    responsibleName: "",
+    email: "",
+    whatsapp: "",
+    role: "",
+    companyName: "",
+    cnpj: "",
+    segment: "",
+    city: "",
+    state: "",
+    screensEstimate: "",
+    intendedUse: "",
+    notes: "",
+    termsAccepted: false,
+  });
+  const [errors, setErrors] = useState({});
+  const [saving, setSaving] = useState(false);
+  const [submitted, setSubmitted] = useState(null);
+
+  const states = [
+    "AC", "AL", "AP", "AM", "BA", "CE", "DF", "ES", "GO", "MA", "MT",
+    "MS", "MG", "PA", "PB", "PR", "PE", "PI", "RJ", "RN", "RS", "RO",
+    "RR", "SC", "SP", "SE", "TO",
+  ];
+  const screenOptions = ["1 tela", "2 a 5 telas", "6 a 10 telas", "Mais de 10 telas"];
+  const useOptions = [
+    "TVs em ambiente comercial",
+    "Totens digitais",
+    "Comunicação interna",
+    "Cardápio digital",
+    "Publicidade",
+    "Gestão de telas para clientes",
+    "Ainda estou avaliando",
+  ];
+
+  function updateField(field, value) {
+    setForm((current) => ({ ...current, [field]: value }));
+    setErrors((current) => ({ ...current, [field]: "" }));
+  }
+
+  function validateForm() {
+    const nextErrors = {};
+    [
+      ["responsibleName", "Informe o nome completo."],
+      ["email", "Informe o e-mail."],
+      ["whatsapp", "Informe o WhatsApp."],
+      ["role", "Informe o cargo ou função."],
+      ["companyName", "Informe o nome da empresa."],
+      ["segment", "Informe o segmento."],
+      ["city", "Informe a cidade."],
+      ["state", "Informe o estado."],
+      ["screensEstimate", "Informe a quantidade estimada de telas."],
+      ["intendedUse", "Informe a finalidade de uso."],
+    ].forEach(([field, message]) => {
+      if (!String(form[field] || "").trim()) nextErrors[field] = message;
+    });
+
+    if (form.email && !isValidEmail(form.email)) nextErrors.email = "Informe um e-mail válido.";
+    if (form.whatsapp && onlyDigits(form.whatsapp).length < 10) {
+      nextErrors.whatsapp = "Informe um WhatsApp válido com DDD.";
+    }
+    if (form.cnpj && !validateCnpj(form.cnpj)) {
+      nextErrors.cnpj = "Informe um CNPJ válido ou deixe vazio.";
+    }
+    if (form.state && !states.includes(form.state)) nextErrors.state = "Selecione um estado válido.";
+    if (!form.termsAccepted) nextErrors.termsAccepted = "É necessário aceitar os termos para enviar.";
+
+    return nextErrors;
+  }
+
+  async function hasActiveDuplicate() {
+    const email = normalizeEmail(form.email);
+    const clientsByEmail = await getDocs(query(
+      collection(db, "clients"),
+      where("email", "==", email)
+    ));
+
+    if (!clientsByEmail.empty) return "Já existe uma conta ativa com este e-mail.";
+
+    const companyName = form.companyName.trim();
+    if (companyName) {
+      const clientsByCompany = await getDocs(query(
+        collection(db, "clients"),
+        where("name", "==", companyName)
+      ));
+
+      if (!clientsByCompany.empty) return "Já existe uma empresa cadastrada com este nome.";
+    }
+
+    const cnpjDigits = onlyDigits(form.cnpj);
+    if (!cnpjDigits) return "";
+
+    const clientsByCnpj = await getDocs(query(
+      collection(db, "clients"),
+      where("cnpj", "==", cnpjDigits)
+    ));
+
+    return clientsByCnpj.empty ? "" : "Já existe uma empresa cadastrada com este CNPJ.";
+  }
+
+  async function handleSubmit(event) {
+    event.preventDefault();
+    const validationErrors = validateForm();
+
+    if (Object.keys(validationErrors).length > 0) {
+      setErrors(validationErrors);
+      return;
+    }
+
+    try {
+      setSaving(true);
+
+      const duplicateMessage = await hasActiveDuplicate();
+      if (duplicateMessage) {
+        setErrors({ form: duplicateMessage });
+        return;
+      }
+
+      const requestData = {
+        responsibleName: form.responsibleName.trim(),
+        email: normalizeEmail(form.email),
+        whatsapp: form.whatsapp.trim(),
+        whatsappDigits: onlyDigits(form.whatsapp),
+        role: form.role.trim(),
+        companyName: form.companyName.trim(),
+        cnpj: onlyDigits(form.cnpj),
+        cnpjDisplay: form.cnpj.trim(),
+        segment: form.segment.trim(),
+        city: form.city.trim(),
+        state: form.state,
+        screensEstimate: form.screensEstimate,
+        intendedUse: form.intendedUse,
+        notes: form.notes.trim(),
+        status: ACCOUNT_REQUEST_STATUS.new,
+        accountStatus: PENDING_ACCOUNT_STATUS,
+        source: "public_signup_request",
+        createdAt: serverTimestamp(),
+        updatedAt: serverTimestamp(),
+        statusHistory: [{
+          status: ACCOUNT_REQUEST_STATUS.new,
+          at: new Date().toISOString(),
+          by: "Solicitação pública",
+        }],
+      };
+
+      await setDoc(
+        doc(db, ACCOUNT_REQUESTS_COLLECTION, getAccountRequestDocId(requestData.email)),
+        requestData
+      );
+
+      try {
+        const emailResult = await trySendAccountRequestEmail(requestData);
+        setSubmitted({ ...requestData, emailResult });
+      } catch (emailError) {
+        console.log("Falha segura ao enviar e-mail de solicitação:", emailError);
+        setSubmitted({ ...requestData, emailResult: { failed: true } });
+      }
+    } catch (error) {
+      console.log(error);
+
+      if (error.code === "permission-denied" || error.code === "already-exists") {
+        setErrors({
+          form: "Este cadastro já foi recebido e está aguardando análise da equipe comercial.",
+        });
+        return;
+      }
+
+      setErrors({
+        form: "Não foi possível salvar sua solicitação agora. Tente novamente em instantes.",
+      });
+    } finally {
+      setSaving(false);
+    }
+  }
+
+  if (submitted) {
+    return (
+      <AccountRequestShell>
+        <div className="account-request-success">
+          <div className="account-request-icon"><CheckCircle2 size={34} /></div>
+          <div className="kicker">Aguardando validação comercial</div>
+          <h1>Solicitação enviada com sucesso!</h1>
+          <p>
+            Recebemos seus dados e sua solicitação de criação de conta na Totem Park.
+            Nossa equipe comercial analisará as informações e entrará em contato em breve
+            para apresentar os planos, entender as necessidades da sua empresa e concluir
+            a ativação da conta.
+          </p>
+          <p>Também tentamos enviar uma confirmação para o e-mail informado no cadastro.</p>
+          <div className="account-request-actions">
+            <button className="login-button secondary" onClick={() => navigate("/")}>
+              Voltar para o login
+            </button>
+            <a className="login-button" href={getCommercialWhatsappUrl()} target="_blank" rel="noreferrer">
+              Falar com nossa equipe
+            </a>
+          </div>
+        </div>
+      </AccountRequestShell>
+    );
+  }
+
+  return (
+    <AccountRequestShell>
+      <div className="account-request-intro">
+        <div className="kicker">Totem Park</div>
+        <h1>Comece com a Totem Park</h1>
+        <p>
+          Preencha seus dados para solicitar a criação da sua conta. Nossa equipe
+          comercial analisará as informações e entrará em contato para apresentar
+          a melhor solução para sua empresa.
+        </p>
+        <ul>
+          <li>Gerencie TVs e totens em um só lugar;</li>
+          <li>Publique conteúdos de forma remota;</li>
+          <li>Receba orientação da equipe comercial.</li>
+        </ul>
+      </div>
+
+      <form className="account-request-form" onSubmit={handleSubmit}>
+        {errors.form && <div className="form-alert">{errors.form}</div>}
+        <h2>Dados do responsável</h2>
+        <div className="account-request-grid">
+          <RequestField label="Nome completo" error={errors.responsibleName}>
+            <input value={form.responsibleName} onChange={(e) => updateField("responsibleName", e.target.value)} />
+          </RequestField>
+          <RequestField label="E-mail" error={errors.email}>
+            <input type="email" value={form.email} onChange={(e) => updateField("email", e.target.value)} />
+          </RequestField>
+          <RequestField label="WhatsApp" error={errors.whatsapp}>
+            <input value={form.whatsapp} placeholder="84 99999-9999" onChange={(e) => updateField("whatsapp", e.target.value)} />
+          </RequestField>
+          <RequestField label="Cargo ou função" error={errors.role}>
+            <input value={form.role} onChange={(e) => updateField("role", e.target.value)} />
+          </RequestField>
+        </div>
+
+        <h2>Dados da empresa</h2>
+        <div className="account-request-grid">
+          <RequestField label="Nome da empresa" error={errors.companyName}>
+            <input value={form.companyName} onChange={(e) => updateField("companyName", e.target.value)} />
+          </RequestField>
+          <RequestField label="CNPJ (opcional)" error={errors.cnpj}>
+            <input value={form.cnpj} onChange={(e) => updateField("cnpj", e.target.value)} />
+          </RequestField>
+          <RequestField label="Segmento de atuação" error={errors.segment}>
+            <input value={form.segment} placeholder="Ex: restaurante, loja, clínica..." onChange={(e) => updateField("segment", e.target.value)} />
+          </RequestField>
+          <RequestField label="Cidade" error={errors.city}>
+            <input value={form.city} onChange={(e) => updateField("city", e.target.value)} />
+          </RequestField>
+          <RequestField label="Estado" error={errors.state}>
+            <select value={form.state} onChange={(e) => updateField("state", e.target.value)}>
+              <option value="">Selecione</option>
+              {states.map((state) => <option key={state}>{state}</option>)}
+            </select>
+          </RequestField>
+          <RequestField label="Quantidade estimada de telas" error={errors.screensEstimate}>
+            <select value={form.screensEstimate} onChange={(e) => updateField("screensEstimate", e.target.value)}>
+              <option value="">Selecione</option>
+              {screenOptions.map((option) => <option key={option}>{option}</option>)}
+            </select>
+          </RequestField>
+          <RequestField label="Finalidade de uso" error={errors.intendedUse}>
+            <select value={form.intendedUse} onChange={(e) => updateField("intendedUse", e.target.value)}>
+              <option value="">Selecione</option>
+              {useOptions.map((option) => <option key={option}>{option}</option>)}
+            </select>
+          </RequestField>
+          <RequestField label="Observações" full>
+            <textarea value={form.notes} onChange={(e) => updateField("notes", e.target.value)} />
+          </RequestField>
+        </div>
+
+        <label className="account-request-terms">
+          <input
+            type="checkbox"
+            checked={form.termsAccepted}
+            onChange={(e) => updateField("termsAccepted", e.target.checked)}
+          />
+          <span>
+            Aceito os Termos de Uso e a Política de Privacidade da Totem Park.
+            Os links oficiais serão conectados quando as páginas jurídicas estiverem publicadas.
+          </span>
+        </label>
+        {errors.termsAccepted && <small className="field-error">{errors.termsAccepted}</small>}
+
+        <button className="login-button" type="submit" disabled={saving}>
+          {saving ? "Enviando..." : "Solicitar criação da conta"}
+        </button>
+        <p className="account-request-note">
+          O envio da solicitação não ativa a conta imediatamente. Nossa equipe entrará
+          em contato para concluir o cadastro.
+        </p>
+        <button type="button" className="login-button secondary" onClick={() => navigate("/")}>
+          Já tenho uma conta — Entrar
+        </button>
+      </form>
+    </AccountRequestShell>
+  );
+}
+
+function AccountRequestShell({ children }) {
+  return (
+    <div className="account-request-page">
+      <div className="account-request-card">
+        <div className="account-request-brand">
+          <img src={logo} alt="Totem Park" />
+        </div>
+        {children}
+        <div className="auth-footer-brand">
+          Desenvolvido por <strong>Park Solutions</strong>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+function RequestField({ label, error, children, full = false }) {
+  return (
+    <label className={`request-field ${full ? "full" : ""}`}>
+      <span>{label}</span>
+      {children}
+      {error && <small className="field-error">{error}</small>}
+    </label>
+  );
+}
+
+function PendingAccountPanel({ onBack }) {
+  return (
+    <div className="login-page">
+      <div className="login-card pending-account-card">
+        <div className="login-logo-image">
+          <img src={logo} alt="Totem Park" />
+        </div>
+        <div className="kicker">Conta aguardando validação</div>
+        <h1>Conta aguardando validação</h1>
+        <p>
+          Seu cadastro foi recebido e está sendo analisado pela nossa equipe comercial.
+          Assim que a conta for aprovada e ativada, você receberá um e-mail com as
+          orientações para acessar a plataforma.
+        </p>
+        <p>Em caso de dúvidas, entre em contato com nossa equipe.</p>
+        <button className="login-button" onClick={onBack}>
+          Voltar para o login
+        </button>
+        <a
+          className="login-button secondary"
+          href={getCommercialWhatsappUrl("Olá! Gostaria de consultar minha solicitação de conta na Totem Park.")}
+          target="_blank"
+          rel="noreferrer"
+        >
+          Falar com a equipe comercial
+        </a>
       </div>
     </div>
   );
@@ -1697,9 +4957,12 @@ function LoginPage() {
 
 function Dashboard() {
   const [clients, setClients] = useState([]);
+  const [clientsError, setClientsError] = useState("");
   const [screensData, setScreensData] = useState([]);
   const [playlistsData, setPlaylistsData] = useState([]);
   const [now, setNow] = useState(Date.now());
+  const [screenStatusFilter, setScreenStatusFilter] = useState("all");
+  const [cachePanelExpanded, setCachePanelExpanded] = useState(false);
 
   useEffect(() => {
     const interval = setInterval(() => {
@@ -1712,13 +4975,16 @@ function Dashboard() {
   useEffect(() => {
     let unsubScreens = [];
     let unsubPlaylists = [];
+    let active = true;
+    const clientsRef = collection(db, "clients");
 
-    const unsubscribeClients = onSnapshot(collection(db, "clients"), (snapshot) => {
+    function applyClientsSnapshot(snapshot) {
       const clientsList = snapshot.docs.map((clientDoc) => ({
         id: clientDoc.id,
         ...clientDoc.data(),
       }));
 
+      setClientsError("");
       setClients(clientsList);
       setScreensData([]);
       setPlaylistsData([]);
@@ -1764,9 +5030,50 @@ function Dashboard() {
         unsubScreens.push(screenUnsub);
         unsubPlaylists.push(playlistUnsub);
       });
-    });
+    }
+
+    let serverConfirmed = false;
+    let refreshing = false;
+    function receiveSnapshot(snapshot) {
+      if (!active || (serverConfirmed && snapshot.metadata.fromCache)) return;
+      if (!snapshot.metadata.fromCache) serverConfirmed = true;
+      applyClientsSnapshot(snapshot);
+    }
+    async function refreshClients() {
+      if (!active || refreshing) return;
+      refreshing = true;
+      try {
+        const snapshot = await getDocsFromServer(clientsRef);
+        receiveSnapshot(snapshot);
+      } catch (error) {
+        if (active) setClientsError(getFirestoreReadErrorMessage(error));
+      } finally {
+        refreshing = false;
+      }
+    }
+    function refreshVisibleClients() {
+      if (document.visibilityState === "visible") refreshClients();
+    }
+    refreshClients();
+    const refreshInterval = setInterval(refreshVisibleClients, 30000);
+    window.addEventListener("online", refreshClients);
+    document.addEventListener("visibilitychange", refreshVisibleClients);
+
+    const unsubscribeClients = onSnapshot(
+      clientsRef,
+      { includeMetadataChanges: true },
+      receiveSnapshot,
+      (error) => {
+        console.log("Erro no realtime de clientes:", error);
+        setClientsError(getFirestoreReadErrorMessage(error));
+      }
+    );
 
     return () => {
+      active = false;
+      clearInterval(refreshInterval);
+      window.removeEventListener("online", refreshClients);
+      document.removeEventListener("visibilitychange", refreshVisibleClients);
       unsubscribeClients();
       unsubScreens.forEach((unsub) => unsub());
       unsubPlaylists.forEach((unsub) => unsub());
@@ -1774,25 +5081,11 @@ function Dashboard() {
   }, []);
 
   function getLastSeenDate(screen) {
-    if (screen.lastSeenAt?.toDate) {
-      return screen.lastSeenAt.toDate();
-    }
-
-    if (screen.lastSeenAt?.seconds) {
-      return new Date(screen.lastSeenAt.seconds * 1000);
-    }
-
-    return null;
+    return getScreenLastSeenDate(screen);
   }
 
   function isScreenOnline(screen) {
-    const lastSeenDate = getLastSeenDate(screen);
-
-    if (!lastSeenDate) return false;
-
-    const diffInSeconds = (now - lastSeenDate.getTime()) / 1000;
-
-    return diffInSeconds <= 20;
+    return getScreenConnectionStatus(screen, now).isOnline;
   }
 
   function getDaysToDue(dueDate) {
@@ -1837,6 +5130,16 @@ function Dashboard() {
 
   const onlineScreens = screensData.filter(isScreenOnline);
   const offlineScreens = screensData.filter((screen) => !isScreenOnline(screen));
+  const loggedOfflineScreens = screensData.filter(
+    (screen) => getScreenConnectionStatus(screen, now).key === "logged-offline"
+  );
+  const notLoggedScreens = screensData.filter(
+    (screen) => getScreenConnectionStatus(screen, now).key === "not-logged"
+  );
+  const filteredRealtimeScreens = screensData.filter((screen) => {
+    if (screenStatusFilter === "all") return true;
+    return getScreenConnectionStatus(screen, now).key === screenStatusFilter;
+  });
 
   const overdueClients = clients.filter((client) => {
     return getClientPlanAccess(client).isOverdue;
@@ -1847,13 +5150,22 @@ function Dashboard() {
     access: getClientPlanAccess(client),
   }));
   const activePlanClients = clientAccessList.filter(({ access }) => access.isActive);
+  const demoClients = clients.filter((client) => getPlanConfig(client.plan).isDemo);
+  const setupClientList = clients.map((client) => getSetupInfo(client));
+  const setupInProgressClients = setupClientList.filter((setup) => setup.isInProgress);
+  const setupPendingClients = setupClientList.filter((setup) => setup.isPending);
+  const setupCompletedClients = setupClientList.filter((setup) => setup.isCompleted);
   const alertPlanClients = clientAccessList.filter(({ access }) => access.statusLabel === "Vencido");
   const partialPlanClients = clientAccessList.filter(({ access }) => access.isPartialRestriction);
   const strongPlanClients = clientAccessList.filter(({ access }) => access.isStrongRestriction);
   const suspendedPlanClients = clientAccessList.filter(({ access }) => access.isSuspended);
   const estimatedMrr = clientAccessList
-    .filter(({ access }) => !access.isSuspended)
-    .reduce((total, { client }) => total + getPlanConfig(client.plan).price, 0);
+    .filter(({ client, access }) => !access.isSuspended && !getPlanConfig(client.plan).isDemo)
+    .reduce((total, { client }) => total + getPlanConfig(client.plan).priceMonthly, 0);
+  const paidSetupRevenue = clients.reduce((total, client) => {
+    const setup = getSetupInfo(client);
+    return setup.isPaidRevenue ? total + setup.setupFee : total;
+  }, 0);
 
   const soonDueClients = clients.filter((client) => {
     const days = getDaysToDue(client.dueDate);
@@ -1911,6 +5223,58 @@ function Dashboard() {
     return clientPlaylists.find((playlist) => playlist.id === screen.playlistId);
   }
 
+  const trafficCards = clients.map((client) => {
+    const clientScreens = screensData.filter((screen) => screen.clientId === client.id);
+    const statusGroups = getClientScreensByStatus(clientScreens, now);
+    const storageUsed = Math.max(
+      0,
+      Number(client.storageUsedBytes || client.usedStorageBytes || client.mediaStorageBytes || 0)
+    );
+    const activePlaylistWeights = clientScreens.map((screen) => getPlaylistWeightBytes(getDashboardActivePlaylist(screen)));
+    const activePlaylistWeightBytes = activePlaylistWeights.reduce((largest, weight) => Math.max(largest, weight), 0);
+    const reportedTraffic = clientScreens.reduce(
+      (total, screen) => total + Math.max(0, Number(screen.estimatedMonthlyTrafficBytes || 0)),
+      0
+    );
+    const estimatedMonthlyTrafficBytes = reportedTraffic || activePlaylistWeightBytes * Math.max(1, statusGroups.online.length || clientScreens.length) * 30;
+    const cacheStatuses = clientScreens.map((screen) => screen.cacheStatus).filter(Boolean);
+    const cacheStatus = cacheStatuses.includes("erro")
+      ? "Erro"
+      : cacheStatuses.includes("preparando")
+        ? "Preparando"
+        : cacheStatuses.includes("parcial")
+          ? "Parcial"
+          : cacheStatuses.includes("pronto")
+            ? "Pronto"
+            : "Indisponível";
+    const sourceStatuses = clientScreens.map((screen) => screen.currentMediaSource).filter(Boolean);
+    const mediaSource = sourceStatuses.includes("mixed")
+      ? "Misto"
+      : sourceStatuses.includes("remote")
+        ? "Internet"
+        : sourceStatuses.includes("cache")
+          ? "Cache"
+          : "Sem sinal";
+    const risk = getClientCacheRisk({
+      client,
+      screens: clientScreens,
+      activePlaylistWeightBytes,
+      estimatedMonthlyTrafficBytes,
+    });
+
+    return {
+      client,
+      statusGroups,
+      storageUsed,
+      activePlaylistWeightBytes,
+      estimatedMonthlyTrafficBytes,
+      cacheStatus,
+      mediaSource,
+      risk,
+    };
+  });
+  const visibleTrafficCards = cachePanelExpanded ? trafficCards : trafficCards.slice(0, 4);
+
   return (
     <>
       <header className="premium-dashboard-hero">
@@ -1937,6 +5301,13 @@ function Dashboard() {
           </div>
         </div>
       </header>
+
+      {clientsError && (
+        <div className="admin-data-alert">
+          <strong>Clientes não carregados</strong>
+          <span>{clientsError}</span>
+        </div>
+      )}
 
       <section className="premium-stats">
         <PremiumStatCard
@@ -1978,11 +5349,67 @@ function Dashboard() {
 
       <section className="admin-plan-kpis">
         <div><span>Ativos</span><strong>{activePlanClients.length}</strong></div>
+        <div><span>Demonstração</span><strong>{demoClients.length}</strong></div>
+        <div><span>Em implantação</span><strong>{setupInProgressClients.length}</strong></div>
+        <div className="warning"><span>Adesões pendentes</span><strong>{setupPendingClients.length}</strong></div>
+        <div><span>Adesões concluídas</span><strong>{setupCompletedClients.length}</strong></div>
         <div className="warning"><span>Vencidos</span><strong>{alertPlanClients.length}</strong></div>
         <div className="partial"><span>Restrição parcial</span><strong>{partialPlanClients.length}</strong></div>
         <div className="strong"><span>Restrição forte</span><strong>{strongPlanClients.length}</strong></div>
         <div className="suspended"><span>Suspensos</span><strong>{suspendedPlanClients.length}</strong></div>
-        <div className="mrr"><span>MRR estimado</span><strong>{estimatedMrr.toLocaleString("pt-BR", { style: "currency", currency: "BRL" })}</strong></div>
+        <div className="mrr"><span>MRR estimado</span><strong>{formatCurrencyBr(estimatedMrr)}</strong></div>
+        <div className="mrr"><span>Adesões pagas</span><strong>{formatCurrencyBr(paidSetupRevenue)}</strong></div>
+      </section>
+
+      <section className="premium-panel traffic-cache-panel">
+        <div className="premium-panel-header">
+          <div>
+            <h2>Consumo e Cache</h2>
+            <p>Monitoramento administrativo para reduzir downloads repetidos de mídias.</p>
+          </div>
+          {trafficCards.length > 0 && (
+            <div className="traffic-cache-actions">
+              <span>
+                {visibleTrafficCards.length}/{trafficCards.length} cliente(s)
+              </span>
+              <button
+                type="button"
+                className="client-action"
+                onClick={() => setCachePanelExpanded((current) => !current)}
+              >
+                {cachePanelExpanded ? "Recolher" : "Expandir"}
+              </button>
+            </div>
+          )}
+        </div>
+
+        <div className={`traffic-cache-grid ${cachePanelExpanded ? "expanded" : "collapsed"}`}>
+          {trafficCards.length === 0 ? (
+            <div className="premium-empty">Nenhum cliente para monitorar ainda.</div>
+          ) : (
+            visibleTrafficCards.map(({ client, statusGroups, storageUsed, activePlaylistWeightBytes, estimatedMonthlyTrafficBytes, cacheStatus, mediaSource, risk }) => (
+              <div className={`traffic-cache-card risk-${risk.key}`} key={client.id}>
+                <div className="traffic-cache-card-top">
+                  <div>
+                    <strong>{client.name}</strong>
+                    <span>Plano {getPlanConfig(client.plan).name}</span>
+                  </div>
+                  <b>{risk.label}</b>
+                </div>
+
+                <div className="traffic-cache-metrics">
+                  <span>Telas: {statusGroups.online.length} online • {statusGroups["logged-offline"].length} offline • {statusGroups["not-logged"].length} não logada(s)</span>
+                  <span>Storage: {formatStorageSize(storageUsed)} / {formatStorageSize(getClientStorageLimit(client), 0)}</span>
+                  <span>Playlist ativa: {formatStorageSize(activePlaylistWeightBytes)}</span>
+                  <span>Cache: {cacheStatus} • {mediaSource}</span>
+                  <span>Tráfego estimado: {formatStorageSize(estimatedMonthlyTrafficBytes)}</span>
+                </div>
+
+                <p>{risk.message}</p>
+              </div>
+            ))
+          )}
+        </div>
       </section>
 
       <section className="premium-dashboard-grid">
@@ -1993,18 +5420,46 @@ function Dashboard() {
               <p>Monitoramento rápido das TVs conectadas.</p>
             </div>
 
-            <div className="premium-screen-summary">
-              <span className="online">{onlineScreens.length} online</span>
-              <span className="offline">{offlineScreens.length} offline</span>
+            <div className="premium-screen-summary" role="group" aria-label="Filtro de status das telas">
+              <button
+                type="button"
+                className={screenStatusFilter === "all" ? "active" : ""}
+                onClick={() => setScreenStatusFilter("all")}
+              >
+                Todas {screensData.length}
+              </button>
+              <button
+                type="button"
+                className={screenStatusFilter === "online" ? "online active" : "online"}
+                onClick={() => setScreenStatusFilter("online")}
+              >
+                Online {onlineScreens.length}
+              </button>
+              <button
+                type="button"
+                className={screenStatusFilter === "logged-offline" ? "warning active" : "warning"}
+                onClick={() => setScreenStatusFilter("logged-offline")}
+              >
+                Logada offline {loggedOfflineScreens.length}
+              </button>
+              <button
+                type="button"
+                className={screenStatusFilter === "not-logged" ? "offline active" : "offline"}
+                onClick={() => setScreenStatusFilter("not-logged")}
+              >
+                Não logada {notLoggedScreens.length}
+              </button>
             </div>
           </div>
 
           <div className="premium-screen-list">
-            {screensData.length === 0 ? (
+            {filteredRealtimeScreens.length === 0 ? (
               <div className="premium-empty">Nenhuma tela cadastrada ainda.</div>
             ) : (
-              screensData.slice(0, 8).map((screen) => {
-                const online = isScreenOnline(screen);
+              filteredRealtimeScreens.slice(0, 8).map((screen) => {
+                const connection = getScreenConnectionStatus(screen, now);
+                const deviceLocation = getScreenDisplayLocation(screen);
+                const online = connection.isOnline;
 
                 return (
                   <div className="premium-screen-row" key={`${screen.clientId}-${screen.id}`}>
@@ -2027,16 +5482,36 @@ function Dashboard() {
                       <div className="manager-now-playing">
                         <small>{screen.currentPlaylistName || "Playlist não informada"}</small>
                         <b>{screen.nowPlayingTitle || "Aguardando mídia"}</b>
+                        <span className="manager-cache-line">
+                          Cache: {getCacheStatusLabel(screen)} • {getMediaSourceLabel(screen.currentMediaSource)}
+                        </span>
+                        {getCacheSyncLabel(screen) && (
+                          <span className="manager-cache-line muted">
+                            {getCacheSyncLabel(screen)}
+                          </span>
+                        )}
                       </div>
                     </div>
 
                     <div className="manager-screen-status-col">
-                      <div className={online ? "premium-live-badge online" : "premium-live-badge offline"}>
-                        {online ? "ONLINE" : "OFFLINE"}
+                      <div className={`premium-live-badge ${connection.className}`}>
+                        {connection.label}
                       </div>
 
                       <span>
-                        {screen.nowPlayingIndex && screen.nowPlayingTotal
+                        {connection.deviceLabel}
+                      </span>
+
+                      <span>
+                        Login: {connection.lastConnection}
+                      </span>
+
+                      <span>
+                        Local: {deviceLocation.city}
+                      </span>
+
+                      <span>
+                        Item: {screen.nowPlayingIndex && screen.nowPlayingTotal
                           ? `${screen.nowPlayingIndex}/${screen.nowPlayingTotal}`
                           : "--"}
                       </span>
@@ -2176,13 +5651,213 @@ function PremiumStatCard({ title, value, icon, status, link, color }) {
 }
 
 
+function AccountRequestsPage() {
+  const [requests, setRequests] = useState([]);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState("");
+  const [statusFilter, setStatusFilter] = useState("Todos");
+  const [updatingId, setUpdatingId] = useState("");
+
+  useEffect(() => {
+    const unsubscribe = onSnapshot(
+      collection(db, ACCOUNT_REQUESTS_COLLECTION),
+      (snapshot) => {
+        const list = snapshot.docs
+          .map((requestDoc) => ({ id: requestDoc.id, ...requestDoc.data() }))
+          .sort((a, b) => {
+            const aTime = a.createdAt?.toMillis?.() || 0;
+            const bTime = b.createdAt?.toMillis?.() || 0;
+            return bTime - aTime;
+          });
+
+        setRequests(list);
+        setError("");
+        setLoading(false);
+      },
+      (snapshotError) => {
+        console.log("Erro ao carregar solicitações:", snapshotError);
+        setError(getFirestoreReadErrorMessage(snapshotError));
+        setLoading(false);
+      }
+    );
+
+    return () => unsubscribe();
+  }, []);
+
+  async function updateRequestStatus(requestItem, nextStatus) {
+    try {
+      setUpdatingId(requestItem.id);
+      const history = Array.isArray(requestItem.statusHistory) ? requestItem.statusHistory : [];
+
+      await updateDoc(doc(db, ACCOUNT_REQUESTS_COLLECTION, requestItem.id), {
+        status: nextStatus,
+        updatedAt: serverTimestamp(),
+        statusHistory: [
+          ...history,
+          {
+            status: nextStatus,
+            at: new Date().toISOString(),
+            by: auth.currentUser?.email || "Administrador",
+          },
+        ],
+      });
+    } catch (statusError) {
+      console.log(statusError);
+      alert("Não foi possível atualizar o status da solicitação.");
+    } finally {
+      setUpdatingId("");
+    }
+  }
+
+  const filteredRequests = requests.filter((requestItem) => (
+    statusFilter === "Todos" || requestItem.status === statusFilter
+  ));
+  const pendingCount = requests.filter((requestItem) => (
+    requestItem.status !== ACCOUNT_REQUEST_STATUS.activated &&
+    requestItem.status !== ACCOUNT_REQUEST_STATUS.rejected
+  )).length;
+
+  return (
+    <>
+      <header className="clients-premium-header">
+        <div>
+          <div className="kicker">Comercial</div>
+          <h1>Solicitações de cadastro</h1>
+          <p>Pedidos enviados pelo botão Criar nova conta, aguardando validação comercial.</p>
+        </div>
+      </header>
+
+      {error && (
+        <div className="admin-data-alert">
+          <strong>Solicitações não carregadas</strong>
+          <span>{error}</span>
+        </div>
+      )}
+
+      <section className="clients-kpi-grid account-request-kpis">
+        <div className="clients-kpi-card">
+          <span>Total recebido</span>
+          <strong>{requests.length}</strong>
+          <p>Solicitações registradas</p>
+        </div>
+        <div className="clients-kpi-card warning">
+          <span>Em andamento</span>
+          <strong>{pendingCount}</strong>
+          <p>Aguardam validação ou contato</p>
+        </div>
+        <div className="clients-kpi-card active">
+          <span>Ativadas</span>
+          <strong>{requests.filter((item) => item.status === ACCOUNT_REQUEST_STATUS.activated).length}</strong>
+          <p>Marcadas como conta ativada</p>
+        </div>
+        <div className="clients-kpi-card danger">
+          <span>Não aprovadas</span>
+          <strong>{requests.filter((item) => item.status === ACCOUNT_REQUEST_STATUS.rejected).length}</strong>
+          <p>Encerradas pelo comercial</p>
+        </div>
+      </section>
+
+      <section className="clients-toolbar">
+        <div className="clients-filter-group">
+          {["Todos", ...ACCOUNT_REQUEST_STATUS_OPTIONS].map((status) => (
+            <button
+              key={status}
+              className={statusFilter === status ? "active" : ""}
+              onClick={() => setStatusFilter(status)}
+            >
+              {status}
+            </button>
+          ))}
+        </div>
+      </section>
+
+      <section className="account-requests-panel">
+        {loading && <p>Carregando solicitações...</p>}
+
+        {!loading && filteredRequests.length === 0 && (
+          <div className="clients-empty">
+            <strong>Nenhuma solicitação encontrada</strong>
+            <span>Novos pedidos aparecerão aqui automaticamente.</span>
+          </div>
+        )}
+
+        {filteredRequests.map((requestItem) => (
+          <article className="account-request-admin-card" key={requestItem.id}>
+            <div className="account-request-admin-main">
+              <div>
+                <span className="client-status-badge temporary">
+                  {requestItem.status || ACCOUNT_REQUEST_STATUS.new}
+                </span>
+                <h3>{requestItem.companyName || "Empresa não informada"}</h3>
+                <p>
+                  {requestItem.responsibleName} • {requestItem.role || "Cargo não informado"}
+                </p>
+              </div>
+              <div className="account-request-admin-select">
+                <label>Status</label>
+                <select
+                  value={requestItem.status || ACCOUNT_REQUEST_STATUS.new}
+                  disabled={updatingId === requestItem.id}
+                  onChange={(event) => updateRequestStatus(requestItem, event.target.value)}
+                >
+                  {ACCOUNT_REQUEST_STATUS_OPTIONS.map((status) => (
+                    <option key={status}>{status}</option>
+                  ))}
+                </select>
+              </div>
+            </div>
+
+            <div className="account-request-admin-grid">
+              <span><strong>E-mail</strong>{requestItem.email}</span>
+              <span><strong>WhatsApp</strong>{requestItem.whatsapp}</span>
+              <span><strong>CNPJ</strong>{requestItem.cnpjDisplay || requestItem.cnpj || "Opcional"}</span>
+              <span><strong>Segmento</strong>{requestItem.segment}</span>
+              <span><strong>Cidade/UF</strong>{requestItem.city}/{requestItem.state}</span>
+              <span><strong>Telas</strong>{requestItem.screensEstimate}</span>
+              <span><strong>Finalidade</strong>{requestItem.intendedUse}</span>
+              <span><strong>Solicitado em</strong>{formatFirestoreDateTime(requestItem.createdAt)}</span>
+            </div>
+
+            {requestItem.notes && (
+              <p className="account-request-notes">
+                <strong>Observações:</strong> {requestItem.notes}
+              </p>
+            )}
+
+            <div className="account-request-admin-actions">
+              <a
+                className="client-action primary"
+                href={getWhatsappUrl(requestItem.whatsappDigits || requestItem.whatsapp, `Olá, ${requestItem.responsibleName}! Recebemos sua solicitação da Totem Park e vamos dar sequência ao atendimento.`)}
+                target="_blank"
+                rel="noreferrer"
+              >
+                Chamar no WhatsApp
+              </a>
+              <button
+                className="client-action"
+                onClick={() => navigator.clipboard?.writeText?.(
+                  `${requestItem.companyName}\n${requestItem.responsibleName}\n${requestItem.email}\n${requestItem.whatsapp}`
+                )}
+              >
+                Copiar dados
+              </button>
+            </div>
+          </article>
+        ))}
+      </section>
+    </>
+  );
+}
+
 function ClientsPage({ onOpenClient }) {
   const [clients, setClients] = useState([]);
+  const [clientsError, setClientsError] = useState("");
   const [showCreateModal, setShowCreateModal] = useState(false);
   const [editingClient, setEditingClient] = useState(null);
   const [savingClient, setSavingClient] = useState(false);
   const [searchTerm, setSearchTerm] = useState("");
   const [statusFilter, setStatusFilter] = useState("Todos");
+  const [clientUsage, setClientUsage] = useState({});
 
   const [form, setForm] = useState({
     name: "",
@@ -2190,27 +5865,136 @@ function ClientsPage({ onOpenClient }) {
     password: "",
     plan: "Start",
     billing: "Mensal",
+    startDate: "",
     dueDate: "",
-    screensLimit: "2",
+    screensLimit: "1",
     storageLimitGb: "5",
+    maxVideoSizeMb: "100",
+    maxImageSizeMb: "10",
     status: "Ativo",
+    premiumTemplatesEnabled: false,
+    marketingEnabled: false,
+    setupEnabled: false,
+    setupStatus: "Não informada",
+    setupFee: "",
+    setupPaidStatus: "Não informado",
+    setupPaidAt: "",
+    setupMethod: "",
+    setupStartDate: "",
+    setupCompletedAt: "",
+    setupNotes: "",
+    demoWatermarkEnabled: true,
+    demoTickerEnabled: true,
+    demoTickerText: DEFAULT_DEMO_TICKER_TEXT,
     logoFile: null,
     logoPreview: "",
     logoUrl: "",
   });
 
   useEffect(() => {
-    const unsubscribe = onSnapshot(collection(db, "clients"), (snapshot) => {
+    let active = true;
+    const clientsRef = collection(db, "clients");
+
+    function applyClientsSnapshot(snapshot) {
       const list = snapshot.docs.map((clientDoc) => ({
         id: clientDoc.id,
         ...clientDoc.data(),
       }));
 
+      setClientsError("");
       setClients(list);
+    }
+
+    let serverConfirmed = false;
+    let refreshing = false;
+    function receiveSnapshot(snapshot) {
+      if (!active || (serverConfirmed && snapshot.metadata.fromCache)) return;
+      if (!snapshot.metadata.fromCache) serverConfirmed = true;
+      applyClientsSnapshot(snapshot);
+    }
+    async function refreshClients() {
+      if (!active || refreshing) return;
+      refreshing = true;
+      try {
+        const snapshot = await getDocsFromServer(clientsRef);
+        receiveSnapshot(snapshot);
+      } catch (error) {
+        if (active) setClientsError(getFirestoreReadErrorMessage(error));
+      } finally {
+        refreshing = false;
+      }
+    }
+    function refreshVisibleClients() {
+      if (document.visibilityState === "visible") refreshClients();
+    }
+    refreshClients();
+    const refreshInterval = setInterval(refreshVisibleClients, 30000);
+    window.addEventListener("online", refreshClients);
+    document.addEventListener("visibilitychange", refreshVisibleClients);
+
+    const unsubscribe = onSnapshot(
+      clientsRef,
+      { includeMetadataChanges: true },
+      receiveSnapshot,
+      (error) => {
+        console.log("Erro no realtime de clientes:", error);
+        setClientsError(getFirestoreReadErrorMessage(error));
+      }
+    );
+
+    return () => {
+      active = false;
+      clearInterval(refreshInterval);
+      window.removeEventListener("online", refreshClients);
+      document.removeEventListener("visibilitychange", refreshVisibleClients);
+      unsubscribe();
+    };
+  }, []);
+
+  useEffect(() => {
+    if (clients.length === 0) {
+      setClientUsage({});
+      return undefined;
+    }
+
+    const unsubscribers = clients.flatMap((client) => {
+      const screensUnsub = onSnapshot(
+        collection(db, "clients", client.id, "screens"),
+        (snapshot) => {
+          setClientUsage((previous) => ({
+            ...previous,
+            [client.id]: {
+              ...(previous[client.id] || {}),
+              screensCount: snapshot.size,
+            },
+          }));
+        }
+      );
+
+      const mediaUnsub = onSnapshot(
+        collection(db, "clients", client.id, "media"),
+        (snapshot) => {
+          const storageUsedBytes = getMediaStorageUsed(
+            snapshot.docs.map((item) => item.data())
+          );
+
+          setClientUsage((previous) => ({
+            ...previous,
+            [client.id]: {
+              ...(previous[client.id] || {}),
+              storageUsedBytes,
+            },
+          }));
+        }
+      );
+
+      return [screensUnsub, mediaUnsub];
     });
 
-    return () => unsubscribe();
-  }, []);
+    return () => {
+      unsubscribers.forEach((unsubscribe) => unsubscribe());
+    };
+  }, [clients]);
 
   function getDaysToDue(dueDate) {
     if (!dueDate) return null;
@@ -2312,10 +6096,27 @@ function ClientsPage({ onOpenClient }) {
       password: "",
       plan: "Start",
       billing: "Mensal",
+      startDate: "",
       dueDate: "",
-      screensLimit: "2",
+      screensLimit: "1",
       storageLimitGb: "5",
+      maxVideoSizeMb: "100",
+      maxImageSizeMb: "10",
       status: "Ativo",
+      premiumTemplatesEnabled: false,
+      marketingEnabled: false,
+      setupEnabled: false,
+      setupStatus: "Não informada",
+      setupFee: "",
+      setupPaidStatus: "Não informado",
+      setupPaidAt: "",
+      setupMethod: "",
+      setupStartDate: "",
+      setupCompletedAt: "",
+      setupNotes: "",
+      demoWatermarkEnabled: true,
+      demoTickerEnabled: true,
+      demoTickerText: DEFAULT_DEMO_TICKER_TEXT,
       logoFile: null,
       logoPreview: "",
       logoUrl: "",
@@ -2336,10 +6137,27 @@ function ClientsPage({ onOpenClient }) {
       password: "",
       plan: getPlanConfig(client.plan).name,
       billing: client.billing || "Mensal",
+      startDate: client.startDate || "",
       dueDate: client.dueDate || "",
       screensLimit: String(getClientScreenLimit(client)),
       storageLimitGb: String(getClientStorageLimit(client) / STORAGE_GB),
+      maxVideoSizeMb: String(getClientMaxVideoSize(client) / STORAGE_MB),
+      maxImageSizeMb: String(getClientMaxImageSize(client) / STORAGE_MB),
       status: client.status || "Ativo",
+      premiumTemplatesEnabled: hasPremiumTemplates(client),
+      marketingEnabled: hasMarketingAccess(client),
+      setupEnabled: client.setupEnabled === true,
+      setupStatus: client.setupStatus || "Não informada",
+      setupFee: client.setupFee ?? "",
+      setupPaidStatus: client.setupPaidStatus || "Não informado",
+      setupPaidAt: client.setupPaidAt || "",
+      setupMethod: client.setupMethod || "",
+      setupStartDate: client.setupStartDate || "",
+      setupCompletedAt: client.setupCompletedAt || "",
+      setupNotes: client.setupNotes || "",
+      demoWatermarkEnabled: client.demoWatermarkEnabled !== false,
+      demoTickerEnabled: client.demoTickerEnabled !== false,
+      demoTickerText: client.demoTickerText || DEFAULT_DEMO_TICKER_TEXT,
       logoFile: null,
       logoPreview: client.logoUrl || "",
       logoUrl: client.logoUrl || "",
@@ -2354,11 +6172,26 @@ function ClientsPage({ onOpenClient }) {
   }
 
   function handleClientPlanChange(plan) {
+    const planConfig = getPlanConfig(plan);
+    const planLimits = getPlanLimits(plan);
+
     setForm((current) => ({
       ...current,
-      plan,
-      screensLimit: String(getPlanConfig(plan).screensLimit),
-      storageLimitGb: String(getPlanLimits(plan).storageLimitBytes / STORAGE_GB),
+      plan: planConfig.name,
+      screensLimit: String(planConfig.screensLimit),
+      storageLimitGb: String(planLimits.storageLimitBytes / STORAGE_GB),
+      maxVideoSizeMb: String(planLimits.maxVideoSizeBytes / STORAGE_MB),
+      maxImageSizeMb: String(planLimits.maxImageSizeBytes / STORAGE_MB),
+      premiumTemplatesEnabled: planConfig.premiumTemplatesEnabled,
+      marketingEnabled: planConfig.marketingEnabled,
+      dueDate: planConfig.isDemo && !current.dueDate
+        ? getTodayDateInput(planConfig.defaultTrialDays)
+        : current.dueDate,
+      demoWatermarkEnabled: planConfig.isDemo ? current.demoWatermarkEnabled !== false : current.demoWatermarkEnabled,
+      demoTickerEnabled: planConfig.isDemo ? current.demoTickerEnabled !== false : current.demoTickerEnabled,
+      demoTickerText: planConfig.isDemo && !current.demoTickerText
+        ? DEFAULT_DEMO_TICKER_TEXT
+        : current.demoTickerText,
     }));
   }
 
@@ -2408,6 +6241,11 @@ function ClientsPage({ onOpenClient }) {
       return;
     }
 
+    if (String(form.setupFee).trim() && parseOptionalMoney(form.setupFee) === null) {
+      alert("Informe um valor de adesão válido ou deixe o campo vazio.");
+      return;
+    }
+
     try {
       setSavingClient(true);
 
@@ -2416,10 +6254,27 @@ function ClientsPage({ onOpenClient }) {
         email: form.email.trim(),
         plan: getPlanConfig(form.plan).name,
         billing: form.billing,
+        startDate: form.startDate || "",
         dueDate: form.dueDate,
         screensLimit: String(Math.max(1, Number(form.screensLimit) || 1)),
         storageLimitBytes: Math.max(STORAGE_MB, Number(form.storageLimitGb) * STORAGE_GB || getPlanLimits(form.plan).storageLimitBytes),
+        maxVideoSizeBytes: Math.max(STORAGE_MB, Number(form.maxVideoSizeMb) * STORAGE_MB || getPlanLimits(form.plan).maxVideoSizeBytes),
+        maxImageSizeBytes: Math.max(STORAGE_MB, Number(form.maxImageSizeMb) * STORAGE_MB || getPlanLimits(form.plan).maxImageSizeBytes),
         status: form.status,
+        premiumTemplatesEnabled: Boolean(form.premiumTemplatesEnabled),
+        marketingEnabled: Boolean(form.marketingEnabled),
+        setupEnabled: Boolean(form.setupEnabled),
+        setupStatus: form.setupEnabled ? form.setupStatus : "Não informada",
+        setupFee: parseOptionalMoney(form.setupFee) === null ? "" : parseOptionalMoney(form.setupFee),
+        setupPaidStatus: form.setupEnabled ? form.setupPaidStatus : "Não informado",
+        setupPaidAt: form.setupPaidAt || "",
+        setupMethod: form.setupMethod.trim(),
+        setupStartDate: form.setupStartDate || "",
+        setupCompletedAt: form.setupCompletedAt || "",
+        setupNotes: form.setupNotes.trim(),
+        demoWatermarkEnabled: Boolean(form.demoWatermarkEnabled),
+        demoTickerEnabled: Boolean(form.demoTickerEnabled),
+        demoTickerText: form.demoTickerText?.trim() || DEFAULT_DEMO_TICKER_TEXT,
         updatedAt: serverTimestamp(),
       };
 
@@ -2441,6 +6296,7 @@ function ClientsPage({ onOpenClient }) {
         const uid = await createClientAuthUser(form.email.trim(), form.password);
         const clientRef = await addDoc(collection(db, "clients"), {
           ...clientData,
+          accountStatus: "active",
           uid,
           logoUrl: "",
           createdAt: serverTimestamp(),
@@ -2507,6 +6363,37 @@ function ClientsPage({ onOpenClient }) {
     }
   }
 
+  async function toggleClientSuspension(client) {
+    const isSuspended = getClientPlanAccess(client).isSuspended;
+    const nextStatus = isSuspended ? "Ativo" : "Suspenso";
+    const confirmMessage = isSuspended
+      ? `Retornar o cliente ${client.name} para Ativo?`
+      : `Suspender o cliente ${client.name}?`;
+
+    if (!window.confirm(confirmMessage)) return;
+
+    try {
+      await updateDoc(doc(db, "clients", client.id), {
+        status: nextStatus,
+        ...(nextStatus === "Ativo"
+          ? {
+              suspendedAt: deleteField(),
+              suspensionReason: deleteField(),
+            }
+          : {
+              suspendedAt: serverTimestamp(),
+              suspensionReason: "Suspenso pelo modo gestor",
+            }),
+        updatedAt: serverTimestamp(),
+      });
+
+      alert(nextStatus === "Ativo" ? "Cliente reativado." : "Cliente suspenso.");
+    } catch (error) {
+      console.log(error);
+      alert("Erro ao alterar status do cliente.");
+    }
+  }
+
   return (
     <>
       <header className="clients-premium-header">
@@ -2524,6 +6411,13 @@ function ClientsPage({ onOpenClient }) {
           Novo cliente
         </button>
       </header>
+
+      {clientsError && (
+        <div className="admin-data-alert">
+          <strong>Clientes não carregados</strong>
+          <span>{clientsError}</span>
+        </div>
+      )}
 
       <section className="clients-kpi-grid">
         <div className="clients-kpi-card">
@@ -2592,6 +6486,13 @@ function ClientsPage({ onOpenClient }) {
           filteredClients.map((client) => {
             const dueInfo = getDueInfo(client);
             const planAccess = getClientPlanAccess(client);
+            const planConfig = getPlanConfig(client.plan);
+            const setupInfo = getSetupInfo(client);
+            const usage = clientUsage[client.id] || {};
+            const screensUsed = Number(usage.screensCount || 0);
+            const storageUsedBytes = Number(usage.storageUsedBytes || 0);
+            const storageLimitBytes = getClientStorageLimit(client);
+            const storageUsage = getStorageUsage(storageUsedBytes, storageLimitBytes);
 
             return (
               <div className="clients-table-row" key={client.id}>
@@ -2611,8 +6512,11 @@ function ClientsPage({ onOpenClient }) {
                 </div>
 
                 <div>
-                  <strong>{getPlanConfig(client.plan).name}</strong>
+                  <strong>{planConfig.name}</strong>
                   <span>{client.billing}</span>
+                  {planConfig.isDemo && (
+                    <span className="client-status-badge temporary">Demonstração</span>
+                  )}
                 </div>
 
                 <div>
@@ -2623,14 +6527,21 @@ function ClientsPage({ onOpenClient }) {
                 </div>
 
                 <div>
-                  <strong>{getClientScreenLimit(client)}</strong>
-                  <span>limite de telas</span>
+                  <strong>{screensUsed}/{getClientScreenLimit(client)}</strong>
+                  <span>{formatStorageSize(storageUsedBytes)} / {formatStorageSize(storageLimitBytes, 0)}</span>
+                  <span className={`client-due ${storageUsage.severity === "danger" ? "danger" : storageUsage.severity === "warning" ? "warning" : "success"}`}>
+                    {storageUsage.label}
+                  </span>
                 </div>
 
                 <div>
                   <span className={`client-status-badge ${getStatusClass(planAccess.statusLabel)}`}>
                     {planAccess.statusLabel}
                   </span>
+                  <span className="client-setup-line">
+                    Adesão: {setupInfo.setupEnabled ? setupInfo.setupStatus : "Não acompanhada"}
+                  </span>
+                  <span className="client-setup-line">{formatSetupFee(client)}</span>
                 </div>
 
                 <div className="clients-actions">
@@ -2653,6 +6564,13 @@ function ClientsPage({ onOpenClient }) {
                     onClick={() => openEditClientModal(client)}
                   >
                     Editar
+                  </button>
+
+                  <button
+                    className={planAccess.isSuspended ? "client-action primary" : "client-action warning"}
+                    onClick={() => toggleClientSuspension(client)}
+                  >
+                    {planAccess.isSuspended ? "Retornar" : "Suspender"}
                   </button>
 
                   <button
@@ -2691,7 +6609,7 @@ function ClientsPage({ onOpenClient }) {
             </div>
 
             <div className="client-modal-section">
-              <h3>Dados principais</h3>
+              <h3>Identificação</h3>
 
               <div className="form-grid">
                 <div className="form-group">
@@ -2803,6 +6721,15 @@ function ClientsPage({ onOpenClient }) {
                 </div>
 
                 <div className="form-group">
+                  <label>Data de início</label>
+                  <input
+                    type="date"
+                    value={form.startDate}
+                    onChange={(e) => setForm({ ...form, startDate: e.target.value })}
+                  />
+                </div>
+
+                <div className="form-group">
                   <label>Limite de telas</label>
                   <input
                     type="number"
@@ -2822,6 +6749,182 @@ function ClientsPage({ onOpenClient }) {
                     step="0.1"
                     value={form.storageLimitGb}
                     onChange={(e) => setForm({ ...form, storageLimitGb: e.target.value })}
+                  />
+                </div>
+
+                <div className="form-group">
+                  <label>Vídeo máximo (MB)</label>
+                  <input
+                    type="number"
+                    min="1"
+                    step="1"
+                    value={form.maxVideoSizeMb}
+                    onChange={(e) => setForm({ ...form, maxVideoSizeMb: e.target.value })}
+                  />
+                </div>
+
+                <div className="form-group">
+                  <label>Imagem máxima (MB)</label>
+                  <input
+                    type="number"
+                    min="1"
+                    step="1"
+                    value={form.maxImageSizeMb}
+                    onChange={(e) => setForm({ ...form, maxImageSizeMb: e.target.value })}
+                  />
+                </div>
+
+                {getPlanConfig(form.plan).isDemo && (
+                  <>
+                    <div className="form-group">
+                      <label>Templates Premium na demonstração</label>
+                      <select
+                        value={form.premiumTemplatesEnabled ? "Sim" : "Não"}
+                        onChange={(e) => setForm({ ...form, premiumTemplatesEnabled: e.target.value === "Sim" })}
+                      >
+                        <option>Não</option>
+                        <option>Sim</option>
+                      </select>
+                    </div>
+
+                    <div className="form-group">
+                      <label>Marketing na demonstração</label>
+                      <select
+                        value={form.marketingEnabled ? "Sim" : "Não"}
+                        onChange={(e) => setForm({ ...form, marketingEnabled: e.target.value === "Sim" })}
+                      >
+                        <option>Não</option>
+                        <option>Sim</option>
+                      </select>
+                    </div>
+                    <div className="form-group">
+                      <label>Logo/nome de demonstraÃ§Ã£o no Player</label>
+                      <select
+                        value={form.demoWatermarkEnabled ? "Sim" : "NÃ£o"}
+                        onChange={(e) => setForm({ ...form, demoWatermarkEnabled: e.target.value === "Sim" })}
+                      >
+                        <option>Sim</option>
+                        <option>NÃ£o</option>
+                      </select>
+                    </div>
+
+                    <div className="form-group">
+                      <label>Barra inferior de demonstraÃ§Ã£o</label>
+                      <select
+                        value={form.demoTickerEnabled ? "Sim" : "NÃ£o"}
+                        onChange={(e) => setForm({ ...form, demoTickerEnabled: e.target.value === "Sim" })}
+                      >
+                        <option>Sim</option>
+                        <option>NÃ£o</option>
+                      </select>
+                    </div>
+
+                    <div className="form-group full">
+                      <label>Mensagem da barra inferior</label>
+                      <input
+                        value={form.demoTickerText}
+                        placeholder="Mensagem exibida no rodapÃ© do Player"
+                        onChange={(e) => setForm({ ...form, demoTickerText: e.target.value })}
+                      />
+                    </div>
+                  </>
+                )}
+              </div>
+            </div>
+
+            <div className="client-modal-section setup-section">
+              <h3>Adesão / Implantação</h3>
+
+              <div className="form-grid">
+                <div className="form-group">
+                  <label>Acompanhar adesão</label>
+                  <select
+                    value={form.setupEnabled ? "Sim" : "Não"}
+                    onChange={(e) => setForm({ ...form, setupEnabled: e.target.value === "Sim" })}
+                  >
+                    <option>Não</option>
+                    <option>Sim</option>
+                  </select>
+                </div>
+
+                <div className="form-group">
+                  <label>Status da implantação</label>
+                  <select
+                    value={form.setupStatus}
+                    onChange={(e) => setForm({ ...form, setupStatus: e.target.value })}
+                  >
+                    <option>Não informada</option>
+                    <option>Pendente</option>
+                    <option>Em implantação</option>
+                    <option>Concluída</option>
+                    <option>Isenta</option>
+                  </select>
+                </div>
+
+                <div className="form-group">
+                  <label>Valor opcional</label>
+                  <input
+                    value={form.setupFee}
+                    placeholder="Deixe vazio se não informado"
+                    onChange={(e) => setForm({ ...form, setupFee: e.target.value })}
+                  />
+                </div>
+
+                <div className="form-group">
+                  <label>Status do pagamento</label>
+                  <select
+                    value={form.setupPaidStatus}
+                    onChange={(e) => setForm({ ...form, setupPaidStatus: e.target.value })}
+                  >
+                    <option>Não informado</option>
+                    <option>Pendente</option>
+                    <option>Pago</option>
+                    <option>Isento</option>
+                  </select>
+                </div>
+
+                <div className="form-group">
+                  <label>Forma de pagamento</label>
+                  <input
+                    value={form.setupMethod}
+                    placeholder="Pix, boleto, cartão..."
+                    onChange={(e) => setForm({ ...form, setupMethod: e.target.value })}
+                  />
+                </div>
+
+                <div className="form-group">
+                  <label>Data de início</label>
+                  <input
+                    type="date"
+                    value={form.setupStartDate}
+                    onChange={(e) => setForm({ ...form, setupStartDate: e.target.value })}
+                  />
+                </div>
+
+                <div className="form-group">
+                  <label>Data de conclusão</label>
+                  <input
+                    type="date"
+                    value={form.setupCompletedAt}
+                    onChange={(e) => setForm({ ...form, setupCompletedAt: e.target.value })}
+                  />
+                </div>
+
+                <div className="form-group">
+                  <label>Pagamento em</label>
+                  <input
+                    type="date"
+                    value={form.setupPaidAt}
+                    onChange={(e) => setForm({ ...form, setupPaidAt: e.target.value })}
+                  />
+                </div>
+
+                <div className="form-group full">
+                  <label>Observações internas</label>
+                  <textarea
+                    value={form.setupNotes}
+                    placeholder="Anotações administrativas sobre a implantação"
+                    onChange={(e) => setForm({ ...form, setupNotes: e.target.value })}
                   />
                 </div>
               </div>
@@ -2972,6 +7075,13 @@ function ClientInternalPanel({ client, onBack, hideBackButton = false, isAdmin =
         >
           Marketing
         </button>
+
+        <button
+          className={tab === "plans" ? "client-tab active" : "client-tab"}
+          onClick={() => setTab("plans")}
+        >
+          Planos
+        </button>
       </div>
 
       {tab === "dashboard" && <ClientDashboard client={currentClient} access={operationalAccess} />}
@@ -2980,6 +7090,7 @@ function ClientInternalPanel({ client, onBack, hideBackButton = false, isAdmin =
       {tab === "screens" && <ClientScreensPage client={currentClient} access={operationalAccess} />}
       {tab === "templates" && <ClientTemplatesPage client={currentClient} access={operationalAccess} />}
       {tab === "marketing" && <ClientMarketingPage client={currentClient} access={operationalAccess} />}
+      {tab === "plans" && <PlansPage clientView />}
         </>
       )}
     </>
@@ -3098,25 +7209,11 @@ function ClientDashboard({ client, access = getClientPlanAccess(client) }) {
   }
 
   function getLastSeenDate(screen) {
-    if (screen.lastSeenAt?.toDate) {
-      return screen.lastSeenAt.toDate();
-    }
-
-    if (screen.lastSeenAt?.seconds) {
-      return new Date(screen.lastSeenAt.seconds * 1000);
-    }
-
-    return null;
+    return getScreenLastSeenDate(screen);
   }
 
   function isScreenOnline(screen) {
-    const lastSeenDate = getLastSeenDate(screen);
-
-    if (!lastSeenDate) return false;
-
-    const diffInSeconds = (Date.now() - lastSeenDate.getTime()) / 1000;
-
-    return diffInSeconds <= 20;
+    return getScreenConnectionStatus(screen).isOnline;
   }
 
   const onlineScreensCount = screens.filter(isScreenOnline).length;
@@ -3128,6 +7225,36 @@ function ClientDashboard({ client, access = getClientPlanAccess(client) }) {
   const storageUsedBytes = getMediaStorageUsed(media);
   const storageLimitBytes = getClientStorageLimit(client);
   const storageUsage = getStorageUsage(storageUsedBytes, storageLimitBytes);
+  const setupInfo = getSetupInfo(client);
+  const screenReports = screens.map((screen) => {
+    const active = getActivePlaylist(screen);
+    const connection = getScreenConnectionStatus(screen);
+
+    return {
+      id: screen.id,
+      name: screen.name || "Tela",
+      code: screen.code || "--",
+      location: screen.location || "Nao informado",
+      orientation: screen.orientation || "Paisagem",
+      status: connection.label,
+      statusClass: connection.className,
+      deviceId: screen.connectedDeviceId || screen.activeDeviceId || "",
+      lastConnection: screen.lastConnection || "Ainda nao conectou",
+      lastSeen: formatScreenConnectionDate(connection.lastSeenDate),
+      playlist: screen.currentPlaylistName || active.playlist?.name || "Sem playlist",
+      mode: screen.currentPlaylistMode || active.mode || "default",
+      nowPlaying: screen.nowPlayingTitle || "Aguardando conteudo",
+      itemProgress: screen.nowPlayingIndex && screen.nowPlayingTotal
+        ? `${screen.nowPlayingIndex}/${screen.nowPlayingTotal}`
+        : "--",
+      cache: screen.cacheStatus
+        ? `${screen.cacheStatus} ${Number(screen.cachedItems || 0)}/${Number(screen.totalCacheableItems || 0)}`
+        : "Sem cache informado",
+      mediaSource: screen.currentMediaSource || "remote",
+    };
+  });
+  const loggedScreensCount = screenReports.filter((report) => report.deviceId).length;
+  const loggedOfflineScreensCount = screenReports.filter((report) => report.deviceId && report.statusClass !== "online").length;
 
   return (
     <>
@@ -3163,16 +7290,23 @@ function ClientDashboard({ client, access = getClientPlanAccess(client) }) {
 
         <StatCard
           title="Templates Premium"
-          value={planConfig.premiumTemplates ? "Ativo" : "Bloqueado"}
+          value={hasPremiumTemplates(client) ? "Ativo" : "Bloqueado"}
           icon={<Newspaper />}
-          status={planConfig.premiumTemplates ? "Recursos liberados" : "Disponível no Business"}
+          status={hasPremiumTemplates(client) ? "Recursos liberados" : "Disponível no Business"}
         />
 
         <StatCard
           title="Marketing"
-          value={planConfig.marketing ? "Ativo" : "Bloqueado"}
+          value={hasMarketingAccess(client) ? "Ativo" : "Bloqueado"}
           icon={<Palette />}
-          status={planConfig.marketing ? "Criação de artes liberada" : "A partir do Professional"}
+          status={hasMarketingAccess(client) ? "Criação de artes liberada" : "A partir do Professional"}
+        />
+
+        <StatCard
+          title="Limite por vídeo"
+          value={formatStorageSize(getClientMaxVideoSize(client), 0)}
+          icon={<Upload />}
+          status={`Imagem até ${formatStorageSize(getClientMaxImageSize(client), 0)}`}
         />
 
         <StatCard
@@ -3196,6 +7330,23 @@ function ClientDashboard({ client, access = getClientPlanAccess(client) }) {
           status="Campanhas criadas"
         />
       </section>
+
+      {setupInfo.setupEnabled && (
+        <section className="panel client-setup-summary">
+          <div className="playlist-editor-header">
+            <div>
+              <h2>Implantação</h2>
+              <p>Status da adesão e implantação do projeto.</p>
+            </div>
+          </div>
+
+          <div className="client-setup-summary-grid">
+            <div><span>Status</span><strong>{setupInfo.setupStatus}</strong></div>
+            <div><span>Pagamento</span><strong>{setupInfo.setupPaidStatus}</strong></div>
+            <div><span>Valor</span><strong>{formatSetupFee(client)}</strong></div>
+          </div>
+        </section>
+      )}
 
       <section className="panel client-dashboard-preview-panel">
         <div className="playlist-editor-header">
@@ -3236,7 +7387,9 @@ function ClientDashboard({ client, access = getClientPlanAccess(client) }) {
                 : activeItem;
               const previewIndexLabel = activePlaylist?.items?.length ? currentIndex + 1 : screen.nowPlayingIndex;
 
-              const online = isScreenOnline(screen);
+              const connection = getScreenConnectionStatus(screen);
+              const deviceLocation = getScreenDisplayLocation(screen);
+              const online = connection.isOnline;
 
               return (
                 <div className="screen-live-card" key={screen.id}>
@@ -3257,9 +7410,9 @@ function ClientDashboard({ client, access = getClientPlanAccess(client) }) {
                     <div className="screen-card-top">
                       <strong>{screen.name}</strong>
 
-                      <div className={online ? "screen-status online" : "screen-status offline"}>
+                      <div className={`screen-status ${connection.className}`}>
                         <div></div>
-                        {online ? "Online agora" : "Offline"}
+                        {connection.label}
                       </div>
                     </div>
 
@@ -3270,8 +7423,8 @@ function ClientDashboard({ client, access = getClientPlanAccess(client) }) {
                           : "Playlist padrão"}
                       </div>
 
-                      <div className={online ? "monitor-heartbeat online" : "monitor-heartbeat offline"}>
-                        {online ? "Sinal ativo" : "Sem sinal"}
+                      <div className={`monitor-heartbeat ${connection.className}`}>
+                        {connection.detail}
                       </div>
                     </div>
 
@@ -3286,11 +7439,97 @@ function ClientDashboard({ client, access = getClientPlanAccess(client) }) {
                           : "Sem progresso"} • {previewMedia?.type || screen.nowPlayingType || "Mídia"}
                       </span>
                     </div>
+
+                    <div className="screen-cache-box">
+                      <small>Cache</small>
+                      <strong>{getCacheStatusLabel(screen)}</strong>
+                      <span>
+                        {getMediaSourceLabel(screen.currentMediaSource)} • {formatStorageSize(screen.cacheSizeBytes || 0)} estimado
+                      </span>
+                      {getCacheSyncLabel(screen) && <span>{getCacheSyncLabel(screen)}</span>}
+                      <span>Atualizado: {formatFirestoreDate(screen.cacheUpdatedAt)}</span>
+                    </div>
+
+                    <div className="screen-connection-box">
+                      <small>Dispositivo</small>
+                      <strong>{connection.deviceLabel}</strong>
+                      <span>Logado em: {connection.lastConnection}</span>
+                      <span>Último sinal: {formatScreenConnectionDate(connection.lastSeenDate)}</span>
+                      <span>Local: {deviceLocation.city}</span>
+                      <span>{deviceLocation.detail}</span>
+                      <span>Local atualizado: {formatScreenConnectionDate(deviceLocation.updatedAt)}</span>
+                    </div>
                   </div>
                 </div>
               );
             })
           )}
+        </div>
+      </section>
+
+      <section className="panel screen-usage-report-panel">
+        <div className="playlist-editor-header">
+          <div>
+            <h2>Relatorio de uso das telas</h2>
+            <p>Resumo detalhado por tela, dispositivo, playlist atual, item exibido e cache.</p>
+          </div>
+        </div>
+
+        <div className="screen-usage-summary">
+          <div><span>Total de telas</span><strong>{screens.length}</strong></div>
+          <div><span>Online agora</span><strong>{onlineScreensCount}</strong></div>
+          <div><span>Logadas</span><strong>{loggedScreensCount}</strong></div>
+          <div><span>Logadas offline</span><strong>{loggedOfflineScreensCount}</strong></div>
+        </div>
+
+        <div className="screen-usage-table-wrap">
+          <table className="screen-usage-table">
+            <thead>
+              <tr>
+                <th>Tela</th>
+                <th>Status</th>
+                <th>Dispositivo</th>
+                <th>Conexao</th>
+                <th>Playlist / Item</th>
+                <th>Cache</th>
+              </tr>
+            </thead>
+            <tbody>
+              {screenReports.length === 0 ? (
+                <tr>
+                  <td colSpan="6">Nenhuma tela cadastrada.</td>
+                </tr>
+              ) : (
+                screenReports.map((report) => (
+                  <tr key={report.id}>
+                    <td>
+                      <strong>{report.name}</strong>
+                      <span>{report.location} • {report.orientation} • Codigo {report.code}</span>
+                    </td>
+                    <td>
+                      <span className={`screen-report-status ${report.statusClass}`}>{report.status}</span>
+                    </td>
+                    <td>
+                      <strong>{report.deviceId ? report.deviceId.slice(0, 18) : "Nenhum dispositivo"}</strong>
+                      {report.deviceId && <span>{report.deviceId}</span>}
+                    </td>
+                    <td>
+                      <strong>Login: {report.lastConnection}</strong>
+                      <span>Ultimo sinal: {report.lastSeen}</span>
+                    </td>
+                    <td>
+                      <strong>{report.playlist}</strong>
+                      <span>{report.nowPlaying} • Item {report.itemProgress}</span>
+                    </td>
+                    <td>
+                      <strong>{report.cache}</strong>
+                      <span>Origem: {report.mediaSource}</span>
+                    </td>
+                  </tr>
+                ))
+              )}
+            </tbody>
+          </table>
         </div>
       </section>
     </>
@@ -3299,15 +7538,18 @@ function ClientDashboard({ client, access = getClientPlanAccess(client) }) {
 
 
 function ClientMediaPage({ client, access = getClientPlanAccess(client) }) {
+  const [uploadNotice, setUploadNotice] = useState(null);
   const [mediaList, setMediaList] = useState([]);
   const [uploading, setUploading] = useState(false);
   const [progress, setProgress] = useState(0);
   const [editingMedia, setEditingMedia] = useState(null);
+  const mediaEditorRef = useRef(null);
+  const mediaFileInputRef = useRef(null);
 
   const storageUsedBytes = getMediaStorageUsed(mediaList);
   const storageLimitBytes = getClientStorageLimit(client);
   const storageUsage = getStorageUsage(storageUsedBytes, storageLimitBytes);
-  const planLimits = getPlanLimits(client.plan);
+  const planLimits = getClientUploadLimits(client);
 
   const [form, setForm] = useState({
     title: "",
@@ -3320,6 +7562,7 @@ function ClientMediaPage({ client, access = getClientPlanAccess(client) }) {
     height: null,
     orientation: "Paisagem",
     aspectRatio: "custom",
+    naturalDuration: null,
   });
 
   useEffect(() => {
@@ -3341,21 +7584,19 @@ function ClientMediaPage({ client, access = getClientPlanAccess(client) }) {
   function validateMediaFile(file) {
     if (!file) return false;
 
-    const isVideo = file.type.startsWith("video/");
-    const isImage = file.type.startsWith("image/");
+    const fileKind = getUploadFileKind(file);
+    const isVideo = fileKind === "video";
+    const isImage = fileKind === "image";
 
     if (!isVideo && !isImage) {
       alert("Selecione uma imagem ou vídeo compatível.");
       return false;
     }
 
-    if (isVideo && file.size > planLimits.maxVideoSizeBytes) {
-      alert("Este vídeo excede o limite do seu plano. Compacte o arquivo ou faça upgrade.");
-      return false;
-    }
-
-    if (isImage && file.size > planLimits.maxImageSizeBytes) {
-      alert("Esta imagem excede o limite do seu plano.");
+    const limit = isVideo ? planLimits.maxVideoSizeBytes : planLimits.maxImageSizeBytes;
+    const notice = uploadSizeNotice(getPlanConfig(client.plan).name, fileKind, file.size, limit);
+    if (notice) {
+      setUploadNotice(notice);
       return false;
     }
 
@@ -3370,9 +7611,18 @@ function ClientMediaPage({ client, access = getClientPlanAccess(client) }) {
   async function handleSelectedFile(file) {
     if (!file || !validateMediaFile(file)) return;
 
-    const type = file.type.startsWith("video/") ? "Vídeo" : "Imagem";
+    const isVideo = getUploadFileKind(file) === "video";
+    const type = isVideo ? "Vídeo" : "Imagem";
     const preview = URL.createObjectURL(file);
-    const dimensions = await detectMediaFileMetadata(file);
+    let dimensions = buildMediaDimensions(0, 0, form.orientation || "Paisagem");
+
+    try {
+      dimensions = await detectMediaFileMetadata(file);
+    } catch (error) {
+      console.log("NÃ£o foi possÃ­vel ler metadata da mÃ­dia:", error);
+    }
+
+    const detectedDuration = dimensions.naturalDuration || null;
 
     setForm({
       ...form,
@@ -3380,14 +7630,23 @@ function ClientMediaPage({ client, access = getClientPlanAccess(client) }) {
       preview,
       type,
       title: form.title || file.name,
+      duration: isVideo && detectedDuration ? String(detectedDuration) : form.duration,
       ...dimensions,
-      sound: type === "Vídeo" ? form.sound : false,
+      sound: isVideo ? form.sound : false,
     });
   }
 
-  function handleFileChange(event) {
+  async function handleFileChange(event) {
     const file = event.target.files[0];
-    handleSelectedFile(file);
+    await handleSelectedFile(file);
+
+    if (!isNativeApp()) {
+      event.target.value = "";
+    }
+  }
+
+  function openMediaFilePicker() {
+    mediaFileInputRef.current?.click();
   }
 
   function resetMediaForm() {
@@ -3403,6 +7662,7 @@ function ClientMediaPage({ client, access = getClientPlanAccess(client) }) {
       height: null,
       orientation: "Paisagem",
       aspectRatio: "custom",
+      naturalDuration: null,
     });
     setProgress(0);
   }
@@ -3422,9 +7682,15 @@ function ClientMediaPage({ client, access = getClientPlanAccess(client) }) {
       height: media.height || null,
       orientation: media.orientation || "Paisagem",
       aspectRatio: media.aspectRatio || "custom",
+      naturalDuration: media.naturalDuration || media.duration || null,
     });
 
-    window.scrollTo({ top: 0, behavior: "smooth" });
+    requestAnimationFrame(() => {
+      mediaEditorRef.current?.scrollIntoView({
+        behavior: "smooth",
+        block: "center",
+      });
+    });
   }
 
   async function updateMediaInPlaylists(mediaId, changes) {
@@ -3441,8 +7707,7 @@ function ClientMediaPage({ client, access = getClientPlanAccess(client) }) {
         const updatedItems = items.map((item) => {
           const isTargetMedia =
             item?.id === mediaId &&
-            item?.playerItemType !== "template" &&
-            !item?.templateType;
+            !isTemplatePreviewItem(item);
 
           if (!isTargetMedia) return item;
 
@@ -3458,6 +7723,55 @@ function ClientMediaPage({ client, access = getClientPlanAccess(client) }) {
         });
       })
     );
+  }
+
+  function isPlaylistMediaReference(item, media) {
+    if (!item || isTemplatePreviewItem(item)) return false;
+
+    const ids = [item.id, item.mediaId, item.sourceMediaId, item.originalId]
+      .map((value) => String(value || "").trim())
+      .filter(Boolean);
+
+    if (ids.includes(String(media.id))) return true;
+
+    const previews = [item.preview, item.remotePreview, item.imageUrl, item.url, item.downloadURL]
+      .map((value) => String(value || "").trim())
+      .filter(Boolean);
+    const mediaPreviews = [media.preview, media.remotePreview, media.imageUrl, media.url, media.downloadURL]
+      .map((value) => String(value || "").trim())
+      .filter(Boolean);
+
+    return previews.some((preview) => mediaPreviews.includes(preview));
+  }
+
+  async function removeMediaFromPlaylists(media) {
+    const playlistsSnapshot = await getDocs(
+      collection(db, "clients", client.id, "playlists")
+    );
+    let affectedPlaylists = 0;
+    let removedItems = 0;
+
+    await Promise.all(
+      playlistsSnapshot.docs.map(async (playlistDoc) => {
+        const playlist = playlistDoc.data();
+        const items = Array.isArray(playlist.items) ? playlist.items : [];
+        const updatedItems = items.filter((item) => !isPlaylistMediaReference(item, media));
+        const removedFromPlaylist = items.length - updatedItems.length;
+
+        if (removedFromPlaylist <= 0) return;
+
+        affectedPlaylists += 1;
+        removedItems += removedFromPlaylist;
+
+        await updateDoc(playlistDoc.ref, {
+          items: updatedItems,
+          playlistRevision: `${Date.now()}-${Math.random().toString(36).slice(2, 8)}`,
+          updatedAt: serverTimestamp(),
+        });
+      })
+    );
+
+    return { affectedPlaylists, removedItems };
   }
 
   async function handleSaveMedia() {
@@ -3514,51 +7828,56 @@ function ClientMediaPage({ client, access = getClientPlanAccess(client) }) {
       setUploading(true);
       setProgress(0);
 
-      const fileName = `${Date.now()}_${form.file.name}`;
+      const fileName = `${Date.now()}_${sanitizeStorageFileName(form.file.name)}`;
       const storagePath = `clients/${client.id}/media/${fileName}`;
-      const storageRef = ref(storage, storagePath);
-      const uploadTask = uploadBytesResumable(storageRef, form.file);
+      const uploadMetadata = {
+        originalName: form.file.name || fileName,
+        clientId: client.id,
+        uploadedByUid: auth.currentUser?.uid || "",
+        uploadedByEmail: normalizeEmail(auth.currentUser?.email || ""),
+      };
 
-      uploadTask.on(
-        "state_changed",
-        (snapshot) => {
-          const percent = Math.round(
-            (snapshot.bytesTransferred / snapshot.totalBytes) * 100
-          );
-          setProgress(percent);
-        },
-        (error) => {
-          console.log(error);
-          alert("Erro ao enviar arquivo.");
-          setUploading(false);
-        },
-        async () => {
-          const downloadURL = await getDownloadURL(uploadTask.snapshot.ref);
+      async function saveMediaDocument(downloadURL) {
+        await addDoc(collection(db, "clients", client.id, "media"), {
+          title: form.title.trim(),
+          duration,
+          type: form.type,
+          preview: downloadURL,
+          width: form.width || null,
+          height: form.height || null,
+          orientation: form.orientation || "Paisagem",
+          aspectRatio: form.aspectRatio || "custom",
+          naturalDuration: form.naturalDuration || null,
+          sound: Boolean(form.sound),
+          sizeBytes: form.file.size,
+          fileName: form.file.name,
+          storagePath: uploadResult.storagePath || storagePath,
+          storageProvider: uploadResult.storageProvider || "firebase",
+          storageKey: uploadResult.storageKey || uploadResult.storagePath || storagePath,
+          fileHash: uploadResult.fileHash || "",
+          etag: uploadResult.etag || "",
+          clientId: client.id,
+          uploadedByUid: auth.currentUser?.uid || "",
+          uploadedByEmail: normalizeEmail(auth.currentUser?.email || ""),
+          createdAt: serverTimestamp(),
+        });
+      }
 
-          await addDoc(collection(db, "clients", client.id, "media"), {
-            title: form.title.trim(),
-            duration,
-            type: form.type,
-            preview: downloadURL,
-            width: form.width || null,
-            height: form.height || null,
-            orientation: form.orientation || "Paisagem",
-            aspectRatio: form.aspectRatio || "custom",
-            sound: form.type === "Vídeo" ? form.sound : false,
-            sizeBytes: form.file.size,
-            fileName: form.file.name,
-            storagePath,
-            createdAt: serverTimestamp(),
-          });
-
-          resetMediaForm();
-          setUploading(false);
-          alert("Mídia enviada com sucesso!");
-        }
-      );
+      const uploadResult = await uploadStorageAsset({
+        path: storagePath,
+        file: form.file,
+        contentType: getUploadContentType(form.file),
+        customMetadata: uploadMetadata,
+        onProgress: setProgress,
+      });
+      setProgress(100);
+      await saveMediaDocument(uploadResult.publicUrl || uploadResult.url);
+      resetMediaForm();
+      alert("Mídia enviada com sucesso!");
     } catch (error) {
       console.log(error);
-      alert("Erro ao enviar mídia.");
+      alert(getUploadErrorMessage(error));
+    } finally {
       setUploading(false);
     }
   }
@@ -3566,16 +7885,32 @@ function ClientMediaPage({ client, access = getClientPlanAccess(client) }) {
   async function deleteMedia(media) {
     if (!requirePlanPermission(access, "canEdit", "excluir mídias")) return;
 
+    const confirmDelete = window.confirm(
+      `Excluir a mídia "${media.title}" do sistema?\n\nEla também será removida automaticamente das playlists onde estiver presente.`
+    );
+
+    if (!confirmDelete) return;
+
     try {
+      const cleanup = await removeMediaFromPlaylists(media);
+
       if (media.storagePath) {
         try {
-          await deleteObject(ref(storage, media.storagePath));
+          await deleteStoredAsset({
+            storagePath: media.storagePath,
+            storageProvider: media.storageProvider || "firebase",
+          });
         } catch (storageError) {
           console.log("Não foi possível remover o arquivo do Storage:", storageError);
         }
       }
 
       await deleteDoc(doc(db, "clients", client.id, "media", media.id));
+      alert(
+        cleanup.removedItems > 0
+          ? `Mídia excluída e removida de ${cleanup.affectedPlaylists} playlist(s).`
+          : "Mídia excluída."
+      );
     } catch (error) {
       console.log(error);
       alert("Erro ao excluir mídia.");
@@ -3586,6 +7921,7 @@ function ClientMediaPage({ client, access = getClientPlanAccess(client) }) {
 
   return (
     <>
+      <UploadLimitDialog notice={uploadNotice} onClose={() => setUploadNotice(null)} />
       <section className={`storage-usage-card ${storageUsage.severity}`}>
         <div className="storage-usage-header">
           <div>
@@ -3602,10 +7938,37 @@ function ClientMediaPage({ client, access = getClientPlanAccess(client) }) {
         </p>
       </section>
 
-      <section className="upload-panel">
+      <section className="upload-panel" ref={mediaEditorRef}>
         <div className="upload-preview-box">
           {form.preview ? (
-            <UniversalPreview item={form} controls compact={false} />
+            <>
+              <UniversalPreview item={form} className="upload-media-preview" controls compact={false} />
+
+              <div className="upload-preview-details">
+                <div>
+                  <span>Arquivo selecionado</span>
+                  <strong>{form.file?.name || form.title}</strong>
+                </div>
+                <div>
+                  <span>Tempo real</span>
+                  <strong>
+                    {form.naturalDuration
+                      ? formatDurationLabel(form.naturalDuration)
+                      : form.type === "Imagem"
+                        ? "Imagem estática"
+                        : "Detectando..."}
+                  </strong>
+                </div>
+                <div>
+                  <span>Tempo salvo</span>
+                  <strong>{formatDurationLabel(form.duration)}</strong>
+                </div>
+                <div>
+                  <span>Formato</span>
+                  <strong>{getPreviewOrientationLabel(form)} • {form.aspectRatio || "custom"}</strong>
+                </div>
+              </div>
+            </>
           ) : (
             <div className="empty-upload">
               <Upload size={42} />
@@ -3637,6 +8000,18 @@ function ClientMediaPage({ client, access = getClientPlanAccess(client) }) {
             <label
               className="file-dropzone"
               htmlFor={fileInputId}
+              role="button"
+              tabIndex={0}
+              onClick={(event) => {
+                if (event.target?.tagName === "INPUT") return;
+                event.preventDefault();
+                openMediaFilePicker();
+              }}
+              onKeyDown={(event) => {
+                if (event.key !== "Enter" && event.key !== " ") return;
+                event.preventDefault();
+                openMediaFilePicker();
+              }}
               onDragOver={(event) => event.preventDefault()}
               onDrop={(event) => {
                 event.preventDefault();
@@ -3644,10 +8019,11 @@ function ClientMediaPage({ client, access = getClientPlanAccess(client) }) {
               }}
             >
               <input
+                ref={mediaFileInputRef}
                 id={fileInputId}
                 className="file-input-hidden"
                 type="file"
-                accept="image/*,video/*"
+                accept="image/*,video/*,.jpg,.jpeg,.png,.webp,.gif,.mp4,.mov,.m4v,.webm,.mkv,.avi,.3gp"
                 onChange={handleFileChange}
               />
 
@@ -3761,7 +8137,7 @@ function ClientMediaPage({ client, access = getClientPlanAccess(client) }) {
           mediaList.map((media) => (
             <div className="media-card" key={media.id}>
               <div className="media-preview">
-                <UniversalPreview item={media} controls compact={false} />
+                <UniversalPreview item={media} compact={false} />
               </div>
 
               <div className="media-info">
@@ -3798,6 +8174,7 @@ function ClientPlaylistsPage({ client, access = getClientPlanAccess(client) }) {
   const [screens, setScreens] = useState([]);
   const [editingPlaylist, setEditingPlaylist] = useState(null);
   const [draggedMediaId, setDraggedMediaId] = useState(null);
+  const [draftPlaylistItems, setDraftPlaylistItems] = useState([]);
   const playlistEditorRef = useRef(null);
   const canUsePremiumTemplates = hasPremiumTemplates(client);
 
@@ -3880,25 +8257,33 @@ function ClientPlaylistsPage({ client, access = getClientPlanAccess(client) }) {
     return `template:${templateId}`;
   }
 
-  function getPlaylistItemKey(item) {
-    if (item?.playerItemType === "template" || item?.templateType) {
-      return getTemplateKey(item.id);
+  function getPlaylistItemKey(item, index = 0) {
+    if (isTemplatePreviewItem(item)) {
+      const templateId = item.id || item.templateId || item.sourceTemplateId || item.sourceMarketingId;
+      return templateId ? getTemplateKey(templateId) : `legacy:${index}`;
     }
 
-    return getMediaKey(item.id);
+    const mediaId = item?.id || item?.mediaId || item?.sourceMediaId;
+    return mediaId ? getMediaKey(mediaId) : `legacy:${index}`;
   }
 
-  function getSelectedItemByKey(key) {
+  function getSelectedItemByKey(key, index = 0) {
+    const legacyItem = draftPlaylistItems[index] || null;
+
+    if (key?.startsWith("legacy:")) {
+      return legacyItem;
+    }
+
     if (key?.startsWith("template:")) {
       const templateId = key.replace("template:", "");
       const template = templates.find((item) => item.id === templateId);
 
-      if (!template) return null;
+      if (!template) return legacyItem;
 
       return {
         ...template,
         title: template.name,
-        preview: "",
+        preview: template.preview || template.previewUrl || template.thumbnailUrl || template.imageUrl || "",
         sound: false,
         playerItemType: "template",
         templateType: template.type,
@@ -3910,12 +8295,67 @@ function ClientPlaylistsPage({ client, access = getClientPlanAccess(client) }) {
     const mediaId = key?.startsWith("media:") ? key.replace("media:", "") : key;
     const media = mediaList.find((item) => item.id === mediaId);
 
-    if (!media) return null;
+    if (!media) return legacyItem;
 
     return {
       ...media,
       playerItemType: "media",
     };
+  }
+
+  function findPlaylistItemSource(item = {}) {
+    const identifiers = [
+      item.id,
+      item.mediaId,
+      item.templateId,
+      item.sourceId,
+      item.sourceMediaId,
+      item.originalId,
+    ]
+      .map((value) => String(value || "").trim())
+      .filter(Boolean);
+
+    const knownPreviews = [
+      item.preview,
+      item.previewUrl,
+      item.thumbnailUrl,
+      item.remotePreview,
+      item.imageUrl,
+      item.url,
+      item.downloadURL,
+      item.fileUrl,
+    ]
+      .map((value) => String(value || "").trim())
+      .filter(Boolean);
+
+    const normalizedTitle = String(item.title || item.name || "").trim().toLowerCase();
+    const isTemplateItem = isTemplatePreviewItem(item);
+    const sourceList = isTemplateItem ? templates : [...mediaList, ...templates];
+
+    return (
+      sourceList.find((candidate) => identifiers.includes(String(candidate.id || "").trim())) ||
+      sourceList.find((candidate) =>
+        knownPreviews.some((preview) =>
+          [
+            candidate.preview,
+            candidate.previewUrl,
+            candidate.thumbnailUrl,
+            candidate.remotePreview,
+            candidate.imageUrl,
+            candidate.url,
+            candidate.downloadURL,
+            candidate.fileUrl,
+          ]
+            .map((value) => String(value || "").trim())
+            .includes(preview)
+        )
+      ) ||
+      sourceList.find((candidate) => {
+        const candidateTitle = String(candidate.title || candidate.name || "").trim().toLowerCase();
+        return normalizedTitle && candidateTitle === normalizedTitle;
+      }) ||
+      {}
+    );
   }
 
   function isSelectedKey(key) {
@@ -3948,10 +8388,98 @@ function ClientPlaylistsPage({ client, access = getClientPlanAccess(client) }) {
     toggleItemKey(getTemplateKey(templateId));
   }
 
+  function isValidPreviewSource(value) {
+    if (typeof value !== "string") return false;
+    const clean = value.trim();
+    if (!clean) return false;
+    if (clean === "undefined" || clean === "null") return false;
+    return /^(https?:|blob:|data:|capacitor:|file:)/i.test(clean);
+  }
+
+  function resolvePreviewSource(item = {}) {
+    const candidates = [
+      item.preview,
+      item.previewUrl,
+      item.thumbnailUrl,
+      item.remotePreview,
+      item.imageUrl,
+      item.url,
+      item.downloadURL,
+      item.fileUrl,
+      item.marketingArt?.imageUrl,
+      item.marketingArt?.imagePreview,
+      item.templateData?.imageUrl,
+      item.logoUrl,
+    ];
+
+    return candidates.find(isValidPreviewSource) || "";
+  }
+
+  function resolveItemOrientation(item = {}, playlistOrientation = "Paisagem") {
+    const marketingType = item.marketingType || item.formatType || item.format || item.type;
+
+    if (item.templateType === "marketing_art" || item.playerItemType === "marketing_art" || item.type === "marketing_art") {
+      if (marketingType === "feed") return "Quadrado";
+      if (marketingType === "story" || marketingType === "reels") return "Retrato";
+    }
+
+    const aspect = String(item.aspectRatio || "").trim();
+    if (aspect === "1:1") return "Quadrado";
+    if (aspect === "9:16") return "Retrato";
+    if (aspect === "16:9") return "Paisagem";
+
+    const width = Number(item.width || item.videoWidth || item.naturalWidth || 0);
+    const height = Number(item.height || item.videoHeight || item.naturalHeight || 0);
+
+    if (width > 0 && height > 0) {
+      const diff = Math.abs(width - height) / Math.max(width, height);
+      if (diff < 0.08) return "Quadrado";
+      return height > width ? "Retrato" : "Paisagem";
+    }
+
+    if (item.orientation === "Retrato" || item.orientation === "Paisagem") return item.orientation;
+    if (playlistOrientation === "Retrato" || playlistOrientation === "Paisagem") return playlistOrientation;
+
+    return "Paisagem";
+  }
+
+  function hydratePlaylistItem(item = {}, playlistOrientation = "Paisagem") {
+    const isTemplateItem = isTemplatePreviewItem(item);
+    const source = findPlaylistItemSource(item);
+    const hydrated = {
+      ...source,
+      ...item,
+    };
+    const sourcePreview = resolvePreviewSource(source);
+    const preview = resolvePreviewSource(hydrated) || sourcePreview;
+    const orientation = resolveItemOrientation(hydrated, playlistOrientation);
+
+    return {
+      ...hydrated,
+      preview,
+      resolvedPreview: preview,
+      sourcePreview,
+      sourceRemotePreview: source.remotePreview || "",
+      sourceImageUrl: source.imageUrl || "",
+      orientation: orientation === "Quadrado" ? hydrated.orientation || "Paisagem" : orientation,
+      resolvedOrientation: orientation,
+      aspectRatio:
+        orientation === "Quadrado"
+          ? "1:1"
+          : orientation === "Retrato"
+            ? hydrated.aspectRatio || "9:16"
+            : hydrated.aspectRatio || "16:9",
+      playerItemType: item.playerItemType || (isTemplateItem ? "template" : "media"),
+      templateType: isTemplateItem ? (item.templateType || source.templateType || source.type) : "",
+      duration: item.duration || source.duration,
+      sound: item.sound ?? source.sound,
+    };
+  }
+
   function renderPlaylistMiniPreview(item) {
     if (!item) return <Monitor size={26} />;
 
-    return <UniversalPreview item={item} className="playlist-preview-frame" compact />;
+    return <UniversalPreview item={item} className="playlist-created-item-preview playlist-preview-frame" compact />;
   }
 
   function getPlaylistItemLabel(item) {
@@ -3964,17 +8492,45 @@ function ClientPlaylistsPage({ client, access = getClientPlanAccess(client) }) {
     return `${item.type} • ${item.duration}s • ${item.sound ? "Com som" : "Sem som"}`;
   }
 
-  function handleCustomNewsUrlChange(url) {
-    const source = saveCustomNewsSource(url);
+  function normalizePlaylistItemForSave(item = {}, playlistOrientation = "Paisagem") {
+    const hydrated = hydratePlaylistItem(item, playlistOrientation);
+    const isTemplateItem = hydrated.playerItemType === "template" || Boolean(hydrated.templateType);
+    const source = findPlaylistItemSource(hydrated);
+    const sourceId = hydrated.id || source.id || "";
+    const orientation = hydrated.resolvedOrientation || getPlayableOrientation(hydrated, playlistOrientation);
 
-    setCustomNewsSources(getSavedCustomNewsSources());
-
-    setForm({
-      ...form,
-      newsSource: source?.name || "Personalizado",
-      newsFeedUrl: url,
-    });
+    return {
+      ...hydrated,
+      id: sourceId || hydrated.id || `${isTemplateItem ? "template" : "media"}-${Date.now()}`,
+      ...(isTemplateItem
+        ? {
+            templateId: hydrated.templateId || source.id || sourceId,
+            sourceTemplateId: hydrated.sourceTemplateId || source.id || sourceId,
+          }
+        : {
+            mediaId: hydrated.mediaId || source.id || sourceId,
+            sourceMediaId: hydrated.sourceMediaId || source.id || sourceId,
+          }),
+      title: hydrated.title || hydrated.name || source.title || source.name || "Item",
+      name: hydrated.name || hydrated.title || source.name || source.title || "Item",
+      playerItemType: isTemplateItem ? "template" : "media",
+      templateType: isTemplateItem ? (hydrated.templateType || source.templateType || source.type || hydrated.type) : "",
+      type: isTemplateItem ? (hydrated.templateType || source.templateType || source.type || hydrated.type) : hydrated.type,
+      orientation: orientation === "Quadrado" ? playlistOrientation || "Paisagem" : orientation,
+      resolvedOrientation: orientation,
+      aspectRatio:
+        orientation === "Quadrado"
+          ? "1:1"
+          : orientation === "Retrato"
+            ? hydrated.aspectRatio || "9:16"
+            : hydrated.aspectRatio || "16:9",
+      preview: hydrated.resolvedPreview || hydrated.preview || source.preview || source.previewUrl || source.imageUrl || "",
+      duration: Number(hydrated.duration || source.duration || 15),
+      sound: Boolean(hydrated.sound),
+    };
   }
+
+
 
   function updateArrayItem(field, index, key, value) {
     setForm((prev) => {
@@ -4021,6 +8577,8 @@ function ClientPlaylistsPage({ client, access = getClientPlanAccess(client) }) {
     }));
   }
 
+
+
   function toggleTargetScreen(screenId) {
     const selected = form.targetScreenIds.includes(screenId);
 
@@ -4033,32 +8591,30 @@ function ClientPlaylistsPage({ client, access = getClientPlanAccess(client) }) {
   }
 
 
-  function handleDragStart(itemKey) {
-    setDraggedMediaId(itemKey);
+  function handleDragStart(index) {
+    setDraggedMediaId(index);
   }
 
   function handleDragOver(e) {
     e.preventDefault();
   }
 
-  function handleDrop(targetItemKey) {
-    if (!draggedMediaId || draggedMediaId === targetItemKey) {
+  function handleDrop(targetIndex) {
+    if (draggedMediaId === null || draggedMediaId === targetIndex) {
       setDraggedMediaId(null);
       return;
     }
 
     const updated = [...form.selectedMediaIds];
-
-    const draggedIndex = updated.indexOf(draggedMediaId);
-    const targetIndex = updated.indexOf(targetItemKey);
+    const draggedIndex = draggedMediaId;
 
     if (draggedIndex === -1 || targetIndex === -1) {
       setDraggedMediaId(null);
       return;
     }
 
-    updated.splice(draggedIndex, 1);
-    updated.splice(targetIndex, 0, draggedMediaId);
+    const [draggedItemKey] = updated.splice(draggedIndex, 1);
+    updated.splice(targetIndex, 0, draggedItemKey);
 
     setForm({
       ...form,
@@ -4087,8 +8643,62 @@ function ClientPlaylistsPage({ client, access = getClientPlanAccess(client) }) {
     });
   }
 
+  function removeItemFromEditingPlaylist(index) {
+    const item = getSelectedItemByKey(form.selectedMediaIds[index], index);
+    const itemName = item?.title || item?.name || `item ${index + 1}`;
+
+    if (!window.confirm(`Remover "${itemName}" apenas desta playlist?`)) return;
+
+    setForm((current) => ({
+      ...current,
+      selectedMediaIds: current.selectedMediaIds.filter((_, itemIndex) => itemIndex !== index),
+    }));
+    setDraftPlaylistItems((current) => current.filter((_, itemIndex) => itemIndex !== index));
+  }
+
+  async function removeItemFromSavedPlaylist(playlist, index) {
+    if (!requirePlanPermission(access, "canEditPlaylists", "editar playlists")) return;
+
+    const items = Array.isArray(playlist.items) ? playlist.items : [];
+    const item = items[index];
+    const itemName = item?.title || item?.name || `item ${index + 1}`;
+
+    if (!window.confirm(`Remover "${itemName}" apenas da playlist "${playlist.name}"?`)) return;
+
+    try {
+      const updatedItems = items.filter((_, itemIndex) => itemIndex !== index);
+      const playlistRevision = `${Date.now()}-${Math.random().toString(36).slice(2, 8)}`;
+
+      await updateDoc(doc(db, "clients", client.id, "playlists", playlist.id), {
+        items: updatedItems,
+        playlistRevision,
+        updatedAt: serverTimestamp(),
+      });
+
+      await Promise.all(
+        screens
+          .filter((screen) => screen.playlistId === playlist.id)
+          .map((screen) => updateDoc(doc(db, "clients", client.id, "screens", screen.id), {
+            playlistRevision,
+            remoteCommand: {
+              id: `playlist-remove-${playlistRevision}-${screen.id}`,
+              type: "refresh",
+              sentAt: new Date().toISOString(),
+            },
+            updatedAt: serverTimestamp(),
+          }))
+      );
+
+      alert("Item removido da playlist.");
+    } catch (error) {
+      console.log(error);
+      alert("Erro ao remover item da playlist.");
+    }
+  }
+
   function resetPlaylistForm() {
     setEditingPlaylist(null);
+    setDraftPlaylistItems([]);
 
     setForm({
       name: "",
@@ -4109,13 +8719,17 @@ function ClientPlaylistsPage({ client, access = getClientPlanAccess(client) }) {
     if (!requirePlanPermission(access, "canEditPlaylists", "editar playlists")) return;
 
     setEditingPlaylist(playlist);
+    const normalizedItems = (playlist.items || []).map((item) =>
+      normalizePlaylistItemForSave(item, playlist.orientation || "Paisagem")
+    );
+    setDraftPlaylistItems(normalizedItems);
 
     setForm({
       name: playlist.name || "",
       transition: playlist.transition || "Fade suave",
       transitionSpeed: playlist.transitionSpeed || "Normal",
       orientation: playlist.orientation || "Paisagem",
-      selectedMediaIds: playlist.items?.map((item) => getPlaylistItemKey(item)) || [],
+      selectedMediaIds: normalizedItems.map((item, index) => getPlaylistItemKey(item, index)),
       scheduleEnabled: playlist.scheduleEnabled || false,
       targetScreenIds: playlist.targetScreenIds || [],
       startDate: playlist.startDate || "",
@@ -4171,8 +8785,17 @@ function ClientPlaylistsPage({ client, access = getClientPlanAccess(client) }) {
 
     try {
       const selectedItems = form.selectedMediaIds
-        .map((key) => getSelectedItemByKey(key))
-        .filter(Boolean);
+        .map((key, index) => getSelectedItemByKey(key, index))
+        .filter(Boolean)
+        .map((item) => normalizePlaylistItemForSave(item, form.orientation));
+      const incompatibleItems = selectedItems.filter((item) => !isOrientationCompatible(item, form.orientation));
+
+      if (incompatibleItems.length > 0) {
+        alert(
+          `Remova ${incompatibleItems.length} item(ns) incompatível(is) com a orientação "${form.orientation}" antes de salvar a playlist.`
+        );
+        return;
+      }
 
       const playlistData = {
         name: form.name,
@@ -4677,22 +9300,30 @@ function ClientPlaylistsPage({ client, access = getClientPlanAccess(client) }) {
               </div>
 
               {form.selectedMediaIds.map((itemKey, index) => {
-                const item = getSelectedItemByKey(itemKey);
+                const item = getSelectedItemByKey(itemKey, index);
 
                 if (!item) return null;
 
+                const hydratedItem = hydratePlaylistItem(item, form.orientation);
+                const orientationClass =
+                  hydratedItem.resolvedOrientation === "Retrato"
+                    ? "portrait"
+                    : hydratedItem.resolvedOrientation === "Quadrado"
+                      ? "square"
+                      : "landscape";
+
                 return (
                   <div
-                    key={itemKey}
+                    key={`${itemKey}-${index}`}
                     className={
-                      draggedMediaId === itemKey
-                        ? "playlist-order-item dragging"
-                        : "playlist-order-item"
+                      draggedMediaId === index
+                        ? `playlist-order-item playlist-order-item-card ${orientationClass} dragging`
+                        : `playlist-order-item playlist-order-item-card ${orientationClass}`
                     }
                     draggable
-                    onDragStart={() => handleDragStart(itemKey)}
+                    onDragStart={() => handleDragStart(index)}
                     onDragOver={handleDragOver}
-                    onDrop={() => handleDrop(itemKey)}
+                    onDrop={() => handleDrop(index)}
                     onDragEnd={() => setDraggedMediaId(null)}
                   >
                     <div className="drag-handle">
@@ -4703,19 +9334,32 @@ function ClientPlaylistsPage({ client, access = getClientPlanAccess(client) }) {
                       {index + 1}
                     </div>
 
-                    <div className="playlist-order-thumb">
-                      {renderPlaylistMiniPreview(item)}
+                    <div className={`playlist-order-thumb playlist-order-preview ${orientationClass}`}>
+                      {renderPlaylistMiniPreview(hydratedItem)}
                     </div>
 
                     <div className="playlist-order-info">
-                      <strong>{item.title || item.name}</strong>
+                      <strong>{hydratedItem.title || hydratedItem.name}</strong>
 
                       <span>
-                        {getPlaylistItemLabel(item)}
+                        {getPlaylistItemLabel(hydratedItem)}
                       </span>
+
+                      <small className={`playlist-created-orientation ${orientationClass}`}>
+                        {hydratedItem.resolvedOrientation || "Paisagem"}
+                      </small>
                     </div>
 
                     <div className="order-buttons">
+                      <button
+                        type="button"
+                        className="order-remove-button"
+                        onClick={() => removeItemFromEditingPlaylist(index)}
+                        title="Remover apenas da playlist"
+                      >
+                        <Trash2 size={15} />
+                      </button>
+
                       <button
                         type="button"
                         disabled={index === 0}
@@ -4810,35 +9454,58 @@ function ClientPlaylistsPage({ client, access = getClientPlanAccess(client) }) {
               </div>
 
               <div className="playlist-items">
-                {playlist.items?.map((item, index) => (
-                  <div className="playlist-item" key={`${playlist.id}-${index}`}>
+                {playlist.items?.map((item, index) => {
+                  const hydratedItem = hydratePlaylistItem(item, playlist.orientation);
+                  const orientationClass =
+                    hydratedItem.resolvedOrientation === "Retrato"
+                      ? "portrait"
+                      : hydratedItem.resolvedOrientation === "Quadrado"
+                        ? "square"
+                        : "landscape";
+
+                  return (
+                  <div className={`playlist-item playlist-created-item ${orientationClass}`} key={`${playlist.id}-${index}`}>
                     <div className="playlist-number">
                       {index + 1}
                     </div>
 
-                    <div className="playlist-thumb">
-                      {renderPlaylistMiniPreview(item)}
+                    <div className={`playlist-thumb playlist-created-item-frame ${orientationClass}`}>
+                      {renderPlaylistMiniPreview(hydratedItem)}
                     </div>
 
-                    <div className="playlist-item-info">
-                      <strong>{item.title || item.name}</strong>
+                    <div className="playlist-item-info playlist-created-item-info">
+                      <strong>{hydratedItem.title || hydratedItem.name}</strong>
 
                       <span>
-                        {getPlaylistItemLabel(item)}
+                        {getPlaylistItemLabel(hydratedItem)}
                       </span>
+
+                      <small className={`playlist-created-orientation ${orientationClass}`}>
+                        {hydratedItem.resolvedOrientation || "Paisagem"}
+                      </small>
                     </div>
 
-                    <div>
-                      {item.playerItemType === "template" || item.templateType ? (
+                    <div className="playlist-item-actions">
+                      {isTemplatePreviewItem(hydratedItem) ? (
                         <Newspaper size={18} />
-                      ) : item.sound ? (
+                      ) : hydratedItem.sound ? (
                         <Volume2 size={18} />
                       ) : (
                         <VolumeX size={18} />
                       )}
+
+                      <button
+                        type="button"
+                        className="playlist-item-remove"
+                        onClick={() => removeItemFromSavedPlaylist(playlist, index)}
+                        title="Remover apenas desta playlist"
+                      >
+                        <Trash2 size={16} />
+                      </button>
                     </div>
                   </div>
-                ))}
+                );
+                })}
               </div>
             </div>
           ))
@@ -4935,28 +9602,11 @@ function ClientScreensPage({ client, access = getClientPlanAccess(client) }) {
   }
 
   function getLastSeenDate(screen) {
-    if (screen.lastSeenAt?.toDate) {
-      return screen.lastSeenAt.toDate();
-    }
-
-    if (screen.lastSeenAt?.seconds) {
-      return new Date(screen.lastSeenAt.seconds * 1000);
-    }
-
-    return null;
+    return getScreenLastSeenDate(screen);
   }
 
   function isScreenOnline(screen) {
-    const lastSeenDate = getLastSeenDate(screen);
-
-    if (!lastSeenDate) {
-      return false;
-    }
-
-    const diffInSeconds =
-      (now - lastSeenDate.getTime()) / 1000;
-
-    return diffInSeconds <= 20;
+    return getScreenConnectionStatus(screen, now).isOnline;
   }
 
   function getLastSeenLabel(screen) {
@@ -5334,7 +9984,9 @@ function ClientScreensPage({ client, access = getClientPlanAccess(client) }) {
           <div className="empty-library">Nenhuma tela cadastrada ainda.</div>
         ) : (
           screens.map((screen) => {
-            const online = isScreenOnline(screen);
+            const connection = getScreenConnectionStatus(screen, now);
+            const deviceLocation = getScreenDisplayLocation(screen);
+            const online = connection.isOnline;
             const active = getActivePlaylist(screen);
             const activePlaylist = active.playlist;
             const currentIndex = getPlaylistPreviewIndex(activePlaylist, now, screen);
@@ -5376,9 +10028,9 @@ function ClientScreensPage({ client, access = getClientPlanAccess(client) }) {
                   <div className="screen-card-top">
                     <span>{screen.orientation}</span>
 
-                    <div className={online ? "screen-status online" : "screen-status offline"}>
+                    <div className={`screen-status ${connection.className}`}>
                       <div></div>
-                      {online ? "Online agora" : "Offline"}
+                      {connection.label}
                     </div>
                   </div>
 
@@ -5404,6 +10056,16 @@ function ClientScreensPage({ client, access = getClientPlanAccess(client) }) {
                           : "Sem progresso"} • {previewMedia?.type || screen.nowPlayingType || "Mídia"}
                       </span>
                     </div>
+
+                    <div className="screen-cache-box">
+                      <small>Cache</small>
+                      <strong>{getCacheStatusLabel(screen)}</strong>
+                      <span>
+                        {getMediaSourceLabel(screen.currentMediaSource)} • {formatStorageSize(screen.cacheSizeBytes || 0)} estimado
+                      </span>
+                      {getCacheSyncLabel(screen) && <span>{getCacheSyncLabel(screen)}</span>}
+                      <span>Atualizado: {formatFirestoreDate(screen.cacheUpdatedAt)}</span>
+                    </div>
                   </div>
 
                   <div className="screen-code-box">
@@ -5420,6 +10082,17 @@ function ClientScreensPage({ client, access = getClientPlanAccess(client) }) {
                   <div className="last-seen-card">
                     <small>Último sinal</small>
                     <strong>{getLastSeenLabel(screen)}</strong>
+                  </div>
+
+                  <div className="screen-connection-box">
+                    <small>Status de login</small>
+                    <strong>{connection.label}</strong>
+                    <span>Dispositivo: {connection.deviceLabel}</span>
+                    <span>Logado em: {connection.lastConnection}</span>
+                    <span>Último sinal real: {formatScreenConnectionDate(connection.lastSeenDate)}</span>
+                    <span>Local: {deviceLocation.city}</span>
+                    <span>{deviceLocation.detail}</span>
+                    <span>Local atualizado: {formatScreenConnectionDate(deviceLocation.updatedAt)}</span>
                   </div>
 
                   <div className="remote-control-panel-inline">
@@ -5508,6 +10181,14 @@ function ClientScreensPage({ client, access = getClientPlanAccess(client) }) {
                       >
                         <Eraser size={16} />
                         <span>Limpar</span>
+                      </button>
+
+                      <button
+                        className="remote-mini-button info"
+                        onClick={() => sendRemoteCommand(screen.id, { type: "clearCache" })}
+                      >
+                        <RefreshCw size={16} />
+                        <span>Limpar cache</span>
                       </button>
 
                       <button
@@ -5716,37 +10397,57 @@ function readMarketingFile(file, setter, fieldFile, fieldPreview) {
 async function uploadMarketingAsset(clientId, file, folder) {
   if (!file) return "";
 
-  const safeName = file.name.replace(/[^a-zA-Z0-9._-]/g, "_");
-  const storageRef = ref(
-    storage,
-    `clients/${clientId}/marketing/${folder}/${Date.now()}_${safeName}`
-  );
-
-  const uploadTask = uploadBytesResumable(storageRef, file);
-
-  await new Promise((resolve, reject) => {
-    uploadTask.on(
-      "state_changed",
-      () => {},
-      reject,
-      resolve
-    );
+  const safeName = sanitizeStorageFileName(file.name || "marketing-asset");
+  const uploadResult = await uploadStorageAsset({
+    path: `clients/${clientId}/marketing/${folder}/${Date.now()}_${safeName}`,
+    file,
+    contentType: getUploadContentType(file),
+    customMetadata: {
+      source: "marketing",
+      clientId,
+      folder,
+    },
   });
 
-  return getDownloadURL(uploadTask.snapshot.ref);
+  return uploadResult.publicUrl || uploadResult.url || "";
 }
 
 async function uploadClientLogo(clientId, file) {
   if (!file) return "";
 
-  const storageRef = ref(storage, `clients/${clientId}/profile/logo`);
-  const uploadTask = uploadBytesResumable(storageRef, file);
-
-  await new Promise((resolve, reject) => {
-    uploadTask.on("state_changed", () => {}, reject, resolve);
+  const uploadResult = await uploadStorageAsset({
+    path: `clients/${clientId}/profile/logo`,
+    file,
+    contentType: getUploadContentType(file),
+    customMetadata: {
+      source: "client-logo",
+      clientId,
+    },
   });
 
-  return getDownloadURL(uploadTask.snapshot.ref);
+  return uploadResult.publicUrl || uploadResult.url || "";
+}
+
+async function uploadTemplateImageAsset(clientId, templateId, file, folder = "background") {
+  if (!file) return "";
+  if (!file.type?.startsWith("image/")) {
+    throw new Error("Apenas imagens podem ser usadas neste upload.");
+  }
+
+  const safeName = sanitizeStorageFileName(file.name || "template-image");
+  const targetId = templateId || `draft_${Date.now()}`;
+  const uploadResult = await uploadStorageAsset({
+    path: `clients/${clientId}/templates/${targetId}/${folder}/${Date.now()}_${safeName}`,
+    file,
+    contentType: getUploadContentType(file),
+    customMetadata: {
+      source: "template",
+      clientId,
+      folder,
+    },
+  });
+
+  return uploadResult.publicUrl || uploadResult.url || "";
 }
 
 function MarketingArtPreview({ art, compact = false, tv = false }) {
@@ -5872,6 +10573,7 @@ function MarketingArtPreview({ art, compact = false, tv = false }) {
 
 function ClientMarketingPage({ client, access = getClientPlanAccess(client) }) {
   const [arts, setArts] = useState([]);
+  const [playlists, setPlaylists] = useState([]);
   const [saving, setSaving] = useState(false);
   const [sendingArtId, setSendingArtId] = useState("");
   const [editingArt, setEditingArt] = useState(null);
@@ -5882,7 +10584,7 @@ function ClientMarketingPage({ client, access = getClientPlanAccess(client) }) {
   }));
 
   useEffect(() => {
-    const unsubscribe = onSnapshot(
+    const unsubscribeMarketing = onSnapshot(
       collection(db, "clients", client.id, "marketing"),
       (snapshot) => {
         setArts(
@@ -5893,8 +10595,22 @@ function ClientMarketingPage({ client, access = getClientPlanAccess(client) }) {
         );
       }
     );
+    const unsubscribePlaylists = onSnapshot(
+      collection(db, "clients", client.id, "playlists"),
+      (snapshot) => {
+        setPlaylists(
+          snapshot.docs.map((item) => ({
+            id: item.id,
+            ...item.data(),
+          }))
+        );
+      }
+    );
 
-    return () => unsubscribe();
+    return () => {
+      unsubscribeMarketing();
+      unsubscribePlaylists();
+    };
   }, [client.id]);
 
   function changeMarketingType(type) {
@@ -6033,7 +10749,7 @@ function ClientMarketingPage({ client, access = getClientPlanAccess(client) }) {
       const textColor = art.textColor || "#ffffff";
       const marketingType = art.marketingType || art.formatType || art.type || "feed";
 
-      await addDoc(collection(db, "clients", client.id, "templates"), {
+      const templatePayload = {
         ...getMarketingVisibility(art),
         type: "marketing_art",
         templateType: "marketing_art",
@@ -6067,9 +10783,9 @@ function ClientMarketingPage({ client, access = getClientPlanAccess(client) }) {
         orientation: marketingType === "feed" ? "Paisagem + Retrato" : "Retrato",
         createdAt: serverTimestamp(),
         updatedAt: serverTimestamp(),
-      });
-
-      alert("Arte enviada para os Templates da playlist!");
+      };
+      const templateRef = await addDoc(collection(db, "clients", client.id, "templates"), templatePayload);
+      alert("Arte enviada para os Templates. Adicione manualmente na playlist desejada.");
     } catch (error) {
       console.log(error);
       alert("Erro ao enviar a arte para a playlist.");
@@ -6334,6 +11050,15 @@ function ClientMarketingPage({ client, access = getClientPlanAccess(client) }) {
                   onChange={(e) => setForm({ ...form, textColor: e.target.value })}
                 />
               </label>
+
+              <label>
+                <span>Texto principal</span>
+                <input
+                  type="color"
+                  value={form.mainTextColor || form.textColor || "#ffffff"}
+                  onChange={(e) => setForm({ ...form, mainTextColor: e.target.value })}
+                />
+              </label>
             </div>
           </div>
 
@@ -6447,10 +11172,17 @@ function ClientTemplatesPage({ client, access = getClientPlanAccess(client) }) {
     orientation: "Paisagem",
     duration: "15",
     city: "João Câmara",
+    weatherCity: "João Câmara/RN",
+    weatherCities: "João Câmara/RN",
+    tideBeach: "Ponta Negra/RN",
+    tideBeaches: "Ponta Negra/RN",
+    tideStation: "Natal",
+    locationRotationInterval: "30",
     newsSource: "G1 RN",
     newsFeedUrl: NEWS_SOURCE_PRESETS["G1 RN"],
     selectedNewsSources: ["G1 RN"],
     tickerSpeed: "normal",
+    newsRotationInterval: "12",
     timeFormat: "24h",
     showWeather: true,
     title: "Informação ao vivo",
@@ -6459,6 +11191,8 @@ function ClientTemplatesPage({ client, access = getClientPlanAccess(client) }) {
     secondaryColor: "#9333ea",
     accentColor: "#22d3ee",
     textColor: "#ffffff",
+    mainTextColor: "#ffffff",
+    backgroundTheme: "neon_gradient",
     targetScreenIds: [],
     enabled: true,
     menuItems: DEFAULT_MENU_ITEMS.map((item) => ({ ...item })),
@@ -6469,8 +11203,21 @@ function ClientTemplatesPage({ client, access = getClientPlanAccess(client) }) {
     footerText: "Desenvolvido por Park Solutions",
     callToAction: "Aponte a câmera e saiba mais",
     logoUrl: client.logoUrl || "",
+    brandTitle: client.name || "Sua empresa",
+    brandSubtitle: "Comunicacao corporativa",
+    useClientLogo: true,
+    customLogoUrl: "",
+    mainTitle: "Comunicados e campanhas em destaque",
+    mainSubtitle: "Tela corporativa personalizada",
+    mainText: "Use este espaco para avisos, indicadores, campanhas e conteudos institucionais.",
+    mainImageUrl: "",
+    backgroundMode: "gradient",
+    backgroundUrl: "",
+    overlayOpacity: "55",
+    benefits: ["Recepcao", "Elevadores", "Mural digital"],
     showHeader: true,
     showLogo: true,
+    showBadge: true,
     showTitle: true,
     showSubtitle: true,
     showFooter: true,
@@ -6480,7 +11227,9 @@ function ClientTemplatesPage({ client, access = getClientPlanAccess(client) }) {
     const unsubTemplates = onSnapshot(
       collection(db, "clients", client.id, "templates"),
       (snapshot) => {
-        setTemplates(snapshot.docs.map((item) => ({ id: item.id, ...item.data() })));
+        setTemplates(
+          snapshot.docs.map((item) => normalizeSavedTemplate({ id: item.id, ...item.data() }))
+        );
       }
     );
 
@@ -6547,9 +11296,15 @@ function ClientTemplatesPage({ client, access = getClientPlanAccess(client) }) {
       clima_premium_v2: {
         name: "Clima Premium V2",
         title: "Clima Premium",
-        subtitle: "Previsao de 4 dias com noticias ao vivo",
+        subtitle: "Previsão de 4 dias com notícias ao vivo",
         duration: "20",
-        city: "Joao Camara",
+        city: "João Câmara/RN",
+        weatherCity: "João Câmara/RN",
+        weatherCities: "João Câmara/RN",
+        tideBeach: "Ponta Negra/RN",
+        tideBeaches: "Ponta Negra/RN",
+        tideStation: "Natal",
+        locationRotationInterval: "30",
         selectedNewsSources: ["G1 RN"],
         tickerSpeed: "normal",
         showFooter: true,
@@ -6557,13 +11312,112 @@ function ClientTemplatesPage({ client, access = getClientPlanAccess(client) }) {
       hora_certa_premium: {
         name: "Hora Certa Premium",
         title: "Hora Certa",
-        subtitle: "Relogio, data, clima e noticias ao vivo",
+        subtitle: "Relógio, data, clima e notícias ao vivo",
         duration: "20",
-        city: "Joao Camara",
+        city: "João Câmara/RN",
+        weatherCity: "João Câmara/RN",
         selectedNewsSources: ["G1 RN"],
         tickerSpeed: "normal",
         timeFormat: "24h",
         showWeather: true,
+        showFooter: true,
+      },
+      resultados_esportivos_premium: {
+        name: "Resultados Esportivos Premium",
+        title: "Totem Park Esportes",
+        subtitle: "Boletim esportivo corporativo com dados manuais",
+        duration: "20",
+        city: "João Câmara/RN",
+        sportsTheme: "corporate_broadcast",
+        showTime: true,
+        showDate: true,
+        showSportsNews: true,
+        showUpcomingGames: true,
+        showOtherSports: true,
+        footballMode: "brasileirao_a",
+        liveRotationInterval: "15",
+        tickerSpeed: "normal",
+        enableScoreAnimations: true,
+        footballCompetitions: DEFAULT_FOOTBALL_COMPETITIONS.map((item) => ({ ...item })),
+        sportsMatches: DEFAULT_SPORTS_MATCHES.map((item) => ({ ...item })),
+        otherSports: DEFAULT_OTHER_SPORTS_OPTIONS.map((item) => ({ ...item })),
+        footerText: "Dados reais gratuitos via TheSportsDB quando disponiveis",
+      },
+      tela_corporativa_personalizada: {
+        name: "Tela Corporativa Personalizada",
+        title: "Tela Corporativa Personalizada",
+        subtitle: "Marca, hora, clima, noticias e conteudo institucional",
+        duration: "20",
+        orientation: "Paisagem + Retrato",
+        city: "JoÃ£o CÃ¢mara/RN",
+        weatherCity: "JoÃ£o CÃ¢mara/RN",
+        selectedNewsSources: ["G1 RN"],
+        newsSource: "G1 RN",
+        newsFeedUrl: NEWS_SOURCE_PRESETS["G1 RN"],
+        tickerSpeed: "normal",
+        newsRotationInterval: "12",
+        timeFormat: "24h",
+        showWeather: true,
+        showForecastDays: true,
+        showClock: true,
+        showDate: true,
+        showFooter: true,
+        showNewsTicker: true,
+        backgroundTheme: "corporate_dark",
+        backgroundMode: "gradient",
+        primaryColor: "#06b6d4",
+        secondaryColor: "#7c3aed",
+        accentColor: "#22d3ee",
+        textColor: "#ffffff",
+        mainTextColor: "#ffffff",
+        overlayOpacity: "55",
+        useClientLogo: true,
+        logoUrl: client.logoUrl || "",
+        customLogoUrl: "",
+        brandTitle: client.name || "Sua empresa",
+        brandSubtitle: "Comunicacao corporativa",
+        mainTitle: "Comunicados e campanhas em destaque",
+        mainSubtitle: "Painel institucional em tempo real",
+        mainText: "Use este espaco para avisos, campanhas, indicadores e conteudos da sua empresa.",
+        mainImageUrl: "",
+        backgroundUrl: "",
+        benefits: ["Recepcao", "Elevadores", "Mural digital"],
+        footerText: "Totem Park - comunicacao que conecta",
+      },
+      receitas_fitness_premium: {
+        name: "Receitas Fitness Premium",
+        title: "Receitas Fitness",
+        subtitle: "Comidas saudáveis em rotação RSS",
+        duration: "20",
+        selectedNewsSources: ["Saudável Receita"],
+        newsSource: "Saudável Receita",
+        newsFeedUrl: NEWS_SOURCE_PRESETS["Saudável Receita"],
+        tickerSpeed: "normal",
+        newsRotationInterval: "12",
+        showFooter: true,
+      },
+      tendencia_beleza_premium: {
+        name: "Tendência de Beleza Premium",
+        title: "Tendência de Beleza",
+        subtitle: "Moda, estética e autocuidado",
+        duration: "20",
+        selectedNewsSources: ["Steal The Look"],
+        newsSource: "Steal The Look",
+        newsFeedUrl: NEWS_SOURCE_PRESETS["Steal The Look"],
+        tickerSpeed: "normal",
+        newsRotationInterval: "12",
+        showFooter: true,
+      },
+      fofocas_premium: {
+        name: "Fofocas Brasil Premium",
+        title: "Fofocas Brasil",
+        subtitle: "Celebridades, TV e bastidores nacionais",
+        duration: "20",
+        selectedNewsSources: ["Metrópoles Celebridades"],
+        newsSource: "Metrópoles Celebridades",
+        newsFeedUrl: NEWS_SOURCE_PRESETS["Metrópoles Celebridades"],
+        tickerSpeed: "normal",
+        newsRotationInterval: "10",
         showFooter: true,
       },
       cardapio_premium: {
@@ -6602,17 +11456,41 @@ function ClientTemplatesPage({ client, access = getClientPlanAccess(client) }) {
       ...preset,
       type,
       newsSource:
-        ["noticias", "jornal_premium", "clima_premium_v2", "hora_certa_premium"].includes(type)
-          ? prev.newsSource || "G1 RN"
+        isRssTemplateType(type)
+          ? preset.newsSource || prev.newsSource || "G1 RN"
           : prev.newsSource,
       newsFeedUrl:
-        ["noticias", "jornal_premium", "clima_premium_v2", "hora_certa_premium"].includes(type)
-          ? prev.newsFeedUrl || NEWS_SOURCE_PRESETS["G1 RN"]
+        isRssTemplateType(type)
+          ? preset.newsFeedUrl || prev.newsFeedUrl || NEWS_SOURCE_PRESETS["G1 RN"]
           : prev.newsFeedUrl,
       selectedNewsSources:
-        ["jornal_premium", "clima_premium_v2", "hora_certa_premium"].includes(type)
+        isRssTemplateType(type)
           ? preset.selectedNewsSources || prev.selectedNewsSources || ["G1 RN"]
           : prev.selectedNewsSources,
+      weatherCity:
+        ["clima", "jornal_premium", "clima_premium_v2", "hora_certa_premium", "tela_corporativa_personalizada"].includes(type)
+          ? preset.weatherCity || preset.city || prev.weatherCity || prev.city || "João Câmara/RN"
+          : prev.weatherCity,
+      weatherCities:
+        type === "clima_premium_v2"
+          ? preset.weatherCities || prev.weatherCities || preset.weatherCity || preset.city || prev.weatherCity || "Joao Camara/RN"
+          : prev.weatherCities,
+      tideBeach:
+        type === "clima_premium_v2"
+          ? preset.tideBeach || prev.tideBeach || "Ponta Negra/RN"
+          : prev.tideBeach,
+      tideBeaches:
+        type === "clima_premium_v2"
+          ? preset.tideBeaches || prev.tideBeaches || preset.tideBeach || prev.tideBeach || "Ponta Negra/RN"
+          : prev.tideBeaches,
+      tideStation:
+        type === "clima_premium_v2"
+          ? preset.tideStation || prev.tideStation || "Natal"
+          : prev.tideStation,
+      locationRotationInterval:
+        type === "clima_premium_v2"
+          ? preset.locationRotationInterval || prev.locationRotationInterval || "30"
+          : prev.locationRotationInterval,
     }));
   }
 
@@ -6624,6 +11502,7 @@ function ClientTemplatesPage({ client, access = getClientPlanAccess(client) }) {
     setForm((prev) => ({
       ...prev,
       newsSource: sourceName,
+      selectedNewsSources: [sourceName],
       newsFeedUrl:
         sourceName === "Personalizado"
           ? prev.newsFeedUrl
@@ -6729,6 +11608,34 @@ function ClientTemplatesPage({ client, access = getClientPlanAccess(client) }) {
     }));
   }
 
+  async function handleTemplateImageUpload(event, field, folder) {
+    const permission = editingTemplate ? "canEditTemplates" : "canCreateTemplates";
+    if (!requirePlanPermission(access, permission, "enviar imagens do template")) return;
+    const file = event.target.files?.[0];
+    event.target.value = "";
+    if (!file) return;
+
+    try {
+      setSaving(true);
+      const imageUrl = await uploadTemplateImageAsset(
+        client.id,
+        editingTemplate?.id,
+        file,
+        folder
+      );
+      setForm((prev) => ({
+        ...prev,
+        [field]: imageUrl,
+        ...(field === "backgroundUrl" ? { backgroundMode: "image" } : {}),
+      }));
+    } catch (error) {
+      console.log(error);
+      alert(error.message || "Erro ao enviar imagem do template.");
+    } finally {
+      setSaving(false);
+    }
+  }
+
   function toggleTargetScreen(screenId) {
     const selected = form.targetScreenIds.includes(screenId);
 
@@ -6748,6 +11655,12 @@ function ClientTemplatesPage({ client, access = getClientPlanAccess(client) }) {
       orientation: "Paisagem",
       duration: "15",
       city: "João Câmara",
+      weatherCity: "João Câmara/RN",
+      weatherCities: "JoÃ£o CÃ¢mara/RN",
+      tideBeach: "Ponta Negra/RN",
+      tideBeaches: "Ponta Negra/RN",
+      tideStation: "Natal",
+      locationRotationInterval: "30",
       newsSource: "G1 RN",
       newsFeedUrl: NEWS_SOURCE_PRESETS["G1 RN"],
       selectedNewsSources: ["G1 RN"],
@@ -6760,6 +11673,8 @@ function ClientTemplatesPage({ client, access = getClientPlanAccess(client) }) {
       secondaryColor: "#9333ea",
       accentColor: "#22d3ee",
       textColor: "#ffffff",
+      mainTextColor: "#ffffff",
+      backgroundTheme: "neon_gradient",
       targetScreenIds: [],
       enabled: true,
       menuItems: DEFAULT_MENU_ITEMS.map((item) => ({ ...item })),
@@ -6767,11 +11682,36 @@ function ClientTemplatesPage({ client, access = getClientPlanAccess(client) }) {
       corporateItems: [...DEFAULT_CORPORATE_ITEMS],
       agendaItems: DEFAULT_AGENDA_ITEMS.map((item) => ({ ...item })),
       indicatorItems: DEFAULT_INDICATOR_ITEMS.map((item) => ({ ...item })),
+      sportsTheme: "corporate_broadcast",
+      showTime: true,
+      showDate: true,
+      showSportsNews: true,
+      showUpcomingGames: true,
+      showOtherSports: true,
+      footballMode: "brasileirao_a",
+      liveRotationInterval: "15",
+      enableScoreAnimations: true,
+      footballCompetitions: DEFAULT_FOOTBALL_COMPETITIONS.map((item) => ({ ...item })),
+      sportsMatches: DEFAULT_SPORTS_MATCHES.map((item) => ({ ...item })),
+      otherSports: DEFAULT_OTHER_SPORTS_OPTIONS.map((item) => ({ ...item })),
       footerText: "Desenvolvido por Park Solutions",
       callToAction: "Aponte a câmera e saiba mais",
       logoUrl: client.logoUrl || "",
+      brandTitle: client.name || "Sua empresa",
+      brandSubtitle: "Comunicacao corporativa",
+      useClientLogo: true,
+      customLogoUrl: "",
+      mainTitle: "Comunicados e campanhas em destaque",
+      mainSubtitle: "Tela corporativa personalizada",
+      mainText: "Use este espaco para avisos, indicadores, campanhas e conteudos institucionais.",
+      mainImageUrl: "",
+      backgroundMode: "gradient",
+      backgroundUrl: "",
+      overlayOpacity: "55",
+      benefits: ["Recepcao", "Elevadores", "Mural digital"],
       showHeader: true,
       showLogo: true,
+      showBadge: true,
       showTitle: true,
       showSubtitle: true,
       showFooter: true,
@@ -6817,9 +11757,25 @@ function ClientTemplatesPage({ client, access = getClientPlanAccess(client) }) {
       };
 
       if (editingTemplate) {
+        const templateRevision = `${Date.now()}-${Math.random().toString(36).slice(2, 8)}`;
         await updateDoc(
           doc(db, "clients", client.id, "templates", editingTemplate.id),
-          templateData
+          { ...templateData, templateRevision }
+        );
+
+        await Promise.all(
+          screens.map((screen) => updateDoc(
+            doc(db, "clients", client.id, "screens", screen.id),
+            {
+              templateRevision,
+              remoteCommand: {
+                id: `template-refresh-${templateRevision}-${screen.id}`,
+                type: "refresh",
+                sentAt: new Date().toISOString(),
+              },
+              updatedAt: serverTimestamp(),
+            }
+          ))
         );
       } else {
         await addDoc(collection(db, "clients", client.id, "templates"), {
@@ -6832,7 +11788,9 @@ function ClientTemplatesPage({ client, access = getClientPlanAccess(client) }) {
       alert(editingTemplate ? "Template atualizado com sucesso!" : "Template criado com sucesso!");
     } catch (error) {
       console.log(error);
-      alert("Erro ao salvar template.");
+      alert(error.code === "permission-denied"
+        ? "Sua conta não tem permissão para salvar este template. Entre em contato com o suporte para verificar o cadastro."
+        : "Não foi possível salvar o template. Confira sua conexão e tente novamente. Seus dados continuam no formulário.");
     } finally {
       setSaving(false);
     }
@@ -6840,35 +11798,66 @@ function ClientTemplatesPage({ client, access = getClientPlanAccess(client) }) {
 
   function startEditTemplate(template) {
     if (!requirePlanPermission(access, "canEditTemplates", "editar templates")) return;
-    if ((template.templateType || template.type) === "marketing_art") return;
+    const normalizedTemplate = normalizeSavedTemplate(template);
 
-    const { id, createdAt, updatedAt, ...savedData } = template;
-    setEditingTemplate(template);
+    const { id, createdAt, updatedAt, ...savedData } = normalizedTemplate;
+    setEditingTemplate(normalizedTemplate);
     setForm((current) => ({
       ...current,
       ...savedData,
-      duration: String(template.duration || 15),
-      targetScreenIds: Array.isArray(template.targetScreenIds) ? [...template.targetScreenIds] : [],
-      menuItems: getTemplateMenuItems(template).map((item) => ({ ...item })),
-      promoItems: getTemplatePromoItems(template).map((item) => ({ ...item })),
-      corporateItems: [...getTemplateCorporateItems(template)],
-      agendaItems: getTemplateAgendaItems(template).map((item) => ({ ...item })),
-      indicatorItems: getTemplateIndicatorItems(template).map((item) => ({ ...item })),
-      logoUrl: template.logoUrl || client.logoUrl || "",
-      selectedNewsSources: getTemplateNewsSources(template),
-      tickerSpeed: getTemplateTickerSpeed(template.tickerSpeed),
-      timeFormat: template.timeFormat || "24h",
-      showWeather: template.showWeather !== false,
+      type: normalizedTemplate.type,
+      templateType: normalizedTemplate.templateType,
+      duration: String(normalizedTemplate.duration || 15),
+      targetScreenIds: Array.isArray(normalizedTemplate.targetScreenIds) ? [...normalizedTemplate.targetScreenIds] : [],
+      menuItems: getTemplateMenuItems(normalizedTemplate).map((item) => ({ ...item })),
+      promoItems: getTemplatePromoItems(normalizedTemplate).map((item) => ({ ...item })),
+      corporateItems: [...getTemplateCorporateItems(normalizedTemplate)],
+      agendaItems: getTemplateAgendaItems(normalizedTemplate).map((item) => ({ ...item })),
+      indicatorItems: getTemplateIndicatorItems(normalizedTemplate).map((item) => ({ ...item })),
+      footballCompetitions: getSportsFootballCompetitions(normalizedTemplate).map((item) => ({ ...item })),
+      sportsMatches: getSportsMatches(normalizedTemplate).map((item) => ({ ...item })),
+      otherSports: getOtherSportsOptions(normalizedTemplate).map((item) => ({ ...item })),
+      sportsTheme: normalizedTemplate.sportsTheme || "arena_dark",
+      showTime: normalizedTemplate.showTime !== false,
+      showDate: normalizedTemplate.showDate !== false,
+      showSportsNews: normalizedTemplate.showSportsNews !== false,
+      showUpcomingGames: normalizedTemplate.showUpcomingGames !== false,
+      showOtherSports: normalizedTemplate.showOtherSports !== false,
+      footballMode: getSportsFootballMode(normalizedTemplate),
+      liveRotationInterval: String(normalizedTemplate.liveRotationInterval || "15"),
+      enableScoreAnimations: normalizedTemplate.enableScoreAnimations !== false,
+      logoUrl: normalizedTemplate.logoUrl || client.logoUrl || "",
+      selectedNewsSources: getTemplateNewsSources(normalizedTemplate),
+      weatherCity: getTemplateWeatherCity(normalizedTemplate),
+      tideBeach: getTemplateTideBeach(normalizedTemplate),
+      tideStation: getTemplateTideStation(normalizedTemplate),
+      tickerSpeed: getTemplateTickerSpeed(normalizedTemplate.tickerSpeed),
+      timeFormat: normalizedTemplate.timeFormat || "24h",
+      showWeather: normalizedTemplate.showWeather !== false,
+      mainTextColor: normalizedTemplate.mainTextColor || normalizedTemplate.textColor || current.mainTextColor || "#ffffff",
     }));
-    setPreviewOrientation(template.orientation === "Retrato" ? "Retrato" : "Paisagem");
+    setPreviewOrientation(normalizedTemplate.orientation === "Retrato" ? "Retrato" : "Paisagem");
     window.scrollTo({ top: 0, behavior: "smooth" });
   }
 
-  async function deleteTemplate(id) {
+  async function deleteTemplate(templateOrId) {
     if (!requirePlanPermission(access, "canEditTemplates", "excluir templates")) return;
+    const templateId = typeof templateOrId === "string" ? templateOrId : templateOrId?.id;
+
+    if (!templateId) {
+      alert("Este template antigo nao possui identificador para exclusao.");
+      return;
+    }
+
+    const templateName = typeof templateOrId === "string" ? "este template" : templateOrId?.name || "este template";
+
+    if (!window.confirm(`Excluir ${templateName}? Esta acao nao pode ser desfeita.`)) {
+      return;
+    }
 
     try {
-      await deleteDoc(doc(db, "clients", client.id, "templates", id));
+      await deleteDoc(doc(db, "clients", client.id, "templates", templateId));
+      if (editingTemplate?.id === templateId) resetForm();
     } catch (error) {
       console.log(error);
       alert("Erro ao excluir template.");
@@ -7026,7 +12015,7 @@ function ClientTemplatesPage({ client, access = getClientPlanAccess(client) }) {
             >
               <CloudSun size={28} />
               <strong>Clima Premium V2</strong>
-              <span>Previsao 4 dias + ticker RSS</span>
+              <span>Previsão 4 dias + ticker RSS</span>
             </button>
 
             <button
@@ -7037,6 +12026,56 @@ function ClientTemplatesPage({ client, access = getClientPlanAccess(client) }) {
               <Clock3 size={28} />
               <strong>Hora Certa Premium</strong>
               <span>Hora, data, clima e RSS</span>
+            </button>
+
+            <button
+              className={getTemplateTypeCardClass("resultados_esportivos_premium")}
+              onClick={() => changeType("resultados_esportivos_premium")}
+              type="button"
+            >
+              <Trophy size={28} />
+              <strong>Resultados Esportivos Premium</strong>
+              <span>Futebol em destaque com fonte gratuita</span>
+            </button>
+
+            <button
+              className={getTemplateTypeCardClass("tela_corporativa_personalizada")}
+              onClick={() => changeType("tela_corporativa_personalizada")}
+              type="button"
+            >
+              <LayoutDashboard size={28} />
+              <strong>Tela Corporativa Personalizada</strong>
+              <span>Marca, hora, clima, noticias e conteudo fixo</span>
+            </button>
+
+            <button
+              className={getTemplateTypeCardClass("receitas_fitness_premium")}
+              onClick={() => changeType("receitas_fitness_premium")}
+              type="button"
+            >
+              <Coffee size={28} />
+              <strong>Receitas Fitness Premium</strong>
+              <span>Receitas saudáveis com RSS e fotos</span>
+            </button>
+
+            <button
+              className={getTemplateTypeCardClass("tendencia_beleza_premium")}
+              onClick={() => changeType("tendencia_beleza_premium")}
+              type="button"
+            >
+              <Sparkles size={28} />
+              <strong>Tendência de Beleza Premium</strong>
+              <span>Beleza, estética e autocuidado</span>
+            </button>
+
+            <button
+              className={getTemplateTypeCardClass("fofocas_premium")}
+              onClick={() => changeType("fofocas_premium")}
+              type="button"
+            >
+              <Megaphone size={28} />
+              <strong>Fofocas Brasil Premium</strong>
+              <span>Celebridades e bastidores nacionais</span>
             </button>
 
             <button
@@ -7127,18 +12166,110 @@ function ClientTemplatesPage({ client, access = getClientPlanAccess(client) }) {
               />
             </div>
 
-            {["clima", "jornal_premium", "clima_premium_v2", "hora_certa_premium"].includes(form.type) && (
+            {["clima", "jornal_premium", "clima_premium_v2", "hora_certa_premium", "tela_corporativa_personalizada"].includes(form.type) && (
               <div className="form-group">
                 <label>Cidade do clima</label>
+                <select
+                  value={WEATHER_CITY_PRESETS.includes(getTemplateWeatherCity(form)) ? getTemplateWeatherCity(form) : "custom"}
+                  onChange={(e) => {
+                    if (e.target.value === "custom") return;
+                    setForm({ ...form, city: e.target.value, weatherCity: e.target.value, weatherCities: e.target.value });
+                  }}
+                >
+                  {WEATHER_CITY_PRESETS.map((cityName) => (
+                    <option key={cityName} value={cityName}>{cityName}</option>
+                  ))}
+                  <option value="custom">Outra cidade</option>
+                </select>
                 <input
-                  value={form.city}
+                  value={getTemplateWeatherCity(form)}
                   placeholder="Ex: João Câmara"
-                  onChange={(e) => setForm({ ...form, city: e.target.value })}
+                  onChange={(e) => setForm({ ...form, city: e.target.value, weatherCity: e.target.value, weatherCities: e.target.value })}
                 />
               </div>
             )}
 
-            {["noticias", "jornal_premium", "clima_premium_v2", "hora_certa_premium"].includes(form.type) && (
+            {form.type === "clima_premium_v2" && (
+              <>
+                <div className="form-group full">
+                  <label>Cidades em rotacao</label>
+                  <textarea
+                    value={form.weatherCities || getTemplateWeatherCity(form)}
+                    placeholder="Ex: Joao Camara/RN, Macau/RN, Galinhos/RN"
+                    onChange={(e) => {
+                      const firstCity = parseTemplateListField(e.target.value, [getTemplateWeatherCity(form)])[0] || getTemplateWeatherCity(form);
+                      setForm({
+                        ...form,
+                        weatherCities: e.target.value,
+                        city: firstCity,
+                        weatherCity: firstCity,
+                      });
+                    }}
+                  />
+                </div>
+
+                <div className="form-group">
+                  <label>Praia para maré</label>
+                  <select
+                    value={TIDE_BEACH_PRESETS.some((beach) => beach.name === getTemplateTideBeach(form)) ? getTemplateTideBeach(form) : "custom"}
+                    onChange={(e) => {
+                      if (e.target.value === "custom") return;
+                      const selectedBeach = TIDE_BEACH_PRESETS.find((beach) => beach.name === e.target.value);
+                      setForm({
+                        ...form,
+                        tideBeach: selectedBeach.name,
+                        tideBeaches: selectedBeach.name,
+                        tideStation: selectedBeach.tideStation,
+                      });
+                    }}
+                  >
+                    {TIDE_BEACH_PRESETS.map((beach) => (
+                      <option key={beach.name} value={beach.name}>{beach.name}</option>
+                    ))}
+                    <option value="custom">Outra praia</option>
+                  </select>
+                </div>
+
+                <div className="form-group">
+                  <label>Praia personalizada</label>
+                  <input
+                    value={getTemplateTideBeach(form)}
+                    placeholder="Ex: Ponta Negra/RN"
+                    onChange={(e) => setForm({ ...form, tideBeach: e.target.value, tideBeaches: e.target.value, tideStation: e.target.value })}
+                  />
+                </div>
+
+                <div className="form-group full">
+                  <label>Praias em rotacao</label>
+                  <textarea
+                    value={form.tideBeaches || getTemplateTideBeach(form)}
+                    placeholder="Ex: Ponta Negra/RN, Touros/RN, Galinhos/RN"
+                    onChange={(e) => {
+                      const firstBeach = parseTemplateListField(e.target.value, [getTemplateTideBeach(form)])[0] || getTemplateTideBeach(form);
+                      const selectedBeach = getTideBeachConfig(firstBeach);
+                      setForm({
+                        ...form,
+                        tideBeaches: e.target.value,
+                        tideBeach: firstBeach,
+                        tideStation: selectedBeach.tideStation || firstBeach,
+                      });
+                    }}
+                  />
+                </div>
+
+                <div className="form-group">
+                  <label>Trocar cidade/praia a cada (segundos)</label>
+                  <input
+                    type="number"
+                    min="10"
+                    value={form.locationRotationInterval || "30"}
+                    onChange={(e) => setForm({ ...form, locationRotationInterval: e.target.value })}
+                  />
+                </div>
+              </>
+            )}
+
+            {isRssTemplateType(form.type) && (
               <>
                 <div className="form-group">
                   <label>Fonte de notícias</label>
@@ -7193,27 +12324,41 @@ function ClientTemplatesPage({ client, access = getClientPlanAccess(client) }) {
               </>
             )}
 
-            {["clima", "noticias", "jornal_premium", "clima_premium_v2", "hora_certa_premium"].includes(form.type) && (
-              <div className="form-group">
-                <label>Velocidade do rodape</label>
-                <select
-                  value={getTemplateTickerSpeed(form.tickerSpeed)}
-                  onChange={(e) => setForm({ ...form, tickerSpeed: e.target.value })}
-                >
-                  <option value="slow">Lenta</option>
-                  <option value="normal">Normal</option>
-                  <option value="fast">Rapida</option>
-                </select>
-              </div>
+            {["clima", "noticias", "jornal_premium", "clima_premium_v2", "hora_certa_premium", "resultados_esportivos_premium", "receitas_fitness_premium", "tendencia_beleza_premium", "fofocas_premium", "tela_corporativa_personalizada"].includes(form.type) && (
+              <>
+                <div className="form-group">
+                  <label>Velocidade do rodape</label>
+                  <select
+                    value={getTemplateTickerSpeed(form.tickerSpeed)}
+                    onChange={(e) => setForm({ ...form, tickerSpeed: e.target.value })}
+                  >
+                    <option value="slow">Lenta</option>
+                    <option value="normal">Normal</option>
+                    <option value="fast">Rápida</option>
+                  </select>
+                </div>
+
+                {isRssTemplateType(form.type) && (
+                  <div className="form-group">
+                    <label>Alternar notícia principal a cada (segundos)</label>
+                    <input
+                      type="number"
+                      min="5"
+                      value={form.newsRotationInterval || "12"}
+                      onChange={(e) => setForm({ ...form, newsRotationInterval: e.target.value })}
+                    />
+                  </div>
+                )}
+              </>
             )}
           </div>
 
-          {["jornal_premium", "clima_premium_v2", "hora_certa_premium"].includes(form.type) && (
+          {isRssTemplateType(form.type) && (
             <div className="template-color-panel">
               <div className="playlist-section-title compact">
                 <div>
-                  <h3>Fontes RSS do rodape</h3>
-                  <p>Escolha uma ou mais fontes para alternar no ticker.</p>
+                  <h3>Fontes RSS</h3>
+                  <p>Escolha uma ou mais fontes para alternar notícia principal e ticker.</p>
                 </div>
               </div>
 
@@ -7228,6 +12373,182 @@ function ClientTemplatesPage({ client, access = getClientPlanAccess(client) }) {
                     {sourceName}
                   </button>
                 ))}
+              </div>
+            </div>
+          )}
+
+          {form.type === "tela_corporativa_personalizada" && (
+            <div className="template-color-panel">
+              <div className="playlist-section-title compact">
+                <div>
+                  <h3>Tela Corporativa Personalizada</h3>
+                  <p>Configure identidade, clima, hora, fundo e conteúdo principal.</p>
+                </div>
+              </div>
+
+              <div className="form-grid">
+                <div className="form-group">
+                  <label>Tema visual</label>
+                  <select
+                    value={form.corporateTheme || "corporate_dark"}
+                    onChange={(e) => setForm({
+                      ...form,
+                      corporateTheme: e.target.value,
+                      backgroundTheme:
+                        e.target.value === "elevator_premium"
+                          ? "glass_panels"
+                          : e.target.value === "minimal_light"
+                            ? "light_premium"
+                            : e.target.value === "neon_corporate"
+                              ? "neon_gradient"
+                              : "corporate_dark",
+                    })}
+                  >
+                    <option value="corporate_dark">Corporativo Dark</option>
+                    <option value="elevator_premium">Elevador Premium</option>
+                    <option value="minimal_light">Minimal Light</option>
+                    <option value="neon_corporate">Neon Corporativo</option>
+                  </select>
+                </div>
+
+                <div className="form-group">
+                  <label>Usar logo do cliente</label>
+                  <select
+                    value={form.useClientLogo === false ? "nao" : "sim"}
+                    onChange={(e) => setForm({
+                      ...form,
+                      useClientLogo: e.target.value === "sim",
+                      logoUrl: e.target.value === "sim" ? client.logoUrl || form.logoUrl || "" : form.logoUrl,
+                    })}
+                  >
+                    <option value="sim">Sim</option>
+                    <option value="nao">Não</option>
+                  </select>
+                </div>
+
+                <div className="form-group">
+                  <label>Logo personalizada</label>
+                  <input
+                    type="file"
+                    accept="image/*"
+                    onChange={(event) => handleTemplateImageUpload(event, "customLogoUrl", "logo")}
+                  />
+                  <input
+                    value={form.customLogoUrl || ""}
+                    placeholder="URL da logo personalizada"
+                    onChange={(e) => setForm({ ...form, customLogoUrl: e.target.value })}
+                  />
+                </div>
+
+                <div className="form-group">
+                  <label>Marca / título</label>
+                  <input
+                    value={form.brandTitle || ""}
+                    onChange={(e) => setForm({ ...form, brandTitle: e.target.value })}
+                  />
+                </div>
+
+                <div className="form-group">
+                  <label>Subtítulo da marca</label>
+                  <input
+                    value={form.brandSubtitle || ""}
+                    onChange={(e) => setForm({ ...form, brandSubtitle: e.target.value })}
+                  />
+                </div>
+
+                <div className="form-group">
+                  <label>Fundo</label>
+                  <select
+                    value={form.backgroundMode || "gradient"}
+                    onChange={(e) => setForm({ ...form, backgroundMode: e.target.value })}
+                  >
+                    <option value="gradient">Gradiente do tema</option>
+                    <option value="solid">Cor sólida</option>
+                    <option value="image">Imagem personalizada</option>
+                  </select>
+                </div>
+
+                <div className="form-group">
+                  <label>Imagem de fundo</label>
+                  <input
+                    type="file"
+                    accept="image/*"
+                    onChange={(event) => handleTemplateImageUpload(event, "backgroundUrl", "background")}
+                  />
+                  <input
+                    value={form.backgroundUrl || ""}
+                    placeholder="URL da imagem de fundo"
+                    onChange={(e) => setForm({ ...form, backgroundUrl: e.target.value, backgroundMode: e.target.value ? "image" : form.backgroundMode })}
+                  />
+                </div>
+
+                <div className="form-group">
+                  <label>Sobreposição do fundo (%)</label>
+                  <input
+                    type="number"
+                    min="0"
+                    max="90"
+                    value={form.overlayOpacity || "55"}
+                    onChange={(e) => setForm({ ...form, overlayOpacity: e.target.value })}
+                  />
+                </div>
+
+                <div className="form-group">
+                  <label>Título do conteúdo</label>
+                  <input
+                    value={form.mainTitle || ""}
+                    onChange={(e) => setForm({ ...form, mainTitle: e.target.value })}
+                  />
+                </div>
+
+                <div className="form-group">
+                  <label>Subtítulo do conteúdo</label>
+                  <input
+                    value={form.mainSubtitle || ""}
+                    onChange={(e) => setForm({ ...form, mainSubtitle: e.target.value })}
+                  />
+                </div>
+
+                <div className="form-group">
+                  <label>Imagem principal</label>
+                  <input
+                    type="file"
+                    accept="image/*"
+                    onChange={(event) => handleTemplateImageUpload(event, "mainImageUrl", "main")}
+                  />
+                  <input
+                    value={form.mainImageUrl || ""}
+                    placeholder="URL da imagem principal"
+                    onChange={(e) => setForm({ ...form, mainImageUrl: e.target.value })}
+                  />
+                </div>
+
+                <div className="form-group">
+                  <label>Benefícios (separados por vírgula)</label>
+                  <input
+                    value={Array.isArray(form.benefits) ? form.benefits.join(", ") : form.benefits || ""}
+                    onChange={(e) => setForm({
+                      ...form,
+                      benefits: e.target.value.split(",").map((item) => item.trim()).filter(Boolean),
+                    })}
+                  />
+                </div>
+              </div>
+
+              <div className="form-group">
+                <label>Texto principal</label>
+                <textarea
+                  value={form.mainText || ""}
+                  onChange={(e) => setForm({ ...form, mainText: e.target.value })}
+                />
+              </div>
+
+              <div className="form-group">
+                <label>Texto institucional do rodapé</label>
+                <input
+                  value={form.footerText || ""}
+                  onChange={(e) => setForm({ ...form, footerText: e.target.value })}
+                />
               </div>
             </div>
           )}
@@ -7586,6 +12907,255 @@ function ClientTemplatesPage({ client, access = getClientPlanAccess(client) }) {
             </div>
           )}
 
+          {form.type === "resultados_esportivos_premium" && (
+            <div className="template-color-panel sports-template-editor">
+              <div className="playlist-section-title compact">
+                <div>
+                  <h3>Resultados Esportivos Premium</h3>
+                  <p>Busca dados reais gratuitos na TheSportsDB e usa dados manuais apenas como reserva.</p>
+                </div>
+              </div>
+
+              <div className="form-grid">
+                <div className="form-group">
+                  <label>Fonte de dados</label>
+                  <input value="TheSportsDB gratuita + fallback manual" readOnly />
+                </div>
+
+                <div className="form-group">
+                  <label>Foco do futebol</label>
+                  <select
+                    value={getSportsFootballMode(form)}
+                    onChange={(e) => setForm({ ...form, footballMode: e.target.value })}
+                  >
+                    <option value="brasileirao_a">Brasileirao Serie A masculino</option>
+                    <option value="selected">Campeonatos selecionados abaixo</option>
+                    <option value="manual">Usar apenas jogos manuais</option>
+                  </select>
+                </div>
+
+                <div className="form-group">
+                  <label>Cidade/local opcional</label>
+                  <input
+                    value={form.city || ""}
+                    onChange={(e) => setForm({ ...form, city: e.target.value })}
+                  />
+                </div>
+
+                <div className="form-group">
+                  <label>Tema visual</label>
+                  <select
+                    value={form.sportsTheme || "corporate_broadcast"}
+                    onChange={(e) => setForm({ ...form, sportsTheme: e.target.value })}
+                  >
+                    <option value="corporate_broadcast">Corporativo Broadcast</option>
+                    <option value="arena_dark">Arena Dark</option>
+                    <option value="neon_scoreboard">Neon Scoreboard</option>
+                    <option value="minimal_premium">Minimal Premium</option>
+                  </select>
+                </div>
+
+                <div className="form-group">
+                  <label>Alternancia entre jogos ao vivo</label>
+                  <select
+                    value={String(form.liveRotationInterval || "15")}
+                    onChange={(e) => setForm({ ...form, liveRotationInterval: e.target.value })}
+                  >
+                    <option value="10">10s</option>
+                    <option value="15">15s</option>
+                    <option value="20">20s</option>
+                    <option value="30">30s</option>
+                  </select>
+                </div>
+
+                <div className="form-group">
+                  <label>Animacoes do placar</label>
+                  <select
+                    value={form.enableScoreAnimations === false ? "nao" : "sim"}
+                    onChange={(e) => setForm({ ...form, enableScoreAnimations: e.target.value === "sim" })}
+                  >
+                    <option value="sim">Sim</option>
+                    <option value="nao">Nao</option>
+                  </select>
+                </div>
+
+                {[
+                  ["showTime", "Mostrar hora"],
+                  ["showDate", "Mostrar data"],
+                  ["showSportsNews", "Mostrar noticias esportivas"],
+                  ["showUpcomingGames", "Mostrar proximos jogos"],
+                  ["showOtherSports", "Mostrar outros esportes"],
+                ].map(([field, label]) => (
+                  <div className="form-group" key={field}>
+                    <label>{label}</label>
+                    <select
+                      value={form[field] === false ? "nao" : "sim"}
+                      onChange={(e) => setForm({ ...form, [field]: e.target.value === "sim" })}
+                    >
+                      <option value="sim">Sim</option>
+                      <option value="nao">Nao</option>
+                    </select>
+                  </div>
+                ))}
+              </div>
+
+              <div className="sports-config-group">
+                <h4>Campeonatos de Futebol</h4>
+                <p>
+                  No foco Serie A, o template busca apenas Brasileiro Serie A masculino. Para liberar outros campeonatos, escolha "Campeonatos selecionados".
+                </p>
+
+                {Array.from(new Set(getSportsFootballCompetitions(form).filter(isMaleProfessionalFootballCompetition).map((item) => item.category))).map((category) => (
+                  <div className="sports-competition-category" key={category}>
+                    <strong>{category}</strong>
+                    <div className="sports-chip-grid">
+                      {getSportsFootballCompetitions(form)
+                        .map((competition, index) => ({ competition, index }))
+                        .filter(({ competition }) => isMaleProfessionalFootballCompetition(competition))
+                        .filter(({ competition }) => competition.category === category)
+                        .map(({ competition, index }) => (
+                          <button
+                            type="button"
+                            key={competition.id}
+                            className={[
+                              competition.enabled ? "sports-chip active" : "sports-chip",
+                              getSportsFootballMode(form) !== "selected" ? "disabled" : "",
+                              getSportsFootballMode(form) === "brasileirao_a" && competition.id === "brasileirao_a" ? "active" : "",
+                            ].filter(Boolean).join(" ")}
+                            disabled={getSportsFootballMode(form) !== "selected"}
+                            onClick={() => updateArrayItem("footballCompetitions", index, "enabled", !competition.enabled)}
+                          >
+                            {competition.name}
+                          </button>
+                        ))}
+                    </div>
+                  </div>
+                ))}
+              </div>
+
+              <div className="sports-config-group">
+                <h4>Outros Esportes</h4>
+                <div className="sports-other-grid">
+                  {getOtherSportsOptions(form).map((sport, index) => (
+                    <div className="sports-other-card" key={sport.id}>
+                      <button
+                        type="button"
+                        className={sport.enabled ? "sports-chip active" : "sports-chip"}
+                        onClick={() => updateArrayItem("otherSports", index, "enabled", !sport.enabled)}
+                      >
+                        {sport.name}
+                      </button>
+                      <select
+                        value={sport.priority || "Media"}
+                        onChange={(e) => updateArrayItem("otherSports", index, "priority", e.target.value)}
+                      >
+                        <option>Baixa</option>
+                        <option>Media</option>
+                        <option>Alta</option>
+                      </select>
+                    </div>
+                  ))}
+                </div>
+              </div>
+
+              <div className="sports-config-group">
+                <div className="playlist-section-title compact">
+                  <div>
+                    <h4>Jogos manuais / demo</h4>
+                    <p>Edite jogos manuais de reserva. Eles aparecem apenas quando a fonte gratuita nao retornar partidas.</p>
+                  </div>
+                  <button
+                    type="button"
+                    className="client-action primary"
+                    onClick={() =>
+                      addArrayItem("sportsMatches", {
+                        id: `manual-${Date.now()}`,
+                        sport: "football",
+                        competitionId: "brasileirao_a",
+                        competitionName: "Campeonato Brasileiro Serie A",
+                        status: "scheduled",
+                        homeTeam: "Mandante",
+                        awayTeam: "Visitante",
+                        homeScore: 0,
+                        awayScore: 0,
+                        startTime: "20:00",
+                        matchTime: "",
+                        period: "Pre-jogo",
+                        venue: "Estadio",
+                        lastEvent: "Proximo jogo",
+                        priority: 3,
+                      })
+                    }
+                  >
+                    + Jogo
+                  </button>
+                </div>
+
+                {(form.sportsMatches || []).map((match, index) => (
+                  <div className="form-grid sports-match-form" key={match.id || index}>
+                    <div className="form-group">
+                      <label>Campeonato</label>
+                      <input value={match.competitionName || ""} onChange={(e) => updateArrayItem("sportsMatches", index, "competitionName", e.target.value)} />
+                    </div>
+                    <div className="form-group">
+                      <label>ID do campeonato</label>
+                      <select value={match.competitionId || "brasileirao_a"} onChange={(e) => updateArrayItem("sportsMatches", index, "competitionId", e.target.value)}>
+                        {getSportsFootballCompetitions(form).filter(isMaleProfessionalFootballCompetition).map((competition) => (
+                          <option key={competition.id} value={competition.id}>{competition.name}</option>
+                        ))}
+                      </select>
+                    </div>
+                    <div className="form-group">
+                      <label>Status</label>
+                      <select value={match.status || "scheduled"} onChange={(e) => updateArrayItem("sportsMatches", index, "status", e.target.value)}>
+                        <option value="live">Ao vivo</option>
+                        <option value="halftime">Intervalo</option>
+                        <option value="finished">Encerrado</option>
+                        <option value="scheduled">Proximo</option>
+                        <option value="postponed">Adiado</option>
+                      </select>
+                    </div>
+                    <div className="form-group">
+                      <label>Mandante</label>
+                      <input value={match.homeTeam || ""} onChange={(e) => updateArrayItem("sportsMatches", index, "homeTeam", e.target.value)} />
+                    </div>
+                    <div className="form-group">
+                      <label>Visitante</label>
+                      <input value={match.awayTeam || ""} onChange={(e) => updateArrayItem("sportsMatches", index, "awayTeam", e.target.value)} />
+                    </div>
+                    <div className="form-group">
+                      <label>Logo mandante</label>
+                      <input value={match.homeLogo || ""} placeholder="https://..." onChange={(e) => updateArrayItem("sportsMatches", index, "homeLogo", e.target.value)} />
+                    </div>
+                    <div className="form-group">
+                      <label>Logo visitante</label>
+                      <input value={match.awayLogo || ""} placeholder="https://..." onChange={(e) => updateArrayItem("sportsMatches", index, "awayLogo", e.target.value)} />
+                    </div>
+                    <div className="form-group">
+                      <label>Placar mandante</label>
+                      <input type="number" value={match.homeScore ?? 0} onChange={(e) => updateArrayItem("sportsMatches", index, "homeScore", Number(e.target.value))} />
+                    </div>
+                    <div className="form-group">
+                      <label>Placar visitante</label>
+                      <input type="number" value={match.awayScore ?? 0} onChange={(e) => updateArrayItem("sportsMatches", index, "awayScore", Number(e.target.value))} />
+                    </div>
+                    <div className="form-group">
+                      <label>Tempo / horario</label>
+                      <input value={match.matchTime || match.startTime || ""} onChange={(e) => updateArrayItem("sportsMatches", index, match.status === "scheduled" ? "startTime" : "matchTime", e.target.value)} />
+                    </div>
+                    <div className="form-group">
+                      <label>Ultimo evento</label>
+                      <input value={match.lastEvent || ""} onChange={(e) => updateArrayItem("sportsMatches", index, "lastEvent", e.target.value)} />
+                    </div>
+                    <button type="button" className="delete-button" onClick={() => removeArrayItem("sportsMatches", index)}>
+                      Remover
+                    </button>
+                  </div>
+                ))}
+              </div>
+            </div>
+          )}
+
           <div className="template-color-panel">
             <div className="playlist-section-title compact">
               <div>
@@ -7595,6 +13165,18 @@ function ClientTemplatesPage({ client, access = getClientPlanAccess(client) }) {
             </div>
 
             <div className="template-color-grid">
+              <label className="template-theme-select">
+                <span>Tema de fundo</span>
+                <select
+                  value={getTemplateBackgroundTheme(form)}
+                  onChange={(e) => setForm({ ...form, backgroundTheme: e.target.value })}
+                >
+                  {TEMPLATE_BACKGROUND_THEMES.map((theme) => (
+                    <option key={theme.value} value={theme.value}>{theme.label}</option>
+                  ))}
+                </select>
+              </label>
+
               <label>
                 <span>Primária</span>
                 <input
@@ -7686,8 +13268,9 @@ function ClientTemplatesPage({ client, access = getClientPlanAccess(client) }) {
         <div className="templates-preview-panel">
           <div className="template-preview-heading">
             <div>
-              <div className="kicker">Resultado final</div>
+              <div className="kicker">Preview automático</div>
               <h2>{previewOrientation}</h2>
+              <p>Atualiza em tempo real conforme você edita o template.</p>
             </div>
             <div className="template-orientation-switch">
               <button
@@ -7741,14 +13324,12 @@ function ClientTemplatesPage({ client, access = getClientPlanAccess(client) }) {
                   </div>
 
                   <div className="template-actions-row">
-                    {(template.templateType || template.type) !== "marketing_art" && (
-                      <button
-                        className="client-action"
-                        onClick={() => startEditTemplate(template)}
-                      >
-                        Editar
-                      </button>
-                    )}
+                    <button
+                      className="client-action"
+                      onClick={() => startEditTemplate(template)}
+                    >
+                      Editar
+                    </button>
                     <button
                       className={template.enabled ? "client-action primary" : "client-action"}
                       onClick={() => toggleTemplate(template)}
@@ -7765,7 +13346,7 @@ function ClientTemplatesPage({ client, access = getClientPlanAccess(client) }) {
 
                     <button
                       className="client-action danger"
-                      onClick={() => deleteTemplate(template.id)}
+                      onClick={() => deleteTemplate(template)}
                     >
                       <Trash2 size={15} />
                     </button>
@@ -7791,40 +13372,61 @@ function SparklineIcon() {
 }
 
 function TemplateVisualPreview({ template, compact = false, tv = false }) {
-  const [weather, setWeather] = useState(null);
-  const [news, setNews] = useState(DEFAULT_NEWS_ITEMS);
+  const [locationRotationTick, setLocationRotationTick] = useState(Date.now());
+  const activeTemplate = (template.templateType || template.type) === "clima_premium_v2"
+    ? {
+        ...template,
+        weatherCity: getActiveTemplateWeatherCity(template, locationRotationTick),
+        city: getActiveTemplateWeatherCity(template, locationRotationTick),
+        tideBeach: getActiveTemplateTideBeach(template, locationRotationTick),
+      }
+    : template;
+  const initialLiveContent = getCachedTemplateLiveContent(activeTemplate);
+  const [weather, setWeather] = useState(initialLiveContent?.weather || null);
+  const [news, setNews] = useState(initialLiveContent?.news || DEFAULT_NEWS_ITEMS);
+  const [realSportsData, setRealSportsData] = useState(initialLiveContent?.sportsData || null);
+  const [realTideForecast, setRealTideForecast] = useState(initialLiveContent?.tideForecast || null);
   const [loading, setLoading] = useState(false);
+  const [clockTick, setClockTick] = useState(() => new Date());
+  const liveContentKey = getTemplateLiveContentCacheKey(activeTemplate);
+
+  useEffect(() => {
+    const interval = setInterval(() => setClockTick(new Date()), 1000);
+    return () => clearInterval(interval);
+  }, []);
+
+  useEffect(() => {
+    if ((template.templateType || template.type) !== "clima_premium_v2") return undefined;
+    const intervalMs = getTemplateLocationRotationSeconds(template) * 1000;
+    const interval = setInterval(() => setLocationRotationTick(Date.now()), Math.max(10000, intervalMs));
+    return () => clearInterval(interval);
+  }, [template.templateType, template.type, template.locationRotationInterval, template.tideRotationInterval, template.weatherCities, template.tideBeaches]);
 
   useEffect(() => {
     let cancelled = false;
 
-    async function loadTemplateContent() {
+    function applyLiveContent(data = {}) {
+      if (data.weather) setWeather(data.weather);
+      if (data.news) setNews(data.news.length ? data.news : DEFAULT_NEWS_ITEMS);
+      if (Object.hasOwn(data, "sportsData")) setRealSportsData(data.sportsData);
+      if (Object.hasOwn(data, "tideForecast")) setRealTideForecast(data.tideForecast);
+    }
+
+    async function loadTemplateContent(force = false) {
       try {
-        setLoading(true);
+        const cached = getCachedTemplateLiveContent(activeTemplate);
+        if (!force && cached && !cancelled) applyLiveContent(cached);
 
-        const realTemplateType = template.templateType || template.type;
+        setLoading(!cached);
 
-        if (["clima", "jornal_premium", "clima_premium_v2", "hora_certa_premium"].includes(realTemplateType)) {
-          const data = await fetchWeatherByCity(template.city);
-          if (!cancelled) setWeather(data);
-        }
-
-        if (["noticias", "jornal_premium", "clima_premium_v2", "hora_certa_premium"].includes(realTemplateType)) {
-          const feedUrls = getTemplateNewsFeedUrls(template);
-          const newsLists = await Promise.all(
-            (feedUrls.length ? feedUrls : [template.newsFeedUrl]).map((feedUrl) =>
-              fetchNewsFromRss(feedUrl)
-            )
-          );
-          const data = newsLists.flat().filter((item) => item?.title).slice(0, 12);
-          if (!cancelled) setNews(data.length ? data : DEFAULT_NEWS_ITEMS);
-        }
+        const data = await primeTemplateLiveContent(activeTemplate, { force });
+        if (!cancelled && data) applyLiveContent(data);
       } catch (error) {
         console.log(error);
 
-        if (["clima", "jornal_premium", "clima_premium_v2", "hora_certa_premium"].includes(template.templateType || template.type) && !cancelled) {
+        if (isWeatherLiveTemplate(template.templateType || template.type) && !cancelled) {
           setWeather({
-            city: template.city || "Sua cidade",
+            city: getTemplateWeatherCity(activeTemplate) || "Sua cidade",
             temperature: "--",
             sensation: "--",
             humidity: "--",
@@ -7833,8 +13435,12 @@ function TemplateVisualPreview({ template, compact = false, tv = false }) {
           });
         }
 
-        if (["noticias", "jornal_premium", "clima_premium_v2", "hora_certa_premium"].includes(template.templateType || template.type) && !cancelled) {
+        if (isRssTemplateType(template.templateType || template.type) && !cancelled) {
           setNews(DEFAULT_NEWS_ITEMS);
+        }
+
+        if ((template.templateType || template.type) === "resultados_esportivos_premium" && !cancelled) {
+          setRealSportsData(null);
         }
       } finally {
         if (!cancelled) setLoading(false);
@@ -7843,18 +13449,23 @@ function TemplateVisualPreview({ template, compact = false, tv = false }) {
 
     loadTemplateContent();
 
-    const interval = setInterval(loadTemplateContent, 10 * 60 * 1000);
+    const refreshInterval = (template.templateType || template.type) === "resultados_esportivos_premium"
+      ? 3 * 60 * 1000
+      : 10 * 60 * 1000;
+    const interval = setInterval(() => loadTemplateContent(true), refreshInterval);
 
     return () => {
       cancelled = true;
       clearInterval(interval);
     };
-  }, [template.type, template.templateType, template.city, template.newsFeedUrl, JSON.stringify(template.selectedNewsSources || [])]);
+  }, [liveContentKey]);
 
   const realTemplateType = template.templateType || template.type;
   const isPortrait = template.orientation === "Retrato";
   const orientationLabel = isPortrait ? "Retrato" : "Paisagem";
-  const mainNews = news[0] || DEFAULT_NEWS_ITEMS[0];
+  const newsRotationIndex = getRotatingNewsIndex(news, template);
+  const rotatedNews = rotateNewsItems(news, newsRotationIndex);
+  const mainNews = rotatedNews[0] || DEFAULT_NEWS_ITEMS[0];
   const mainNewsTitle = getNewsItemTitle(mainNews);
   const mainNewsTitleSize = compact
     ? 18
@@ -7872,10 +13483,75 @@ function TemplateVisualPreview({ template, compact = false, tv = false }) {
         ? 35
         : 42;
   const forecastCards = getWeatherForecastCards(weather);
-  const clockParts = getTemplateClockParts(template);
+  const tideForecast = realTemplateType === "clima_premium_v2"
+    ? (realTideForecast || getTideForecastForTemplate(activeTemplate))
+    : null;
+  const weatherReferenceDate = getWeatherReferenceDate(weather);
+  const clockParts = getTemplateClockParts(template, clockTick);
   const tickerSpeed = getTemplateTickerSpeed(template.tickerSpeed);
-  const isLiveCompactTemplate = ["clima", "noticias", "jornal_premium", "clima_premium_v2", "hora_certa_premium"].includes(realTemplateType);
+  const isLiveCompactTemplate = ["clima", "noticias", "jornal_premium", "clima_premium_v2", "hora_certa_premium", "receitas_fitness_premium", "tendencia_beleza_premium", "fofocas_premium", "tela_corporativa_personalizada"].includes(realTemplateType);
   const isTemplateVisible = (field) => template[field] !== false;
+  const sportsData = realTemplateType === "resultados_esportivos_premium"
+    ? (realSportsData || getSportsData(template))
+    : null;
+  const sportsUsingRealData = sportsData?.source === "TheSportsDB";
+  const liveRotationMs = Math.max(10, Number(template.liveRotationInterval || 15)) * 1000;
+  const sportsLiveIndex = sportsData?.liveFootball?.length
+    ? Math.floor(Date.now() / liveRotationMs) % sportsData.liveFootball.length
+    : 0;
+  const primarySportsMatch = sportsData?.liveFootball?.[sportsLiveIndex]
+    || sportsData?.primaryMatch
+    || DEFAULT_SPORTS_MATCHES[0];
+  const sportsUpcomingList = sportsData?.liveFootball?.length
+    ? sportsData.liveFootball
+    : sportsData?.upcomingFootball?.length
+      ? sportsData.upcomingFootball
+      : sportsData?.finishedFootball || [];
+  const sportsRecentList = sportsData?.finishedFootball?.length
+    ? sportsData.finishedFootball
+    : sportsData?.upcomingFootball || [];
+  const sportsTableRows = realTemplateType === "resultados_esportivos_premium"
+    ? buildSportsTableRows(sportsData || {}, template)
+    : [];
+  const sportsTickerText = realTemplateType === "resultados_esportivos_premium"
+    ? buildSportsTickerText(template, sportsData || {}, primarySportsMatch)
+    : "";
+  const sportsHeadline = primarySportsMatch
+    ? (template.subtitle || `${primarySportsMatch.homeTeam} e ${primarySportsMatch.awayTeam} movimentam a rodada`)
+    : (template.subtitle || "Boletim esportivo corporativo");
+  const corporateLogoUrl = template.customLogoUrl
+    || (template.useClientLogo === false ? "" : template.logoUrl)
+    || template.logoUrl
+    || logo;
+  const corporateBenefits = Array.isArray(template.benefits)
+    ? template.benefits
+    : String(template.benefits || "")
+        .split(",")
+        .map((item) => item.trim())
+        .filter(Boolean);
+  const corporateOverlayOpacity = Math.min(90, Math.max(0, Number(template.overlayOpacity ?? 55))) / 100;
+  const corporateBackgroundStyle = realTemplateType === "tela_corporativa_personalizada"
+    ? {
+        "--corporate-overlay": corporateOverlayOpacity,
+        backgroundImage:
+          template.backgroundMode === "image" && template.backgroundUrl
+            ? `linear-gradient(135deg, rgba(2, 6, 23, ${corporateOverlayOpacity}), rgba(15, 23, 42, ${Math.min(0.92, corporateOverlayOpacity + 0.18)})), url("${template.backgroundUrl}")`
+            : undefined,
+      }
+    : {};
+  const footerTickerText = isRssTemplateType(realTemplateType)
+    ? buildSequentialNewsTicker(rotatedNews, template)
+    : realTemplateType === "clima"
+      ? `Clima em ${weather?.city || template.city || "sua cidade"} • Atualização automática`
+      : realTemplateType === "cardapio_premium"
+        ? `${template.title || "Cardápio Digital"} • Produtos, categorias e preços`
+        : realTemplateType === "promocao_premium"
+          ? `${template.title || "Ofertas da Semana"} • Promoções em destaque`
+          : realTemplateType === "corporativo_premium"
+            ? `${template.title || "Comunicação Corporativa"} • Avisos, agenda e indicadores`
+            : realTemplateType === "resultados_esportivos_premium"
+              ? sportsTickerText
+              : template.subtitle || "Template profissional para TV";
 
   if (realTemplateType === "marketing_art") {
     return <MarketingArtPreview art={template} compact={compact} tv={tv} />;
@@ -7906,27 +13582,123 @@ function TemplateVisualPreview({ template, compact = false, tv = false }) {
 
   return (
     <div
-      className={`template-tv-preview template-${realTemplateType} template-orientation-${isPortrait ? "portrait" : "landscape"} ticker-${tickerSpeed} ${isLiveCompactTemplate ? "template-live-compact" : ""} ${compact ? "compact" : ""}`}
-      style={getTemplateThemeStyle(template)}
+      className={`template-tv-preview template-${realTemplateType} template-bg-${getTemplateBackgroundTheme(template)} template-orientation-${isPortrait ? "portrait" : "landscape"} ticker-${tickerSpeed} ${isLiveCompactTemplate ? "template-live-compact" : ""} ${compact ? "compact" : ""}`}
+      style={{ ...getTemplateThemeStyle(template, footerTickerText), ...corporateBackgroundStyle }}
     >
       <div className="template-orb one"></div>
       <div className="template-orb two"></div>
 
-      {isTemplateVisible("showHeader") && <div className="template-tv-topbar">
+      {isTemplateVisible("showHeader") && realTemplateType !== "tela_corporativa_personalizada" && <div className="template-tv-topbar">
         <div className="template-client-brand">
           {isTemplateVisible("showLogo") && template.logoUrl && (
             <img src={template.logoUrl} alt="Logo do cliente" />
           )}
-          <span>{template.title || "Totem Park"} • {orientationLabel}</span>
+          {isTemplateVisible("showTitle") && <span>{template.title || "Totem Park"} • {orientationLabel}</span>}
         </div>
-        <strong>{new Date().toLocaleTimeString("pt-BR", { hour: "2-digit", minute: "2-digit" })}</strong>
+        <strong>{clockParts.time}</strong>
       </div>}
+
+      {realTemplateType === "tela_corporativa_personalizada" && (
+        <div className={`template-corporate-custom theme-${template.corporateTheme || "corporate_dark"}`}>
+          <header className="corporate-custom-header">
+            <div className="corporate-custom-brand">
+              {isTemplateVisible("showLogo") && (
+                <span className="corporate-custom-logo">
+                  {corporateLogoUrl ? (
+                    <img src={corporateLogoUrl} alt="Logo" />
+                  ) : (
+                    (template.brandTitle || template.title || "TP").slice(0, 2).toUpperCase()
+                  )}
+                </span>
+              )}
+              <div>
+                {isTemplateVisible("showTitle") && <strong>{template.brandTitle || template.title || "Tela Corporativa"}</strong>}
+                {isTemplateVisible("showSubtitle") && (
+                  <small>{template.brandSubtitle || template.subtitle || "Comunicacao corporativa"}</small>
+                )}
+              </div>
+            </div>
+
+            <div className="corporate-custom-live">
+              {template.showClock !== false && (
+                <div className="corporate-custom-clock">
+                  <strong>{clockParts.time}</strong>
+                  {template.showDate !== false && <span>{clockParts.date}</span>}
+                </div>
+              )}
+
+              {template.showWeather !== false && (
+                <div className="corporate-custom-weather">
+                  <span>{getWeatherIconSafe(weather?.weatherCode, weatherReferenceDate)}</span>
+                  <div>
+                    <strong>{weather?.temperature ?? "--"}{"\u00b0C"}</strong>
+                    <small>{weather?.city || getTemplateWeatherCity(template) || "Sua cidade"}</small>
+                  </div>
+                </div>
+              )}
+            </div>
+          </header>
+
+          <main className="corporate-custom-main">
+            <section className="corporate-custom-message">
+              {isTemplateVisible("showBadge") && <div className="template-breaking">{getTemplateBadge(realTemplateType)}</div>}
+              {isTemplateVisible("showTitle") && (
+                <h2>{template.mainTitle || template.title || "Comunicados e campanhas em destaque"}</h2>
+              )}
+              {isTemplateVisible("showSubtitle") && (
+                <p>{template.mainSubtitle || template.subtitle || "Painel institucional em tempo real"}</p>
+              )}
+              <span>{template.mainText || "Use este espaco para avisos, campanhas, indicadores e conteudos da sua empresa."}</span>
+
+              <div className="corporate-custom-benefits">
+                {(corporateBenefits.length ? corporateBenefits : ["Recepcao", "Elevadores", "Mural digital"]).slice(0, compact ? 2 : 4).map((item, index) => (
+                  <b key={`${item}-${index}`}>{item}</b>
+                ))}
+              </div>
+            </section>
+
+            <section className="corporate-custom-media">
+              {template.mainImageUrl ? (
+                <img src={template.mainImageUrl} alt={template.mainTitle || template.title || "Conteudo"} />
+              ) : (
+                <div>
+                  <LayoutDashboard size={compact ? 38 : 82} />
+                  <strong>{template.callToAction || "Painel pronto para sua comunicacao"}</strong>
+                </div>
+              )}
+            </section>
+          </main>
+
+          {!compact && template.showForecastDays !== false && (
+            <section className="corporate-custom-forecast">
+              {(forecastCards.length ? forecastCards : [
+                { day: "SEG", icon: "☀", max: 32, min: 24 },
+                { day: "TER", icon: "⛅", max: 31, min: 23 },
+                { day: "QUA", icon: "☔", max: 29, min: 22 },
+                { day: "QUI", icon: "☁", max: 30, min: 23 },
+              ]).slice(0, 4).map((item, index) => (
+                <div key={`${item.day}-${index}`}>
+                  <strong>{item.day}</strong>
+                  <span>{item.icon}</span>
+                  <small>{item.max}{"\u00b0"} / {item.min}{"\u00b0"}</small>
+                </div>
+              ))}
+            </section>
+          )}
+
+          {!compact && template.footerText && (
+            <div className="corporate-custom-footer-text">
+              {template.footerText}
+            </div>
+          )}
+        </div>
+      )}
 
       {(template.templateType || template.type) === "clima" && (
         <div className="template-weather-layout">
           <div>
             <small>Agora em</small>
-            <h2>{weather?.city || template.city || "Sua cidade"}</h2>
+            <h2>{weather?.city || getTemplateWeatherCity(template) || "Sua cidade"}</h2>
             {isTemplateVisible("showSubtitle") && <p>
               {template.subtitle || "Previsão atualizada automaticamente"}
               {weather?.source ? ` • ${weather.source}` : ""}
@@ -7964,7 +13736,7 @@ function TemplateVisualPreview({ template, compact = false, tv = false }) {
             {isTemplateVisible("showSubtitle") && <p>{template.subtitle || "Manchetes atualizadas automaticamente"}</p>}
 
             <div className="template-news-list">
-              {news.slice(0, compact ? 2 : 3).map((item, index) => (
+              {rotatedNews.slice(0, compact ? 2 : 3).map((item, index) => (
                 <div key={`${getNewsItemTitle(item)}-${index}`} className="template-news-item">
                   <span>{String(index + 1).padStart(2, "0")}</span>
                   <strong>{getNewsItemTitle(item)}</strong>
@@ -7985,10 +13757,10 @@ function TemplateVisualPreview({ template, compact = false, tv = false }) {
               alignItems: "stretch",
             }}
           >
-            {getNewsItemImage(news[0]) ? (
+            {getNewsItemImage(mainNews) ? (
               <img
-                src={getNewsItemImage(news[0])}
-                alt={getNewsItemTitle(news[0])}
+                src={getNewsItemImage(mainNews)}
+                alt={getNewsItemTitle(mainNews)}
                 style={{
                   width: "100%",
                   height: "100%",
@@ -8029,7 +13801,7 @@ function TemplateVisualPreview({ template, compact = false, tv = false }) {
                   color: "#ffffff",
                 }}
               >
-                {getNewsItemTitle(news[0])}
+                {getNewsItemTitle(mainNews)}
               </strong>
 
               {!compact && (
@@ -8041,8 +13813,8 @@ function TemplateVisualPreview({ template, compact = false, tv = false }) {
                     lineHeight: 1.25,
                   }}
                 >
-                  {getNewsItemDescription(news[0]) ||
-                    `${getNewsItemSource(news[0], template.newsSource || "Notícias")} • ${getNewsItemTime(news[0])}`}
+                  {getNewsItemDescription(mainNews) ||
+                    `${getNewsItemSource(mainNews, template.newsSource || "Notícias")} • ${getNewsItemTime(mainNews)}`}
                 </p>
               )}
 
@@ -8055,7 +13827,7 @@ function TemplateVisualPreview({ template, compact = false, tv = false }) {
                   fontSize: compact ? 11 : 14,
                 }}
               >
-                {getNewsItemSource(news[0], template.newsSource || "Notícias")} • {getNewsItemTime(news[0])}
+                {getNewsItemSource(mainNews, template.newsSource || "Notícias")} • {getNewsItemTime(mainNews)}
               </span>
             </div>
           </div>
@@ -8066,19 +13838,41 @@ function TemplateVisualPreview({ template, compact = false, tv = false }) {
         <div className="template-premium-weather-v2">
           <div className="premium-weather-hero">
             <div>
-              <div className="template-breaking">{getTemplateBadge(realTemplateType)}</div>
-              {isTemplateVisible("showTitle") && <h2>{weather?.city || template.city || "Sua cidade"}</h2>}
-              <p>{new Date().toLocaleDateString("pt-BR", { weekday: "long", day: "2-digit", month: "long", year: "numeric" })}</p>
+              {isTemplateVisible("showBadge") && <div className="template-breaking">{getTemplateBadge(realTemplateType)}</div>}
+              {isTemplateVisible("showTitle") && <h2>{weather?.city || getTemplateWeatherCity(template) || "Sua cidade"}</h2>}
+              <p>{weatherReferenceDate.toLocaleDateString("pt-BR", { weekday: "long", day: "2-digit", month: "long", year: "numeric" })}</p>
             </div>
 
             <div className="premium-weather-current">
-              <span className="premium-weather-icon">{getWeatherIcon(weather?.weatherCode)}</span>
+              <span className="premium-weather-icon">{getWeatherIconSafe(weather?.weatherCode, weatherReferenceDate)}</span>
+              <strong className="weather-text-fixed">{loading && !weather ? "--" : <>{weather?.temperature ?? "--"}{"\u00b0C"}</>}</strong>
               <strong>{loading && !weather ? "--" : `${weather?.temperature ?? "--"}°C`}</strong>
-              <small>{getWeatherConditionLabel(weather?.weatherCode)}</small>
+              <small>{getWeatherConditionLabel(weather?.weatherCode, weatherReferenceDate)}</small>
+              <em className="weather-text-fixed">Sensação {weather?.sensation ?? "--"}{"\u00b0C"}</em>
               <em>Sensacao {weather?.sensation ?? "--"}°C</em>
             </div>
           </div>
 
+            {tideForecast && (
+              <div className="premium-weather-tide">
+                <div>
+                  <span>Tábua de maré</span>
+                  <strong>{tideForecast.beach}</strong>
+                  <small>Estação {tideForecast.station}</small>
+                </div>
+
+                <div className="premium-tide-list">
+                  {tideForecast.items.map((item) => (
+                    <div className="premium-tide-row" key={`${item.time}-${item.label}`}>
+                      <span>{item.time}</span>
+                      <strong>{item.label}</strong>
+                      <small>{item.height}</small>
+                      <i style={{ "--tide-level": `${item.level}%` }} />
+                    </div>
+                  ))}
+                </div>
+              </div>
+            )}
           <div className="premium-weather-forecast">
             {(forecastCards.length ? forecastCards : [
               { day: "SEG", icon: "☀", max: 32, min: 24 },
@@ -8089,6 +13883,7 @@ function TemplateVisualPreview({ template, compact = false, tv = false }) {
               <div className="premium-weather-day" key={`${item.day}-${index}`}>
                 <strong>{item.day}</strong>
                 <span>{item.icon}</span>
+                <small className="weather-text-fixed">{item.max}{"\u00b0"} / {item.min}{"\u00b0"}</small>
                 <small>{item.max}° / {item.min}°</small>
               </div>
             ))}
@@ -8099,7 +13894,7 @@ function TemplateVisualPreview({ template, compact = false, tv = false }) {
       {realTemplateType === "hora_certa_premium" && (
         <div className="template-premium-clock">
           <div className="premium-clock-main">
-            <div className="template-breaking">{getTemplateBadge(realTemplateType)}</div>
+            {isTemplateVisible("showBadge") && <div className="template-breaking">{getTemplateBadge(realTemplateType)}</div>}
             <strong>{clockParts.time}</strong>
             <span>{clockParts.weekday}</span>
             <p>{clockParts.date}</p>
@@ -8107,11 +13902,255 @@ function TemplateVisualPreview({ template, compact = false, tv = false }) {
 
           {template.showWeather !== false && (
             <div className="premium-clock-weather">
-              <span>{getWeatherIcon(weather?.weatherCode)}</span>
+              <span>{getWeatherIconSafe(weather?.weatherCode, weatherReferenceDate)}</span>
+              <strong className="weather-text-fixed">{weather?.temperature ?? "--"}{"\u00b0C"}</strong>
               <strong>{weather?.temperature ?? "--"}°C</strong>
               <small>{weather?.city || template.city || "Sua cidade"}</small>
-              <em>{getWeatherConditionLabel(weather?.weatherCode)}</em>
+              <em>{getWeatherConditionLabel(weather?.weatherCode, weatherReferenceDate)}</em>
             </div>
+          )}
+        </div>
+      )}
+
+      {realTemplateType === "resultados_esportivos_premium" && (
+        <div
+          className={[
+            "template-sports-scoreboard",
+            `sports-theme-${template.sportsTheme || "corporate_broadcast"}`,
+            template.enableScoreAnimations === false ? "no-score-animation" : "",
+          ].filter(Boolean).join(" ")}
+        >
+          {isTemplateVisible("showHeader") && <div className="sports-score-header">
+            <div className="sports-brand">
+              {isTemplateVisible("showLogo") && (template.logoUrl ? <img src={template.logoUrl} alt="Logo" /> : <Trophy size={compact ? 18 : 30} />)}
+              <div>
+                {isTemplateVisible("showTitle") && <strong>{template.title || "Resultados Esportivos"}</strong>}
+                {isTemplateVisible("showSubtitle") && <span>{template.city || "Esportes ao vivo"}</span>}
+              </div>
+            </div>
+
+            <div className="sports-clock-box">
+              {template.showTime !== false && (
+                <strong>{clockParts.time}</strong>
+              )}
+              {template.showDate !== false && (
+                <span>{weatherReferenceDate.toLocaleDateString("pt-BR", { weekday: compact ? undefined : "short", day: "2-digit", month: "2-digit" })}</span>
+              )}
+              {sportsUsingRealData && sportsData.sourceSyncedAt && !compact && (
+                <span>Atualizado {sportsData.sourceSyncedAt}</span>
+              )}
+            </div>
+
+            {isTemplateVisible("showBadge") && <div className={`sports-status-pill ${primarySportsMatch.status === "live" ? "live" : ""}`}>
+              {sportsUsingRealData && primarySportsMatch.status !== "live"
+                ? "DADOS REAIS"
+                : getMatchStatusLabel(primarySportsMatch.status)}
+            </div>}
+          </div>}
+
+          <div className="sports-headline">
+            <span>Boletim esportivo</span>
+            <strong>{sportsHeadline}</strong>
+          </div>
+
+          <div className="sports-score-content">
+            <div className="sports-main-match">
+              <div className="sports-match-kicker">
+                <span>{primarySportsMatch.competitionName}</span>
+                <b>
+                  {primarySportsMatch.dateEvent ? `${primarySportsMatch.dateEvent} - ` : ""}
+                  {primarySportsMatch.matchTime || primarySportsMatch.startTime || "Horario a definir"}
+                </b>
+              </div>
+
+              <div className="sports-teams-row">
+                <div className="sports-team">
+                  <div className="sports-team-logo">
+                    {primarySportsMatch.homeLogo
+                      ? <img src={primarySportsMatch.homeLogo} alt={primarySportsMatch.homeTeam} />
+                      : getTeamInitials(primarySportsMatch.homeTeam)}
+                  </div>
+                  <strong>{primarySportsMatch.homeTeam}</strong>
+                </div>
+
+                <div className="sports-score">
+                  {primarySportsMatch.status === "scheduled" ? (
+                    <span>x</span>
+                  ) : (
+                    <>
+                      <strong>{primarySportsMatch.homeScore ?? 0}</strong>
+                      <span>x</span>
+                      <strong>{primarySportsMatch.awayScore ?? 0}</strong>
+                    </>
+                  )}
+                </div>
+
+                <div className="sports-team">
+                  <div className="sports-team-logo">
+                    {primarySportsMatch.awayLogo
+                      ? <img src={primarySportsMatch.awayLogo} alt={primarySportsMatch.awayTeam} />
+                      : getTeamInitials(primarySportsMatch.awayTeam)}
+                  </div>
+                  <strong>{primarySportsMatch.awayTeam}</strong>
+                </div>
+              </div>
+
+              <div className="sports-match-footer">
+                <span>{primarySportsMatch.period || "Tempo nao informado"}</span>
+                <strong>{primarySportsMatch.lastEvent || "Acompanhe os resultados aqui"}</strong>
+              </div>
+
+              {sportsData.liveFootball.length > 1 && (
+                <div className="sports-rotation-note">
+                  {sportsLiveIndex + 1} de {sportsData.liveFootball.length} ao vivo - alternancia automatica a cada {template.liveRotationInterval || 15}s
+                </div>
+              )}
+            </div>
+
+            <div className="sports-side-panel">
+              <div className="sports-panel-card">
+                <h4>
+                  {sportsData.liveFootball.length ? "Jogos ao vivo" : "Proximos jogos"}
+                </h4>
+                {(sportsData.liveFootball.length
+                  ? sportsData.liveFootball
+                  : sportsUsingRealData && sportsData.upcomingFootball.length
+                    ? sportsData.upcomingFootball
+                    : sportsData.finishedFootball).slice(0, compact ? 2 : 4).map((match) => (
+                  <div className="sports-mini-match" key={match.id}>
+                    <span>{match.competitionName}</span>
+                    <strong>{match.homeTeam} {match.status === "scheduled" ? "x" : `${match.homeScore ?? 0} x ${match.awayScore ?? 0}`} {match.awayTeam}</strong>
+                    <small>{match.dateEvent ? `${match.dateEvent} - ` : ""}{getMatchStatusLabel(match.status)}</small>
+                  </div>
+                ))}
+              </div>
+
+              {template.showUpcomingGames !== false && (
+                <div className="sports-panel-card">
+                  <h4>{sportsUsingRealData ? "Resultados recentes" : "Proximos jogos"}</h4>
+                  {(sportsUsingRealData && sportsData.finishedFootball.length
+                    ? sportsData.finishedFootball
+                    : sportsData.upcomingFootball).slice(0, compact ? 1 : 3).map((match) => (
+                    <div className="sports-mini-match" key={match.id}>
+                      <span>{match.dateEvent || match.startTime || "Horario a definir"} - {match.competitionName}</span>
+                      <strong>
+                        {match.homeTeam} {match.status === "scheduled" ? "x" : `${match.homeScore ?? 0} x ${match.awayScore ?? 0}`} {match.awayTeam}
+                      </strong>
+                      <small>{match.venue || "Local a definir"}</small>
+                    </div>
+                  ))}
+                </div>
+              )}
+
+              <div className="sports-panel-card sports-table-card">
+                <h4>Tabela</h4>
+                {sportsTableRows.slice(0, compact ? 4 : 8).map((row, index) => (
+                  <div className="sports-table-row" key={`${row.team}-${index}`}>
+                    <span>{row.position || index + 1}</span>
+                    <strong>{row.team}</strong>
+                    <b>{row.points ?? row.pts ?? "-"}</b>
+                  </div>
+                ))}
+              </div>
+            </div>
+          </div>
+
+          {template.showOtherSports !== false && (
+            <div className="sports-other-events">
+              {sportsData.otherSportsEvents.slice(0, compact ? 2 : 4).map((event) => (
+                <div className="sports-other-card" key={event.id}>
+                  <div className="sports-other-logos">
+                    <span className="sports-other-logo">
+                      {event.homeLogo ? <img src={event.homeLogo} alt={event.homeTeam || event.sport} /> : getTeamInitials(event.homeTeam || event.sport)}
+                    </span>
+                    <em>x</em>
+                    <span className="sports-other-logo">
+                      {event.awayLogo ? <img src={event.awayLogo} alt={event.awayTeam || event.sport} /> : getTeamInitials(event.awayTeam || event.title)}
+                    </span>
+                  </div>
+                  <span>{event.sport}{event.dateEvent ? ` • ${event.dateEvent}` : ""}</span>
+                  <strong className="sports-other-score">{event.score}</strong>
+                  <small className="sports-other-title">{event.title}</small>
+                  <small className="sports-other-detail">{event.detail}</small>
+                </div>
+              ))}
+            </div>
+          )}
+
+          {template.showSportsNews !== false && !compact && (
+            <div className="sports-demo-note">
+              Fonte: {sportsData.source === "TheSportsDB"
+                ? "TheSportsDB gratuita - resultados e agenda reais"
+                : "manual/demo - aguardando dados gratuitos disponiveis"}. Livescore minuto a minuto pode exigir fonte paga.
+            </div>
+          )}
+        </div>
+      )}
+
+      {["receitas_fitness_premium", "tendencia_beleza_premium", "fofocas_premium"].includes(realTemplateType) && (
+        <div className={`template-rss-magazine template-rss-${realTemplateType} news-focus`}>
+          {isTemplateVisible("showHeader") && <header className="template-rss-magazine-header">
+            <div className="template-rss-magazine-brand">
+              {isTemplateVisible("showLogo") && <span>{realTemplateType === "receitas_fitness_premium" ? "RF" : realTemplateType === "tendencia_beleza_premium" ? "TB" : "FB"}</span>}
+              <div>
+                {isTemplateVisible("showTitle") && <strong>{template.title || getTemplateTypeLabel(realTemplateType)}</strong>}
+                {isTemplateVisible("showSubtitle") && <small>{template.subtitle || getNewsItemSource(mainNews, "RSS atualizado")}</small>}
+              </div>
+            </div>
+            {isTemplateVisible("showBadge") && <em>{getTemplateBadge(realTemplateType)}</em>}
+          </header>}
+
+          <main className="template-rss-magazine-body">
+            <section className="template-rss-magazine-kicker">
+              <div className="template-breaking">
+                {realTemplateType === "receitas_fitness_premium" ? "Receita do dia" : realTemplateType === "tendencia_beleza_premium" ? "Destaque" : "Prioridade Brasil"}
+              </div>
+              <h2>
+                {realTemplateType === "receitas_fitness_premium"
+                  ? "Comida fitness para a rotina"
+                  : realTemplateType === "tendencia_beleza_premium"
+                    ? "Tendências reais de beleza e autocuidado"
+                    : "Celebridades, TV e bastidores nacionais"}
+              </h2>
+              {!compact && (
+                <p>
+                  {realTemplateType === "receitas_fitness_premium"
+                    ? "A matéria principal alterna receitas saudáveis com imagem, resumo e fonte."
+                    : realTemplateType === "tendencia_beleza_premium"
+                      ? "A notícia principal alterna com foto, título e resumo em visual editorial."
+                      : "As notícias alternam com prioridade em fontes brasileiras e conteúdo nacional."}
+                </p>
+              )}
+            </section>
+
+            <article className="template-rss-magazine-main">
+              <div className="template-rss-magazine-photo">
+                {getNewsItemImage(mainNews) ? (
+                  <img src={getNewsItemImage(mainNews)} alt={getNewsItemTitle(mainNews)} />
+                ) : (
+                  <div className="template-rss-magazine-placeholder">
+                    {realTemplateType === "receitas_fitness_premium" ? <Coffee size={compact ? 34 : 64} /> : realTemplateType === "tendencia_beleza_premium" ? <Sparkles size={compact ? 34 : 64} /> : <Megaphone size={compact ? 34 : 64} />}
+                  </div>
+                )}
+              </div>
+
+              <div className="template-rss-magazine-copy">
+                <div className="template-breaking">{getNewsItemSource(mainNews, template.newsSource || "RSS")}</div>
+                <h3>{mainNewsTitle}</h3>
+                {!compact && <p>{getNewsItemDescription(mainNews) || "Conteúdo em atualização automática."}</p>}
+              </div>
+            </article>
+          </main>
+
+          {!compact && (
+            <section className="template-rss-magazine-cards">
+              {rotatedNews.slice(1, 3).map((item, index) => (
+                <div className="template-rss-mini-card" key={`${getNewsItemTitle(item)}-${index}`}>
+                  <strong>{getNewsItemTitle(item)}</strong>
+                  <span>{getNewsItemSource(item, template.newsSource || "RSS")}</span>
+                </div>
+              ))}
+            </section>
           )}
         </div>
       )}
@@ -8180,21 +14219,21 @@ function TemplateVisualPreview({ template, compact = false, tv = false }) {
               <div className="template-journal-stat" style={{ borderRadius: 24, padding: compact ? 12 : 22, background: "rgba(255,255,255,0.08)", border: "1px solid rgba(255,255,255,0.14)" }}>
                 <small>Clima</small>
                 <h2 style={{ margin: "6px 0", fontSize: compact ? 22 : 42 }}>{weather?.temperature ?? "--"}°</h2>
-                <p style={{ margin: 0 }}>{weather?.city || template.city || "Sua cidade"}</p>
+                <p style={{ margin: 0 }}>{weather?.city || getTemplateWeatherCity(template) || "Sua cidade"}</p>
               </div>
 
               <div className="template-journal-stat" style={{ borderRadius: 24, padding: compact ? 12 : 22, background: "rgba(255,255,255,0.08)", border: "1px solid rgba(255,255,255,0.14)" }}>
                 <small>Agora</small>
                 <h2 style={{ margin: "6px 0", fontSize: compact ? 22 : 42 }}>
-                  {new Date().toLocaleTimeString("pt-BR", { hour: "2-digit", minute: "2-digit" })}
+                  {clockParts.time}
                 </h2>
-                <p style={{ margin: 0 }}>{new Date().toLocaleDateString("pt-BR")}</p>
+                <p style={{ margin: 0 }}>{weatherReferenceDate.toLocaleDateString("pt-BR")}</p>
               </div>
 
               {!compact && (
                 <div className="template-journal-headlines" style={{ borderRadius: 24, padding: 22, background: "rgba(255,255,255,0.08)", border: "1px solid rgba(255,255,255,0.14)", gridColumn: isPortrait ? "1 / -1" : "auto" }}>
                   <small>Manchetes</small>
-                  {news.slice(1, isPortrait ? 4 : 5).map((item, index) => (
+                  {rotatedNews.slice(1, isPortrait ? 4 : 5).map((item, index) => (
                     <p className="template-journal-headline" key={`${getNewsItemTitle(item)}-${index}`} style={{ margin: "10px 0 0", fontWeight: 800 }}>
                       {String(index + 1).padStart(2, "0")} • {getNewsItemTitle(item)}
                     </p>
@@ -8380,7 +14419,7 @@ function TemplateVisualPreview({ template, compact = false, tv = false }) {
               <div style={{ borderRadius: 22, padding: compact ? 12 : 20, background: "rgba(0,0,0,0.24)", border: "1px solid rgba(255,255,255,0.13)" }}>
                 <small>Agora</small>
                 <strong style={{ display: "block", marginTop: 8, fontSize: compact ? 20 : 34 }}>
-                  {new Date().toLocaleTimeString("pt-BR", { hour: "2-digit", minute: "2-digit" })}
+                  {clockParts.time}
                 </strong>
               </div>
             </div>
@@ -8390,9 +14429,9 @@ function TemplateVisualPreview({ template, compact = false, tv = false }) {
 
       {((template.templateType || template.type) === "comercial" || (template.templateType || template.type) === "aviso") && (
         <div className="template-generic-layout">
-          <div className="template-generic-badge">
+          {isTemplateVisible("showBadge") && <div className="template-generic-badge">
             {getTemplateBadge(realTemplateType)}
-          </div>
+          </div>}
 
           {isTemplateVisible("showTitle") && <h2>{template.title || template.name}</h2>}
           {isTemplateVisible("showSubtitle") && <p>{template.subtitle || "Mensagem personalizada para sua TV."}</p>}
@@ -8406,8 +14445,8 @@ function TemplateVisualPreview({ template, compact = false, tv = false }) {
 
       {isTemplateVisible("showFooter") && <div className="template-tv-ticker">
         <span>
-          {["noticias", "jornal_premium", "clima_premium_v2", "hora_certa_premium"].includes(realTemplateType)
-            ? `${getNewsItemSource(news[0], template.newsSource || "Notícias")} • ${getNewsItemTitle(news[0])}`
+          {isRssTemplateType(realTemplateType)
+            ? buildSequentialNewsTicker(rotatedNews, template)
             : realTemplateType === "clima"
               ? `Clima em ${weather?.city || template.city || "sua cidade"} • Atualização automática`
               : realTemplateType === "cardapio_premium"
@@ -8416,7 +14455,9 @@ function TemplateVisualPreview({ template, compact = false, tv = false }) {
                   ? `${template.title || "Ofertas da Semana"} • Promoções em destaque`
                   : realTemplateType === "corporativo_premium"
                     ? `${template.title || "Comunicação Corporativa"} • Avisos, agenda e indicadores`
-                    : template.subtitle || "Template profissional para TV"}
+                    : realTemplateType === "resultados_esportivos_premium"
+                      ? sportsTickerText
+                      : template.subtitle || "Template profissional para TV"}
         </span>
       </div>}
     </div>
@@ -8476,18 +14517,15 @@ function ScreenInUseCard({ screen, loading, onBack, onTryAnother }) {
   );
 }
 
-function TVConnectPage() {
+function TVConnectPage({ playerOnly = false }) {
   const navigate = useNavigate();
 
   const [screenCode, setScreenCode] = useState("");
   const [loading, setLoading] = useState(false);
   const [screenInUse, setScreenInUse] = useState(null);
 
-  function finishConnection(clientId, code, deviceId) {
-    localStorage.setItem(
-      "totempark-tv-connection",
-      JSON.stringify({ clientId, code, deviceId })
-    );
+  function finishConnection(clientId, code, deviceId, screenId = "") {
+    persistTvConnection({ clientId, code, deviceId, screenId });
 
     navigate(`/player/${clientId}/${code}`);
   }
@@ -8502,6 +14540,19 @@ function TVConnectPage() {
 
     try {
       setLoading(true);
+
+      if (IS_PLAYER_TELEMETRY_BUILD) {
+        const deviceId = getTotemDeviceId();
+        const binding = await claimPlayerBinding({
+          app: firebaseApp,
+          auth,
+          code,
+          deviceId,
+          appVersion: import.meta.env.VITE_APP_VERSION || "2a2-c.1",
+        });
+        finishConnection(binding.clientId, code, deviceId, binding.screenId);
+        return;
+      }
 
       const codeRef = doc(db, "tv_codes", code);
       const codeSnap = await getDoc(codeRef);
@@ -8518,6 +14569,7 @@ function TVConnectPage() {
       const clientId = codeData.clientId;
       const screenId = codeData.screenId;
       const deviceId = getTotemDeviceId();
+      const deviceLocation = await resolveScreenLocationSnapshot();
 
       if (!clientId) {
         alert("Não foi possível identificar o cliente desta tela.");
@@ -8562,15 +14614,24 @@ function TVConnectPage() {
               };
             }
 
-            transaction.update(screenRef, {
+            const connectionPayload = {
               connectedDeviceId: deviceId,
               activeDeviceId: deleteField(),
+              status: "online",
               remoteCommand: null,
               lastCommandSent: "",
               commandStatus: "connected",
               lastConnection: new Date().toLocaleString("pt-BR"),
               lastSeenAt: serverTimestamp(),
-            });
+            };
+
+            if (deviceLocation) {
+              connectionPayload.deviceLocation = deviceLocation;
+              connectionPayload.deviceLocationCity = deviceLocation.cityLabel || deviceLocation.city || "";
+              connectionPayload.deviceLocationUpdatedAt = serverTimestamp();
+            }
+
+            transaction.update(screenRef, connectionPayload);
             return { inUse: false };
           });
 
@@ -8587,7 +14648,7 @@ function TVConnectPage() {
         }
       }
 
-      finishConnection(clientId, code, deviceId);
+      finishConnection(clientId, code, deviceId, screenId);
     } catch (error) {
       console.log(error);
       alert("Erro ao conectar a TV. Verifique as regras do Firestore para leitura da coleção tv_codes.");
@@ -8596,20 +14657,8 @@ function TVConnectPage() {
   }
 
   useEffect(() => {
-    const saved = localStorage.getItem("totempark-tv-connection");
-
-    if (!saved) return;
-
-    try {
-      const parsed = JSON.parse(saved);
-
-      if (parsed.clientId && parsed.code) {
-        navigate(`/player/${parsed.clientId}/${parsed.code}`);
-      }
-    } catch (error) {
-      console.log(error);
-      localStorage.removeItem("totempark-tv-connection");
-    }
+    const saved = readTvConnection();
+    if (saved) navigate(`/player/${saved.clientId}/${saved.code}`);
   }, [navigate]);
 
   if (screenInUse) {
@@ -8688,30 +14737,32 @@ function TVConnectPage() {
         <button
           className="tv-change-mode-button"
           onClick={() => {
-            localStorage.removeItem("totempark-tv-connection");
+            clearTvConnection({ explicit: true, reason: "choose-another-code" });
             setScreenCode("");
           }}
         >
           Digitar outro código
         </button>
 
-        <button
-          className="tv-change-mode-button secondary"
-          onClick={() => {
-            localStorage.removeItem("totempark-tv-connection");
-            localStorage.removeItem("totempark-app-mode");
-            window.location.href = "/";
-          }}
-        >
-          Voltar para o painel gestor
-        </button>
+        {!playerOnly && (
+          <button
+            className="tv-change-mode-button secondary"
+            onClick={() => {
+              clearTvConnection({ explicit: true, reason: "return-to-manager" });
+              localStorage.removeItem("totempark-app-mode");
+              window.location.href = "/";
+            }}
+          >
+            Voltar para o painel gestor
+          </button>
+        )}
 
-        {isNativeApp() && (
+        {!playerOnly && isNativeApp() && (
           <button
             className="tv-change-mode-button tertiary"
             onClick={() => {
               localStorage.removeItem("totempark-app-mode");
-              localStorage.removeItem("totempark-tv-connection");
+              clearTvConnection({ explicit: true, reason: "change-app-mode" });
               window.location.href = "/";
             }}
           >
@@ -8726,6 +14777,7 @@ function TVConnectPage() {
 
 function PlayerPage() {
   const { clientId, codigo } = useParams();
+  const navigate = useNavigate();
   const hasManualScreenRotation =
     isNativeApp() && Boolean(localStorage.getItem("totempark-screen-rotation"));
   const offlineStorageKey = `totempark-offline-assets-${clientId}-${codigo}`;
@@ -8736,18 +14788,29 @@ function PlayerPage() {
   const [clientLoading, setClientLoading] = useState(true);
   const [defaultPlaylist, setDefaultPlaylist] = useState(null);
   const [allPlaylists, setAllPlaylists] = useState([]);
+  const [clientTemplates, setClientTemplates] = useState([]);
   const [screenTemplates, setScreenTemplates] = useState([]);
   const [activePlaylist, setActivePlaylist] = useState(null);
   const [activeTemplate, setActiveTemplate] = useState(null);
   const [activeMode, setActiveMode] = useState("default");
   const [mediaIndex, setMediaIndex] = useState(0);
   const [previousMediaIndex, setPreviousMediaIndex] = useState(null);
+  const [decoderReleasePending, setDecoderReleasePending] = useState(false);
   const [readyMediaKey, setReadyMediaKey] = useState("");
   const [isAndroidTv, setIsAndroidTv] = useState(null);
   const [offlineAssetMap, setOfflineAssetMap] = useState(() =>
     isNativeApp() ? restoreOfflineAssetMap(offlineStorageKey) : {}
   );
+  const [mediaCacheMap, setMediaCacheMap] = useState({});
   const [offlineCacheStatus, setOfflineCacheStatus] = useState("");
+  const [playerCacheStatus, setPlayerCacheStatus] = useState({
+    cacheStatus: "",
+    cachedItems: 0,
+    totalCacheableItems: 0,
+    failedCacheItems: 0,
+    cacheSizeBytes: 0,
+    currentMediaSource: "remote",
+  });
   const [loading, setLoading] = useState(true);
   const [now, setNow] = useState(new Date());
   const [remoteOverlay, setRemoteOverlay] = useState(null);
@@ -8755,18 +14818,125 @@ function PlayerPage() {
   const [maintenanceMode, setMaintenanceMode] = useState(false);
   const [blackoutMode, setBlackoutMode] = useState(false);
   const [pauseMode, setPauseMode] = useState(false);
+  const [singleImageLoopCycle, setSingleImageLoopCycle] = useState(0);
+  const [linkValidationState, setLinkValidationState] = useState(LINK_STATES.VALIDATION_START);
   const [lastCommandId, setLastCommandId] = useState(null);
   const lastCommandIdRef = useRef(null);
   const transitionInProgressRef = useRef(false);
   const transitionCleanupRef = useRef(null);
   const offlineStatusTimerRef = useRef(null);
   const cacheQueueRef = useRef(Promise.resolve());
+  const mediaCacheRunRef = useRef(0);
+  const mediaCacheProgressReportAtRef = useRef(0);
+  const mediaCacheObjectUrlsRef = useRef(new Set());
+  const lastCacheStatusPayloadRef = useRef("");
   const playbackTimerRef = useRef(null);
   const playbackTimingKeyRef = useRef("");
   const playbackRemainingRef = useRef(0);
   const playbackStartedAtRef = useRef(0);
+  const jumpVideoRefs = useRef(new Map());
+  const releasingVideoNodesRef = useRef(new WeakSet());
+  const jumpLastReactKeyRef = useRef("");
+  const jumpLastSourceByElement = useRef(new WeakMap());
   const advancingRef = useRef(false);
+  const lastPlaybackItemIdentityRef = useRef("");
+  const returnToTvTimerRef = useRef(null);
+  const exitingTvRef = useRef(false);
+  const playerSessionStartedAtRef = useRef(Date.now());
+  const telemetryRef = useRef(null);
+  const telemetryTransitionRef = useRef("");
+  const lastTelemetryHistorySyncRef = useRef(0);
+  const playerBindingRef = useRef(null);
+  const playerIdentityStateRef = useRef(PLAYER_IDENTITY_STATES.UNAVAILABLE);
+  if (!telemetryRef.current) {
+    telemetryRef.current = createPlayerTelemetry({
+      identity: {
+        clientId,
+        deviceId: getTotemDeviceId(),
+        appVersion: import.meta.env.VITE_APP_VERSION || import.meta.env.VITE_APP_MODE || "unknown",
+        platform: isNativeApp() ? "ANDROID" : "WEB",
+      },
+    });
+  }
   const isAndroidSmartTv = isNativeApp() && isAndroidTv === true;
+
+  useEffect(() => {
+    if (!IS_PLAYER_TELEMETRY_BUILD || !clientId || !codigo) return undefined;
+    let cancelled = false;
+    const establishIdentity = async () => {
+      try {
+        const binding = await claimPlayerBinding({
+          app: firebaseApp,
+          auth,
+          code: codigo,
+          deviceId: getTotemDeviceId(),
+          appVersion: import.meta.env.VITE_APP_VERSION || "2a2-c.1",
+        });
+        if (cancelled) return;
+        playerBindingRef.current = binding;
+        playerIdentityStateRef.current = PLAYER_IDENTITY_STATES.BOUND;
+      } catch (error) {
+        if (cancelled) return;
+        playerBindingRef.current = null;
+        playerIdentityStateRef.current = classifyPlayerIdentityFailure(error);
+        console.log("Identidade do Player ainda não validada:", error);
+      }
+    };
+    establishIdentity();
+    window.addEventListener("online", establishIdentity);
+    return () => {
+      cancelled = true;
+      window.removeEventListener("online", establishIdentity);
+    };
+  }, [clientId, codigo]);
+
+  useEffect(() => {
+    if (!screen?.id || !clientId) return undefined;
+    const telemetry = telemetryRef.current;
+    telemetry.updateIdentity({ clientId, screenId: screen.id, deviceId: getTotemDeviceId() });
+    const unsubscribe = onSnapshot(
+      doc(db, "settings", "telemetry2a2c"),
+      (snapshot) => telemetry.configure(snapshot.exists() ? snapshot.data() : TELEMETRY_DEFAULT_CONFIG),
+      () => telemetry.configure(TELEMETRY_DEFAULT_CONFIG)
+    );
+    const online = () => telemetry.setConnection("ONLINE");
+    const offline = () => telemetry.setConnection("OFFLINE");
+    window.addEventListener("online", online);
+    window.addEventListener("offline", offline);
+    return () => {
+      unsubscribe();
+      window.removeEventListener("online", online);
+      window.removeEventListener("offline", offline);
+    };
+  }, [screen?.id, clientId]);
+
+  useEffect(() => {
+    const telemetry = telemetryRef.current;
+    const onOperationalEvent = ({ detail = {} }) => {
+      const mapping = {
+        CACHE_HIT: ["cacheHits", 1], CACHE_MISS: ["cacheMisses", 1],
+        DOWNLOAD_START: ["downloadStarts", 1], DOWNLOAD_COMPLETE: ["downloadCompleted", 1],
+        DOWNLOAD_FAILED: ["downloadFailed", 1], DOWNLOAD_TIMEOUT: ["downloadTimeouts", 1],
+        FILETRANSFER_RETRY: ["downloadRetries", 1], FILETRANSFER_STALLED: ["downloadStalls", 1],
+      };
+      const metric = mapping[detail.type];
+      if (metric) telemetry.increment(metric[0], metric[1]);
+      if (detail.type === "DOWNLOAD_COMPLETE") telemetry.increment("bytesDownloaded", Number(detail.finalFileSizeBytes || 0));
+      if (detail.partialFileSize) telemetry.increment("partialBytesObserved", Number(detail.partialFileSize || 0));
+    };
+    window.addEventListener("totempark-operational-event", onOperationalEvent);
+    return () => window.removeEventListener("totempark-operational-event", onOperationalEvent);
+  }, []);
+
+  function isFreshExitCommand(remoteCommand, commandStatus) {
+    if (remoteCommand?.type !== "exitTv" || commandStatus !== "sent") return false;
+
+    const sentAtMs = getTimestampMs(remoteCommand.sentAt);
+
+    if (!sentAtMs) return true;
+
+    return sentAtMs >= playerSessionStartedAtRef.current - 5000;
+  }
 
   useEffect(() => {
     if (!isNativeApp()) return;
@@ -8783,7 +14953,12 @@ function PlayerPage() {
     return () => {
       clearTimeout(transitionCleanupRef.current);
       clearTimeout(offlineStatusTimerRef.current);
+      clearTimeout(returnToTvTimerRef.current);
       clearTimeout(playbackTimerRef.current);
+      mediaCacheObjectUrlsRef.current.forEach((url) => {
+        if (String(url).startsWith("blob:")) URL.revokeObjectURL(url);
+      });
+      mediaCacheObjectUrlsRef.current.clear();
     };
   }, []);
 
@@ -8887,39 +15062,217 @@ function PlayerPage() {
     };
   }
 
+  function updateLocalMediaCacheMap(results = {}) {
+    setMediaCacheMap((previous) => {
+      Object.values(previous).forEach((entry) => {
+        if (entry?.url && String(entry.url).startsWith("blob:")) {
+          URL.revokeObjectURL(entry.url);
+          mediaCacheObjectUrlsRef.current.delete(entry.url);
+        }
+      });
+
+      const next = {};
+
+      Object.entries(results).forEach(([key, value]) => {
+        if (!value?.url) return;
+        next[key] = value;
+        if (String(value.url).startsWith("blob:")) {
+          mediaCacheObjectUrlsRef.current.add(value.url);
+        }
+      });
+
+      return next;
+    });
+  }
+
+  function applyPlayerMediaCache(item) {
+    if (!item || !isCacheableMediaItem(item)) return item;
+
+    const remotePreview = item.remotePreview || item.preview;
+    const mediaCacheKey = getMediaCacheKey(clientId, item);
+    const cached = mediaCacheMap[mediaCacheKey];
+
+    if (isNativeApp() && isAndroidLocalMediaSource(item.preview)) {
+      return {
+        ...item,
+        remotePreview,
+        mediaCacheKey,
+        currentMediaSource: "local",
+      };
+    }
+
+    if (cached?.url) {
+      return {
+        ...item,
+        remotePreview,
+        preview: cached.url,
+        mediaCacheKey,
+        currentMediaSource: "cache",
+      };
+    }
+
+    return {
+      ...item,
+      remotePreview,
+      mediaCacheKey,
+      currentMediaSource: "remote",
+    };
+  }
+
+  function fallbackToRemoteMedia(item) {
+    if (
+      (IS_PLAYER_LAB_BUILD || IS_PLAYER_CANARY_BUILD || IS_PLAYER_RC_BUILD) &&
+      item?.currentMediaSource === "local" &&
+      item.remotePreview
+    ) {
+      setOfflineAssetMap((previous) => {
+        const next = { ...previous };
+        delete next[item.remotePreview];
+        return next;
+      });
+      setPlayerCacheStatus((previous) => ({
+        ...previous,
+        currentMediaSource: "remote",
+      }));
+      return true;
+    }
+
+    if (item?.currentMediaSource !== "cache" || !item.mediaCacheKey || !item.remotePreview) {
+      return false;
+    }
+
+    setMediaCacheMap((previous) => {
+      const cached = previous[item.mediaCacheKey];
+
+      if (cached?.url && String(cached.url).startsWith("blob:")) {
+        URL.revokeObjectURL(cached.url);
+        mediaCacheObjectUrlsRef.current.delete(cached.url);
+      }
+
+      const next = { ...previous };
+      delete next[item.mediaCacheKey];
+      return next;
+    });
+
+    setPlayerCacheStatus((previous) => ({
+      ...previous,
+      currentMediaSource: "remote",
+    }));
+
+    return true;
+  }
+
+  function hydrateTemplatePlaylistItem(item = {}) {
+    const isTemplateItem = item?.playerItemType === "template" || Boolean(item?.templateType);
+    if (!isTemplateItem) return item;
+
+    const identifiers = [
+      item.templateId,
+      item.sourceTemplateId,
+      item.id,
+      item.sourceMarketingId,
+    ]
+      .map((value) => String(value || "").trim())
+      .filter(Boolean);
+    const latestTemplate = clientTemplates.find((template) =>
+      identifiers.includes(String(template.id || "").trim())
+    );
+
+    if (!latestTemplate) return item;
+
+    return {
+      ...item,
+      ...latestTemplate,
+      id: latestTemplate.id,
+      templateId: item.templateId || latestTemplate.id,
+      sourceTemplateId: item.sourceTemplateId || latestTemplate.id,
+      title: latestTemplate.title || latestTemplate.name || item.title || item.name,
+      name: latestTemplate.name || latestTemplate.title || item.name || item.title,
+      templateType: latestTemplate.templateType || latestTemplate.type || item.templateType || item.type,
+      type: latestTemplate.templateType || latestTemplate.type || item.templateType || item.type,
+      duration: Number(latestTemplate.duration || item.duration || 15),
+      playerItemType: "template",
+    };
+  }
+
+  async function reportCacheStatus(payload) {
+    if (!screen?.id || !clientId) return;
+
+    const normalized = {
+      cacheStatus: payload.cacheStatus || "",
+      cachedItems: Number(payload.cachedItems || 0),
+      totalCacheableItems: Number(payload.totalCacheableItems || 0),
+      failedCacheItems: Number(payload.failedCacheItems || 0),
+      cacheSizeBytes: Number(payload.cacheSizeBytes || 0),
+      currentMediaSource: payload.currentMediaSource || playerCacheStatus.currentMediaSource || "remote",
+      activePlaylistWeightBytes: Number(payload.activePlaylistWeightBytes || 0),
+      estimatedMonthlyTrafficBytes: Number(payload.estimatedMonthlyTrafficBytes || 0),
+      cacheManifestKey: payload.cacheManifestKey || "",
+      cacheManifestItems: Number(payload.cacheManifestItems || 0),
+      cacheManifestSizeBytes: Number(payload.cacheManifestSizeBytes || 0),
+      cacheDownloadedItems: Number(payload.cacheDownloadedItems || 0),
+      cacheRemovedItems: Number(payload.cacheRemovedItems || 0),
+    };
+    const signature = JSON.stringify(normalized);
+
+    if (lastCacheStatusPayloadRef.current === signature) return;
+    lastCacheStatusPayloadRef.current = signature;
+
+    try {
+      const statusPayload = {
+        ...normalized,
+        cacheUpdatedAt: serverTimestamp(),
+      };
+
+      if (payload.lastMediaDownloadAt) {
+        statusPayload.lastMediaDownloadAt = payload.lastMediaDownloadAt;
+        statusPayload.lastMediaDownloadBytes = Number(payload.lastMediaDownloadBytes || 0);
+      }
+
+      await updateDoc(doc(db, "clients", clientId, "screens", screen.id), statusPayload);
+    } catch (error) {
+      console.log("Erro ao atualizar status do cache:", error);
+    }
+  }
+
+  const activePlaylistItems = activePlaylist?.items || [];
+  const hasActivePlaylistItems = activePlaylistItems.length > 0;
   const playerItems = [
-    ...(activePlaylist?.items || []).map((item) => {
-      const localizedItem = applyOfflineAssetUrls(item, offlineAssetMap);
+    ...activePlaylistItems.map((item) => {
+      const latestItem = hydrateTemplatePlaylistItem(item);
+      const localizedItem = applyOfflineAssetUrls(latestItem, offlineAssetMap);
+      const cachedItem = applyPlayerMediaCache(localizedItem);
 
       if (item?.playerItemType === "template" || item?.templateType) {
         return {
-          ...localizedItem,
-          title: localizedItem.title || localizedItem.name,
-          templateType: localizedItem.templateType || localizedItem.type,
-          type: localizedItem.templateType || localizedItem.type,
-          duration: Number(localizedItem.duration || 15),
+          ...cachedItem,
+          title: cachedItem.title || cachedItem.name,
+          templateType: cachedItem.templateType || cachedItem.type,
+          type: cachedItem.templateType || cachedItem.type,
+          duration: Number(cachedItem.duration || 15),
           playerItemType: "template",
         };
       }
 
       return {
-        ...localizedItem,
+        ...cachedItem,
         playerItemType: "media",
       };
     }),
-    ...screenTemplates.map((template) => {
+    ...(hasActivePlaylistItems ? [] : screenTemplates).map((template) => {
       const localizedTemplate = applyOfflineAssetUrls(template, offlineAssetMap);
+      const cachedTemplate = applyPlayerMediaCache(localizedTemplate);
 
       return {
-        ...localizedTemplate,
-        title: localizedTemplate.name,
-        templateType: localizedTemplate.type,
-        type: localizedTemplate.type,
-        duration: Number(localizedTemplate.duration || 15),
+        ...cachedTemplate,
+        title: cachedTemplate.name,
+        templateType: cachedTemplate.type,
+        type: cachedTemplate.type,
+        duration: Number(cachedTemplate.duration || 15),
         playerItemType: "template",
       };
     }),
-  ];
+  ].filter((item) => isOrientationCompatible(item, screen?.orientation || activePlaylist?.orientation || "Paisagem"));
 
   const activePlaylistRevision = [
     activePlaylist?.playlistRevision || "",
@@ -8929,8 +15282,49 @@ function PlayerPage() {
     activePlaylist?.updatedAt?.nanoseconds || "",
   ].join("-");
   const activeItemsKey = `${activePlaylistRevision}|${playerItems
-    .map((item) => `${item.playerItemType}-${item.id || item.preview || item.title}-${Number(item.duration || 0)}-${item.updatedAt?.seconds || ""}`)
+    .map((item) => [
+      item.playerItemType,
+      item.id || item.templateId || item.remotePreview || item.preview || item.title || "item",
+      item.templateRevision || "",
+      Number(item.duration || 0),
+      item.updatedAt?.seconds || "",
+      item.updatedAt?.nanoseconds || "",
+      item.sizeBytes || "",
+      Array.isArray(item.selectedNewsSources) ? item.selectedNewsSources.join(",") : "",
+      item.newsSource || "",
+      item.tickerSpeed || "",
+      item.showBadge === false ? "hideBadge" : "showBadge",
+    ].join("-"))
     .join("|")}`;
+  useEffect(() => {
+    if (!jumpDiagnosticEnabled()) return;
+    const item = playerItems[mediaIndex] || playerItems[0];
+    if (!item) return;
+    const newKey = `${activePlaylist?.id || "templates"}-${activePlaylistRevision}-${item?.id || item?.preview || item?.title || "item"}-${mediaIndex}-${activePlaylistRevision}`;
+    const oldKey = jumpLastReactKeyRef.current;
+    if (oldKey && oldKey !== newKey) recordJumpEvent("REACT_KEY_CHANGE", { oldKey, newKey, mediaId: item.mediaId || item.id || "", index: mediaIndex, reason: "item-or-playlist-revision" });
+    jumpLastReactKeyRef.current = newKey;
+  }, [activePlaylist?.id, activePlaylistRevision, activeItemsKey, mediaIndex]);
+  const mediaCacheReadyKey = Object.keys(mediaCacheMap).sort().join("|");
+  const mediaCacheManifest = buildMediaCacheManifest(clientId, playerItems);
+  const mediaCacheManifestKey = mediaCacheManifest.manifestKey;
+  const activePlaylistWeightBytes = getPlaylistWeightBytes({ items: playerItems });
+  const estimatedMonthlyTrafficBytes = activePlaylistWeightBytes * 30;
+
+  useEffect(() => {
+    if (!playerItems.length) return;
+
+    [0, 1, 2].forEach((offset) => {
+      const nextIndex = (mediaIndex + offset) % playerItems.length;
+      const item = playerItems[nextIndex];
+
+      if (item?.playerItemType === "template" || item?.templateType) {
+        primeTemplateLiveContent(item).catch((error) => {
+          console.log("Erro ao pre-carregar dados do template:", error);
+        });
+      }
+    });
+  }, [activeItemsKey, mediaIndex]);
 
   const playlistsForOffline = allPlaylists.filter((playlist) => {
     if (playlist.id === screen?.playlistId) return true;
@@ -8944,7 +15338,7 @@ function PlayerPage() {
   const offlineAssetUrls = collectOfflineAssetUrls([
     defaultPlaylist,
     activeTemplate,
-    screenTemplates,
+    hasActivePlaylistItems ? [] : screenTemplates,
     playlistsForOffline,
   ]);
   const offlineAssetsKey = offlineAssetUrls.join("|");
@@ -8956,17 +15350,80 @@ function PlayerPage() {
     clearTimeout(offlineStatusTimerRef.current);
     setOfflineCacheStatus("downloading");
 
+    const reportNativeOfflineProgress = (payload = {}) => {
+      const total = Number(payload.total || offlineAssetUrls.length || 0);
+      const failed = Number(payload.failed || 0);
+      const downloaded = Number(payload.downloaded || 0);
+      const statusPayload = {
+        cacheStatus: "preparando",
+        cachedItems: Math.max(0, Number(payload.completed || 0) - failed),
+        totalCacheableItems: total,
+        failedCacheItems: failed,
+        cacheDownloadedItems: downloaded,
+        cacheRemovedItems: Number(payload.removed || 0),
+        lastMediaDownloadBytes: Number(payload.downloadedBytes || 0),
+        cacheUpdatedAt: serverTimestamp(),
+        currentMediaSource: downloaded > 0 ? "mixed" : "internet",
+        activePlaylistWeightBytes,
+        estimatedMonthlyTrafficBytes,
+      };
+
+      setPlayerCacheStatus((previous) => ({
+        ...previous,
+        ...statusPayload,
+      }));
+
+      if (Date.now() - mediaCacheProgressReportAtRef.current > 3000 || payload.completed === total) {
+        mediaCacheProgressReportAtRef.current = Date.now();
+        reportCacheStatus(statusPayload);
+      }
+    };
+
+    reportNativeOfflineProgress({ completed: 0, total: offlineAssetUrls.length });
+
     cacheQueueRef.current = cacheQueueRef.current
       .catch(() => {})
       .then(() => cacheOfflineAssets(
         offlineAssetUrls,
         offlineScope,
-        offlineStorageKey
+        offlineStorageKey,
+        {
+          purgeUnused: true,
+          mediaByUrl: Object.fromEntries(playerItems.map((item) => {
+            const remoteUrl = item.remotePreview || item.preview || item.imageUrl || "";
+            return [remoteUrl, { mediaId: item.mediaId || item.id || "", mediaName: item.title || item.name || item.fileName || "", fileName: item.fileName || "", sizeBytes: Number(item.sizeBytes || 0), playlistId: activePlaylist?.id || "", screenId: screen?.id || "" }];
+          }).filter(([url]) => /^https?:\/\//i.test(url))),
+          onProgress: reportNativeOfflineProgress,
+        }
       ))
       .then((result) => {
         if (!active) return;
 
         setOfflineAssetMap(result.urlMap);
+
+        const finalStatus = {
+          cacheStatus: result.failed > 0 ? "parcial" : "pronto",
+          cachedItems: Math.max(0, Number(result.total || 0) - Number(result.failed || 0)),
+          totalCacheableItems: Number(result.total || 0),
+          failedCacheItems: Number(result.failed || 0),
+          cacheDownloadedItems: Number(result.downloaded || 0),
+          cacheRemovedItems: Number(result.removed || 0),
+          lastMediaDownloadBytes: Number(result.downloadedBytes || 0),
+          cacheUpdatedAt: serverTimestamp(),
+          currentMediaSource: result.downloaded > 0 ? "mixed" : "internet",
+          activePlaylistWeightBytes,
+          estimatedMonthlyTrafficBytes,
+        };
+
+        if (result.downloaded > 0) {
+          finalStatus.lastMediaDownloadAt = serverTimestamp();
+        }
+
+        setPlayerCacheStatus((previous) => ({
+          ...previous,
+          ...finalStatus,
+        }));
+        reportCacheStatus(finalStatus);
 
         if (result.failed > 0) {
           setOfflineCacheStatus("partial");
@@ -8992,6 +15449,24 @@ function PlayerPage() {
       .catch((error) => {
         console.log("Erro ao preparar playlist offline:", error);
         if (active) {
+          const errorStatus = {
+            cacheStatus: "parcial",
+            cachedItems: 0,
+            totalCacheableItems: offlineAssetUrls.length,
+            failedCacheItems: offlineAssetUrls.length,
+            cacheDownloadedItems: 0,
+            cacheRemovedItems: 0,
+            cacheUpdatedAt: serverTimestamp(),
+            currentMediaSource: "internet",
+            activePlaylistWeightBytes,
+            estimatedMonthlyTrafficBytes,
+          };
+
+          setPlayerCacheStatus((previous) => ({
+            ...previous,
+            ...errorStatus,
+          }));
+          reportCacheStatus(errorStatus);
           setOfflineCacheStatus("partial");
           offlineStatusTimerRef.current = setTimeout(() => {
             setOfflineCacheStatus("");
@@ -9002,29 +15477,225 @@ function PlayerPage() {
     return () => {
       active = false;
     };
-  }, [offlineAssetsKey, offlineReadyMessageKey, offlineScope, offlineStorageKey]);
+  }, [offlineAssetsKey, offlineReadyMessageKey, offlineScope, offlineStorageKey, activePlaylistWeightBytes, estimatedMonthlyTrafficBytes]);
+
+  useEffect(() => {
+    if (!screen?.id || !clientId || playerItems.length === 0) return;
+    if (isNativeApp()) return;
+
+    const cacheableItems = playerItems.filter(isCacheableMediaItem);
+    const totalCacheableItems = cacheableItems.length;
+    const runId = mediaCacheRunRef.current + 1;
+    mediaCacheRunRef.current = runId;
+
+    if (totalCacheableItems === 0) {
+      const stats = getMediaCacheStats(clientId);
+      const emptyStatus = {
+        cacheStatus: "pronto",
+        cachedItems: 0,
+        totalCacheableItems: 0,
+        failedCacheItems: 0,
+        cacheSizeBytes: stats.cacheSizeBytes,
+        currentMediaSource: "remote",
+        activePlaylistWeightBytes,
+        estimatedMonthlyTrafficBytes: 0,
+      cacheManifestKey: mediaCacheManifestKey,
+      cacheManifestItems: 0,
+      cacheManifestSizeBytes: 0,
+      cacheDownloadedItems: 0,
+      cacheRemovedItems: 0,
+    };
+      setPlayerCacheStatus(emptyStatus);
+      reportCacheStatus(emptyStatus);
+      return;
+    }
+
+    const currentItem = playerItems[mediaIndex] || playerItems[0];
+    const currentKey = currentItem ? getMediaCacheKey(clientId, currentItem) : "";
+    const initialStatus = {
+      cacheStatus: "preparando",
+      cachedItems: 0,
+      totalCacheableItems,
+      failedCacheItems: 0,
+      cacheSizeBytes: getMediaCacheStats(clientId).cacheSizeBytes,
+      currentMediaSource: currentItem?.currentMediaSource || "remote",
+      activePlaylistWeightBytes,
+      estimatedMonthlyTrafficBytes,
+      cacheManifestKey: mediaCacheManifestKey,
+      cacheManifestItems: mediaCacheManifest.totalItems,
+      cacheManifestSizeBytes: mediaCacheManifest.totalSizeBytes,
+      cacheDownloadedItems: 0,
+      cacheRemovedItems: 0,
+    };
+
+    setPlayerCacheStatus(initialStatus);
+    reportCacheStatus(initialStatus);
+
+    cachePlaylistMedia({
+      clientId,
+      items: playerItems,
+      currentIndex: mediaIndex,
+      concurrency: isAndroidSmartTv ? 1 : 2,
+      onProgress: ({ completed, total, failed, downloaded }) => {
+        if (mediaCacheRunRef.current !== runId) return;
+
+        const progressStatus = {
+          cacheStatus: "preparando",
+          cachedItems: Math.max(0, completed - failed),
+          totalCacheableItems: total,
+          failedCacheItems: failed,
+          cacheSizeBytes: getMediaCacheStats(clientId).cacheSizeBytes,
+          cacheDownloadedItems: downloaded || 0,
+          cacheManifestKey: mediaCacheManifestKey,
+          cacheManifestItems: mediaCacheManifest.totalItems,
+          cacheManifestSizeBytes: mediaCacheManifest.totalSizeBytes,
+          cacheRemovedItems: 0,
+          currentMediaSource: currentItem?.currentMediaSource || "remote",
+          activePlaylistWeightBytes,
+          estimatedMonthlyTrafficBytes,
+        };
+
+        setPlayerCacheStatus((previous) => ({
+          ...previous,
+          ...progressStatus,
+        }));
+
+        const shouldReportProgress =
+          completed === total ||
+          Date.now() - mediaCacheProgressReportAtRef.current > 3000;
+
+        if (shouldReportProgress) {
+          mediaCacheProgressReportAtRef.current = Date.now();
+          reportCacheStatus(progressStatus);
+        }
+      },
+    })
+      .then(async (result) => {
+        if (mediaCacheRunRef.current !== runId) return;
+
+        updateLocalMediaCacheMap(result.results);
+
+        const keepKeys = cacheableItems.map((item) => getMediaCacheKey(clientId, item));
+        const cleanup = await removeUnusedCachedMedia(keepKeys, [currentKey]).catch(() => ({ removed: 0 }));
+
+        const stats = getMediaCacheStats(clientId);
+        const finalStatus = {
+          cacheStatus: result.failed > 0 ? "parcial" : "pronto",
+          cachedItems: result.cached,
+          totalCacheableItems: result.total,
+          failedCacheItems: result.failed,
+          cacheSizeBytes: stats.cacheSizeBytes,
+          currentMediaSource: result.cached > 0 && result.cached < result.total
+            ? "mixed"
+            : currentKey && result.results[currentKey]
+              ? "cache"
+              : currentItem?.currentMediaSource || "remote",
+          activePlaylistWeightBytes,
+          estimatedMonthlyTrafficBytes: result.failed > 0 ? estimatedMonthlyTrafficBytes : 0,
+          cacheManifestKey: result.manifest?.manifestKey || mediaCacheManifestKey,
+          cacheManifestItems: result.manifest?.totalItems ?? mediaCacheManifest.totalItems,
+          cacheManifestSizeBytes: result.manifest?.totalSizeBytes ?? mediaCacheManifest.totalSizeBytes,
+          cacheDownloadedItems: result.downloaded || 0,
+          cacheRemovedItems: cleanup.removed || 0,
+        };
+
+        if (result.downloaded > 0) {
+          finalStatus.lastMediaDownloadAt = serverTimestamp();
+          finalStatus.lastMediaDownloadBytes = result.downloadedBytes || 0;
+        }
+
+        setPlayerCacheStatus(finalStatus);
+        reportCacheStatus(finalStatus);
+      })
+      .catch((error) => {
+        if (mediaCacheRunRef.current !== runId) return;
+
+        console.log("Erro ao preparar cache inteligente:", error);
+        const stats = getMediaCacheStats(clientId);
+        const errorStatus = {
+          cacheStatus: "erro",
+          cachedItems: 0,
+          totalCacheableItems,
+          failedCacheItems: totalCacheableItems,
+          cacheSizeBytes: stats.cacheSizeBytes,
+          currentMediaSource: currentItem?.currentMediaSource || "remote",
+          activePlaylistWeightBytes,
+          estimatedMonthlyTrafficBytes,
+          cacheManifestKey: mediaCacheManifestKey,
+          cacheManifestItems: mediaCacheManifest.totalItems,
+          cacheManifestSizeBytes: mediaCacheManifest.totalSizeBytes,
+        };
+
+        setPlayerCacheStatus(errorStatus);
+        reportCacheStatus(errorStatus);
+      });
+  }, [screen?.id, clientId, mediaCacheManifestKey, isAndroidSmartTv, activePlaylistWeightBytes, estimatedMonthlyTrafficBytes]);
 
   function getPlayerItemKey(item, index) {
     return `${activePlaylist?.id || "templates"}-${activePlaylistRevision}-${item?.id || item?.preview || item?.title || "item"}-${index}`;
   }
 
-  function goToNextMedia() {
+  function getStablePlayerItemIdentity(item = {}) {
+    return [
+      item.playerItemType || "",
+      item.mediaId || item.sourceMediaId || item.templateId || item.id || "",
+      item.storagePath || "",
+      item.remotePreview || item.preview || item.imageUrl || "",
+      item.title || item.name || "",
+      item.templateType || item.type || "",
+    ].join("|");
+  }
+
+  function goToNextMedia(reason = "UNKNOWN") {
     if (advancingRef.current) return;
+
+    recordJumpEvent("PLAYER_ADVANCE_REQUEST", { reason, index: mediaIndex, mediaId: playerItems[mediaIndex]?.mediaId || playerItems[mediaIndex]?.id || "" });
 
     const items = playerItems;
 
-    if (items.length <= 1) return;
+    if (items.length === 1) {
+      if (isSingleImagePlaylist(items)) {
+        setSingleImageLoopCycle((cycle) => cycle + 1);
+      }
+      return;
+    }
+
+    const nextItemIndex = mediaIndex + 1 >= items.length ? 0 : mediaIndex + 1;
+    const singleDecoderTransition = IS_PLAYER_DECODER_EXPERIMENT_BUILD &&
+      isVideoToVideoTransition(items, mediaIndex);
 
     advancingRef.current = true;
     clearTimeout(playbackTimerRef.current);
     playbackTimerRef.current = null;
 
+    if (singleDecoderTransition) {
+      clearTimeout(transitionCleanupRef.current);
+      const oldVideo = document.querySelector(".player-transition-layer.is-current video.player-media");
+      recordJumpEvent("DECODER_RELEASE_START", {
+        reason,
+        fromIndex: mediaIndex,
+        toIndex: nextItemIndex,
+        ...mediaElementSnapshot(oldVideo, items[mediaIndex]?.mediaId || items[mediaIndex]?.id || "", mediaIndex),
+      });
+      if (oldVideo) releasingVideoNodesRef.current.add(oldVideo);
+      const release = releaseVideoElement(oldVideo);
+      recordJumpEvent("DECODER_SOURCE_CLEARED", { reason, ...release });
+      setDecoderReleasePending(true);
+      setPreviousMediaIndex(null);
+    }
+
     setMediaIndex((prev) => {
       const safePrev = prev >= items.length ? 0 : prev;
       const nextIndex = safePrev + 1 >= items.length ? 0 : safePrev + 1;
 
+      telemetryTransitionRef.current = telemetryRef.current.startTransition({
+        fromMediaId: items[safePrev]?.mediaId || items[safePrev]?.id || "",
+        toMediaId: items[nextIndex]?.mediaId || items[nextIndex]?.id || "",
+        reason,
+      });
+
       transitionInProgressRef.current = true;
-      setPreviousMediaIndex(safePrev);
+      if (!singleDecoderTransition) setPreviousMediaIndex(safePrev);
 
       if (items[nextIndex]?.playerItemType === "template") {
         setReadyMediaKey(getPlayerItemKey(items[nextIndex], nextIndex));
@@ -9041,12 +15712,21 @@ function PlayerPage() {
     });
   }
 
+  useLayoutEffect(() => {
+    if (!IS_PLAYER_DECODER_EXPERIMENT_BUILD || !decoderReleasePending) return;
+    const remainingVideoCount = document.querySelectorAll(".player-transition-layer video.player-media").length;
+    recordJumpEvent("DECODER_RELEASE_END", { remainingVideoCount, nextIndex: mediaIndex });
+    if (remainingVideoCount === 0) setDecoderReleasePending(false);
+  }, [decoderReleasePending, mediaIndex]);
+
   function markCurrentMediaReady(item, index) {
     const itemKey = getPlayerItemKey(item, index);
 
     if (itemKey !== getPlayerItemKey(playerItems[mediaIndex], mediaIndex)) return;
 
     setReadyMediaKey(itemKey);
+    telemetryRef.current.completeTransition(telemetryTransitionRef.current, "SUCCESS");
+    telemetryTransitionRef.current = "";
     clearTimeout(transitionCleanupRef.current);
     transitionCleanupRef.current = setTimeout(() => {
       setPreviousMediaIndex(null);
@@ -9057,7 +15737,7 @@ function PlayerPage() {
   function skipFailedMedia() {
     transitionInProgressRef.current = false;
     setReadyMediaKey("");
-    goToNextMedia();
+    goToNextMedia("ERROR");
   }
 
   function getPlayerOrientationClass() {
@@ -9084,6 +15764,180 @@ function PlayerPage() {
     return "speed-normal";
   }
 
+  function showTvCodeScreen() {
+    exitingTvRef.current = true;
+    clearTimeout(returnToTvTimerRef.current);
+    clearTimeout(playbackTimerRef.current);
+    localStorage.removeItem("totempark-app-mode");
+    window.location.replace("/tv");
+  }
+
+  function clearTvConnectionAndShowCode(reason) {
+    clearTvConnection({ explicit: true, reason });
+    showTvCodeScreen();
+  }
+
+  useEffect(() => {
+    if (!clientId || !codigo) return;
+
+    let cancelled = false;
+    let unsubscribeScreen = null;
+    const localDeviceId = getTotemDeviceId();
+    const savedTvConnection = readTvConnection();
+    const canRecoverSavedDeviceLink = (connectedDeviceId) =>
+      isNativeApp() &&
+      Boolean(connectedDeviceId) &&
+      savedTvConnection?.clientId === clientId &&
+      String(savedTvConnection?.code || "").toUpperCase() === codigo.toUpperCase() &&
+      savedTvConnection?.deviceId === connectedDeviceId;
+
+    function scheduleValidationTimeout(reason) {
+      clearTimeout(returnToTvTimerRef.current);
+      returnToTvTimerRef.current = setTimeout(() => {
+        const result = classifyLinkValidation({ timedOut: true });
+        setLinkValidationState(result.state);
+        logLinkEvent(result.state, { reason });
+        setLoading(false);
+      }, isNativeApp() ? 10000 : 0);
+    }
+
+    function handleScreenData(screenDoc) {
+      if (cancelled) return;
+      if (exitingTvRef.current) return;
+
+      if (!screenDoc.exists()) {
+        scheduleValidationTimeout("screen-document-not-confirmed");
+        return;
+      }
+
+      clearTimeout(returnToTvTimerRef.current);
+
+      const screenData = { id: screenDoc.id, ...screenDoc.data() };
+      const connectedDeviceId = screenData.connectedDeviceId || "";
+      const lastSeenMs = getTimestampMs(screenData.lastSeenAt);
+      const recentlyOnline = lastSeenMs > 0 && Date.now() - lastSeenMs <= 60000;
+
+      if (
+        connectedDeviceId &&
+        connectedDeviceId !== localDeviceId &&
+        recentlyOnline &&
+        !canRecoverSavedDeviceLink(connectedDeviceId)
+      ) {
+        const result = classifyLinkValidation({
+          connectedDeviceId,
+          localDeviceId,
+          recentlyOnline,
+        });
+        setLinkValidationState(result.state);
+        logLinkEvent(result.state, { connectedDeviceId, localDeviceId });
+        setLoading(false);
+        return;
+      }
+
+      persistTvConnection({
+        clientId,
+        code: codigo,
+        deviceId: localDeviceId,
+        screenId: screenDoc.id,
+      });
+      setLinkValidationState(LINK_STATES.VALIDATED);
+      logLinkEvent(LINK_STATES.VALIDATED, { screenId: screenDoc.id });
+      setScreen(screenData);
+      setLoading(false);
+    }
+
+    function subscribeToScreenRef(screenRef) {
+      unsubscribeScreen?.();
+      unsubscribeScreen = onSnapshot(screenRef, handleScreenData, (error) => {
+        console.log("Erro ao acompanhar tela do player:", error);
+        const result = classifyLinkValidation({ error });
+        setLinkValidationState(result.state);
+        logLinkEvent(result.state, { stage: "screen-listener", code: error?.code || "" });
+        setLoading(false);
+      });
+    }
+
+    async function subscribeToScreen() {
+      if (exitingTvRef.current) return;
+
+      try {
+        setLinkValidationState(LINK_STATES.VALIDATION_START);
+        logLinkEvent(LINK_STATES.VALIDATION_START, { hasScreenId: Boolean(savedTvConnection?.screenId) });
+
+        if (!navigator.onLine) {
+          const result = classifyLinkValidation({ online: false });
+          setLinkValidationState(result.state);
+          logLinkEvent(result.state);
+        }
+
+        if (savedTvConnection?.screenId) {
+          subscribeToScreenRef(doc(db, "clients", clientId, "screens", savedTvConnection.screenId));
+          return;
+        }
+
+        const codeRef = doc(db, "tv_codes", codigo.toUpperCase());
+        const codeSnap = await getDoc(codeRef);
+
+        if (cancelled) return;
+
+        if (codeSnap.exists() && codeSnap.data()?.screenId) {
+          const resolvedScreenId = codeSnap.data().screenId;
+          updateTvConnectionScreenId(resolvedScreenId);
+          subscribeToScreenRef(doc(db, "clients", clientId, "screens", resolvedScreenId));
+          return;
+        }
+
+        const screenQuery = query(
+          collection(db, "clients", clientId, "screens"),
+          where("code", "==", codigo.toUpperCase())
+        );
+
+        unsubscribeScreen = onSnapshot(screenQuery, (snapshot) => {
+          if (snapshot.empty) {
+            scheduleValidationTimeout("screen-query-empty");
+            return;
+          }
+
+          handleScreenData(snapshot.docs[0]);
+        }, (error) => {
+          console.log("Erro ao buscar tela pelo codigo:", error);
+          const result = classifyLinkValidation({ error });
+          setLinkValidationState(result.state);
+          logLinkEvent(result.state, { stage: "screen-query", code: error?.code || "" });
+          setLoading(false);
+        });
+      } catch (error) {
+        console.log("Erro ao resolver codigo da TV:", error);
+        const result = classifyLinkValidation({
+          online: navigator.onLine,
+          error,
+        });
+        setLinkValidationState(result.state);
+        logLinkEvent(result.state, { stage: "code-resolution", code: error?.code || "" });
+        setLoading(false);
+      }
+    }
+
+    subscribeToScreen();
+    const retryValidation = () => subscribeToScreen();
+    const markOffline = () => {
+      setLinkValidationState(LINK_STATES.OFFLINE);
+      logLinkEvent(LINK_STATES.OFFLINE);
+      setLoading(false);
+    };
+    window.addEventListener("online", retryValidation);
+    window.addEventListener("offline", markOffline);
+
+    return () => {
+      cancelled = true;
+      clearTimeout(returnToTvTimerRef.current);
+      unsubscribeScreen?.();
+      window.removeEventListener("online", retryValidation);
+      window.removeEventListener("offline", markOffline);
+    };
+  }, [clientId, codigo]);
+
+  /*
   useEffect(() => {
     if (!clientId || !codigo) return;
 
@@ -9118,6 +15972,7 @@ function PlayerPage() {
 
     return () => unsubscribe();
   }, [clientId, codigo]);
+  */
 
   useEffect(() => {
     if (!clientId) return undefined;
@@ -9147,31 +16002,64 @@ function PlayerPage() {
     );
 
     async function sendHeartbeat() {
+      if (exitingTvRef.current) return;
+
       try {
         const localDeviceId = getTotemDeviceId();
+        const currentScreen = await getDoc(screenDocRef);
 
-        await runTransaction(db, async (transaction) => {
-          const currentScreen = await transaction.get(screenDocRef);
+        if (!currentScreen.exists()) return;
 
-          if (!currentScreen.exists()) return;
+        const screenData = currentScreen.data();
 
-          const screenData = currentScreen.data();
-          const connectedDeviceId = screenData.connectedDeviceId;
-          const pendingExit =
-            screenData.remoteCommand?.type === "exitTv" &&
-            screenData.commandStatus === "sent";
+        if (isFreshExitCommand(screenData.remoteCommand, screenData.commandStatus)) {
+          return;
+        }
 
-          if (pendingExit) return;
-          if (connectedDeviceId && connectedDeviceId !== localDeviceId) return;
+        const telemetryHeartbeat = telemetryRef.current.heartbeat();
+        const telemetrySnapshot = telemetryHeartbeat?.snapshot;
+        const heartbeatPayload = {
+          connectedDeviceId: localDeviceId,
+          activeDeviceId: deleteField(),
+          status: "online",
+          lastConnection: new Date().toLocaleString("pt-BR"),
+          lastSeenAt: serverTimestamp(),
+        };
 
-          transaction.update(screenDocRef, {
-            connectedDeviceId: localDeviceId,
-            activeDeviceId: deleteField(),
-            status: "online",
-            lastConnection: new Date().toLocaleString("pt-BR"),
-            lastSeenAt: serverTimestamp(),
+        await updateDoc(screenDocRef, heartbeatPayload);
+
+        const binding = playerBindingRef.current;
+        const canSyncTelemetry = telemetrySnapshot
+          && telemetryHeartbeat?.due
+          && binding?.status === "ACTIVE"
+          && binding.clientId === clientId
+          && binding.screenId === screen.id
+          && binding.deviceId === localDeviceId;
+
+        if (canSyncTelemetry) {
+          await updateDoc(screenDocRef, {
+            telemetry: {
+            schemaVersion: telemetrySnapshot.schemaVersion,
+            session: telemetrySnapshot.session,
+            current: telemetrySnapshot.current,
+            counters: telemetrySnapshot.counters,
+            lastPlayerEvents: telemetrySnapshot.lastPlayerEvents.slice(-3),
+            transitions: telemetrySnapshot.transitions.slice(-2),
+            },
+            telemetryUpdatedAt: serverTimestamp(),
           });
-        });
+        }
+
+        if (canSyncTelemetry && telemetryHeartbeat.outbox.length > 0 && Date.now() - lastTelemetryHistorySyncRef.current >= 15 * 60 * 1000) {
+          const pending = telemetryHeartbeat.outbox.at(-1);
+          await setDoc(
+            doc(db, "clients", clientId, "screens", screen.id, "telemetrySessions", telemetrySnapshot.session.sessionId),
+            { ...pending.payload, sequence: pending.sequence, updatedAt: serverTimestamp() },
+            { merge: true }
+          );
+          telemetryRef.current.acknowledge(pending.sequence);
+          lastTelemetryHistorySyncRef.current = Date.now();
+        }
       } catch (error) {
         console.log(error);
       }
@@ -9183,13 +16071,55 @@ function PlayerPage() {
       sendHeartbeat();
     }, 15000);
 
-    return () => clearInterval(interval);
+    const onVisible = () => {
+      if (document.visibilityState === "visible") sendHeartbeat();
+    };
+    window.addEventListener("online", sendHeartbeat);
+    document.addEventListener("visibilitychange", onVisible);
+
+    return () => {
+      clearInterval(interval);
+      window.removeEventListener("online", sendHeartbeat);
+      document.removeEventListener("visibilitychange", onVisible);
+    };
   }, [screen?.id, clientId, maintenanceMode, blackoutMode, takeoverMessage]);
+
+  useEffect(() => {
+    if (!screen?.id || !clientId) return;
+    let cancelled = false;
+    async function updateLocation() {
+      try {
+        const deviceLocation = await resolveScreenLocationSnapshot();
+        if (!deviceLocation || cancelled || exitingTvRef.current) return;
+        await updateDoc(doc(db, "clients", clientId, "screens", screen.id), {
+          deviceLocation,
+          deviceLocationCity: deviceLocation.cityLabel || deviceLocation.city || "",
+          deviceLocationUpdatedAt: serverTimestamp(),
+        });
+      } catch (error) {
+        console.log("Erro ao atualizar localização da TV:", error);
+      }
+    }
+    updateLocation();
+    const interval = setInterval(updateLocation, SCREEN_LOCATION_CACHE_TTL_MS);
+    return () => {
+      cancelled = true;
+      clearInterval(interval);
+    };
+  }, [screen?.id, clientId]);
 
   async function releaseCurrentScreen() {
     if (!screen?.id || !clientId) return;
 
     try {
+      exitingTvRef.current = true;
+      clearTimeout(returnToTvTimerRef.current);
+      if (IS_PLAYER_TELEMETRY_BUILD && playerBindingRef.current?.status === "ACTIVE") {
+        await revokeOwnPlayerBinding({ app: firebaseApp, auth, reason: "PLAYER_RELEASE" });
+        playerBindingRef.current = null;
+        playerIdentityStateRef.current = PLAYER_IDENTITY_STATES.REVOKED;
+        return;
+      }
       const screenRef = doc(db, "clients", clientId, "screens", screen.id);
       const localDeviceId = getTotemDeviceId();
 
@@ -9238,8 +16168,7 @@ function PlayerPage() {
         return;
       }
 
-      const isPendingExit =
-        remoteCommand.type === "exitTv" && data.commandStatus === "sent";
+      const isPendingExit = isFreshExitCommand(remoteCommand, data.commandStatus);
 
       if (firstSnapshot && !isPendingExit) {
         lastCommandIdRef.current = remoteCommand.id;
@@ -9258,16 +16187,11 @@ function PlayerPage() {
       setLastCommandId(remoteCommand.id);
 
       if (remoteCommand.type === "exitTv") {
+        if (!isFreshExitCommand(remoteCommand, data.commandStatus)) return;
+
+        exitingTvRef.current = true;
         await releaseCurrentScreen();
-        localStorage.removeItem("totempark-tv-connection");
-        localStorage.removeItem("totempark-app-mode");
-
-        if (isNativeApp()) {
-          window.location.href = "/";
-        } else {
-          window.location.href = "/tv";
-        }
-
+        clearTvConnectionAndShowCode("remote-exit-command");
         return;
       }
 
@@ -9276,6 +16200,8 @@ function PlayerPage() {
           lastCommandExecuted: remoteCommand.type || "",
           lastCommandExecutedAt: serverTimestamp(),
           commandStatus: "executed",
+          lastSeenAt: serverTimestamp(),
+          status: "online",
         });
       } catch (error) {
         console.log(error);
@@ -9289,6 +16215,29 @@ function PlayerPage() {
       if (remoteCommand.type === "refresh") {
         setMediaIndex(0);
         setNow(new Date());
+        return;
+      }
+
+      if (remoteCommand.type === "clearCache") {
+        clearScreenMediaCache(clientId)
+          .then((result) => {
+            updateLocalMediaCacheMap({});
+            const stats = getMediaCacheStats(clientId);
+            const clearedStatus = {
+              cacheStatus: "preparando",
+              cachedItems: 0,
+              totalCacheableItems: 0,
+              failedCacheItems: 0,
+              cacheSizeBytes: stats.cacheSizeBytes,
+              currentMediaSource: "remote",
+            };
+            setPlayerCacheStatus(clearedStatus);
+            reportCacheStatus(clearedStatus);
+            console.log(`Cache da tela limpo: ${result.removed} arquivo(s).`);
+          })
+          .catch((error) => {
+            console.log("Erro ao limpar cache da tela:", error);
+          });
         return;
       }
 
@@ -9400,6 +16349,7 @@ function PlayerPage() {
           nowPlayingTemplateType: currentItem.templateType || "",
           nowPlayingItemType: currentItem.playerItemType || "",
           nowPlayingSound: currentItem.sound || false,
+          currentMediaSource: currentItem.currentMediaSource || "remote",
           nowPlayingIndex: safeIndex + 1,
           nowPlayingTotal: items.length,
           currentPlaylistId: activePlaylist.id || "",
@@ -9413,7 +16363,7 @@ function PlayerPage() {
     }
 
     updateNowPlaying();
-  }, [screen?.id, clientId, activePlaylist?.id, activeMode, mediaIndex, activeItemsKey]);
+  }, [screen?.id, clientId, activePlaylist?.id, activeMode, mediaIndex, activeItemsKey, mediaCacheReadyKey]);
 
   useEffect(() => {
     if (!clientId) return;
@@ -9439,11 +16389,11 @@ function PlayerPage() {
     const unsubscribe = onSnapshot(
       collection(db, "clients", clientId, "templates"),
       (snapshot) => {
-        const list = snapshot.docs
-          .map((templateDoc) => ({
+        const list = snapshot.docs.map((templateDoc) => ({
             id: templateDoc.id,
             ...templateDoc.data(),
-          }))
+          }));
+        const screenScopedTemplates = list
           .filter((template) => {
             if (!template.enabled) return false;
 
@@ -9458,7 +16408,8 @@ function PlayerPage() {
             return true;
           });
 
-        setScreenTemplates(list);
+        setClientTemplates(list);
+        setScreenTemplates(screenScopedTemplates);
       }
     );
 
@@ -9528,10 +16479,26 @@ function PlayerPage() {
     if (items.length === 0) return;
 
     setMediaIndex((prev) => {
+      const previousIdentity = lastPlaybackItemIdentityRef.current;
+
+      if (previousIdentity) {
+        const preservedIndex = items.findIndex(
+          (item) => getStablePlayerItemIdentity(item) === previousIdentity
+        );
+
+        if (preservedIndex >= 0) return preservedIndex;
+      }
+
       if (prev >= items.length) return 0;
       return prev;
     });
-  }, [activePlaylist?.id, activePlaylist?.items?.length]);
+  }, [activePlaylist?.id, activeItemsKey]);
+
+  useEffect(() => {
+    const currentItem = playerItems[mediaIndex] || playerItems[0];
+    if (!currentItem) return;
+    lastPlaybackItemIdentityRef.current = getStablePlayerItemIdentity(currentItem);
+  }, [activeItemsKey, mediaIndex]);
 
   useEffect(() => {
     const items = playerItems;
@@ -9546,7 +16513,9 @@ function PlayerPage() {
       Number.isFinite(durationInSeconds) && durationInSeconds > 0
         ? durationInSeconds * 1000
         : fallbackDuration * 1000;
-    const timingKey = `${currentKey}-${durationInMs}`;
+    const timingKey = `${currentKey}-${durationInMs}-${
+      isSingleImagePlaylist(items) ? singleImageLoopCycle : ""
+    }`;
     const isPlaybackBlocked =
       pauseMode || takeoverMessage || blackoutMode || maintenanceMode;
     const isWaitingForAndroidTvVideo =
@@ -9555,6 +16524,7 @@ function PlayerPage() {
       readyMediaKey !== currentKey;
 
     if (playbackTimingKeyRef.current !== timingKey) {
+      if (playbackTimerRef.current) recordJumpEvent("TIMER_CANCELLED", { reason: "timing-key-change", index: safeIndex, mediaId: currentItem?.mediaId || currentItem?.id || "", timingKey: playbackTimingKeyRef.current });
       clearTimeout(playbackTimerRef.current);
       playbackTimerRef.current = null;
       playbackTimingKeyRef.current = timingKey;
@@ -9567,16 +16537,21 @@ function PlayerPage() {
 
     playbackStartedAtRef.current = Date.now();
     const remaining = Math.max(0, playbackRemainingRef.current);
+    const expectedFireAt = Date.now() + remaining;
+    recordJumpEvent("TIMER_CREATED", { expectedFireAt, remainingMs: remaining, durationMs: durationInMs, index: safeIndex, mediaId: currentItem?.mediaId || currentItem?.id || "", timingKey });
 
     playbackTimerRef.current = setTimeout(() => {
+      const video = document.querySelector(".player-transition-layer.is-current video");
+      recordJumpEvent("TIMER_FIRED", { expectedFireAt, actualFireAt: Date.now(), remainingMs: remaining, durationMs: durationInMs, ...mediaElementSnapshot(video, currentItem?.mediaId || currentItem?.id || "", safeIndex) });
       playbackTimerRef.current = null;
       playbackRemainingRef.current = 0;
-      goToNextMedia();
+      goToNextMedia(currentItem?.playerItemType === "template" ? "TEMPLATE_TIMER" : currentItem?.type === "Imagem" ? "IMAGE_TIMER" : "VIDEO_TIMER");
     }, remaining);
 
     return () => {
       if (!playbackTimerRef.current) return;
 
+      recordJumpEvent("TIMER_CANCELLED", { reason: "effect-cleanup", expectedFireAt, index: safeIndex, mediaId: currentItem?.mediaId || currentItem?.id || "", currentTime: document.querySelector(".player-transition-layer.is-current video")?.currentTime ?? null });
       clearTimeout(playbackTimerRef.current);
       playbackTimerRef.current = null;
       playbackRemainingRef.current = Math.max(
@@ -9584,7 +16559,7 @@ function PlayerPage() {
         playbackRemainingRef.current - (Date.now() - playbackStartedAtRef.current)
       );
     };
-  }, [activePlaylist?.id, activeItemsKey, mediaIndex, readyMediaKey, pauseMode, takeoverMessage, blackoutMode, maintenanceMode, isAndroidSmartTv]);
+  }, [activePlaylist?.id, activeItemsKey, mediaIndex, readyMediaKey, pauseMode, takeoverMessage, blackoutMode, maintenanceMode, isAndroidSmartTv, singleImageLoopCycle]);
 
   useEffect(() => {
     const mediaElement = document.querySelector(
@@ -9606,6 +16581,36 @@ function PlayerPage() {
   }, [pauseMode, mediaIndex, activePlaylist?.id]);
 
   const playerPlanAccess = getClientPlanAccess(playerClient);
+  const showDemoWatermark = Boolean(
+    playerClient &&
+    getPlanConfig(playerClient.plan).watermarkEnabled &&
+    playerClient.demoWatermarkEnabled !== false
+  );
+  const demoTickerText = String(playerClient?.demoTickerText || DEFAULT_DEMO_TICKER_TEXT).trim();
+  const showDemoTicker = Boolean(
+    showDemoWatermark &&
+    playerClient?.demoTickerEnabled !== false &&
+    demoTickerText
+  );
+  const demoPlayerOverlay = showDemoWatermark ? (
+    <>
+      <div className="demo-player-watermark">
+        <img src={logo} alt="" />
+        <span>Demonstração</span>
+      </div>
+
+      {showDemoTicker && (
+        <div className="demo-player-bottom-bar">
+          <span>{demoTickerText}</span>
+        </div>
+      )}
+    </>
+  ) : null;
+  const playerCacheSyncLabel = getCacheSyncLabel(playerCacheStatus);
+  const shouldShowPlayerCacheSyncLabel = Boolean(
+    playerCacheSyncLabel &&
+    playerCacheStatus.cacheStatus === "preparando"
+  );
 
   if (loading || clientLoading) {
     return <div className="player-screen">Carregando player...</div>;
@@ -9665,7 +16670,13 @@ function PlayerPage() {
   }
 
   if (!screen) {
-    return <div className="player-screen">Tela não encontrada.</div>;
+    const validationMessage = {
+      [LINK_STATES.OFFLINE]: "Offline. Vínculo preservado; aguardando reconexão.",
+      [LINK_STATES.VALIDATION_ERROR]: "Não foi possível validar agora. Vínculo preservado.",
+      [LINK_STATES.VALIDATION_TIMEOUT]: "Validação pendente. Vínculo preservado.",
+      [LINK_STATES.DEVICE_CONFLICT]: "Conflito de dispositivo pendente. Vínculo preservado.",
+    }[linkValidationState] || "Validando vínculo da tela...";
+    return <div className="player-screen">{validationMessage}</div>;
   }
 
   if (activeTemplate) {
@@ -9686,12 +16697,19 @@ function PlayerPage() {
           </div>
         )}
 
+        {demoPlayerOverlay}
+
+        {shouldShowPlayerCacheSyncLabel && !offlineCacheStatus && (
+          <div className="offline-cache-status smart-cache-status">
+            {playerCacheSyncLabel}
+          </div>
+        )}
+
         <button
           className="tv-player-exit-button"
           onClick={() => {
             releaseCurrentScreen().finally(() => {
-              localStorage.removeItem("totempark-tv-connection");
-              window.location.href = "/tv";
+              clearTvConnectionAndShowCode("operator-exit-button");
             });
           }}
         >
@@ -9736,6 +16754,7 @@ function PlayerPage() {
   const visibleLayers = [];
 
   if (
+    !decoderReleasePending &&
     previousMediaIndex !== null &&
     previousMediaIndex !== safeMediaIndex &&
     playerItems[previousMediaIndex]
@@ -9747,13 +16766,15 @@ function PlayerPage() {
     });
   }
 
-  visibleLayers.push({
-    item: currentMedia,
-    index: safeMediaIndex,
-    state: currentMediaReady
-      ? `is-current is-ready ${currentTransitionReady ? "transition-active" : ""}`
-      : "is-current is-pending",
-  });
+  if (!decoderReleasePending) {
+    visibleLayers.push({
+      item: currentMedia,
+      index: safeMediaIndex,
+      state: currentMediaReady
+        ? `is-current is-ready ${currentTransitionReady ? "transition-active" : ""}`
+        : "is-current is-pending",
+    });
+  }
 
   function renderPlayerItem(item, index, isCurrent) {
     if (item.playerItemType === "template") {
@@ -9761,9 +16782,33 @@ function PlayerPage() {
     }
 
     if (item.type === "Vídeo") {
+      const resolvedSource = resolveAndroidMediaSource(item);
+      const source = resolvedSource.kind === "LOCAL" ? "LOCAL" : "REMOTE";
+      const diagnosticMedia = { mediaId: item.mediaId || item.id || "", mediaName: item.title || item.name || item.fileName || "", remoteUrl: resolvedSource.remoteUrl, localPath: source === "LOCAL" ? resolvedSource.src : "", fileName: item.fileName || "", sizeBytes: Number(item.sizeBytes || 0), playlistId: activePlaylist?.id || "", screenId: screen?.id || "", src: resolvedSource.src };
+      const telemetryMedia = { ...diagnosticMedia, mediaType: "VIDEO", mediaSource: source === "LOCAL" ? "CACHE_LOCAL" : "INTERNET_FALLBACK" };
+      const reactKey = `${getPlayerItemKey(item, index)}-${activePlaylistRevision}`;
+      const jumpContext = { mediaId: diagnosticMedia.mediaId, index, reactKey, expectedTransition: !isCurrent || transitionInProgressRef.current };
+      let videoRef = jumpVideoRefs.current.get(reactKey);
+      if (!videoRef && jumpDiagnosticEnabled()) {
+        let previousNode = null;
+        videoRef = (node) => {
+          if (node === previousNode) return;
+          if (previousNode) registerVideoElement(null, { ...jumpContext, previousNode });
+          previousNode = node;
+          if (node) registerVideoElement(node, jumpContext);
+        };
+        jumpVideoRefs.current.set(reactKey, videoRef);
+      }
+      const captureVideoEvent = (type, event, extra = {}) => {
+        const video = event?.currentTarget;
+        recordVideoEvent(type, video, { ...jumpContext, expectedTransition: !isCurrent || transitionInProgressRef.current });
+        telemetryRef.current.record(type, { ...telemetryMedia, currentTime: video?.currentTime, duration: video?.duration, readyState: video?.readyState, networkState: video?.networkState, paused: video?.paused, ended: video?.ended, errorCode: video?.error?.code || null, ...extra });
+      };
+      recordSourceAssigned(source, diagnosticMedia);
       return (
         <video
-          src={item.preview}
+          ref={videoRef}
+          src={resolvedSource.src}
           poster={isAndroidSmartTv ? "data:image/gif;base64,R0lGODlhAQABAAD/ACwAAAAAAQABAAACADs=" : undefined}
           autoPlay={!pauseMode}
           muted={!item.sound}
@@ -9776,11 +16821,19 @@ function PlayerPage() {
           tabIndex={-1}
           aria-hidden="true"
           className="player-media"
+          onLoadStart={(event) => {
+            const previousSrc = jumpLastSourceByElement.current.get(event.currentTarget) || "";
+            const nextSrc = event.currentTarget.currentSrc || event.currentTarget.src;
+            recordSrcChange(event.currentTarget, previousSrc, nextSrc, { ...jumpContext, reason: "loadstart" });
+            jumpLastSourceByElement.current.set(event.currentTarget, nextSrc);
+          }}
           onLoadedMetadata={(event) => {
+            captureVideoEvent("loadedmetadata", event);
             if (isCurrent && !isAndroidSmartTv) markCurrentMediaReady(item, index);
             if (!pauseMode) event.currentTarget.play().catch(() => {});
           }}
           onLoadedData={(event) => {
+            captureVideoEvent("loadeddata", event);
             if (isCurrent && !isAndroidSmartTv) markCurrentMediaReady(item, index);
 
             if (!pauseMode) {
@@ -9790,23 +16843,58 @@ function PlayerPage() {
             }
           }}
           onCanPlay={(event) => {
+            captureVideoEvent("canplay", event);
             if (isCurrent && !isAndroidSmartTv) markCurrentMediaReady(item, index);
             if (!pauseMode) event.currentTarget.play().catch(() => {});
           }}
-          onPlaying={() => {
+          onCanPlayThrough={(event) => captureVideoEvent("canplaythrough", event)}
+          onDurationChange={(event) => captureVideoEvent("durationchange", event)}
+          onRateChange={(event) => captureVideoEvent("ratechange", event)}
+          onTimeUpdate={(event) => recordVideoEvent("timeupdate", event.currentTarget, { ...jumpContext, expectedTransition: !isCurrent || transitionInProgressRef.current })}
+          onSeeking={(event) => captureVideoEvent("seeking", event)}
+          onSeeked={(event) => captureVideoEvent("seeked", event)}
+          onSuspend={(event) => captureVideoEvent("suspend", event)}
+          onPlaying={(event) => {
+            if (IS_PLAYER_DECODER_EXPERIMENT_BUILD && releasingVideoNodesRef.current.has(event.currentTarget)) return;
+            captureVideoEvent("playing", event);
             if (isCurrent && isAndroidSmartTv) markCurrentMediaReady(item, index);
+            if (isCurrent) {
+              recordPlayback("PLAYBACK_START", source, diagnosticMedia);
+              telemetryRef.current.record("PLAYBACK_START", telemetryMedia);
+            }
           }}
           onPlay={(event) => {
+            captureVideoEvent("play", event);
             if (pauseMode) event.currentTarget.pause();
           }}
-          onEnded={() => {
+          onPause={(event) => captureVideoEvent("pause", event)}
+          onAbort={(event) => captureVideoEvent("abort", event)}
+          onEmptied={(event) => captureVideoEvent("emptied", event)}
+          onEnded={(event) => {
             if (!isCurrent || pauseMode) return;
-            goToNextMedia();
+            captureVideoEvent("ended", event);
+            telemetryRef.current.record("PLAYBACK_END", telemetryMedia);
+            recordPlayback("PLAYBACK_END", source, diagnosticMedia);
+            if (isSingleVideoPlaylist(playerItems)) {
+              telemetryTransitionRef.current = telemetryRef.current.startTransition({
+                fromMediaId: telemetryMedia.mediaId,
+                toMediaId: telemetryMedia.mediaId,
+                reason: "LOOP_SINGLE_ITEM",
+              });
+              restartSingleVideo(event.currentTarget);
+              return;
+            }
+            goToNextMedia("VIDEO_ENDED");
           }}
-          onWaiting={() => {}}
-          onStalled={() => {}}
-          onError={() => {
+          onWaiting={(event) => captureVideoEvent("waiting", event)}
+          onStalled={(event) => captureVideoEvent("stalled", event)}
+          onError={(event) => {
+            if (IS_PLAYER_DECODER_EXPERIMENT_BUILD && releasingVideoNodesRef.current.has(event.currentTarget)) return;
             if (!isCurrent) return;
+            captureVideoEvent("error", event, { message: "Erro ao carregar vídeo" });
+            telemetryRef.current.record("PLAYBACK_ERROR", { ...telemetryMedia, message: "Erro ao carregar vídeo" });
+            recordPlayback("PLAYBACK_ERROR", source, { ...diagnosticMedia, message: "Erro ao carregar vídeo" });
+            if (fallbackToRemoteMedia(item)) return;
             console.log("Erro ao carregar video. Pulando midia.");
             skipFailedMedia();
           }}
@@ -9814,16 +16902,34 @@ function PlayerPage() {
       );
     }
 
+    const resolvedSource = resolveAndroidMediaSource(item);
+    const source = resolvedSource.kind === "LOCAL" ? "LOCAL" : "REMOTE";
+    const diagnosticMedia = { mediaId: item.mediaId || item.id || "", mediaName: item.title || item.name || item.fileName || "", remoteUrl: resolvedSource.remoteUrl, localPath: source === "LOCAL" ? resolvedSource.src : "", fileName: item.fileName || "", sizeBytes: Number(item.sizeBytes || 0), playlistId: activePlaylist?.id || "", screenId: screen?.id || "", src: resolvedSource.src };
+    const telemetryMedia = { ...diagnosticMedia, mediaType: "IMAGE", mediaSource: source === "LOCAL" ? "CACHE_LOCAL" : "INTERNET_FALLBACK" };
+    recordSourceAssigned(source, diagnosticMedia);
     return (
       <img
-        src={item.preview}
+        ref={!isNativeApp() && String(item.preview).startsWith("blob:") ? (image) => {
+          // A retained previous layer can become current without another load event.
+          if (
+            isCurrent && image?.complete && image.naturalWidth > 0 &&
+            image.naturalHeight > 0 &&
+            readyMediaKey !== getPlayerItemKey(item, index)
+          ) {
+            markCurrentMediaReady(item, index);
+          }
+        } : undefined}
+        src={resolvedSource.src}
         alt={item.title}
         className="player-media"
         onLoad={() => {
-          if (isCurrent) markCurrentMediaReady(item, index);
+          if (isCurrent) { markCurrentMediaReady(item, index); recordPlayback("PLAYBACK_START", source, diagnosticMedia); telemetryRef.current.record("PLAYBACK_START", telemetryMedia); }
         }}
         onError={() => {
           if (!isCurrent) return;
+          telemetryRef.current.record("PLAYBACK_ERROR", { ...telemetryMedia, message: "Erro ao carregar imagem" });
+          recordPlayback("PLAYBACK_ERROR", source, { ...diagnosticMedia, message: "Erro ao carregar imagem" });
+          if (fallbackToRemoteMedia(item)) return;
           console.log("Erro ao carregar imagem. Pulando midia.");
           skipFailedMedia();
         }}
@@ -9833,6 +16939,13 @@ function PlayerPage() {
 
   return (
     <div className={`player-screen ${playerOrientationClass} ${isAndroidSmartTv ? "android-tv-player" : ""}`}>
+      {IS_PLAYER_LAB_BUILD && <button className="player-lab-badge" onClick={() => navigate("/diagnostico-lab")}>LAB · Diagnóstico</button>}
+      {IS_PLAYER_CANARY_BUILD && <button className="player-lab-badge" onClick={() => navigate("/diagnostico-canary")}>CANARY · Diagnóstico</button>}
+      {IS_PLAYER_RC_BUILD && <button className="player-lab-badge" onClick={() => navigate("/diagnostico-rc")}>RC · Diagnóstico</button>}
+      {IS_PLAYER_PHASE_B_BUILD && <button className="player-lab-badge" onClick={() => navigate("/diagnostico-2a2-b")}>2A.2-B · Diagnóstico</button>}
+      {IS_PLAYER_LINK_FIX_BUILD && <button className="player-lab-badge" onClick={() => navigate("/diagnostico-link-fix")}>LINK-FIX · Diagnóstico</button>}
+      {IS_PLAYER_TELEMETRY_BUILD && <button className="player-lab-badge" onClick={() => navigate("/diagnostico-telemetria")}>2A.2-C · Diagnóstico</button>}
+      {(IS_PLAYER_JUMP_DIAG_BUILD || IS_PLAYER_DECODER_EXPERIMENT_BUILD) && <button className="player-lab-badge" onClick={() => navigate("/diagnostico-salto")}>SALTO · Diagnóstico</button>}
       {offlineCacheStatus && (
         <div className={`offline-cache-status ${offlineCacheStatus}`}>
           {offlineCacheStatus === "downloading"
@@ -9840,6 +16953,12 @@ function PlayerPage() {
             : offlineCacheStatus === "ready"
               ? "Conteúdo disponível offline"
               : "Cache offline parcial"}
+        </div>
+      )}
+
+      {shouldShowPlayerCacheSyncLabel && !offlineCacheStatus && (
+        <div className="offline-cache-status smart-cache-status">
+          {playerCacheSyncLabel}
         </div>
       )}
 
@@ -9862,6 +16981,8 @@ function PlayerPage() {
         </div>
       )}
 
+      {demoPlayerOverlay}
+
       {visibleLayers.map(({ item, index, state }) => (
         <div
           key={`${getPlayerItemKey(item, index)}-${activePlaylistRevision}`}
@@ -9875,19 +16996,74 @@ function PlayerPage() {
 }
 
 
-function PlansPage() {
+function PlansPage({ clientView = false } = {}) {
+  const [visiblePlanKeys, setVisiblePlanKeys] = useState(getDefaultVisiblePlanKeys());
+  const [savingPlanVisibility, setSavingPlanVisibility] = useState("");
+
+  useEffect(() => {
+    const unsubscribe = onSnapshot(
+      doc(db, "settings", "commercialPlans"),
+      (snapshot) => {
+        const keys = snapshot.data()?.visiblePlanKeys;
+        setVisiblePlanKeys(Array.isArray(keys) ? keys : getDefaultVisiblePlanKeys());
+      },
+      (error) => {
+        console.log("Erro ao carregar visibilidade dos planos:", error);
+      }
+    );
+
+    return () => unsubscribe();
+  }, []);
+
+  async function togglePlanVisibility(plan) {
+    const currentlyVisible = isPlanVisibleForClients(plan, visiblePlanKeys);
+    const nextKeys = currentlyVisible
+      ? visiblePlanKeys.filter((key) => key !== plan.key)
+      : [...new Set([...visiblePlanKeys, plan.key])];
+
+    try {
+      setSavingPlanVisibility(plan.key);
+      await setDoc(
+        doc(db, "settings", "commercialPlans"),
+        {
+          visiblePlanKeys: nextKeys,
+          updatedAt: serverTimestamp(),
+        },
+        { merge: true }
+      );
+      setVisiblePlanKeys(nextKeys);
+    } catch (error) {
+      console.log(error);
+      alert("Erro ao alterar visibilidade do plano.");
+    } finally {
+      setSavingPlanVisibility("");
+    }
+  }
+
+  const plansToRender = Object.values(COMMERCIAL_PLANS).filter((plan) => {
+    if (!clientView) return true;
+    return isPlanVisibleForClients(plan, visiblePlanKeys);
+  });
+
   return (
     <>
       <header className="header">
         <div>
           <div className="kicker">Planos</div>
           <h1>Planos do Totem Park</h1>
-          <p>Modelo comercial sugerido para venda mensal e anual.</p>
+          <p>
+            {clientView
+              ? "Conheça os planos disponíveis para contratação e upgrade."
+              : "Planos comerciais oficiais. Use Visualizar/Ocultar para controlar o que aparece para clientes."}
+          </p>
         </div>
       </header>
 
       <section className="cards-grid plans-commercial-grid">
-        {Object.values(COMMERCIAL_PLANS).map((plan) => (
+        {plansToRender.map((plan) => {
+          const visibleForClients = isPlanVisibleForClients(plan, visiblePlanKeys);
+
+          return (
           <div
             className={plan.name === "Professional" ? "plan-card featured" : "plan-card"}
             key={plan.name}
@@ -9895,24 +17071,270 @@ function PlansPage() {
             {plan.name === "Professional" && (
               <div className="plan-recommended">Mais recomendado</div>
             )}
+            {!clientView && (
+              <div className={`plan-visibility-badge ${visibleForClients ? "visible" : "hidden"}`}>
+                {visibleForClients ? "Visível para clientes" : "Oculto para clientes"}
+              </div>
+            )}
             <h3>{plan.name}</h3>
             <div className="plan-price">
               {plan.priceLabel} <span>/mês</span>
             </div>
-            <p className="plan-annual">Até {plan.screensLimit} telas</p>
+            <p className="plan-annual">
+              {plan.isDemo ? "Uso interno/comercial" : `Até ${plan.screensLimit} tela(s)`}
+            </p>
             <div className="features">
-              <Feature text={`${plan.screensLimit} telas incluídas`} />
+              <Feature text={`${plan.screensLimit} tela(s) incluída(s)`} />
+              <Feature text={`${formatStorageSize(plan.storageLimitBytes, plan.isDemo ? 1 : 0)} de armazenamento`} />
+              <Feature text={`Vídeo até ${formatStorageSize(plan.maxVideoSizeBytes, 0)}`} />
+              <Feature text={`Imagem até ${formatStorageSize(plan.maxImageSizeBytes, 0)}`} />
+              {plan.isDemo && <Feature text={`Validade padrão de ${plan.defaultTrialDays} dias`} />}
+              {plan.watermarkEnabled && <Feature text="Marca d'água no Player" />}
               <Feature text={plan.premiumTemplates ? "Templates Premium" : "Templates simples"} />
               <Feature text={plan.marketing ? "Marketing integrado" : "Playlists e mídias"} />
             </div>
+
+            {!clientView && (
+              <button
+                className={visibleForClients ? "client-action warning plan-visibility-button" : "client-action primary plan-visibility-button"}
+                disabled={savingPlanVisibility === plan.key}
+                onClick={() => togglePlanVisibility(plan)}
+              >
+                {savingPlanVisibility === plan.key
+                  ? "Salvando..."
+                  : visibleForClients
+                    ? "Ocultar dos clientes"
+                    : "Visualizar para clientes"}
+              </button>
+            )}
           </div>
-        ))}
+          );
+        })}
       </section>
+
+      {clientView && plansToRender.length === 0 && (
+        <section className="panel">
+          <p>Nenhum plano está disponível para visualização no momento.</p>
+        </section>
+      )}
     </>
   );
 }
 
 function SettingsPage({ user }) {
+  const [developerPassword, setDeveloperPassword] = useState("");
+  const [developerUnlocked, setDeveloperUnlocked] = useState(false);
+  const [masterEmails, setMasterEmails] = useState(BOOTSTRAP_MASTER_EMAILS);
+  const [masterForm, setMasterForm] = useState({ email: "", password: "" });
+  const [editingMasterEmail, setEditingMasterEmail] = useState("");
+  const [newMasterPassword, setNewMasterPassword] = useState("");
+  const [savingDeveloperAction, setSavingDeveloperAction] = useState(false);
+
+  useEffect(() => {
+    if (!developerUnlocked) return undefined;
+
+    let active = true;
+
+    loadMasterEmails()
+      .then((emails) => {
+        if (active) setMasterEmails(emails);
+      })
+      .catch((error) => {
+        console.log("Nao foi possivel carregar masters:", error);
+      });
+
+    return () => {
+      active = false;
+    };
+  }, [developerUnlocked]);
+
+  function unlockDeveloperMode() {
+    if (developerPassword !== DEVELOPER_MODE_PASSWORD) {
+      alert("Senha do modo desenvolvedor inválida.");
+      return;
+    }
+
+    setDeveloperUnlocked(true);
+    setDeveloperPassword("");
+  }
+
+  async function createJuniorMasterAccount() {
+    const email = "juniordoparque10@gmail.com";
+    const password = "123456";
+    const secondaryApp = initializeApp(firebaseConfig, `secondary-master-${Date.now()}`);
+    const secondaryAuth = getAuth(secondaryApp);
+
+    try {
+      setSavingDeveloperAction(true);
+      await createUserWithEmailAndPassword(secondaryAuth, email, password);
+      alert("Master Junior cadastrado no Firebase Auth com senha inicial 123456.");
+    } catch (error) {
+      console.log(error);
+
+      if (error.code === "auth/email-already-in-use") {
+        alert("Este master já existe no Firebase Auth. Ele já está autorizado como master no sistema.");
+        return;
+      }
+
+      alert("Erro ao cadastrar o master Junior.");
+    } finally {
+      await deleteApp(secondaryApp).catch(() => {});
+      setSavingDeveloperAction(false);
+    }
+  }
+
+  async function sendMasterPasswordReset(email) {
+    try {
+      setSavingDeveloperAction(true);
+      await sendPasswordResetEmail(auth, email);
+      alert(`E-mail de redefinição enviado para ${email}.`);
+    } catch (error) {
+      console.log(error);
+      alert("Erro ao enviar redefinição de senha do master.");
+    } finally {
+      setSavingDeveloperAction(false);
+    }
+  }
+
+  async function persistMasterEmails(nextEmails) {
+    const normalizedEmails = Array.from(
+      new Set(nextEmails.map(normalizeEmail).filter(Boolean))
+    );
+
+    if (normalizedEmails.length === 0) {
+      alert("Mantenha pelo menos um perfil master ativo.");
+      return false;
+    }
+
+    await setDoc(
+      doc(db, ...MASTER_ACCESS_DOC),
+      {
+        emails: normalizedEmails,
+        updatedAt: serverTimestamp(),
+        updatedBy: user?.email || auth.currentUser?.email || "",
+      },
+      { merge: true }
+    );
+
+    setMasterEmails(normalizedEmails);
+    return true;
+  }
+
+  async function createMasterAuthAccount(email, password) {
+    if (!password) return;
+
+    if (password.length < 6) {
+      throw new Error("A senha precisa ter pelo menos 6 caracteres.");
+    }
+
+    const secondaryApp = initializeApp(firebaseConfig, `secondary-master-${Date.now()}`);
+    const secondaryAuth = getAuth(secondaryApp);
+
+    try {
+      await createUserWithEmailAndPassword(secondaryAuth, email, password);
+    } catch (error) {
+      if (error.code !== "auth/email-already-in-use") throw error;
+    } finally {
+      await deleteApp(secondaryApp).catch(() => {});
+    }
+  }
+
+  function startEditMaster(email) {
+    setEditingMasterEmail(email);
+    setMasterForm({ email, password: "" });
+  }
+
+  function cancelMasterEdit() {
+    setEditingMasterEmail("");
+    setMasterForm({ email: "", password: "" });
+  }
+
+  async function saveMasterAccess() {
+    const email = normalizeEmail(masterForm.email);
+
+    if (!email || !email.includes("@")) {
+      alert("Informe um e-mail valido para o master.");
+      return;
+    }
+
+    try {
+      setSavingDeveloperAction(true);
+
+      if (masterForm.password) {
+        await createMasterAuthAccount(email, masterForm.password);
+      }
+
+      const nextEmails = editingMasterEmail
+        ? masterEmails.map((item) => item === editingMasterEmail ? email : item)
+        : [...masterEmails, email];
+
+      const saved = await persistMasterEmails(nextEmails);
+      if (!saved) return;
+
+      cancelMasterEdit();
+      alert(
+        masterForm.password
+          ? "Master salvo e login criado/validado no Firebase Auth."
+          : "Acesso master salvo."
+      );
+    } catch (error) {
+      console.log(error);
+      alert(error?.message || "Erro ao salvar master.");
+    } finally {
+      setSavingDeveloperAction(false);
+    }
+  }
+
+  async function removeMasterAccess(email) {
+    const normalizedEmail = normalizeEmail(email);
+    const confirmRemove = window.confirm(
+      `Remover o acesso master de ${normalizedEmail}?\n\nO usuario pode continuar existindo no Firebase Auth, mas nao entrara mais como master.`
+    );
+
+    if (!confirmRemove) return;
+
+    try {
+      setSavingDeveloperAction(true);
+      const saved = await persistMasterEmails(
+        masterEmails.filter((item) => item !== normalizedEmail)
+      );
+
+      if (saved) {
+        if (editingMasterEmail === normalizedEmail) cancelMasterEdit();
+        alert("Acesso master removido.");
+      }
+    } catch (error) {
+      console.log(error);
+      alert("Erro ao remover acesso master.");
+    } finally {
+      setSavingDeveloperAction(false);
+    }
+  }
+
+  async function updateLoggedMasterPassword() {
+    if (!newMasterPassword || newMasterPassword.length < 6) {
+      alert("Informe uma nova senha com pelo menos 6 caracteres.");
+      return;
+    }
+
+    if (!auth.currentUser) {
+      alert("Nenhum usuário logado no Firebase Auth.");
+      return;
+    }
+
+    try {
+      setSavingDeveloperAction(true);
+      await updatePassword(auth.currentUser, newMasterPassword);
+      setNewMasterPassword("");
+      alert("Senha do master logado atualizada.");
+    } catch (error) {
+      console.log(error);
+      alert("Não foi possível alterar a senha. Por segurança, faça logout, entre novamente e tente de novo.");
+    } finally {
+      setSavingDeveloperAction(false);
+    }
+  }
+
   return (
     <section className="panel">
       <h2>Configurações</h2>
@@ -9923,6 +17345,136 @@ function SettingsPage({ user }) {
           <input value={user?.email || ""} readOnly />
         </div>
       </div>
+
+      <section className="developer-mode-panel">
+        <div className="developer-mode-header">
+          <div>
+            <div className="kicker">Acesso restrito</div>
+            <h3>Modo desenvolvedor</h3>
+            <p>Gerencie perfis master e ações sensíveis do sistema.</p>
+          </div>
+          <span>{developerUnlocked ? "Liberado" : "Bloqueado"}</span>
+        </div>
+
+        {!developerUnlocked ? (
+          <div className="developer-unlock-row">
+            <input
+              type="password"
+              value={developerPassword}
+              placeholder="Senha do desenvolvedor"
+              onChange={(event) => setDeveloperPassword(event.target.value)}
+              onKeyDown={(event) => {
+                if (event.key === "Enter") unlockDeveloperMode();
+              }}
+            />
+            <button className="client-action primary" onClick={unlockDeveloperMode}>
+              Entrar
+            </button>
+          </div>
+        ) : (
+          <>
+            <div className="developer-master-grid">
+              {masterEmails.map((email) => (
+                <div className="developer-master-card" key={email}>
+                  <small>Perfil master</small>
+                  <strong>{email}</strong>
+                  <button
+                    className="client-action"
+                    disabled={savingDeveloperAction}
+                    onClick={() => sendMasterPasswordReset(email)}
+                  >
+                    Redefinir senha por e-mail
+                  </button>
+                  <button
+                    className="client-action"
+                    disabled={savingDeveloperAction}
+                    onClick={() => startEditMaster(email)}
+                  >
+                    Editar
+                  </button>
+                  <button
+                    className="client-action danger"
+                    disabled={savingDeveloperAction || masterEmails.length <= 1}
+                    onClick={() => removeMasterAccess(email)}
+                  >
+                    Remover acesso
+                  </button>
+                </div>
+              ))}
+            </div>
+
+            <div className="developer-actions-box">
+              <h4>{editingMasterEmail ? "Editar master" : "Adicionar master"}</h4>
+              <p>
+                Autoriza e cria o login <strong>juniordoparque10@gmail.com</strong> com senha inicial <strong>123456</strong>, caso ainda não exista.
+              </p>
+              <div className="developer-unlock-row">
+                <input
+                  type="email"
+                  value={masterForm.email}
+                  placeholder="email@dominio.com"
+                  onChange={(event) => setMasterForm((current) => ({
+                    ...current,
+                    email: event.target.value,
+                  }))}
+                />
+                <input
+                  type="password"
+                  value={masterForm.password}
+                  placeholder="Senha inicial opcional"
+                  onChange={(event) => setMasterForm((current) => ({
+                    ...current,
+                    password: event.target.value,
+                  }))}
+                />
+              </div>
+              {editingMasterEmail && (
+                <button
+                  className="client-action"
+                  disabled={savingDeveloperAction}
+                  onClick={cancelMasterEdit}
+                >
+                  Cancelar edicao
+                </button>
+              )}
+              <button
+                className="client-action primary"
+                disabled={savingDeveloperAction}
+                onClick={saveMasterAccess}
+              >
+                {editingMasterEmail ? "Salvar edicao" : "Adicionar master"}
+              </button>
+            </div>
+
+            <div className="developer-actions-box">
+              <h4>Senha do master logado</h4>
+              <p>Por regra do Firebase, o painel só altera diretamente a senha do usuário master atualmente logado.</p>
+              <div className="developer-unlock-row">
+                <input
+                  type="password"
+                  value={newMasterPassword}
+                  placeholder="Nova senha do master logado"
+                  onChange={(event) => setNewMasterPassword(event.target.value)}
+                />
+                <button
+                  className="client-action primary"
+                  disabled={savingDeveloperAction}
+                  onClick={updateLoggedMasterPassword}
+                >
+                  Alterar senha
+                </button>
+              </div>
+            </div>
+
+            <div className="developer-actions-box">
+              <h4>Clientes</h4>
+              <p>
+                Cadastro, edição, suspensão e retorno ficam na aba <strong>Clientes</strong>. Senhas de clientes são redefinidas pelo botão <strong>Senha</strong>, usando o fluxo seguro do Firebase.
+              </p>
+            </div>
+          </>
+        )}
+      </section>
     </section>
   );
 }
@@ -10052,6 +17604,8 @@ function AdminPlanControls({ client, adminUser }) {
     status: client.status || "Ativo",
     screensLimit: String(getClientScreenLimit(client)),
     storageLimitGb: String(getClientStorageLimit(client) / STORAGE_GB),
+    maxVideoSizeMb: String(getClientMaxVideoSize(client) / STORAGE_MB),
+    maxImageSizeMb: String(getClientMaxImageSize(client) / STORAGE_MB),
   });
   const [saving, setSaving] = useState(false);
   const access = getClientPlanAccess(client);
@@ -10064,6 +17618,8 @@ function AdminPlanControls({ client, adminUser }) {
       status: client.status || "Ativo",
       screensLimit: String(getClientScreenLimit(client)),
       storageLimitGb: String(getClientStorageLimit(client) / STORAGE_GB),
+      maxVideoSizeMb: String(getClientMaxVideoSize(client) / STORAGE_MB),
+      maxImageSizeMb: String(getClientMaxImageSize(client) / STORAGE_MB),
     });
   }, [client]);
 
@@ -10115,6 +17671,8 @@ function AdminPlanControls({ client, adminUser }) {
         status: "Ativo",
         screensLimit: String(Math.max(1, Number(form.screensLimit) || 1)),
         storageLimitBytes: Math.max(STORAGE_MB, Number(form.storageLimitGb) * STORAGE_GB || getPlanLimits(form.plan).storageLimitBytes),
+        maxVideoSizeBytes: Math.max(STORAGE_MB, Number(form.maxVideoSizeMb) * STORAGE_MB || getPlanLimits(form.plan).maxVideoSizeBytes),
+        maxImageSizeBytes: Math.max(STORAGE_MB, Number(form.maxImageSizeMb) * STORAGE_MB || getPlanLimits(form.plan).maxImageSizeBytes),
         graceUnlockUntil: deleteField(),
         suspendedAt: deleteField(),
         suspensionReason: deleteField(),
@@ -10163,6 +17721,8 @@ function AdminPlanControls({ client, adminUser }) {
                 plan,
                 screensLimit: String(getPlanConfig(plan).screensLimit),
                 storageLimitGb: String(getPlanLimits(plan).storageLimitBytes / STORAGE_GB),
+                maxVideoSizeMb: String(getPlanLimits(plan).maxVideoSizeBytes / STORAGE_MB),
+                maxImageSizeMb: String(getPlanLimits(plan).maxImageSizeBytes / STORAGE_MB),
               }));
             }}
           >
@@ -10193,6 +17753,14 @@ function AdminPlanControls({ client, adminUser }) {
         <div className="form-group">
           <label>Limite de armazenamento (GB)</label>
           <input type="number" min="0.1" step="0.1" value={form.storageLimitGb} onChange={(event) => setForm({ ...form, storageLimitGb: event.target.value })} />
+        </div>
+        <div className="form-group">
+          <label>Vídeo máximo (MB)</label>
+          <input type="number" min="1" step="1" value={form.maxVideoSizeMb} onChange={(event) => setForm({ ...form, maxVideoSizeMb: event.target.value })} />
+        </div>
+        <div className="form-group">
+          <label>Imagem máxima (MB)</label>
+          <input type="number" min="1" step="1" value={form.maxImageSizeMb} onChange={(event) => setForm({ ...form, maxImageSizeMb: event.target.value })} />
         </div>
       </div>
 
