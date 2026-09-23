@@ -1,0 +1,4 @@
+android/app/src/playerRc/assets/public/assets/*.js -text -whitespace
+android/app/src/playerRc/assets/public/assets/*.css -text -whitespace
+android/app/src/playerRollback/assets/public/assets/*.js -text -whitespace
+android/app/src/playerRollback/assets/public/assets/*.css -text -whitespace

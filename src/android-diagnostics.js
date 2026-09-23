@@ -29,7 +29,7 @@ const APP_VERSION = PHASE_B_MODE
   : JUMP_MODE
   ? "1.0-player-jump-diagnostic"
   : RC_MODE
-  ? "1.0.0-2a2-ab-rc2"
+  ? "1.0.0-2a2-rebaseline-rc5"
   : CANARY_MODE
     ? "1.0-player-canary-2a2-a"
     : "1.0-player-lab-2a2-a";
@@ -193,4 +193,4 @@ import { getJumpEvents } from "./jump-diagnostics";
 import { registerPlugin } from "@capacitor/core";
 import { DECODER_EXPERIMENT_PACKAGE, makeDecoderDiagnosticExport } from "./diagnostic-export";
 
-const PublicDiagnosticExport = registerPlugin("DiagnosticExport");
+const PublicDiagnosticExport = DECODER_EXPERIMENT_MODE ? registerPlugin("DiagnosticExport") : null;

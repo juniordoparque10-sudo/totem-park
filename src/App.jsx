@@ -3712,6 +3712,7 @@ const IS_PLAYER_RC_BUILD = APP_BUILD_MODE === "playerRc";
 const IS_PLAYER_TELEMETRY_BUILD = APP_BUILD_MODE === "playerTelemetry";
 const IS_PLAYER_JUMP_DIAG_BUILD = APP_BUILD_MODE === "playerJumpDiag";
 const IS_PLAYER_DECODER_EXPERIMENT_BUILD = APP_BUILD_MODE === "playerDecoderExperiment";
+const IS_PLAYER_DECODER_LIFECYCLE_BUILD = IS_PLAYER_RC_BUILD || IS_PLAYER_DECODER_EXPERIMENT_BUILD;
 const IS_PLAYER_PHASE_B_BUILD = APP_BUILD_MODE === "playerPhaseB";
 const IS_PLAYER_LINK_FIX_BUILD = APP_BUILD_MODE === "playerLinkFix";
 
@@ -14891,7 +14892,7 @@ function PlayerPage() {
   }, [clientId, codigo]);
 
   useEffect(() => {
-    if (!screen?.id || !clientId) return undefined;
+    if (!IS_PLAYER_TELEMETRY_BUILD || !screen?.id || !clientId) return undefined;
     const telemetry = telemetryRef.current;
     telemetry.updateIdentity({ clientId, screenId: screen.id, deviceId: getTotemDeviceId() });
     const unsubscribe = onSnapshot(
@@ -15661,7 +15662,7 @@ function PlayerPage() {
     }
 
     const nextItemIndex = mediaIndex + 1 >= items.length ? 0 : mediaIndex + 1;
-    const singleDecoderTransition = IS_PLAYER_DECODER_EXPERIMENT_BUILD &&
+    const singleDecoderTransition = IS_PLAYER_DECODER_LIFECYCLE_BUILD &&
       isVideoToVideoTransition(items, mediaIndex);
 
     advancingRef.current = true;
@@ -15713,7 +15714,7 @@ function PlayerPage() {
   }
 
   useLayoutEffect(() => {
-    if (!IS_PLAYER_DECODER_EXPERIMENT_BUILD || !decoderReleasePending) return;
+    if (!IS_PLAYER_DECODER_LIFECYCLE_BUILD || !decoderReleasePending) return;
     const remainingVideoCount = document.querySelectorAll(".player-transition-layer video.player-media").length;
     recordJumpEvent("DECODER_RELEASE_END", { remainingVideoCount, nextIndex: mediaIndex });
     if (remainingVideoCount === 0) setDecoderReleasePending(false);
@@ -16855,7 +16856,7 @@ function PlayerPage() {
           onSeeked={(event) => captureVideoEvent("seeked", event)}
           onSuspend={(event) => captureVideoEvent("suspend", event)}
           onPlaying={(event) => {
-            if (IS_PLAYER_DECODER_EXPERIMENT_BUILD && releasingVideoNodesRef.current.has(event.currentTarget)) return;
+            if (IS_PLAYER_DECODER_LIFECYCLE_BUILD && releasingVideoNodesRef.current.has(event.currentTarget)) return;
             captureVideoEvent("playing", event);
             if (isCurrent && isAndroidSmartTv) markCurrentMediaReady(item, index);
             if (isCurrent) {
@@ -16889,7 +16890,7 @@ function PlayerPage() {
           onWaiting={(event) => captureVideoEvent("waiting", event)}
           onStalled={(event) => captureVideoEvent("stalled", event)}
           onError={(event) => {
-            if (IS_PLAYER_DECODER_EXPERIMENT_BUILD && releasingVideoNodesRef.current.has(event.currentTarget)) return;
+            if (IS_PLAYER_DECODER_LIFECYCLE_BUILD && releasingVideoNodesRef.current.has(event.currentTarget)) return;
             if (!isCurrent) return;
             captureVideoEvent("error", event, { message: "Erro ao carregar vídeo" });
             telemetryRef.current.record("PLAYBACK_ERROR", { ...telemetryMedia, message: "Erro ao carregar vídeo" });
