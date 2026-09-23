@@ -1,5 +1,7 @@
 # Player 2A.2 RC5 — inventário e rebaseline
 
+**Estado físico final (22/09/2026): RC5 BLOQUEADO.** O rollback v11 baseado no RC4 foi aprovado e é a base operacional segura da TV Teste. Ver `docs/player-operational-status-2026-09-22.md`. Os gates locais abaixo não representam aprovação física nem autorização de rollout.
+
 ## Preservação
 
 - Fonte anterior preservada no commit `f641738` e tag `pre-rebaseline-2a2-2026-09-22`.
