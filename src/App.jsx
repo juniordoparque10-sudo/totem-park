@@ -385,10 +385,6 @@ function getScreenDeviceLabel(screen = {}) {
 
 function getScreenLastSeenDate(screen = {}) {
   // Only timestamps written by the player count as proof of connectivity.
-  if (screen.telemetry?.schemaVersion >= 3) {
-    const telemetryTimestamp = getTimestampMs(screen.telemetryUpdatedAt);
-    return telemetryTimestamp ? new Date(telemetryTimestamp) : null;
-  }
   const timestamp = Math.max(
     getTimestampMs(screen.lastSeenAt),
     getTimestampMs(screen.lastCommandExecutedAt),
@@ -5558,11 +5554,11 @@ function Dashboard({ onNavigate, onOpenTelemetry }) {
 
                       <div className="manager-now-playing">
                         <small>{screen.currentPlaylistName || "Playlist não informada"}</small>
-                        <b>{screen.telemetry?.schemaVersion >= 3 ? "Não instrumentado" : screen.nowPlayingTitle || "Aguardando mídia"}</b>
+                        <b>{screen.nowPlayingTitle || "Aguardando mídia"}</b>
                         <span className="manager-cache-line">
-                          {screen.telemetry?.schemaVersion >= 3 ? "Cache e origem: Não instrumentado" : <>Cache: {getCacheStatusLabel(screen)} • {getMediaSourceLabel(screen.currentMediaSource)}</>}
+                          Cache: {getCacheStatusLabel(screen)} • {getMediaSourceLabel(screen.currentMediaSource)}
                         </span>
-                        {!(screen.telemetry?.schemaVersion >= 3) && getCacheSyncLabel(screen) && (
+                        {getCacheSyncLabel(screen) && (
                           <span className="manager-cache-line muted">
                             {getCacheSyncLabel(screen)}
                           </span>
@@ -5584,7 +5580,7 @@ function Dashboard({ onNavigate, onOpenTelemetry }) {
                       </span>
 
                       <span>
-                        Última comunicação: {formatScreenConnectionDate(screen.telemetry?.schemaVersion >= 3 ? screen.telemetryUpdatedAt : screen.lastSeenAt)}
+                        Última comunicação: {formatScreenConnectionDate(getScreenLastSeenDate(screen))}
                       </span>
 
                       <span>

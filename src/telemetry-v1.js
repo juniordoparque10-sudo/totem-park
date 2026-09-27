@@ -23,7 +23,11 @@ export function linkedAtForScreen(screen, bindings = []) {
 }
 
 export function screenStatus(screen, now = Date.now()) {
-  const lastSeen = timestampMs(screen?.telemetry?.schemaVersion >= 3 ? screen?.telemetryUpdatedAt : screen?.lastSeenAt);
+  const lastSeen = Math.max(...[
+    screen?.lastSeenAt,
+    screen?.lastCommandExecutedAt,
+    screen?.lastMediaUpdateAt,
+  ].map((value) => timestampMs(value) || 0));
   if (lastSeen === null) return "OFFLINE";
   const age = now - lastSeen;
   if (!Number.isFinite(age)) return "OFFLINE";
@@ -39,7 +43,6 @@ export function telemetryStatus(screen, config, now = Date.now()) {
     || config.deviceIds?.includes(screen.connectedDeviceId)
   );
   if (!allowed) return "TELEMETRIA DESATIVADA";
-  if (screenStatus(screen, now) === "OFFLINE") return "TELA OFFLINE";
   if (!screen.telemetry || !timestampMs(screen.telemetryUpdatedAt)) return "AGUARDANDO PRIMEIRO SINAL";
   if (now - timestampMs(screen.telemetryUpdatedAt) > 10 * 60_000) return "DADOS DESATUALIZADOS";
   return "ATIVA";

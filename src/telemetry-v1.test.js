@@ -21,15 +21,15 @@ test("screen and telemetry states remain independent", () => {
   assert.equal(telemetryStatus(screen, { enabled: false }, now), "TELEMETRIA DESATIVADA");
   assert.equal(telemetryStatus({ ...screen, telemetry: {}, telemetryUpdatedAt: now - 700_000 }, enabled, now), "DADOS DESATUALIZADOS");
   assert.equal(telemetryStatus({ ...screen, telemetry: {}, telemetryUpdatedAt: now - 1_000 }, enabled, now), "ATIVA");
-  assert.equal(telemetryStatus({ ...screen, lastSeenAt: now - 200_000 }, enabled, now), "TELA OFFLINE");
+  assert.equal(telemetryStatus({ ...screen, lastSeenAt: now - 200_000 }, enabled, now), "AGUARDANDO PRIMEIRO SINAL");
 });
 
-test("operational V1 uses its own heartbeat for online status", () => {
+test("screen presence uses Player heartbeat even when telemetry is stale", () => {
   const now = 1_000_000;
-  const screen = { lastSeenAt: now - 200_000, telemetry: { schemaVersion: 3 }, telemetryUpdatedAt: now - 10_000 };
+  const screen = { lastSeenAt: now - 10_000, telemetry: { schemaVersion: 3 }, telemetryUpdatedAt: now - 200_000 };
   assert.equal(screenStatus(screen, now), "ONLINE");
-  assert.equal(screenStatus({ ...screen, telemetryUpdatedAt: now - 60_000 }, now), "ATENÇÃO");
-  assert.equal(screenStatus({ ...screen, telemetryUpdatedAt: now - 200_000 }, now), "OFFLINE");
+  assert.equal(screenStatus({ ...screen, lastSeenAt: now - 60_000 }, now), "ATENÇÃO");
+  assert.equal(screenStatus({ ...screen, lastSeenAt: now - 200_000 }, now), "OFFLINE");
 });
 
 test("missing metrics are distinct from measured zero", () => {

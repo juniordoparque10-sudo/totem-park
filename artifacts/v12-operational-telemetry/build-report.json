@@ -1,0 +1,11 @@
+{
+  "Apk": "C:\\Users\\centr\\Desktop\\totem-park\\artifacts\\v12-operational-telemetry\\Totem-Park-Player-V12-Operational-Telemetry-V1-Candidate-v13.apk",
+  "ApkSha256": "6C6E47166D761ABD4711B43FC109AA8961DF6777EE4B8A203FF17955BD55C139",
+  "BaselineApkSha256": "8C01E52C4CEE6A4DE0E6B93C8A1A0DA3896AA1EEA31C0096F89C38B3CE1898BB",
+  "Package": "br.com.parksolutions.totempark",
+  "VersionCode": 13,
+  "VersionName": "1.0.0-v12-operational-telemetry-v1-candidate",
+  "PlayerBundleSha256": "709BA00A7DC29932AB917EA4617829D9C2E6548BA9232490A5173CE373CF95C0",
+  "SidecarSha256": "39E8CC3FA350E3D369272E5D64B0F6995973BE6654460BB75AD04411CE92755B",
+  "UnchangedPublicAssets": 54
+}

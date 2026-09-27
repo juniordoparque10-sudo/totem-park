@@ -22,7 +22,11 @@ export function timestampMs(value) {
 }
 
 export function getPortalScreenStatus(screen, now = Date.now()) {
-  const lastSeenAt = timestampMs(screen?.telemetry?.schemaVersion >= 3 ? screen?.telemetryUpdatedAt : screen?.lastSeenAt);
+  const lastSeenAt = Math.max(
+    timestampMs(screen?.lastSeenAt),
+    timestampMs(screen?.lastCommandExecutedAt),
+    timestampMs(screen?.lastMediaUpdateAt)
+  );
   if (!lastSeenAt) return "OFFLINE";
   const age = Math.max(0, now - lastSeenAt);
   if (age <= SCREEN_ONLINE_THRESHOLD_MS) return "ONLINE";
@@ -68,8 +72,8 @@ export function compareTelemetryScreens(left = {}, right = {}, now = Date.now())
   const statusComparison = (priority[leftStatus] ?? 3) - (priority[rightStatus] ?? 3);
   if (statusComparison !== 0) return statusComparison;
 
-  const leftSeen = timestampMs(left?.telemetry?.schemaVersion >= 3 ? left.telemetryUpdatedAt : left.lastSeenAt);
-  const rightSeen = timestampMs(right?.telemetry?.schemaVersion >= 3 ? right.telemetryUpdatedAt : right.lastSeenAt);
+  const leftSeen = timestampMs(left?.lastSeenAt);
+  const rightSeen = timestampMs(right?.lastSeenAt);
   if (leftSeen && rightSeen && leftSeen !== rightSeen) return rightSeen - leftSeen;
   if (leftSeen !== rightSeen) return leftSeen ? -1 : 1;
   return comparePortalScreens(left, right);
@@ -94,7 +98,6 @@ export function isTelemetryEnabledForScreen(config, screen) {
 export function getTelemetryVisualState({ config, screen, now = Date.now(), readError = false, periodHasData = true }) {
   if (readError) return "READ_ERROR";
   if (!isTelemetryEnabledForScreen(config, screen)) return "DISABLED";
-  if (getPortalScreenStatus(screen, now) === "OFFLINE") return "SCREEN_OFFLINE";
   if (!screen?.telemetry || !timestampMs(screen.telemetryUpdatedAt)) return "WAITING_FIRST_SIGNAL";
   const staleAfter = Math.max(60_000, Number(config?.syncIntervalMs || 300_000)) * 2;
   if (now - timestampMs(screen.telemetryUpdatedAt) > staleAfter) return "STALE";

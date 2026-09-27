@@ -13954,6 +13954,12 @@ button.premium-stat-card{width:100%;font:inherit;text-align:left;color:inherit;c
 @media(max-width:900px){.telemetry-v2-header{align-items:flex-start;flex-direction:column}.telemetry-main-filters{grid-template-columns:repeat(2,1fr)}.telemetry-primary-kpis{grid-template-columns:repeat(2,1fr)}.telemetry-overview-grid{grid-template-columns:1fr}.traffic-chart-card{grid-column:auto}.telemetry-table-toolbar{grid-template-columns:1fr 1fr}.telemetry-table-toolbar>div{grid-column:span 2}}
 @media(max-width:600px){.telemetry-v2-header-actions{align-items:stretch;flex-direction:column;width:100%}.telemetry-report-controls{align-items:stretch;flex-direction:column;width:100%}.telemetry-report-controls select,.telemetry-report-controls button{width:100%}.telemetry-report-controls button{justify-content:center}.telemetry-main-filters,.telemetry-primary-kpis,.telemetry-secondary-kpis,.telemetry-table-toolbar{grid-template-columns:1fr}.telemetry-table-toolbar>div{grid-column:auto}.telemetry-donut-wrap{align-items:center;flex-direction:column;height:auto}.telemetry-visual-card{min-height:0}.telemetry-section-nav{justify-content:flex-start}.telemetry-metric-card{min-height:100px}}
 
+.telemetry-table-v2 .head>span,.telemetry-table-v2>button>span{text-align:center}
+.telemetry-table-v2>button>span:first-child{justify-content:center}
+.telemetry-table-v2>button>.telemetry-origin-cell{display:flex;flex-direction:column;align-items:center;text-align:center}
+.telemetry-origin-cell small{max-width:100%}
+.content:has(> .telemetry-page){overflow-x:clip;overflow-y:visible}
+
 @media(max-width:700px){
   .telemetry-screens-section{padding:12px}
   .telemetry-table-v2{border:0;border-radius:0;background:transparent;overflow:visible}
