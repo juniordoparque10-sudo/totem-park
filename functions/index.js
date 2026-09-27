@@ -57,17 +57,26 @@ exports.claimPlayerBinding = onCall(async (request) => {
     }
 
     const now = FieldValue.serverTimestamp();
+    const sameCurrentLink = previous.status === "ACTIVE"
+      && previous.clientId === clientId
+      && previous.screenId === screenId
+      && previous.deviceId === deviceId;
+    // Legacy pairedAt/createdAt can predate a later relink. Do not turn either
+    // into a claimed current-link timestamp without independent evidence.
+    const linkedAt = sameCurrentLink ? (previous.linkedAt || null) : now;
     transaction.set(bindingRef, {
       uid, clientId, screenId, deviceId, appVersion,
       status: "ACTIVE",
       createdAt: previous.createdAt || now,
-      pairedAt: previous.pairedAt || now,
+      pairedAt: sameCurrentLink ? (previous.pairedAt || null) : now,
+      linkedAt,
       updatedAt: now,
       revokedAt: null,
     }, { merge: false });
     transaction.update(screenRef, {
       connectedAuthUid: uid,
       connectedDeviceId: deviceId,
+      linkedAt,
       status: "online",
       lastSeenAt: now,
     });

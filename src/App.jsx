@@ -1,6 +1,7 @@
 import UploadLimitDialog from "./UploadLimitDialog";
 import { uploadLimitBytes, uploadSizeNotice } from "./upload-plan-policy";
-import TelemetryDashboard from "./TelemetryDashboard";
+import TelemetryDashboard from "./TelemetryDashboardV1";
+import { linkedAtForScreen, screenStatus, telemetryStatus, timestampMs } from "./telemetry-v1";
 ﻿import { useEffect, useLayoutEffect, useRef, useState } from "react";
 import { Routes, Route, Navigate, useParams, useNavigate } from "react-router-dom";
 import { initializeApp, deleteApp } from "firebase/app";
@@ -3999,6 +4000,7 @@ function AdminApp({ screenRotation, onScreenRotationChange }) {
   const [loadingAuth, setLoadingAuth] = useState(true);
   const [activePage, setActivePage] = useState("dashboard");
   const [selectedClient, setSelectedClient] = useState(null);
+  const [telemetryFocus, setTelemetryFocus] = useState(null);
   const [appMode, setAppMode] = useState(() => {
     if (!isNativeApp()) return "web";
 
@@ -4304,6 +4306,7 @@ function AdminApp({ screenRotation, onScreenRotationChange }) {
               active={activePage === "telemetry" && !selectedClient}
               onClick={() => {
                 setSelectedClient(null);
+                setTelemetryFocus(null);
                 setActivePage("telemetry");
               }}
             />
@@ -4361,8 +4364,11 @@ function AdminApp({ screenRotation, onScreenRotationChange }) {
         </aside>
 
         <main className="content">
-          {!selectedClient && activePage === "dashboard" && <Dashboard />}
-          {!selectedClient && activePage === "telemetry" && <TelemetryDashboard />}
+          {!selectedClient && activePage === "dashboard" && <Dashboard onOpenTelemetry={(screen) => {
+            setTelemetryFocus({ clientId: screen.clientId, id: screen.id });
+            setActivePage("telemetry");
+          }} />}
+          {!selectedClient && activePage === "telemetry" && <TelemetryDashboard focusScreen={telemetryFocus} />}
           {!selectedClient && activePage === "clients" && (
             <ClientsPage onOpenClient={setSelectedClient} />
           )}
@@ -4956,10 +4962,12 @@ function PendingAccountPanel({ onBack }) {
   );
 }
 
-function Dashboard() {
+function Dashboard({ onOpenTelemetry }) {
   const [clients, setClients] = useState([]);
   const [clientsError, setClientsError] = useState("");
   const [screensData, setScreensData] = useState([]);
+  const [playerBindings, setPlayerBindings] = useState([]);
+  const [telemetryConfig, setTelemetryConfig] = useState({ enabled: false, screenIds: [], clientIds: [], deviceIds: [] });
   const [playlistsData, setPlaylistsData] = useState([]);
   const [now, setNow] = useState(Date.now());
   const [screenStatusFilter, setScreenStatusFilter] = useState("all");
@@ -4973,6 +4981,14 @@ function Dashboard() {
     return () => clearInterval(interval);
   }, []);
 
+  useEffect(() => onSnapshot(collection(db, "playerDeviceBindings"), (snapshot) => {
+    setPlayerBindings(snapshot.docs.map((item) => ({ id: item.id, ...item.data() })));
+  }, () => setPlayerBindings([])), []);
+
+  useEffect(() => onSnapshot(doc(db, "settings", "telemetry2a2c"), (snapshot) => {
+    setTelemetryConfig(snapshot.exists() ? snapshot.data() : { enabled: false, screenIds: [], clientIds: [], deviceIds: [] });
+  }), []);
+
   useEffect(() => {
     let unsubScreens = [];
     let unsubPlaylists = [];
@@ -4983,7 +4999,7 @@ function Dashboard() {
       const clientsList = snapshot.docs.map((clientDoc) => ({
         id: clientDoc.id,
         ...clientDoc.data(),
-      }));
+      })).sort((a, b) => String(a.name || "").localeCompare(String(b.name || ""), "pt-BR"));
 
       setClientsError("");
       setClients(clientsList);
@@ -5134,11 +5150,13 @@ function Dashboard() {
   const loggedOfflineScreens = screensData.filter(
     (screen) => getScreenConnectionStatus(screen, now).key === "logged-offline"
   );
+  const attentionScreens = screensData.filter((screen) => screenStatus(screen, now) === "ATENÇÃO");
   const notLoggedScreens = screensData.filter(
     (screen) => getScreenConnectionStatus(screen, now).key === "not-logged"
   );
   const filteredRealtimeScreens = screensData.filter((screen) => {
     if (screenStatusFilter === "all") return true;
+    if (screenStatusFilter === "attention") return screenStatus(screen, now) === "ATENÇÃO";
     return getScreenConnectionStatus(screen, now).key === screenStatusFilter;
   });
 
@@ -5438,6 +5456,13 @@ function Dashboard() {
               </button>
               <button
                 type="button"
+                className={screenStatusFilter === "attention" ? "warning active" : "warning"}
+                onClick={() => setScreenStatusFilter("attention")}
+              >
+                Atenção {attentionScreens.length}
+              </button>
+              <button
+                type="button"
                 className={screenStatusFilter === "logged-offline" ? "warning active" : "warning"}
                 onClick={() => setScreenStatusFilter("logged-offline")}
               >
@@ -5463,7 +5488,7 @@ function Dashboard() {
                 const online = connection.isOnline;
 
                 return (
-                  <div className="premium-screen-row" key={`${screen.clientId}-${screen.id}`}>
+                  <div className="premium-screen-row" key={`${screen.clientId}-${screen.id}`} role="button" tabIndex={0} onClick={() => onOpenTelemetry(screen)} onKeyDown={(event) => { if (event.key === "Enter" || event.key === " ") { event.preventDefault(); onOpenTelemetry(screen); } }}>
                     <div className={online ? "premium-screen-dot online" : "premium-screen-dot offline"}></div>
 
                     <div className="premium-screen-icon premium-screen-thumb">
@@ -5498,6 +5523,7 @@ function Dashboard() {
                       <div className={`premium-live-badge ${connection.className}`}>
                         {connection.label}
                       </div>
+                      {screenStatus(screen, now) === "ATENÇÃO" && <span className="manager-screen-attention">Atenção</span>}
 
                       <span>
                         {connection.deviceLabel}
@@ -5506,6 +5532,30 @@ function Dashboard() {
                       <span>
                         Login: {connection.lastConnection}
                       </span>
+
+                      <span>
+                        Última comunicação: {timestampMs(screen.telemetry?.schemaVersion >= 3 ? screen.telemetryUpdatedAt : screen.lastSeenAt) === null ? "—" : new Date(timestampMs(screen.telemetry?.schemaVersion >= 3 ? screen.telemetryUpdatedAt : screen.lastSeenAt)).toLocaleString("pt-BR")}
+                      </span>
+
+                      <span>
+                        Vinculada desde: {timestampMs(linkedAtForScreen(screen, playerBindings)) === null ? "—" : new Date(timestampMs(linkedAtForScreen(screen, playerBindings))).toLocaleString("pt-BR")}
+                      </span>
+
+                      <span>
+                        App: {screen.telemetry?.session?.appVersion || "—"}
+                      </span>
+
+                      <span className="manager-telemetry-badge">
+                        Telemetria: {telemetryStatus(screen, telemetryConfig, now)}
+                      </span>
+
+                      <span>
+                        Tempo ativo: {screen.telemetry?.schemaVersion >= 3 && Number.isFinite(Number(screen.telemetry?.counters?.activeTimeMs)) ? `${Math.floor(Number(screen.telemetry.counters.activeTimeMs) / 60000)} min` : "—"}
+                      </span>
+
+                      {telemetryStatus(screen, telemetryConfig, now) === "ATIVA" && <span>
+                        Reprodução: Não instrumentado
+                      </span>}
 
                       <span>
                         Local: {deviceLocation.city}
@@ -6067,7 +6117,7 @@ function ClientsPage({ onOpenClient }) {
       statusFilter === "Todos" || getClientPlanAccess(client).statusLabel === statusFilter;
 
     return matchesSearch && matchesStatus;
-  });
+  }).sort((a, b) => String(a.name || "").localeCompare(String(b.name || ""), "pt-BR"));
 
   async function createClientAuthUser(email, password) {
     const secondaryApp = initializeApp(

@@ -39,5 +39,32 @@ test("authenticated backend claim creates an authoritative binding", async () =>
     assert.equal(snapshot.data().uid, credential.user.uid);
     assert.equal(snapshot.data().clientId, "client-a");
     assert.equal(snapshot.data().deviceId, "device-a");
+    assert.ok(snapshot.data().linkedAt?.toMillis());
+    const screen = await getDoc(doc(context.firestore(), "clients/client-a/screens/screen-a"));
+    assert.equal(screen.data().linkedAt.toMillis(), snapshot.data().linkedAt.toMillis());
+  });
+
+  let original;
+  await env.withSecurityRulesDisabled(async (context) => {
+    original = (await getDoc(doc(context.firestore(), `playerDeviceBindings/${credential.user.uid}`))).data().linkedAt.toMillis();
+  });
+  await claim({ code: "SECURE1", deviceId: "device-a", appVersion: "test-reopen" });
+  let unchanged;
+  await env.withSecurityRulesDisabled(async (context) => {
+    unchanged = (await getDoc(doc(context.firestore(), `playerDeviceBindings/${credential.user.uid}`))).data().linkedAt.toMillis();
+  });
+  assert.equal(unchanged, original, "revalidation must preserve the original link time");
+
+  const revoke = httpsCallable(getFunctions(app), "revokePlayerBinding");
+  await revoke({ reason: "TEST_REPAIR" });
+  await new Promise((resolve) => setTimeout(resolve, 1200));
+  await claim({ code: "SECURE1", deviceId: "device-b", appVersion: "test-relink" });
+  await env.withSecurityRulesDisabled(async (context) => {
+    const binding = (await getDoc(doc(context.firestore(), `playerDeviceBindings/${credential.user.uid}`))).data();
+    const screen = (await getDoc(doc(context.firestore(), "clients/client-a/screens/screen-a"))).data();
+    assert.equal(binding.deviceId, "device-b");
+    assert.ok(binding.linkedAt.toMillis() > original,
+      `new binding must get a new server timestamp: original=${original}, next=${binding.linkedAt.toMillis()}, previousStatus=${binding.status}`);
+    assert.equal(screen.linkedAt.toMillis(), binding.linkedAt.toMillis());
   });
 });

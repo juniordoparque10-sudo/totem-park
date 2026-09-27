@@ -86,6 +86,7 @@ test("player cannot create or edit a binding", async () => {
   const player = env.authenticatedContext("player-a").firestore();
   await assertFails(setDoc(doc(player, bindingPath("new-player")), { uid: "new-player", status: "ACTIVE" }));
   await assertFails(updateDoc(doc(player, bindingPath("player-a")), { screenId: "screen-b" }));
+  await assertFails(updateDoc(doc(player, screenPath()), { linkedAt: new Date() }));
 });
 
 test("master can manage bindings and owner cannot", async () => {
