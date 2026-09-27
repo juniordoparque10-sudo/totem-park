@@ -1,6 +1,6 @@
 export const SCREEN_HEARTBEAT_INTERVAL_MS = 15_000;
-export const SCREEN_ONLINE_THRESHOLD_MS = SCREEN_HEARTBEAT_INTERVAL_MS * 2;
-export const SCREEN_ATTENTION_THRESHOLD_MS = SCREEN_HEARTBEAT_INTERVAL_MS * 4;
+export const SCREEN_ONLINE_THRESHOLD_MS = 45_000;
+export const SCREEN_ATTENTION_THRESHOLD_MS = 120_000;
 const PT_BR_COLLATOR = new Intl.Collator("pt-BR", { sensitivity: "base", numeric: true });
 
 export function sortClientsAlphabetically(clients = []) {
@@ -22,7 +22,7 @@ export function timestampMs(value) {
 }
 
 export function getPortalScreenStatus(screen, now = Date.now()) {
-  const lastSeenAt = timestampMs(screen?.lastSeenAt);
+  const lastSeenAt = timestampMs(screen?.telemetry?.schemaVersion >= 3 ? screen?.telemetryUpdatedAt : screen?.lastSeenAt);
   if (!lastSeenAt) return "OFFLINE";
   const age = Math.max(0, now - lastSeenAt);
   if (age <= SCREEN_ONLINE_THRESHOLD_MS) return "ONLINE";
@@ -68,8 +68,8 @@ export function compareTelemetryScreens(left = {}, right = {}, now = Date.now())
   const statusComparison = (priority[leftStatus] ?? 3) - (priority[rightStatus] ?? 3);
   if (statusComparison !== 0) return statusComparison;
 
-  const leftSeen = timestampMs(left.lastSeenAt);
-  const rightSeen = timestampMs(right.lastSeenAt);
+  const leftSeen = timestampMs(left?.telemetry?.schemaVersion >= 3 ? left.telemetryUpdatedAt : left.lastSeenAt);
+  const rightSeen = timestampMs(right?.telemetry?.schemaVersion >= 3 ? right.telemetryUpdatedAt : right.lastSeenAt);
   if (leftSeen && rightSeen && leftSeen !== rightSeen) return rightSeen - leftSeen;
   if (leftSeen !== rightSeen) return leftSeen ? -1 : 1;
   return comparePortalScreens(left, right);

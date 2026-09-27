@@ -1,6 +1,7 @@
 import UploadLimitDialog from "./UploadLimitDialog";
 import { uploadLimitBytes, uploadSizeNotice } from "./upload-plan-policy";
 import TelemetryDashboard from "./TelemetryDashboard";
+import { linkedAtForScreen, telemetryStatus } from "./telemetry-v1";
 ﻿import { useEffect, useLayoutEffect, useRef, useState } from "react";
 import { Routes, Route, Navigate, useParams, useNavigate } from "react-router-dom";
 import { initializeApp, deleteApp } from "firebase/app";
@@ -366,8 +367,8 @@ function getTimestampMs(value) {
   return 0;
 }
 
-const SCREEN_ONLINE_WINDOW_SECONDS = 30;
-const SCREEN_ATTENTION_WINDOW_SECONDS = 60;
+const SCREEN_ONLINE_WINDOW_SECONDS = 45;
+const SCREEN_ATTENTION_WINDOW_SECONDS = 120;
 const SCREEN_LOCATION_CACHE_KEY = "totempark-screen-location-cache";
 const SCREEN_LOCATION_CACHE_TTL_MS = 30 * 60 * 1000;
 let screenLocationRetryAfter = 0;
@@ -384,6 +385,10 @@ function getScreenDeviceLabel(screen = {}) {
 
 function getScreenLastSeenDate(screen = {}) {
   // Only timestamps written by the player count as proof of connectivity.
+  if (screen.telemetry?.schemaVersion >= 3) {
+    const telemetryTimestamp = getTimestampMs(screen.telemetryUpdatedAt);
+    return telemetryTimestamp ? new Date(telemetryTimestamp) : null;
+  }
   const timestamp = Math.max(
     getTimestampMs(screen.lastSeenAt),
     getTimestampMs(screen.lastCommandExecutedAt),
@@ -4015,6 +4020,7 @@ function AdminApp({ screenRotation, onScreenRotationChange }) {
   const [authStatus, setAuthStatus] = useState("AUTH_LOADING");
   const [activePage, setActivePage] = useState("dashboard");
   const [selectedClient, setSelectedClient] = useState(null);
+  const [telemetryFocus, setTelemetryFocus] = useState(null);
   const [appMode, setAppMode] = useState(() => {
     if (!isNativeApp()) return "web";
 
@@ -4385,8 +4391,11 @@ function AdminApp({ screenRotation, onScreenRotationChange }) {
         </aside>
 
         <main className="content">
-          {!selectedClient && activePage === "dashboard" && <Dashboard onNavigate={setActivePage} />}
-          {!selectedClient && activePage === "telemetry" && <TelemetryDashboard />}
+          {!selectedClient && activePage === "dashboard" && <Dashboard onNavigate={setActivePage} onOpenTelemetry={(screen) => {
+            setTelemetryFocus({ clientId: screen.clientId, id: screen.id });
+            setActivePage("telemetry");
+          }} />}
+          {!selectedClient && activePage === "telemetry" && <TelemetryDashboard focusScreen={telemetryFocus} />}
           {!selectedClient && activePage === "clients" && (
             <ClientsPage onOpenClient={setSelectedClient} />
           )}
@@ -4980,10 +4989,12 @@ function PendingAccountPanel({ onBack }) {
   );
 }
 
-function Dashboard({ onNavigate }) {
+function Dashboard({ onNavigate, onOpenTelemetry }) {
   const [clients, setClients] = useState([]);
   const [clientsError, setClientsError] = useState("");
   const [screensData, setScreensData] = useState([]);
+  const [playerBindings, setPlayerBindings] = useState([]);
+  const [telemetryConfig, setTelemetryConfig] = useState({ enabled: false, screenIds: [], clientIds: [], deviceIds: [] });
   const [playlistsData, setPlaylistsData] = useState([]);
   const [now, setNow] = useState(Date.now());
   const [screenStatusFilter, setScreenStatusFilter] = useState("all");
@@ -4997,6 +5008,14 @@ function Dashboard({ onNavigate }) {
 
     return () => clearInterval(interval);
   }, []);
+
+  useEffect(() => onSnapshot(collection(db, "playerDeviceBindings"), (snapshot) => {
+    setPlayerBindings(snapshot.docs.map((item) => ({ id: item.id, ...item.data() })));
+  }, () => setPlayerBindings([])), []);
+
+  useEffect(() => onSnapshot(doc(db, "settings", "telemetry2a2c"), (snapshot) => {
+    setTelemetryConfig(snapshot.exists() ? snapshot.data() : { enabled: false, screenIds: [], clientIds: [], deviceIds: [] });
+  }), []);
 
   useEffect(() => {
     let unsubScreens = [];
@@ -5518,7 +5537,9 @@ function Dashboard({ onNavigate }) {
                 const deviceLocation = getScreenDisplayLocation(screen);
 
                 return (
-                  <div className="premium-screen-row" key={`${screen.clientId}-${screen.id}`}>
+                  <div className="premium-screen-row" key={`${screen.clientId}-${screen.id}`} role="button" tabIndex={0} onClick={() => onOpenTelemetry?.(screen)} onKeyDown={(event) => {
+                    if (event.key === "Enter" || event.key === " ") { event.preventDefault(); onOpenTelemetry?.(screen); }
+                  }}>
                     <div className={`premium-screen-dot ${connection.className}`}></div>
 
                     <div className="premium-screen-icon premium-screen-thumb">
@@ -5537,11 +5558,11 @@ function Dashboard({ onNavigate }) {
 
                       <div className="manager-now-playing">
                         <small>{screen.currentPlaylistName || "Playlist não informada"}</small>
-                        <b>{screen.nowPlayingTitle || "Aguardando mídia"}</b>
+                        <b>{screen.telemetry?.schemaVersion >= 3 ? "Não instrumentado" : screen.nowPlayingTitle || "Aguardando mídia"}</b>
                         <span className="manager-cache-line">
-                          Cache: {getCacheStatusLabel(screen)} • {getMediaSourceLabel(screen.currentMediaSource)}
+                          {screen.telemetry?.schemaVersion >= 3 ? "Cache e origem: Não instrumentado" : <>Cache: {getCacheStatusLabel(screen)} • {getMediaSourceLabel(screen.currentMediaSource)}</>}
                         </span>
-                        {getCacheSyncLabel(screen) && (
+                        {!(screen.telemetry?.schemaVersion >= 3) && getCacheSyncLabel(screen) && (
                           <span className="manager-cache-line muted">
                             {getCacheSyncLabel(screen)}
                           </span>
@@ -5560,6 +5581,22 @@ function Dashboard({ onNavigate }) {
 
                       <span>
                         Login: {connection.lastConnection}
+                      </span>
+
+                      <span>
+                        Última comunicação: {formatScreenConnectionDate(screen.telemetry?.schemaVersion >= 3 ? screen.telemetryUpdatedAt : screen.lastSeenAt)}
+                      </span>
+
+                      <span>
+                        Vinculada desde: {linkedAtForScreen(screen, playerBindings) ? formatScreenConnectionDate(linkedAtForScreen(screen, playerBindings)) : "—"}
+                      </span>
+
+                      <span>
+                        Telemetria: {telemetryStatus(screen, telemetryConfig, now)}
+                      </span>
+
+                      <span>
+                        App: {screen.telemetry?.session?.appVersion || "—"} • Tempo ativo: {screen.telemetry?.schemaVersion >= 3 && Number.isFinite(Number(screen.telemetry?.counters?.activeTimeMs)) ? `${Math.floor(Number(screen.telemetry.counters.activeTimeMs) / 60000)} min` : "—"}
                       </span>
 
                       <span>
