@@ -1,0 +1,68 @@
+{
+  "input": "C:\\Users\\centr\\Desktop\\totem-park\\artifacts\\v11-binary-hotfix\\stage\\android\\app\\src\\main\\assets\\public\\assets\\index-C8VMWlD5.js",
+  "inputSha256": "E156CCFE9D13D6417B6B95D15DFD8FBDF3DF525BDB84E88FBD8792A8A2C065EB",
+  "output": "C:\\Users\\centr\\Desktop\\totem-park\\artifacts\\v11-binary-hotfix\\stage\\android\\app\\src\\main\\assets\\public\\assets\\index-C8VMWlD5-hotfix.js",
+  "outputSha256": "709BA00A7DC29932AB917EA4617829D9C2E6548BA9232490A5173CE373CF95C0",
+  "changes": [
+    {
+      "label": "lifecycle/watchdog hooks",
+      "matches": 1,
+      "beforeBytes": 69,
+      "afterBytes": 159
+    },
+    {
+      "label": "fast boot with native file validation",
+      "matches": 1,
+      "beforeBytes": 35,
+      "afterBytes": 2002
+    },
+    {
+      "label": "release decoder before VIDEO to VIDEO transition",
+      "matches": 1,
+      "beforeBytes": 132,
+      "afterBytes": 692
+    },
+    {
+      "label": "mount only after previous decoder unmount",
+      "matches": 1,
+      "beforeBytes": 192,
+      "afterBytes": 208
+    },
+    {
+      "label": "decoder release completion gate",
+      "matches": 1,
+      "beforeBytes": 31,
+      "afterBytes": 319
+    },
+    {
+      "label": "ignore stale playing event during release",
+      "matches": 1,
+      "beforeBytes": 58,
+      "afterBytes": 122
+    },
+    {
+      "label": "ignore stale error event during release",
+      "matches": 1,
+      "beforeBytes": 151,
+      "afterBytes": 215
+    },
+    {
+      "label": "video only watchdog",
+      "matches": 1,
+      "beforeBytes": 16,
+      "afterBytes": 1643
+    },
+    {
+      "label": "stop local playback after confirmed screen removal",
+      "matches": 1,
+      "beforeBytes": 58,
+      "afterBytes": 164
+    },
+    {
+      "label": "stop local playback after confirmed device conflict",
+      "matches": 1,
+      "beforeBytes": 76,
+      "afterBytes": 84
+    }
+  ]
+}
