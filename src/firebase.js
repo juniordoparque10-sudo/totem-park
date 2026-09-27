@@ -2,7 +2,7 @@ import { Capacitor } from "@capacitor/core";
 import { usePersistentFirestoreCache } from "./firestore-cache-policy";
 import { initializeApp } from "firebase/app";
 
-import { getAuth } from "firebase/auth";
+import { browserLocalPersistence, getAuth, setPersistence } from "firebase/auth";
 
 import {
   initializeFirestore,
@@ -25,6 +25,12 @@ const firebaseConfig = {
 const app = initializeApp(firebaseConfig);
 
 export const auth = getAuth(app);
+// Auth observers must not decide routing before durable browser persistence is ready.
+// Keeping this promise exported also makes the boot order explicit for route guards.
+export const authPersistenceReady = setPersistence(auth, browserLocalPersistence).catch((error) => {
+  console.error("Nao foi possivel configurar a persistencia local do login:", error);
+  throw error;
+});
 export const db = initializeFirestore(app, {
   experimentalAutoDetectLongPolling: true,
   localCache: usePersistentFirestoreCache({
