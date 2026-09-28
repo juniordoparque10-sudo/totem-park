@@ -14077,3 +14077,162 @@ button.premium-stat-card{width:100%;font:inherit;text-align:left;color:inherit;c
   -webkit-line-clamp: 2;
 }
 
+/* Telas em tempo real: três áreas legíveis sem mudar os dados exibidos. */
+.premium-screen-row.realtime-screen-card {
+  display: grid;
+  grid-template-columns: minmax(0, 1.05fr) minmax(0, 1.35fr) minmax(0, 1fr);
+  align-items: stretch;
+  gap: 0;
+  min-width: 0;
+  padding: 14px 16px;
+  cursor: pointer;
+}
+
+.realtime-screen-card > div {
+  min-width: 0;
+}
+
+.realtime-screen-identity {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 12px;
+  padding: 2px 18px 2px 0;
+}
+
+.realtime-screen-identity-head {
+  display: flex;
+  align-items: center;
+  gap: 11px;
+  width: 100%;
+  min-width: 0;
+}
+
+.realtime-screen-identity .premium-screen-dot {
+  flex: 0 0 9px;
+  width: 9px;
+  height: 9px;
+}
+
+.realtime-screen-identity .premium-screen-thumb {
+  flex: 0 0 46px;
+  width: 46px;
+  height: 46px;
+  border-radius: 12px;
+  overflow: hidden;
+}
+
+.realtime-screen-name {
+  min-width: 0;
+}
+
+.realtime-screen-name strong {
+  display: block;
+  color: #f3f7ff;
+  font-size: 15px;
+  line-height: 1.25;
+  overflow-wrap: break-word;
+  word-break: normal;
+}
+
+.realtime-screen-name span {
+  display: block;
+  margin-top: 4px;
+  color: #9fb1ce;
+  font-size: 11px;
+  line-height: 1.3;
+  overflow-wrap: break-word;
+  word-break: normal;
+}
+
+.realtime-screen-identity .premium-live-badge {
+  padding: 5px 10px;
+  font-size: 11px;
+  white-space: nowrap;
+}
+
+.realtime-screen-section {
+  min-width: 0;
+  padding: 2px 18px;
+  border-left: 1px solid rgba(148, 163, 184, 0.15);
+}
+
+.realtime-screen-communication {
+  padding-right: 0;
+}
+
+.realtime-screen-section-title {
+  display: block;
+  margin-bottom: 8px;
+  color: #78a9dd;
+  font-size: 10px;
+  font-weight: 800;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+}
+
+.realtime-screen-now-playing {
+  min-width: 0;
+  margin-bottom: 9px;
+}
+
+.realtime-screen-now-playing small,
+.realtime-screen-now-playing strong {
+  display: block;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.realtime-screen-now-playing small {
+  color: #67e8f9;
+  font-size: 11px;
+}
+
+.realtime-screen-now-playing strong {
+  margin-top: 3px;
+  color: #f3f7ff;
+  font-size: 13px;
+  line-height: 1.3;
+}
+
+.realtime-screen-facts {
+  display: grid;
+  gap: 5px;
+  min-width: 0;
+}
+
+.realtime-screen-facts span {
+  display: block;
+  min-width: 0;
+  color: #9fb1ce;
+  font-size: 11px;
+  line-height: 1.35;
+  overflow-wrap: break-word;
+  word-break: normal;
+}
+
+.realtime-screen-facts span[title] {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+@media (max-width: 800px) {
+  .premium-screen-row.realtime-screen-card {
+    grid-template-columns: minmax(0, 1fr);
+    gap: 12px;
+  }
+
+  .realtime-screen-identity {
+    padding: 0;
+  }
+
+  .realtime-screen-section {
+    padding: 12px 0 0;
+    border-left: 0;
+    border-top: 1px solid rgba(148, 163, 184, 0.15);
+  }
+}
+

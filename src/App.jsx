@@ -5533,77 +5533,54 @@ function Dashboard({ onNavigate, onOpenTelemetry }) {
                 const deviceLocation = getScreenDisplayLocation(screen);
 
                 return (
-                  <div className="premium-screen-row" key={`${screen.clientId}-${screen.id}`} role="button" tabIndex={0} onClick={() => onOpenTelemetry?.(screen)} onKeyDown={(event) => {
+                  <div className="premium-screen-row realtime-screen-card" key={`${screen.clientId}-${screen.id}`} role="button" tabIndex={0} onClick={() => onOpenTelemetry?.(screen)} onKeyDown={(event) => {
                     if (event.key === "Enter" || event.key === " ") { event.preventDefault(); onOpenTelemetry?.(screen); }
                   }}>
-                    <div className={`premium-screen-dot ${connection.className}`}></div>
-
-                    <div className="premium-screen-icon premium-screen-thumb">
-                      {renderLivePreviewMedia(
-                        screen,
-                        getDashboardActivePlaylist(screen)?.items?.[0],
-                        <Monitor size={24} />
-                      )}
+                    <div className="realtime-screen-identity">
+                      <div className="realtime-screen-identity-head">
+                        <div className={`premium-screen-dot ${connection.className}`}></div>
+                        <div className="premium-screen-icon premium-screen-thumb">
+                          {renderLivePreviewMedia(
+                            screen,
+                            getDashboardActivePlaylist(screen)?.items?.[0],
+                            <Monitor size={24} />
+                          )}
+                        </div>
+                        <div className="realtime-screen-name">
+                          <strong>{screen.name}</strong>
+                          <span>{screen.clientName} • {screen.location || "Não informado"}</span>
+                        </div>
+                      </div>
+                      <span className={`premium-live-badge ${connection.className}`}>{connection.label}</span>
                     </div>
 
-                    <div className="premium-screen-text">
-                      <strong>{screen.name}</strong>
-                      <span>
-                        {screen.clientName} • {screen.location || "Não informado"}
-                      </span>
-
-                      <div className="manager-now-playing">
-                        <small>{screen.currentPlaylistName || "Playlist não informada"}</small>
-                        <b>{screen.nowPlayingTitle || "Aguardando mídia"}</b>
-                        <span className="manager-cache-line">
-                          Cache: {getCacheStatusLabel(screen)} • {getMediaSourceLabel(screen.currentMediaSource)}
-                        </span>
-                        {getCacheSyncLabel(screen) && (
-                          <span className="manager-cache-line muted">
-                            {getCacheSyncLabel(screen)}
-                          </span>
-                        )}
+                    <div className="realtime-screen-section">
+                      <span className="realtime-screen-section-title">Operação</span>
+                      <div className="realtime-screen-now-playing">
+                        <small title={screen.currentPlaylistName || "Playlist não informada"}>{screen.currentPlaylistName || "Playlist não informada"}</small>
+                        <strong title={screen.nowPlayingTitle || "Aguardando mídia"}>{screen.nowPlayingTitle || "Aguardando mídia"}</strong>
                       </div>
-                    </div>
-
-                    <div className="manager-screen-status-col">
-                      <div className={`premium-live-badge ${connection.className}`}>
-                        {connection.label}
-                      </div>
-
-                      <span>
-                        {connection.deviceLabel}
-                      </span>
-
-                      <span>
-                        Login: {connection.lastConnection}
-                      </span>
-
-                      <span>
-                        Última comunicação: {formatScreenConnectionDate(getScreenLastSeenDate(screen))}
-                      </span>
-
-                      <span>
-                        Vinculada desde: {linkedAtForScreen(screen, playerBindings) ? formatScreenConnectionDate(linkedAtForScreen(screen, playerBindings)) : "—"}
-                      </span>
-
-                      <span>
-                        Telemetria: {telemetryStatus(screen, telemetryConfig, now)}
-                      </span>
-
-                      <span>
-                        App: {screen.telemetry?.session?.appVersion || "—"} • Tempo ativo: {screen.telemetry?.schemaVersion >= 3 && Number.isFinite(Number(screen.telemetry?.counters?.activeTimeMs)) ? `${Math.floor(Number(screen.telemetry.counters.activeTimeMs) / 60000)} min` : "—"}
-                      </span>
-
-                      <span>
-                        Local: {deviceLocation.city}
-                      </span>
-
-                      <span>
-                        Item: {screen.nowPlayingIndex && screen.nowPlayingTotal
+                      <div className="realtime-screen-facts">
+                        <span>Cache: {getCacheStatusLabel(screen)} • {getMediaSourceLabel(screen.currentMediaSource)}</span>
+                        {getCacheSyncLabel(screen) && <span>{getCacheSyncLabel(screen)}</span>}
+                        <span title={screen.telemetry?.session?.appVersion || "—"}>App: {screen.telemetry?.session?.appVersion || "—"}</span>
+                        <span>Tempo ativo: {screen.telemetry?.schemaVersion >= 3 && Number.isFinite(Number(screen.telemetry?.counters?.activeTimeMs)) ? `${Math.floor(Number(screen.telemetry.counters.activeTimeMs) / 60000)} min` : "—"}</span>
+                        <span>Local: {deviceLocation.city}</span>
+                        <span>Item: {screen.nowPlayingIndex && screen.nowPlayingTotal
                           ? `${screen.nowPlayingIndex}/${screen.nowPlayingTotal}`
-                          : "--"}
-                      </span>
+                          : "--"}</span>
+                      </div>
+                    </div>
+
+                    <div className="realtime-screen-section realtime-screen-communication">
+                      <span className="realtime-screen-section-title">Comunicação</span>
+                      <div className="realtime-screen-facts">
+                        <span title={connection.deviceLabel}>{connection.deviceLabel}</span>
+                        <span>Login: {connection.lastConnection}</span>
+                        <span>Última comunicação: {formatScreenConnectionDate(getScreenLastSeenDate(screen))}</span>
+                        <span>Vinculada desde: {linkedAtForScreen(screen, playerBindings) ? formatScreenConnectionDate(linkedAtForScreen(screen, playerBindings)) : "—"}</span>
+                        <span>Telemetria: {telemetryStatus(screen, telemetryConfig, now)}</span>
+                      </div>
                     </div>
                   </div>
                 );
