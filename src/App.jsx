@@ -5189,7 +5189,7 @@ function Dashboard({ onNavigate, onOpenTelemetry }) {
       if (screenStatusFilter === "all") return true;
       return getScreenConnectionStatus(screen, now).key === screenStatusFilter;
     })
-    .sort(comparePortalScreens);
+    .sort((left, right) => comparePortalScreens(left, right, now));
   const screensPerPage = 8;
   const screenPagination = getPortalScreenPage(filteredRealtimeScreens, screenPage, screensPerPage);
   const { page: safeScreenPage, pageCount: screenPageCount, items: visibleRealtimeScreens } = screenPagination;

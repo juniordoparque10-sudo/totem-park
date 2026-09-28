@@ -52,7 +52,7 @@ export function formatRelativeCommunication(value, now = Date.now()) {
   return `há ${dayLabel} e ${hourLabel}`;
 }
 
-export function comparePortalScreens(left = {}, right = {}) {
+function compareScreenNames(left = {}, right = {}) {
   const leftKey = [left.clientName, left.name || left.code, left.id]
     .map((value) => String(value || "").trim().toLocaleLowerCase("pt-BR"));
   const rightKey = [right.clientName, right.name || right.code, right.id]
@@ -65,8 +65,25 @@ export function comparePortalScreens(left = {}, right = {}) {
   return 0;
 }
 
-export function compareTelemetryScreens(left = {}, right = {}) {
-  return comparePortalScreens(left, right);
+function isScreenOnlineForOrder(screen, now) {
+  if (screen.portalStatus) return screen.portalStatus === "ONLINE";
+  return Boolean(screen.connectedDeviceId || screen.activeDeviceId)
+    && getPortalScreenStatus(screen, now) === "ONLINE";
+}
+
+export function comparePortalScreens(left = {}, right = {}, now = Date.now()) {
+  const leftOnline = isScreenOnlineForOrder(left, now);
+  const rightOnline = isScreenOnlineForOrder(right, now);
+  if (leftOnline !== rightOnline) return leftOnline ? -1 : 1;
+  if (!leftOnline) {
+    const lastSeenDifference = timestampMs(right.lastSeenAt) - timestampMs(left.lastSeenAt);
+    if (lastSeenDifference !== 0) return lastSeenDifference;
+  }
+  return compareScreenNames(left, right);
+}
+
+export function compareTelemetryScreens(left = {}, right = {}, now = Date.now()) {
+  return comparePortalScreens(left, right, now);
 }
 
 export function getPortalScreenPage(screens = [], requestedPage = 1, pageSize = 8) {
