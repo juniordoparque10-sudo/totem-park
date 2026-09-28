@@ -65,17 +65,7 @@ export function comparePortalScreens(left = {}, right = {}) {
   return 0;
 }
 
-export function compareTelemetryScreens(left = {}, right = {}, now = Date.now()) {
-  const priority = { ONLINE: 0, ATTENTION: 1, OFFLINE: 2 };
-  const leftStatus = left.portalStatus || getPortalScreenStatus(left, now);
-  const rightStatus = right.portalStatus || getPortalScreenStatus(right, now);
-  const statusComparison = (priority[leftStatus] ?? 3) - (priority[rightStatus] ?? 3);
-  if (statusComparison !== 0) return statusComparison;
-
-  const leftSeen = timestampMs(left?.lastSeenAt);
-  const rightSeen = timestampMs(right?.lastSeenAt);
-  if (leftSeen && rightSeen && leftSeen !== rightSeen) return rightSeen - leftSeen;
-  if (leftSeen !== rightSeen) return leftSeen ? -1 : 1;
+export function compareTelemetryScreens(left = {}, right = {}) {
   return comparePortalScreens(left, right);
 }
 
