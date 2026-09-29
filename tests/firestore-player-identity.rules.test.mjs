@@ -99,6 +99,20 @@ test("master can manage bindings and owner cannot", async () => {
   await assertFails(updateDoc(doc(owner, bindingPath("new-player")), { status: "REVOKED" }));
 });
 
+test("only master can change the per-screen Templates V2 test mode", async () => {
+  const master = env.authenticatedContext("master", { email: "master@example.com" }).firestore();
+  const owner = env.authenticatedContext("client-owner", { email: "owner@example.com" }).firestore();
+  const player = env.authenticatedContext("player-a").firestore();
+
+  await assertFails(updateDoc(doc(owner, screenPath()), { templatesV2TestMode: true }));
+  await assertFails(updateDoc(doc(player, screenPath()), { templatesV2TestMode: true }));
+  await assertSucceeds(updateDoc(doc(master, screenPath()), {
+    templatesV2TestMode: true,
+    templatesV2TestModeUpdatedBy: "master@example.com",
+  }));
+  assert.equal((await getDoc(doc(master, screenPath()))).data().templatesV2TestMode, true);
+});
+
 test("sequence cannot move backwards", async () => {
   const db = env.authenticatedContext("player-a").firestore();
   await assertSucceeds(setDoc(doc(db, sessionPath()), { ...telemetry(), sequence: 5 }));

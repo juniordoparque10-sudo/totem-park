@@ -137,6 +137,7 @@ import {
 import { deleteStoredAsset, uploadStorageAsset } from "./storage-service";
 import TemplateV2Editor from "./templates-v2/editor/TemplateV2Editor";
 import TemplateV2Renderer from "./templates-v2/TemplateV2Renderer";
+import TemplateV2ScaledStage from "./templates-v2/editor/TemplateV2ScaledStage";
 import { getPublishedTemplateV2View, isTemplateV2 } from "./templates-v2/schema";
 import { getTemplatesV2ScreenCapability } from "./templates-v2/player-capability";
 import logo from "./assets/logo.png";
@@ -7184,7 +7185,7 @@ function ClientInternalPanel({ client, onBack, hideBackButton = false, isAdmin =
       {tab === "dashboard" && <ClientDashboard client={currentClient} access={operationalAccess} />}
       {tab === "media" && <ClientMediaPage client={currentClient} access={operationalAccess} />}
       {tab === "playlists" && <ClientPlaylistsPage client={currentClient} access={operationalAccess} isAdmin={isAdmin} />}
-      {tab === "screens" && <ClientScreensPage client={currentClient} access={operationalAccess} />}
+      {tab === "screens" && <ClientScreensPage client={currentClient} access={operationalAccess} isAdmin={isAdmin} adminUser={adminUser} />}
       {tab === "templates" && <ClientTemplatesPage client={currentClient} access={operationalAccess} isAdmin={isAdmin} />}
       {tab === "marketing" && <ClientMarketingPage client={currentClient} access={operationalAccess} />}
       {tab === "plans" && <PlansPage clientView />}
@@ -9041,7 +9042,7 @@ function ClientPlaylistsPage({ client, access = getClientPlanAccess(client), isA
           toggleTemplate(template.id);
         }}
       >
-        <UniversalPreview
+        {templateV2 ? <TemplateV2ScaledStage className={`playlist-preview-frame tpv2-picker-thumbnail ${template.orientation === "Retrato" ? "portrait" : "landscape"}`} template={template} config={template.published} orientation={template.orientation || "Paisagem"} mode="thumbnail" /> : <UniversalPreview
           item={{
             ...template,
             playerItemType: "template",
@@ -9049,7 +9050,7 @@ function ClientPlaylistsPage({ client, access = getClientPlanAccess(client), isA
           }}
           className="playlist-preview-frame"
           compact
-        />
+        />}
 
         <strong>{template.name}</strong>
 
@@ -9652,7 +9653,7 @@ function ClientPlaylistsPage({ client, access = getClientPlanAccess(client), isA
 
 
 
-function ClientScreensPage({ client, access = getClientPlanAccess(client) }) {
+function ClientScreensPage({ client, access = getClientPlanAccess(client), isAdmin = false, adminUser = null }) {
   const [screens, setScreens] = useState([]);
   const [playlists, setPlaylists] = useState([]);
   const [now, setNow] = useState(Date.now());
@@ -9998,6 +9999,20 @@ function ClientScreensPage({ client, access = getClientPlanAccess(client) }) {
     }
   }
 
+  async function setTemplatesV2TestMode(screen, enabled) {
+    if (!isAdmin) return;
+    try {
+      await updateDoc(doc(db, "clients", client.id, "screens", screen.id), {
+        templatesV2TestMode: enabled,
+        templatesV2TestModeUpdatedAt: serverTimestamp(),
+        templatesV2TestModeUpdatedBy: adminUser?.email || adminUser?.uid || "Master",
+      });
+    } catch (error) {
+      console.log(error);
+      alert("Não foi possível alterar o modo de homologação V2.");
+    }
+  }
+
   function sendOverlayCommand(screenId) {
     const message = window.prompt("Digite a mensagem do overlay:");
 
@@ -10169,6 +10184,7 @@ function ClientScreensPage({ client, access = getClientPlanAccess(client) }) {
                   </div>
 
                   <h3>{screen.name}</h3>
+                  {isAdmin && screen.templatesV2TestMode && <div className="screen-v2-canary-badge">CANÁRIO V2 · TEMPLATES V2 EM HOMOLOGAÇÃO</div>}
                   <p>Local: {screen.location}</p>
                   <p>Playlist padrão: {screen.playlistName}</p>
 
@@ -10228,6 +10244,11 @@ function ClientScreensPage({ client, access = getClientPlanAccess(client) }) {
                     <span>{deviceLocation.detail}</span>
                     <span>Local atualizado: {formatScreenConnectionDate(deviceLocation.updatedAt)}</span>
                   </div>
+
+                  {isAdmin && <div className="screen-v2-test-control">
+                    <div><small>Controle restrito Master</small><strong>Modo de Teste Templates V2</strong><span>A liberação vale somente para esta tela.</span></div>
+                    <button type="button" className={screen.templatesV2TestMode ? "active" : ""} onClick={() => setTemplatesV2TestMode(screen, !screen.templatesV2TestMode)}>{screen.templatesV2TestMode ? "Ativado" : "Desativado"}</button>
+                  </div>}
 
                   <div className="remote-control-panel-inline">
                     <div className="remote-control-heading">

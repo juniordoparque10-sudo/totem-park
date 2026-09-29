@@ -129,3 +129,7 @@
 .templates-library-tabs button { min-height:40px; padding:0 17px; border:0; border-radius:10px; color:#94a3b8; background:transparent; font-weight:850; cursor:pointer; }
 .templates-library-tabs button.active { color:#07111f; background:linear-gradient(135deg,#67e8f9,#38bdf8); box-shadow:0 8px 22px rgba(34,211,238,.18); }
 .templates-library-tabs button span { margin-left:6px; font-size:9px; text-transform:uppercase; opacity:.72; }
+.tpv2-published-strip{grid-template-columns:repeat(auto-fit,minmax(min(100%,360px),1fr))}
+.tpv2-published-strip article>.tpv2-created-thumbnail{width:100%;aspect-ratio:16/9;background:#050b14}
+.tpv2-published-strip article.portrait>.tpv2-created-thumbnail{width:min(100%,260px);aspect-ratio:9/16;margin:0 auto}
+.tpv2-created-thumbnail .tpv2-scaled-stage{box-shadow:none}

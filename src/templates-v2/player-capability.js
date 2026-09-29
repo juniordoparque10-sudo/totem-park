@@ -11,6 +11,7 @@ export function getPlayerVersionLabel(screen = {}) {
 
 export function supportsTemplatesV2(player = {}) {
   if (player?.capabilities?.templatesV2 === true || player?.supportsTemplatesV2 === true) return true;
+  if (player?.templatesV2TestMode === true) return true;
   if (player?.capabilities?.templatesV2 === false || player?.supportsTemplatesV2 === false) return false;
 
   const versionCode = Number(player?.versionCode || player?.playerVersionCode || 0);

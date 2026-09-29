@@ -3013,6 +3013,12 @@
 
 .select-media-card.awaiting-player-update { border-color:rgba(245,158,11,.55); }
 .select-media-card.awaiting-player-update em { display:block; width:max-content; max-width:100%; margin-top:8px; padding:5px 8px; border-radius:999px; background:rgba(245,158,11,.14); color:#fbbf24; font-size:11px; font-style:normal; font-weight:900; }
+.tpv2-picker-thumbnail.landscape{width:100%;aspect-ratio:16/9;background:#050b14}
+.tpv2-picker-thumbnail.portrait{width:min(68%,190px);aspect-ratio:9/16;margin-inline:auto;background:#050b14}
+.tpv2-picker-thumbnail .tpv2-scaled-stage{box-shadow:none}
+.screen-v2-canary-badge{width:max-content;max-width:100%;margin:5px 0 10px;padding:6px 9px;border-radius:999px;color:#fde68a;background:rgba(245,158,11,.13);border:1px solid rgba(245,158,11,.3);font-size:10px;font-weight:950;letter-spacing:.04em}
+.screen-v2-test-control{margin:12px 0;padding:12px;border:1px solid rgba(56,189,248,.22);border-radius:13px;background:rgba(14,165,233,.07);display:flex;align-items:center;justify-content:space-between;gap:12px}
+.screen-v2-test-control small,.screen-v2-test-control strong,.screen-v2-test-control span{display:block}.screen-v2-test-control small{color:#7dd3fc;font-size:9px;text-transform:uppercase}.screen-v2-test-control span{margin-top:3px;color:#94a3b8;font-size:10px}.screen-v2-test-control button{min-height:36px;padding:0 12px;border:1px solid rgba(148,163,184,.24);border-radius:10px;color:#cbd5e1;background:#111c2c;font-weight:850}.screen-v2-test-control button.active{color:#052e16;background:#6ee7b7;border-color:#6ee7b7}
 
 .premium-panel-header > div:first-child {
   flex: 1 1 170px;

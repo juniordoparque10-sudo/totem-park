@@ -150,9 +150,14 @@ service cloud.firestore {
         allow read: if true;
         allow create, delete: if isMaster() || isClientOwner(clientId);
         allow update: if isMaster()
-          || isClientOwner(clientId)
-          || isAllowedPublicScreenUpdate()
-          || isAllowedPlayerTelemetryUpdate(clientId, screenId);
+          || ((isClientOwner(clientId)
+            || isAllowedPublicScreenUpdate()
+            || isAllowedPlayerTelemetryUpdate(clientId, screenId))
+            && !request.resource.data.diff(resource.data).affectedKeys().hasAny([
+              "templatesV2TestMode",
+              "templatesV2TestModeUpdatedAt",
+              "templatesV2TestModeUpdatedBy"
+            ]));
 
         match /telemetrySessions/{sessionId} {
           allow read: if isMaster() || isClientOwner(clientId);
@@ -184,7 +189,8 @@ service cloud.firestore {
 
       match /{subcollection}/{documentId} {
         allow read: if true;
-        allow write: if isMaster() || isClientOwner(clientId);
+        allow write: if isMaster()
+          || (subcollection != "screens" && isClientOwner(clientId));
       }
     }
 

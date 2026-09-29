@@ -4,7 +4,6 @@ import { ChevronDown, CloudSun, Image, Palette, Plus, RotateCcw, Save, Send, Typ
 import { auth, db } from "../../firebase";
 import { uploadStorageAsset } from "../../storage-service";
 import { uploadLimitBytes } from "../../upload-plan-policy";
-import TemplateV2Renderer from "../TemplateV2Renderer";
 import {
   HERO_BUSINESS_TYPE,
   CLOCK_PRO_TYPE,
@@ -256,7 +255,7 @@ export default function TemplateV2Editor({ client, access, entitlement = { allow
         <TemplateV2PreviewPanel template={previewTemplate} config={draftState.editorDraft} orientation={orientation} onOrientationChange={setOrientation} scale={scale} onScaleChange={setScale} onOpen={() => setPreviewOpen(true)} dynamicData={previewDynamicData} />
       </div>
       {previewOpen && <PopupPreview template={previewTemplate} config={draftState.editorDraft} orientation={orientation} onClose={() => setPreviewOpen(false)} dynamicData={previewDynamicData} />}
-      {templates.length > 0 && <div className="tpv2-published-strip"><h3>Meus Templates V2</h3>{templates.map((item) => { const view = getPublishedTemplateV2View(item); const draft = getTemplateV2DraftConfig(item); const hasChanges = Boolean(view && isTemplateV2Dirty(draft,view.published)); const preview = view?.published || draft; const previewOrientation = preview.display?.defaultOrientation || "Paisagem"; return <article key={item.id}><TemplateV2Renderer template={item} config={preview} orientation={previewOrientation} compact mode="thumbnail"/><div className="tpv2-created-meta"><strong>{getTemplateV2Name(item)}</strong><span>{item.identity?.templateType || item.templateType}</span><em className={view ? "published" : "draft"}>{hasChanges ? "Alterações não publicadas" : view ? "Publicado" : "Rascunho"}</em></div></article>; })}</div>}
+      {templates.length > 0 && <div className="tpv2-published-strip"><h3>Meus Templates V2</h3>{templates.map((item) => { const view = getPublishedTemplateV2View(item); const draft = getTemplateV2DraftConfig(item); const hasChanges = Boolean(view && isTemplateV2Dirty(draft,view.published)); const preview = hasChanges ? draft : view?.published || draft; const previewOrientation = preview.display?.defaultOrientation || "Paisagem"; return <article className={previewOrientation === "Retrato" ? "portrait" : "landscape"} key={item.id}><TemplateV2ScaledStage className="tpv2-created-thumbnail" template={item} config={preview} orientation={previewOrientation} mode="thumbnail"/><div className="tpv2-created-meta"><strong>{getTemplateV2Name(item)}</strong><span>{item.identity?.templateType || item.templateType} · {previewOrientation}</span><em className={view ? "published" : "draft"}>{hasChanges ? "Alterações não publicadas" : view ? "Publicado" : "Rascunho"}</em></div></article>; })}</div>}
     </div>
   );
 }
