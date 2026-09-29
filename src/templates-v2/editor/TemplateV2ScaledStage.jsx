@@ -1,7 +1,7 @@
 import { useEffect, useMemo, useRef, useState } from "react";
 import TemplateV2Renderer from "../TemplateV2Renderer";
 
-export default function TemplateV2ScaledStage({ template, config, orientation, zoom = "fit", className = "" }) {
+export default function TemplateV2ScaledStage({ template, config, orientation, zoom = "fit", className = "", dynamicData = null, mode = "thumbnail" }) {
   const areaRef = useRef(null);
   const [available, setAvailable] = useState({ width: 0, height: 0 });
   const logical = orientation === "Retrato" ? { width: 1080, height: 1920 } : { width: 1920, height: 1080 };
@@ -30,7 +30,7 @@ export default function TemplateV2ScaledStage({ template, config, orientation, z
     <div ref={areaRef} className={`tpv2-scaled-area ${className}`}>
       {scale > 0 && <div className="tpv2-scaled-stage" style={{ width: logical.width * scale, height: logical.height * scale }}>
         <div className="tpv2-logical-template" style={{ width: logical.width, height: logical.height, transform: `scale(${scale})` }}>
-          <TemplateV2Renderer template={template} config={config} orientation={orientation} />
+          <TemplateV2Renderer template={template} config={config} orientation={orientation} dynamicData={dynamicData} mode={mode} />
         </div>
       </div>}
     </div>

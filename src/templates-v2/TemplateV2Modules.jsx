@@ -1,6 +1,7 @@
 import { useSyncExternalStore } from "react";
 import { Clock3, CloudSun, QrCode, Sparkles } from "lucide-react";
 import { buildQrUrl } from "../qr-code";
+import { shouldRenderTemplateV2InternalVideo, shouldShowTemplateMediaPlaceholder } from "./render-mode";
 
 let clockSnapshot = Date.now();
 let clockTimer = null;
@@ -17,13 +18,22 @@ export function TemplateClock({ format = "24h", large = false }) {
   return <strong className={large ? "tpv2-clock-large" : ""}><Clock3 /> {new Date(snapshot).toLocaleTimeString("pt-BR", { hour:"2-digit", minute:"2-digit", hour12:format === "12h" })}</strong>;
 }
 
-export function TemplateWeather({ config = {}, data }) {
-  return <span><CloudSun /> {data?.temperature != null ? `${data.temperature}° · ` : ""}{data?.city || config.city || "Sua cidade"}</span>;
+export function TemplateDate() {
+  const snapshot = useSyncExternalStore(subscribeClock, getClockSnapshot, getClockSnapshot);
+  const value = new Date(snapshot).toLocaleDateString("pt-BR", { weekday:"long", day:"2-digit", month:"long" });
+  return <span className="tpv2-date">{value.charAt(0).toUpperCase() + value.slice(1)}</span>;
 }
 
-export function TemplateMedia({ asset, fit = "cover", position = "center" }) {
-  if (!asset?.url) return <div className="tpv2-media-fallback"><Sparkles /><span>Selecione uma imagem da biblioteca</span></div>;
-  if (asset.type === "video") return <video src={asset.url} muted autoPlay loop playsInline style={{ objectFit:fit, objectPosition:position }} />;
+export function TemplateWeather({ config = {}, data }) {
+  return <span><CloudSun /> {data?.temperature != null ? `${data.temperature}° · ` : ""}{data?.condition || data?.city || config.city || "Sua cidade"}</span>;
+}
+
+export function TemplateMedia({ asset, fit = "cover", position = "center", mode = "player" }) {
+  const visiblePlaceholder = shouldShowTemplateMediaPlaceholder(mode);
+  if (!asset?.url) return <div className={`tpv2-media-fallback ${visiblePlaceholder ? "is-editor-placeholder" : "is-empty"}`}>{visiblePlaceholder && <><Sparkles /><span>Selecione uma imagem da biblioteca</span></>}</div>;
+  if (asset.type === "video") return shouldRenderTemplateV2InternalVideo(mode)
+    ? <video src={asset.url} muted autoPlay loop playsInline style={{ objectFit:fit, objectPosition:position }} />
+    : <div className="tpv2-media-fallback is-empty" />;
   return <img src={asset.url} alt="" style={{ objectFit:fit, objectPosition:position }} />;
 }
 

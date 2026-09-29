@@ -15,6 +15,7 @@ test("a new V2 template starts as draft-only", () => {
   assert.equal(template.schemaVersion, 2);
   assert.equal(template.identity.name, "Recepção");
   assert.equal(template.published, null);
+  assert.equal(template.status.publicationState, "draft");
   assert.equal(getPublishedTemplateV2View(template), null);
 });
 
@@ -95,4 +96,14 @@ test("news ticker configuration remains inside the draft contract", () => {
 test("registry explicitly declares ticker support", () => {
   const definitions = listTemplateV2Definitions();
   definitions.forEach((definition) => assert.equal(definition.newsTicker, definition.modules.includes("news")));
+});
+
+test("dynamic templates persist display options instead of generated values", () => {
+  const clock = createHeroBusinessDraft({ modules:{ clock:{showDate:false,showLocal:true}, weather:{city:"Natal/RN"} } });
+  assert.equal(clock.modules.clock.showDate,false);
+  assert.equal(clock.modules.clock.showLocal,true);
+  assert.equal(clock.modules.weather.city,"Natal/RN");
+  const weather = createHeroBusinessDraft({ modules:{ weather:{showCity:true,showCurrent:true,showFeelsLike:false,showForecast:true,forecastDays:5} } });
+  assert.equal(weather.modules.weather.forecastDays,5);
+  assert.equal(weather.modules.weather.showFeelsLike,false);
 });

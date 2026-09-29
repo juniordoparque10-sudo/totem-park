@@ -53,8 +53,8 @@ const HERO_DEFAULTS = {
     },
   },
   modules: {
-    clock: { enabled: true, format: "24h" },
-    weather: { enabled: false, city: "Sua cidade" },
+    clock: { enabled: true, format: "24h", showDate: true, showLocal: true },
+    weather: { enabled: false, city: "Sua cidade", showCity: true, showCurrent: true, showFeelsLike: true, showForecast: true, forecastDays: 5 },
     news: { enabled: false, newsSource: "", newsFeedUrl: "", selectedNewsSources: [], tickerSpeed: "normal", tickerSize: "normal", tickerBackground: "#07111f", tickerTextColor: "#ffffff", tickerTransparency: 8, tickerLabel: "Últimas notícias" },
     qrCode: { enabled: false, value: "", position: "bottom-right", size: "medium", margin: 32 },
   },
@@ -140,6 +140,7 @@ export function createTemplateV2Document({ name = "Hero Business", type = HERO_B
     },
     status: {
       enabled: true,
+      publicationState: "draft",
       draftRevision: "",
       publishedRevision: "",
     },

@@ -7,10 +7,14 @@ import { uploadLimitBytes } from "../../upload-plan-policy";
 import TemplateV2Renderer from "../TemplateV2Renderer";
 import {
   HERO_BUSINESS_TYPE,
+  CLOCK_PRO_TYPE,
+  WEATHER_PREMIUM_TYPE,
   cloneTemplateV2Config,
   createTemplateV2Document,
   getPublishedTemplateV2View,
+  getTemplateV2DraftConfig,
   getTemplateV2Name,
+  isTemplateV2Dirty,
   isTemplateV2,
 } from "../schema";
 import { TEMPLATE_V2_CATEGORIES, getTemplateV2Definition, listTemplateV2Definitions } from "../registry";
@@ -36,19 +40,18 @@ function Section({ icon, title, children, initialOpen = false }) {
   return <section className={`tpv2-editor-section ${open ? "open" : ""}`}><button type="button" onClick={() => setOpen(!open)}>{icon}<strong>{title}</strong><ChevronDown /></button>{open && <div>{children}</div>}</section>;
 }
 
-function PopupPreview({ template, config, orientation, onClose }) {
+function PopupPreview({ template, config, orientation, onClose, dynamicData }) {
   useEffect(() => { const close = (event) => event.key === "Escape" && onClose(); window.addEventListener("keydown", close); return () => window.removeEventListener("keydown", close); }, [onClose]);
-  return <div className="tpv2-preview-modal" onClick={onClose}><div className="tpv2-preview-dialog" onClick={(event) => event.stopPropagation()}><header><div><strong>Prévia ampliada</strong><span>{orientation} · editorDraft</span></div><button type="button" onClick={onClose}>Fechar</button></header><TemplateV2ScaledStage className={`tpv2-preview-dialog-stage ${orientation === "Retrato" ? "portrait" : "landscape"}`} template={template} config={config} orientation={orientation} /></div></div>;
+  return <div className="tpv2-preview-modal" onClick={onClose}><div className="tpv2-preview-dialog" onClick={(event) => event.stopPropagation()}><header><div><strong>Prévia ampliada</strong><span>{orientation} · editorDraft</span></div><button type="button" onClick={onClose}>Fechar</button></header><TemplateV2ScaledStage className={`tpv2-preview-dialog-stage ${orientation === "Retrato" ? "portrait" : "landscape"}`} template={template} config={config} orientation={orientation} dynamicData={dynamicData} /></div></div>;
 }
 
 function TypographyControl({ label, value, onChange, sizeLimits, lineLimits = [0.9, 1.7] }) {
   return <div className="tpv2-typography-control"><strong>{label}</strong><label>Tamanho <input type="range" min={sizeLimits[0]} max={sizeLimits[1]} value={value.fontSize} onChange={(event) => onChange("fontSize", Number(event.target.value))} /><span>{value.fontSize}px</span></label><label>Entrelinhas <input type="range" min={lineLimits[0]} max={lineLimits[1]} step="0.05" value={value.lineHeight} onChange={(event) => onChange("lineHeight", Number(event.target.value))} /><span>{Number(value.lineHeight).toFixed(2)}</span></label></div>;
 }
 
-export default function TemplateV2Editor({ client, access, entitlement = { allowed: true }, weatherCities = [], newsSources = [] }) {
+export default function TemplateV2Editor({ client, access, entitlement = { allowed: true }, weatherCities = [], newsSources = [], loadWeather, loadNews }) {
   const [templates, setTemplates] = useState([]);
   const [mediaList, setMediaList] = useState([]);
-  const [screens, setScreens] = useState([]);
   const [selectedId, setSelectedId] = useState("");
   const [newType, setNewType] = useState(HERO_BUSINESS_TYPE);
   const [catalogCategory, setCatalogCategory] = useState("Todos");
@@ -60,12 +63,14 @@ export default function TemplateV2Editor({ client, access, entitlement = { allow
   const [uploading, setUploading] = useState(false);
   const [message, setMessage] = useState("");
   const [previewOpen, setPreviewOpen] = useState(false);
+  const [previewDynamicData, setPreviewDynamicData] = useState(null);
   const selected = useMemo(() => templates.find((item) => item.id === selectedId) || null, [templates, selectedId]);
   const activeType = selected?.identity?.templateType || selected?.templateType || newType;
   const definition = getTemplateV2Definition(activeType);
   const catalogItems = listTemplateV2Definitions().filter((item) => (catalogCategory === "Todos" || item.category === catalogCategory) && (catalogOrientation === "Todos" || item.orientations.includes(catalogOrientation)));
   const draftState = useTemplateV2Draft(selected, activeType);
   const previewTemplate = selected || createTemplateV2Document({ name, type: activeType });
+  const previewNewsKey = JSON.stringify(draftState.editorDraft.modules.news || {});
 
   useEffect(() => {
     const stopTemplates = onSnapshot(collection(db, "clients", client.id, "templates"), (snapshot) => {
@@ -73,13 +78,31 @@ export default function TemplateV2Editor({ client, access, entitlement = { allow
       setTemplates(list);
     });
     const stopMedia = onSnapshot(collection(db, "clients", client.id, "media"), (snapshot) => setMediaList(snapshot.docs.map((item) => ({ id: item.id, ...item.data() }))));
-    const stopScreens = onSnapshot(collection(db, "clients", client.id, "screens"), (snapshot) => setScreens(snapshot.docs.map((item) => ({ id: item.id, ...item.data() }))));
-    return () => { stopTemplates(); stopMedia(); stopScreens(); };
+    return () => { stopTemplates(); stopMedia(); };
   }, [client.id]);
 
   /* The selected Firestore document is an external editor session boundary. */
   /* eslint-disable-next-line react-hooks/set-state-in-effect, react-hooks/exhaustive-deps */
   useEffect(() => { setName(selected ? getTemplateV2Name(selected) : (definition?.label || "Hero Business")); }, [selected?.id, selected?.status?.draftRevision, definition?.label]);
+
+  /* Live weather is an external resource; loading state intentionally begins at the request boundary. */
+  /* eslint-disable react-hooks/set-state-in-effect */
+  useEffect(() => {
+    if (![CLOCK_PRO_TYPE, WEATHER_PREMIUM_TYPE].includes(activeType) || !draftState.editorDraft.modules.weather?.enabled || !loadWeather) { setPreviewDynamicData(null); return undefined; }
+    let cancelled = false;
+    setPreviewDynamicData({ loading:true });
+    loadWeather(draftState.editorDraft.modules.weather.city).then((weather) => { if (!cancelled) setPreviewDynamicData({ weather }); }).catch(() => { if (!cancelled) setPreviewDynamicData({ weather:null, error:true }); });
+    return () => { cancelled = true; };
+  }, [activeType, draftState.editorDraft.modules.weather?.city, draftState.editorDraft.modules.weather?.enabled, loadWeather]);
+  /* eslint-enable react-hooks/set-state-in-effect */
+
+  useEffect(() => {
+    const newsConfig = JSON.parse(previewNewsKey);
+    if (!newsConfig.enabled || !loadNews) return undefined;
+    let cancelled = false;
+    loadNews(newsConfig).then((news) => { if (!cancelled) setPreviewDynamicData((current) => ({ ...(current || {}), news })); }).catch(() => {});
+    return () => { cancelled = true; };
+  }, [previewNewsKey, loadNews]);
 
   async function saveDraft() {
     if (!entitlement.allowed) { setMessage("Templates V2 não estão disponíveis no seu plano."); return; }
@@ -109,6 +132,7 @@ export default function TemplateV2Editor({ client, access, entitlement = { allow
     if (!selected) { setMessage("Salve o rascunho antes de publicar."); return; }
     if (draftState.isDirty) { setMessage("Salve as alterações do rascunho antes de publicar."); return; }
     if (access?.canEditTemplates === false) { setMessage("Seu plano não permite publicar templates."); return; }
+    if (draftState.persistedDraft.media?.primary?.type === "video") { setMessage("Substitua o vídeo interno por uma imagem antes de publicar. Vídeo em Template V2 ainda está em homologação."); return; }
     setSaving(true); setMessage("");
     try {
       const publishedRevision = revision("published");
@@ -124,13 +148,13 @@ export default function TemplateV2Editor({ client, access, entitlement = { allow
         enabled: true,
         "identity.name": name.trim() || definition?.label || "Template V2",
         "status.enabled": true,
+        "status.publicationState": "published",
         "status.publishedRevision": publishedRevision,
         publishedAt: serverTimestamp(),
         updatedAt: serverTimestamp(),
       });
-      await Promise.all(screens.map((screen) => updateDoc(doc(db, "clients", client.id, "screens", screen.id), { templateRevision: publishedRevision, remoteCommand: { id: `template-refresh-${publishedRevision}-${screen.id}`, type: "refresh", sentAt: new Date().toISOString() }, updatedAt: serverTimestamp() })));
       draftState.markPublished(published);
-      setMessage(`Publicação atualizada e refresh enviado para ${screens.length} tela(s).`);
+      setMessage("Template publicado e disponível para seleção em playlists. Nenhuma tela foi alterada.");
     } catch (error) { console.error(error); setMessage("Não foi possível publicar o template."); } finally { setSaving(false); }
   }
 
@@ -140,7 +164,8 @@ export default function TemplateV2Editor({ client, access, entitlement = { allow
     if (!entitlement.allowed) { setMessage("Templates V2 não estão disponíveis no seu plano."); return; }
     if (access?.canUpload === false) { setMessage("Seu plano não permite novos uploads."); return; }
     const kind = file.type.startsWith("video/") ? "video" : file.type.startsWith("image/") ? "image" : "";
-    if (!kind) { setMessage("Selecione uma imagem ou vídeo compatível."); return; }
+    if (!kind) { setMessage("Selecione uma imagem compatível."); return; }
+    if (targetPath === "media.primary" && kind === "video") { setMessage("Vídeo dentro de Template V2 ainda está em homologação. Selecione uma imagem."); return; }
     if (targetPath === "content.logo" && kind !== "image") { setMessage("O logo precisa ser uma imagem."); return; }
     const limit = uploadLimitBytes(uploadPlanName(client.plan), kind);
     if (limit > 0 && file.size > limit) { setMessage(`O arquivo excede o limite de ${Math.round(limit / 1024 / 1024)} MB do plano.`); return; }
@@ -185,7 +210,11 @@ export default function TemplateV2Editor({ client, access, entitlement = { allow
       <div className="tpv2-editor-grid">
         <main className="tpv2-editor-form">
           <div className={`tpv2-save-state ${draftState.isDirty ? "dirty" : "saved"}`}><span>{draftState.isDirty ? "Alterações não salvas" : "Rascunho sincronizado"}</span><small>{draftState.publishedSnapshot ? "Existe uma publicação ativa" : "Ainda não publicado"}</small></div>
-          <Section icon={<Type />} title="Conteúdo" initialOpen>
+          {[CLOCK_PRO_TYPE, WEATHER_PREMIUM_TYPE].includes(activeType) ? <Section icon={<Type />} title={activeType === CLOCK_PRO_TYPE ? "Configuração da hora" : "Dados do clima"} initialOpen>
+            <label>Nome do template<input value={name} onChange={(event) => setName(event.target.value)} /></label>
+            {activeType === CLOCK_PRO_TYPE && <><label className="tpv2-check"><input type="checkbox" checked={draftState.editorDraft.modules.clock.showDate} onChange={(event) => draftState.update("modules.clock.showDate", event.target.checked)} /> Exibir data</label><label className="tpv2-check"><input type="checkbox" checked={draftState.editorDraft.modules.clock.showLocal} onChange={(event) => draftState.update("modules.clock.showLocal", event.target.checked)} /> Exibir local</label></>}
+            {activeType === WEATHER_PREMIUM_TYPE && <><label className="tpv2-check"><input type="checkbox" checked={draftState.editorDraft.modules.weather.showCity} onChange={(event) => draftState.update("modules.weather.showCity", event.target.checked)} /> Exibir nome da cidade</label><label className="tpv2-check"><input type="checkbox" checked={draftState.editorDraft.modules.weather.showCurrent} onChange={(event) => draftState.update("modules.weather.showCurrent", event.target.checked)} /> Exibir condição atual</label><label className="tpv2-check"><input type="checkbox" checked={draftState.editorDraft.modules.weather.showFeelsLike} onChange={(event) => draftState.update("modules.weather.showFeelsLike", event.target.checked)} /> Exibir sensação térmica</label><label className="tpv2-check"><input type="checkbox" checked={draftState.editorDraft.modules.weather.showForecast} onChange={(event) => draftState.update("modules.weather.showForecast", event.target.checked)} /> Exibir próximos dias</label>{draftState.editorDraft.modules.weather.showForecast && <label>Quantidade<select value={draftState.editorDraft.modules.weather.forecastDays} onChange={(event) => draftState.update("modules.weather.forecastDays", Number(event.target.value))}><option value="3">3 dias</option><option value="4">4 dias</option><option value="5">5 dias</option></select></label>}</>}
+          </Section> : <Section icon={<Type />} title="Conteúdo" initialOpen>
             <label>Nome do template<input value={name} onChange={(event) => setName(event.target.value)} /></label>
             <label>Headline<textarea rows="3" value={draftState.editorDraft.content.headline} onChange={(event) => draftState.update("content.headline", event.target.value)} /></label>
             <label>Subtítulo<textarea rows="3" value={draftState.editorDraft.content.subtitle} onChange={(event) => draftState.update("content.subtitle", event.target.value)} /></label>
@@ -198,10 +227,10 @@ export default function TemplateV2Editor({ client, access, entitlement = { allow
               <TypographyControl label="CTA" value={draftState.editorDraft.style.typography.cta} sizeLimits={[12,28]} onChange={(property, value) => updateTypography("cta", property, value)} />
               <TypographyControl label="Serviços" value={draftState.editorDraft.style.typography.service} sizeLimits={[12,30]} onChange={(property, value) => updateTypography("service", property, value)} />
             </div>
-          </Section>
+          </Section>}
           <Section icon={<Image />} title="Mídia">
             <TemplateV2MediaField label="Logo" value={draftState.editorDraft.content.logo} mediaList={mediaList.filter((item) => !String(item.type || item.contentType).toLowerCase().includes("video"))} onChange={(value) => draftState.update("content.logo", value)} onUpload={(file, event) => uploadMedia(file, event, "content.logo")} uploading={uploading} accept="image/*" />
-            <TemplateV2MediaField label="Mídia principal" value={draftState.editorDraft.media.primary} mediaList={mediaList} onChange={(value) => draftState.update("media.primary", value)} onUpload={(file, event) => uploadMedia(file, event, "media.primary")} uploading={uploading} />
+            <TemplateV2MediaField label="Mídia principal" value={draftState.editorDraft.media.primary} mediaList={mediaList} onChange={(value) => draftState.update("media.primary", value)} onUpload={(file, event) => uploadMedia(file, event, "media.primary")} uploading={uploading} imagesOnly accept="image/*" />
             <div className="tpv2-inline-fields"><label>Ajuste<select value={draftState.editorDraft.style.mediaFit} onChange={(event) => draftState.update("style.mediaFit", event.target.value)}><option value="cover">Preencher</option><option value="contain">Ajustar</option></select></label><label>Posição<select value={draftState.editorDraft.style.mediaPosition} onChange={(event) => draftState.update("style.mediaPosition", event.target.value)}><option value="center">Centro</option><option value="top">Topo</option><option value="bottom">Base</option><option value="left">Esquerda</option><option value="right">Direita</option></select></label></div>
           </Section>
           <Section icon={<Palette />} title="Aparência">
@@ -211,8 +240,8 @@ export default function TemplateV2Editor({ client, access, entitlement = { allow
             <label>Uso da mídia principal<select value={draftState.editorDraft.style.mediaLayout} onChange={(event) => draftState.update("style.mediaLayout", event.target.value)}><option value="split">Painel dividido</option><option value="full">Fundo completo</option></select></label>
           </Section>
           <Section icon={<CloudSun />} title="Dados dinâmicos">
-            {definition?.modules.includes("clock") && <label className="tpv2-check"><input type="checkbox" checked={draftState.editorDraft.modules.clock.enabled} onChange={(event) => draftState.update("modules.clock.enabled", event.target.checked)} /> Exibir relógio</label>}
-            {definition?.modules.includes("weather") && <><label className="tpv2-check"><input type="checkbox" checked={draftState.editorDraft.modules.weather.enabled} onChange={(event) => draftState.update("modules.weather.enabled", event.target.checked)} /> Exibir clima</label>{draftState.editorDraft.modules.weather.enabled && <label>Cidade/local<select value={weatherCities.includes(draftState.editorDraft.modules.weather.city) ? draftState.editorDraft.modules.weather.city : "custom"} onChange={(event) => event.target.value !== "custom" && draftState.update("modules.weather.city", event.target.value)}>{weatherCities.map((city) => <option key={city}>{city}</option>)}<option value="custom">Outra cidade</option></select><input value={draftState.editorDraft.modules.weather.city} placeholder="Ex: João Câmara/RN" onChange={(event) => draftState.update("modules.weather.city", event.target.value)} /></label>}</>}
+            {definition?.modules.includes("clock") && activeType !== CLOCK_PRO_TYPE && <label className="tpv2-check"><input type="checkbox" checked={draftState.editorDraft.modules.clock.enabled} onChange={(event) => draftState.update("modules.clock.enabled", event.target.checked)} /> Exibir relógio</label>}
+            {definition?.modules.includes("weather") && <>{activeType !== WEATHER_PREMIUM_TYPE && <label className="tpv2-check"><input type="checkbox" checked={draftState.editorDraft.modules.weather.enabled} onChange={(event) => draftState.update("modules.weather.enabled", event.target.checked)} /> Exibir clima</label>}{(activeType === WEATHER_PREMIUM_TYPE || draftState.editorDraft.modules.weather.enabled) && <label>Cidade/local<select value={weatherCities.includes(draftState.editorDraft.modules.weather.city) ? draftState.editorDraft.modules.weather.city : "custom"} onChange={(event) => event.target.value !== "custom" && draftState.update("modules.weather.city", event.target.value)}>{weatherCities.map((city) => <option key={city}>{city}</option>)}<option value="custom">Outra cidade</option></select><input value={draftState.editorDraft.modules.weather.city} placeholder="Ex: João Câmara/RN" onChange={(event) => draftState.update("modules.weather.city", event.target.value)} /></label>}</>}
             {definition?.modules.includes("news") && <><label className="tpv2-check"><input type="checkbox" checked={Boolean(draftState.editorDraft.modules.news?.enabled)} onChange={(event) => draftState.update("modules.news.enabled", event.target.checked)} /> Exibir notícias/RSS</label>{draftState.editorDraft.modules.news?.enabled && <><div className="tpv2-news-source-list"><strong>Fontes de notícias</strong>{newsSources.map((source) => <label className="tpv2-check" key={`${source.name}-${source.url}`}><input type="checkbox" checked={(draftState.editorDraft.modules.news.selectedNewsSources || []).includes(source.name)} onChange={() => toggleNewsSourceV2(source)} /> {source.name}</label>)}</div><label>URL RSS personalizada<input value={draftState.editorDraft.modules.news.newsFeedUrl || ""} onChange={(event) => draftState.update("modules.news.newsFeedUrl", event.target.value)} /></label></>}</>}
             {definition?.newsTicker && draftState.editorDraft.modules.news?.enabled && <div className="tpv2-ticker-settings"><strong>Faixa de notícias</strong><div className="tpv2-inline-fields"><label>Velocidade<select value={draftState.editorDraft.modules.news.tickerSpeed} onChange={(event) => draftState.update("modules.news.tickerSpeed", event.target.value)}><option value="slow">Lenta</option><option value="normal">Normal</option><option value="fast">Rápida</option></select></label><label>Tamanho<select value={draftState.editorDraft.modules.news.tickerSize} onChange={(event) => draftState.update("modules.news.tickerSize", event.target.value)}><option value="compact">Compacta</option><option value="normal">Normal</option><option value="large">Grande</option></select></label></div><label>Identificação<input value={draftState.editorDraft.modules.news.tickerLabel} onChange={(event) => draftState.update("modules.news.tickerLabel", event.target.value)} /></label><div className="tpv2-color-grid"><label>Cor da faixa<input type="color" value={draftState.editorDraft.modules.news.tickerBackground} onChange={(event) => draftState.update("modules.news.tickerBackground", event.target.value)} /></label><label>Cor do texto<input type="color" value={draftState.editorDraft.modules.news.tickerTextColor} onChange={(event) => draftState.update("modules.news.tickerTextColor", event.target.value)} /></label></div><label>Transparência da faixa <input type="range" min="0" max="80" value={draftState.editorDraft.modules.news.tickerTransparency} onChange={(event) => draftState.update("modules.news.tickerTransparency", Number(event.target.value))} /><span>{draftState.editorDraft.modules.news.tickerTransparency}%</span></label></div>}
             {definition?.modules.includes("qrCode") && <><label className="tpv2-check"><input type="checkbox" checked={draftState.editorDraft.modules.qrCode.enabled} onChange={(event) => draftState.update("modules.qrCode.enabled", event.target.checked)} /> Exibir QR Code</label>{draftState.editorDraft.modules.qrCode.enabled && <><label>Conteúdo do QR Code<input value={draftState.editorDraft.modules.qrCode.value} placeholder="https://... ou qualquer texto" onChange={(event) => draftState.update("modules.qrCode.value", event.target.value)} /></label>{!draftState.editorDraft.modules.qrCode.value.trim() && <small className="tpv2-field-warning">Informe o conteúdo do QR Code.</small>}<div className="tpv2-inline-fields"><label>Posição<select value={draftState.editorDraft.modules.qrCode.position} onChange={(event) => draftState.update("modules.qrCode.position", event.target.value)}><option value="top-left">Superior esquerdo</option><option value="top-right">Superior direito</option><option value="bottom-left">Inferior esquerdo</option><option value="bottom-right">Inferior direito</option><option value="center">Centro</option></select></label><label>Tamanho<select value={draftState.editorDraft.modules.qrCode.size} onChange={(event) => draftState.update("modules.qrCode.size", event.target.value)}><option value="small">Pequeno</option><option value="medium">Médio</option><option value="large">Grande</option></select></label></div><label>Margem / afastamento <input type="range" min="16" max="96" value={draftState.editorDraft.modules.qrCode.margin} onChange={(event) => draftState.update("modules.qrCode.margin", Number(event.target.value))} /><span>{draftState.editorDraft.modules.qrCode.margin}px</span></label></>}</>}
@@ -224,10 +253,10 @@ export default function TemplateV2Editor({ client, access, entitlement = { allow
           {message && <div className="tpv2-message-bar">{message}</div>}
           <div className="tpv2-editor-actions"><button type="button" onClick={draftState.discard} disabled={!draftState.isDirty || saving}><RotateCcw /> Descartar</button><button type="button" onClick={saveDraft} disabled={saving}><Save /> Salvar alterações</button><button type="button" className="publish" onClick={publish} disabled={!selected || draftState.isDirty || saving}><Send /> {selected?.published ? "Atualizar publicação" : "Publicar"}</button></div>
         </main>
-        <TemplateV2PreviewPanel template={previewTemplate} config={draftState.editorDraft} orientation={orientation} onOrientationChange={setOrientation} scale={scale} onScaleChange={setScale} onOpen={() => setPreviewOpen(true)} />
+        <TemplateV2PreviewPanel template={previewTemplate} config={draftState.editorDraft} orientation={orientation} onOrientationChange={setOrientation} scale={scale} onScaleChange={setScale} onOpen={() => setPreviewOpen(true)} dynamicData={previewDynamicData} />
       </div>
-      {previewOpen && <PopupPreview template={previewTemplate} config={draftState.editorDraft} orientation={orientation} onClose={() => setPreviewOpen(false)} />}
-      {templates.length > 0 && <div className="tpv2-published-strip"><h3>Publicações V2</h3>{templates.map((item) => { const view = getPublishedTemplateV2View(item); return <article key={item.id}>{view ? <TemplateV2Renderer template={item} config={view.published} orientation={view.orientation} compact /> : <div className="tpv2-unpublished">Rascunho ainda não publicado</div>}<strong>{getTemplateV2Name(item)}</strong></article>; })}</div>}
+      {previewOpen && <PopupPreview template={previewTemplate} config={draftState.editorDraft} orientation={orientation} onClose={() => setPreviewOpen(false)} dynamicData={previewDynamicData} />}
+      {templates.length > 0 && <div className="tpv2-published-strip"><h3>Meus Templates V2</h3>{templates.map((item) => { const view = getPublishedTemplateV2View(item); const draft = getTemplateV2DraftConfig(item); const hasChanges = Boolean(view && isTemplateV2Dirty(draft,view.published)); const preview = view?.published || draft; const previewOrientation = preview.display?.defaultOrientation || "Paisagem"; return <article key={item.id}><TemplateV2Renderer template={item} config={preview} orientation={previewOrientation} compact mode="thumbnail"/><div className="tpv2-created-meta"><strong>{getTemplateV2Name(item)}</strong><span>{item.identity?.templateType || item.templateType}</span><em className={view ? "published" : "draft"}>{hasChanges ? "Alterações não publicadas" : view ? "Publicado" : "Rascunho"}</em></div></article>; })}</div>}
     </div>
   );
 }

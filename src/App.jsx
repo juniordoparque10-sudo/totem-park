@@ -138,6 +138,7 @@ import { deleteStoredAsset, uploadStorageAsset } from "./storage-service";
 import TemplateV2Editor from "./templates-v2/editor/TemplateV2Editor";
 import TemplateV2Renderer from "./templates-v2/TemplateV2Renderer";
 import { getPublishedTemplateV2View, isTemplateV2 } from "./templates-v2/schema";
+import { getTemplatesV2ScreenCapability } from "./templates-v2/player-capability";
 import logo from "./assets/logo.png";
 import "./App.css";
 
@@ -7182,7 +7183,7 @@ function ClientInternalPanel({ client, onBack, hideBackButton = false, isAdmin =
 
       {tab === "dashboard" && <ClientDashboard client={currentClient} access={operationalAccess} />}
       {tab === "media" && <ClientMediaPage client={currentClient} access={operationalAccess} />}
-      {tab === "playlists" && <ClientPlaylistsPage client={currentClient} access={operationalAccess} />}
+      {tab === "playlists" && <ClientPlaylistsPage client={currentClient} access={operationalAccess} isAdmin={isAdmin} />}
       {tab === "screens" && <ClientScreensPage client={currentClient} access={operationalAccess} />}
       {tab === "templates" && <ClientTemplatesPage client={currentClient} access={operationalAccess} isAdmin={isAdmin} />}
       {tab === "marketing" && <ClientMarketingPage client={currentClient} access={operationalAccess} />}
@@ -8263,7 +8264,7 @@ function ClientMediaPage({ client, access = getClientPlanAccess(client) }) {
   );
 }
 
-function ClientPlaylistsPage({ client, access = getClientPlanAccess(client) }) {
+function ClientPlaylistsPage({ client, access = getClientPlanAccess(client), isAdmin = false }) {
   const [mediaList, setMediaList] = useState([]);
   const [templates, setTemplates] = useState([]);
   const [playlists, setPlaylists] = useState([]);
@@ -8273,6 +8274,7 @@ function ClientPlaylistsPage({ client, access = getClientPlanAccess(client) }) {
   const [draftPlaylistItems, setDraftPlaylistItems] = useState([]);
   const playlistEditorRef = useRef(null);
   const canUsePremiumTemplates = hasPremiumTemplates(client);
+  const templatesV2Entitlement = getTemplatesV2Entitlement(client, isAdmin);
 
   const [form, setForm] = useState({
     name: "",
@@ -8304,6 +8306,7 @@ function ClientPlaylistsPage({ client, access = getClientPlanAccess(client) }) {
         setTemplates(
           snapshot.docs
             .map((item) => ({ id: item.id, ...item.data() }))
+            .filter((item) => !isTemplateV2(item) || templatesV2Entitlement.allowed)
             .map((item) => isTemplateV2(item) ? getPublishedTemplateV2View(item) : item)
             .filter(Boolean)
         );
@@ -8340,7 +8343,7 @@ function ClientPlaylistsPage({ client, access = getClientPlanAccess(client) }) {
       unsubPlaylists();
       unsubScreens();
     };
-  }, [client.id]);
+  }, [client.id, templatesV2Entitlement.allowed]);
 
   function getMediaKey(mediaId) {
     return `media:${mediaId}`;
@@ -8881,6 +8884,16 @@ function ClientPlaylistsPage({ client, access = getClientPlanAccess(client) }) {
         .map((key, index) => getSelectedItemByKey(key, index))
         .filter(Boolean)
         .map((item) => normalizePlaylistItemForSave(item, form.orientation));
+      const hasTemplateV2 = selectedItems.some(isTemplateV2);
+      const linkedScreens = screens.filter((screen) => (
+        (editingPlaylist && screen.playlistId === editingPlaylist.id)
+        || (form.scheduleEnabled && form.targetScreenIds.includes(screen.id))
+      ));
+      const playerCapability = getTemplatesV2ScreenCapability(linkedScreens);
+      if (hasTemplateV2 && !playerCapability.allowed) {
+        alert("Esta playlist possui telas que receberão suporte aos Templates V2 na próxima atualização do Totem Park Player. Sua playlist atual continuará funcionando normalmente.");
+        return;
+      }
       const incompatibleItems = selectedItems.filter((item) => !isOrientationCompatible(item, form.orientation));
 
       if (incompatibleItems.length > 0) {
@@ -8971,10 +8984,19 @@ function ClientPlaylistsPage({ client, access = getClientPlanAccess(client) }) {
   const availableTemplates = templates.filter((template) =>
     canUsePremiumTemplates || !isPremiumTemplate(template)
   );
+  const availableLegacyTemplates = availableTemplates.filter((template) => !isTemplateV2(template));
+  const availableV2Templates = availableTemplates.filter(isTemplateV2);
   const landscapeMedia = mediaList.filter((media) => getPreviewAspectClass(media) !== "portrait");
   const portraitMedia = mediaList.filter((media) => getPreviewAspectClass(media) === "portrait");
-  const landscapeTemplates = availableTemplates.filter((template) => getPreviewAspectClass(template) !== "portrait");
-  const portraitTemplates = availableTemplates.filter((template) => getPreviewAspectClass(template) === "portrait");
+  const landscapeTemplates = availableLegacyTemplates.filter((template) => getPreviewAspectClass(template) !== "portrait");
+  const portraitTemplates = availableLegacyTemplates.filter((template) => getPreviewAspectClass(template) === "portrait");
+  const landscapeV2Templates = availableV2Templates.filter((template) => getPreviewAspectClass(template) !== "portrait");
+  const portraitV2Templates = availableV2Templates.filter((template) => getPreviewAspectClass(template) === "portrait");
+  const playlistLinkedScreens = screens.filter((screen) => (
+    (editingPlaylist && screen.playlistId === editingPlaylist.id)
+    || (form.scheduleEnabled && form.targetScreenIds.includes(screen.id))
+  ));
+  const templatesV2PlayerCapability = getTemplatesV2ScreenCapability(playlistLinkedScreens);
 
   function renderSelectableMediaCard(media) {
     return (
@@ -9000,6 +9022,8 @@ function ClientPlaylistsPage({ client, access = getClientPlanAccess(client) }) {
   }
 
   function renderSelectableTemplateCard(template) {
+    const templateV2 = isTemplateV2(template);
+    const awaitingPlayerUpdate = templateV2 && !templatesV2PlayerCapability.allowed;
     return (
       <button
         key={template.id}
@@ -9007,9 +9031,15 @@ function ClientPlaylistsPage({ client, access = getClientPlanAccess(client) }) {
         className={
           isSelectedKey(getTemplateKey(template.id))
             ? "select-media-card selected"
-            : "select-media-card"
+            : `select-media-card${awaitingPlayerUpdate ? " awaiting-player-update" : ""}`
         }
-        onClick={() => toggleTemplate(template.id)}
+        onClick={() => {
+          if (awaitingPlayerUpdate) {
+            alert("Este template estará disponível para suas telas após a próxima atualização do Totem Park Player. Sua playlist atual continuará funcionando normalmente.");
+            return;
+          }
+          toggleTemplate(template.id);
+        }}
       >
         <UniversalPreview
           item={{
@@ -9026,6 +9056,7 @@ function ClientPlaylistsPage({ client, access = getClientPlanAccess(client) }) {
         <span>
           {getTemplateTypeLabel(template.type)} • {template.duration || 15}s • {getPreviewOrientationLabel(template)}
         </span>
+        {awaitingPlayerUpdate && <em>Disponível em breve</em>}
       </button>
     );
   }
@@ -9375,6 +9406,16 @@ function ClientPlaylistsPage({ client, access = getClientPlanAccess(client) }) {
                     )}
                   </div>
                 </div>
+                {availableV2Templates.length > 0 && <>
+                  <div className="preview-library-group">
+                    <h4>Templates V2 · Paisagem</h4>
+                    <div className="preview-library-grid">{landscapeV2Templates.length ? landscapeV2Templates.map(renderSelectableTemplateCard) : <div className="empty-library compact">Nenhum Template V2 paisagem publicado.</div>}</div>
+                  </div>
+                  <div className="preview-library-group">
+                    <h4>Templates V2 · Retrato</h4>
+                    <div className="preview-library-grid">{portraitV2Templates.length ? portraitV2Templates.map(renderSelectableTemplateCard) : <div className="empty-library compact">Nenhum Template V2 retrato publicado.</div>}</div>
+                  </div>
+                </>}
               </>
             )}
           </div>
@@ -12032,7 +12073,7 @@ function ClientTemplatesPage({ client, access = getClientPlanAccess(client), isA
 
       <nav className="templates-library-tabs" aria-label="Bibliotecas de templates"><button type="button" className={libraryTab === "legacy" ? "active" : ""} onClick={() => setLibraryTab("legacy")}>Templates</button><button type="button" className={libraryTab === "v2" ? "active" : ""} onClick={() => setLibraryTab("v2")}>Templates V2 <span>Professional</span></button></nav>
 
-      {libraryTab === "v2" ? <TemplateV2Editor client={client} access={access} entitlement={templatesV2Entitlement} weatherCities={WEATHER_CITY_PRESETS} newsSources={[...Object.entries(NEWS_SOURCE_PRESETS).map(([name,url]) => ({name,url})), ...customNewsSources]} /> : <>
+      {libraryTab === "v2" ? <TemplateV2Editor client={client} access={access} entitlement={templatesV2Entitlement} weatherCities={WEATHER_CITY_PRESETS} newsSources={[...Object.entries(NEWS_SOURCE_PRESETS).map(([name,url]) => ({name,url})), ...customNewsSources]} loadWeather={loadTemplateV2Weather} loadNews={loadTemplateV2News} /> : <>
 
       {upgradeMessage && (
         <UpgradeAccessCard
@@ -13474,6 +13515,24 @@ function TemplateVisualPreview({ template, compact = false, tv = false }) {
   return <LegacyTemplateVisualPreview template={template} compact={compact} tv={tv} />;
 }
 
+async function loadTemplateV2Weather(city) {
+  const weather = await fetchWeatherByCity(city);
+  const daily = weather?.daily || {};
+  return {
+    ...weather,
+    condition:getWeatherConditionLabel(weather?.weatherCode, getWeatherReferenceDate(weather)),
+    icon:getWeatherIconSafe(weather?.weatherCode, getWeatherReferenceDate(weather)),
+    forecast:(daily.time || []).slice(0,5).map((date,index) => ({ date, day:new Date(`${date}T12:00:00`).toLocaleDateString("pt-BR",{weekday:"short"}).replace(".","").toUpperCase(), icon:getWeatherIconSafe(daily.weather_code?.[index]), max:Math.round(daily.temperature_2m_max?.[index] ?? 0), min:Math.round(daily.temperature_2m_min?.[index] ?? 0) })),
+    unavailable:weather?.temperature === "--",
+  };
+}
+
+async function loadTemplateV2News(config = {}) {
+  const sourceTemplate = { newsSource:config.newsSource, newsFeedUrl:config.newsFeedUrl, selectedNewsSources:config.selectedNewsSources };
+  const lists = await Promise.all(getTemplateNewsFeedUrls(sourceTemplate).map((url) => fetchNewsFromRss(url)));
+  return lists.flat().filter((item) => item?.title).slice(0,8);
+}
+
 function TemplateV2LivePreview({ template, compact = false, tv = false }) {
   const config = template.published;
   const weatherConfig = config?.modules?.weather || {};
@@ -13485,12 +13544,9 @@ function TemplateV2LivePreview({ template, compact = false, tv = false }) {
     let cancelled = false;
     async function load() {
       const next = {};
-      if (weatherConfig.enabled) next.weather = await fetchWeatherByCity(weatherConfig.city || "Sua cidade");
+      if (weatherConfig.enabled) next.weather = await loadTemplateV2Weather(weatherConfig.city || "Sua cidade");
       if (newsConfig.enabled) {
-        const sourceTemplate = { ...template, newsSource:newsConfig.newsSource, newsFeedUrl:newsConfig.newsFeedUrl, selectedNewsSources:newsConfig.selectedNewsSources };
-        const urls = getTemplateNewsFeedUrls(sourceTemplate);
-        const lists = await Promise.all(urls.map((url) => fetchNewsFromRss(url)));
-        next.news = lists.flat().filter((item) => item?.title).slice(0, 8);
+        next.news = await loadTemplateV2News(newsConfig);
       }
       if (!cancelled) setDynamicData(next);
     }
