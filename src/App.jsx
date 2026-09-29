@@ -1,6 +1,8 @@
 import UploadLimitDialog from "./UploadLimitDialog";
 import { uploadLimitBytes, uploadSizeNotice } from "./upload-plan-policy";
 import TelemetryDashboard from "./TelemetryDashboard";
+import { buildQrUrl } from "./qr-code";
+import { normalizeTemplatesV2Override, resolveTemplatesV2Entitlement } from "./templates-v2/entitlement";
 import { linkedAtForScreen, telemetryStatus } from "./telemetry-v1";
 ﻿import { useEffect, useLayoutEffect, useRef, useState } from "react";
 import { Routes, Route, Navigate, useParams, useNavigate } from "react-router-dom";
@@ -133,6 +135,9 @@ import {
   revokeOwnPlayerBinding,
 } from "./player-identity";
 import { deleteStoredAsset, uploadStorageAsset } from "./storage-service";
+import TemplateV2Editor from "./templates-v2/editor/TemplateV2Editor";
+import TemplateV2Renderer from "./templates-v2/TemplateV2Renderer";
+import { getPublishedTemplateV2View, isTemplateV2 } from "./templates-v2/schema";
 import logo from "./assets/logo.png";
 import "./App.css";
 
@@ -5733,6 +5738,14 @@ function PremiumStatCard({ title, value, icon, status, link, color, onClick }) {
   );
 }
 
+function getTemplatesV2Entitlement(client, isMaster = false) {
+  return resolveTemplatesV2Entitlement({
+    planKey: getPlanConfig(client?.plan).key,
+    override: client?.templatesV2Override,
+    isMaster,
+  });
+}
+
 
 function AccountRequestsPage() {
   const [requests, setRequests] = useState([]);
@@ -7171,7 +7184,7 @@ function ClientInternalPanel({ client, onBack, hideBackButton = false, isAdmin =
       {tab === "media" && <ClientMediaPage client={currentClient} access={operationalAccess} />}
       {tab === "playlists" && <ClientPlaylistsPage client={currentClient} access={operationalAccess} />}
       {tab === "screens" && <ClientScreensPage client={currentClient} access={operationalAccess} />}
-      {tab === "templates" && <ClientTemplatesPage client={currentClient} access={operationalAccess} />}
+      {tab === "templates" && <ClientTemplatesPage client={currentClient} access={operationalAccess} isAdmin={isAdmin} />}
       {tab === "marketing" && <ClientMarketingPage client={currentClient} access={operationalAccess} />}
       {tab === "plans" && <PlansPage clientView />}
         </>
@@ -8280,10 +8293,7 @@ function ClientPlaylistsPage({ client, access = getClientPlanAccess(client) }) {
       collection(db, "clients", client.id, "media"),
       (snapshot) => {
         setMediaList(
-          snapshot.docs.map((item) => ({
-            id: item.id,
-            ...item.data(),
-          }))
+          snapshot.docs.map((item) => ({ id: item.id, ...item.data() }))
         );
       }
     );
@@ -8292,10 +8302,10 @@ function ClientPlaylistsPage({ client, access = getClientPlanAccess(client) }) {
       collection(db, "clients", client.id, "templates"),
       (snapshot) => {
         setTemplates(
-          snapshot.docs.map((item) => ({
-            id: item.id,
-            ...item.data(),
-          }))
+          snapshot.docs
+            .map((item) => ({ id: item.id, ...item.data() }))
+            .map((item) => isTemplateV2(item) ? getPublishedTemplateV2View(item) : item)
+            .filter(Boolean)
         );
       }
     );
@@ -10403,14 +10413,6 @@ function getMarketingDefaultForm() {
   };
 }
 
-function buildQrUrl(value) {
-  const cleanValue = String(value || "").trim();
-
-  if (!cleanValue) return "";
-
-  return `https://api.qrserver.com/v1/create-qr-code/?size=260x260&data=${encodeURIComponent(cleanValue)}`;
-}
-
 const OFFLINE_ASSET_FIELDS = new Set(["preview", "imageUrl", "logoUrl"]);
 
 function collectOfflineAssetUrls(values) {
@@ -11237,7 +11239,8 @@ function ClientMarketingPage({ client, access = getClientPlanAccess(client) }) {
 }
 
 
-function ClientTemplatesPage({ client, access = getClientPlanAccess(client) }) {
+function ClientTemplatesPage({ client, access = getClientPlanAccess(client), isAdmin = false }) {
+  const [libraryTab, setLibraryTab] = useState("legacy");
   const [templates, setTemplates] = useState([]);
   const [screens, setScreens] = useState([]);
   const [saving, setSaving] = useState(false);
@@ -11245,6 +11248,7 @@ function ClientTemplatesPage({ client, access = getClientPlanAccess(client) }) {
   const [previewOrientation, setPreviewOrientation] = useState("Paisagem");
   const [editingTemplate, setEditingTemplate] = useState(null);
   const canUsePremiumTemplates = hasPremiumTemplates(client);
+  const templatesV2Entitlement = getTemplatesV2Entitlement(client, isAdmin);
   const [customNewsSources, setCustomNewsSources] = useState(() =>
     getSavedCustomNewsSources()
   );
@@ -11311,7 +11315,10 @@ function ClientTemplatesPage({ client, access = getClientPlanAccess(client) }) {
       collection(db, "clients", client.id, "templates"),
       (snapshot) => {
         setTemplates(
-          snapshot.docs.map((item) => normalizeSavedTemplate({ id: item.id, ...item.data() }))
+          snapshot.docs
+            .map((item) => ({ id: item.id, ...item.data() }))
+            .filter((item) => !isTemplateV2(item))
+            .map((item) => normalizeSavedTemplate(item))
         );
       }
     );
@@ -12022,6 +12029,10 @@ function ClientTemplatesPage({ client, access = getClientPlanAccess(client) }) {
           Ao vivo + personalizável
         </div>
       </section>
+
+      <nav className="templates-library-tabs" aria-label="Bibliotecas de templates"><button type="button" className={libraryTab === "legacy" ? "active" : ""} onClick={() => setLibraryTab("legacy")}>Templates</button><button type="button" className={libraryTab === "v2" ? "active" : ""} onClick={() => setLibraryTab("v2")}>Templates V2 <span>Professional</span></button></nav>
+
+      {libraryTab === "v2" ? <TemplateV2Editor client={client} access={access} entitlement={templatesV2Entitlement} weatherCities={WEATHER_CITY_PRESETS} newsSources={[...Object.entries(NEWS_SOURCE_PRESETS).map(([name,url]) => ({name,url})), ...customNewsSources]} /> : <>
 
       {upgradeMessage && (
         <UpgradeAccessCard
@@ -13440,6 +13451,7 @@ function ClientTemplatesPage({ client, access = getClientPlanAccess(client) }) {
           )}
         </div>
       </section>
+      </>}
     </>
   );
 }
@@ -13455,6 +13467,44 @@ function SparklineIcon() {
 }
 
 function TemplateVisualPreview({ template, compact = false, tv = false }) {
+  if (isTemplateV2(template)) {
+    return <TemplateV2LivePreview template={template} compact={compact} tv={tv} />;
+  }
+
+  return <LegacyTemplateVisualPreview template={template} compact={compact} tv={tv} />;
+}
+
+function TemplateV2LivePreview({ template, compact = false, tv = false }) {
+  const config = template.published;
+  const weatherConfig = config?.modules?.weather || {};
+  const newsConfig = config?.modules?.news || {};
+  const [dynamicData, setDynamicData] = useState(null);
+  const dynamicKey = JSON.stringify({ city:weatherConfig.city || "", enabledWeather:weatherConfig.enabled, enabledNews:newsConfig.enabled, feed:newsConfig.newsFeedUrl || "", sources:newsConfig.selectedNewsSources || [] });
+
+  useEffect(() => {
+    let cancelled = false;
+    async function load() {
+      const next = {};
+      if (weatherConfig.enabled) next.weather = await fetchWeatherByCity(weatherConfig.city || "Sua cidade");
+      if (newsConfig.enabled) {
+        const sourceTemplate = { ...template, newsSource:newsConfig.newsSource, newsFeedUrl:newsConfig.newsFeedUrl, selectedNewsSources:newsConfig.selectedNewsSources };
+        const urls = getTemplateNewsFeedUrls(sourceTemplate);
+        const lists = await Promise.all(urls.map((url) => fetchNewsFromRss(url)));
+        next.news = lists.flat().filter((item) => item?.title).slice(0, 8);
+      }
+      if (!cancelled) setDynamicData(next);
+    }
+    load().catch(() => { if (!cancelled) setDynamicData({}); });
+    const interval = setInterval(load, 10 * 60 * 1000);
+    return () => { cancelled = true; clearInterval(interval); };
+  // The serialized configuration is the refresh boundary for existing live sources.
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [dynamicKey]);
+
+  return <TemplateV2Renderer template={template} config={config} orientation={config?.display?.defaultOrientation || template.orientation || "Paisagem"} compact={compact} tv={tv} dynamicData={dynamicData} />;
+}
+
+function LegacyTemplateVisualPreview({ template, compact = false, tv = false }) {
   const [locationRotationTick, setLocationRotationTick] = useState(Date.now());
   const activeTemplate = (template.templateType || template.type) === "clima_premium_v2"
     ? {
@@ -15355,7 +15405,9 @@ function PlayerPage() {
         playerItemType: "template",
       };
     }),
-  ].filter((item) => isOrientationCompatible(item, screen?.orientation || activePlaylist?.orientation || "Paisagem"));
+  ]
+    .filter((item) => !isTemplateV2(item) || Boolean(item.published))
+    .filter((item) => isOrientationCompatible(item, screen?.orientation || activePlaylist?.orientation || "Paisagem"));
 
   const activePlaylistRevision = [
     activePlaylist?.playlistRevision || "",
@@ -16479,6 +16531,7 @@ function PlayerPage() {
         const screenScopedTemplates = list
           .filter((template) => {
             if (!template.enabled) return false;
+            if (isTemplateV2(template) && !template.published) return false;
 
             if (
               template.targetScreenIds &&
@@ -17689,9 +17742,11 @@ function AdminPlanControls({ client, adminUser }) {
     storageLimitGb: String(getClientStorageLimit(client) / STORAGE_GB),
     maxVideoSizeMb: String(getClientMaxVideoSize(client) / STORAGE_MB),
     maxImageSizeMb: String(getClientMaxImageSize(client) / STORAGE_MB),
+    templatesV2Override: normalizeTemplatesV2Override(client.templatesV2Override),
   });
   const [saving, setSaving] = useState(false);
   const access = getClientPlanAccess(client);
+  const templatesV2Entitlement = resolveTemplatesV2Entitlement({ planKey: getPlanConfig(form.plan).key, override: form.templatesV2Override });
 
   useEffect(() => {
     setForm({
@@ -17703,6 +17758,7 @@ function AdminPlanControls({ client, adminUser }) {
       storageLimitGb: String(getClientStorageLimit(client) / STORAGE_GB),
       maxVideoSizeMb: String(getClientMaxVideoSize(client) / STORAGE_MB),
       maxImageSizeMb: String(getClientMaxImageSize(client) / STORAGE_MB),
+      templatesV2Override: normalizeTemplatesV2Override(client.templatesV2Override),
     });
   }, [client]);
 
@@ -17756,6 +17812,7 @@ function AdminPlanControls({ client, adminUser }) {
         storageLimitBytes: Math.max(STORAGE_MB, Number(form.storageLimitGb) * STORAGE_GB || getPlanLimits(form.plan).storageLimitBytes),
         maxVideoSizeBytes: Math.max(STORAGE_MB, Number(form.maxVideoSizeMb) * STORAGE_MB || getPlanLimits(form.plan).maxVideoSizeBytes),
         maxImageSizeBytes: Math.max(STORAGE_MB, Number(form.maxImageSizeMb) * STORAGE_MB || getPlanLimits(form.plan).maxImageSizeBytes),
+        templatesV2Override: normalizeTemplatesV2Override(form.templatesV2Override),
         graceUnlockUntil: deleteField(),
         suspendedAt: deleteField(),
         suspensionReason: deleteField(),
@@ -17844,6 +17901,15 @@ function AdminPlanControls({ client, adminUser }) {
         <div className="form-group">
           <label>Imagem máxima (MB)</label>
           <input type="number" min="1" step="1" value={form.maxImageSizeMb} onChange={(event) => setForm({ ...form, maxImageSizeMb: event.target.value })} />
+        </div>
+        <div className="form-group">
+          <label>Templates V2</label>
+          <select value={form.templatesV2Override} onChange={(event) => setForm({ ...form, templatesV2Override: event.target.value })}>
+            <option value="inherited">Padrão do plano</option>
+            <option value="allowed">Liberado</option>
+            <option value="blocked">Bloqueado</option>
+          </select>
+          <small>Plano: {getPlanConfig(form.plan).name} · acesso efetivo: <strong>{templatesV2Entitlement.allowed ? "LIBERADO" : "BLOQUEADO"}</strong> {templatesV2Entitlement.source === "plan" ? "pelo plano" : "por override"}</small>
         </div>
       </div>
 

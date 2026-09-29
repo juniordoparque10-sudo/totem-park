@@ -1,0 +1,46 @@
+import { useSyncExternalStore } from "react";
+import { Clock3, CloudSun, QrCode, Sparkles } from "lucide-react";
+import { buildQrUrl } from "../qr-code";
+
+let clockSnapshot = Date.now();
+let clockTimer = null;
+const clockListeners = new Set();
+function subscribeClock(listener) {
+  clockListeners.add(listener);
+  if (!clockTimer) clockTimer = setInterval(() => { clockSnapshot = Date.now(); clockListeners.forEach((notify) => notify()); }, 1000);
+  return () => { clockListeners.delete(listener); if (!clockListeners.size && clockTimer) { clearInterval(clockTimer); clockTimer = null; } };
+}
+const getClockSnapshot = () => clockSnapshot;
+
+export function TemplateClock({ format = "24h", large = false }) {
+  const snapshot = useSyncExternalStore(subscribeClock, getClockSnapshot, getClockSnapshot);
+  return <strong className={large ? "tpv2-clock-large" : ""}><Clock3 /> {new Date(snapshot).toLocaleTimeString("pt-BR", { hour:"2-digit", minute:"2-digit", hour12:format === "12h" })}</strong>;
+}
+
+export function TemplateWeather({ config = {}, data }) {
+  return <span><CloudSun /> {data?.temperature != null ? `${data.temperature}° · ` : ""}{data?.city || config.city || "Sua cidade"}</span>;
+}
+
+export function TemplateMedia({ asset, fit = "cover", position = "center" }) {
+  if (!asset?.url) return <div className="tpv2-media-fallback"><Sparkles /><span>Selecione uma imagem da biblioteca</span></div>;
+  if (asset.type === "video") return <video src={asset.url} muted autoPlay loop playsInline style={{ objectFit:fit, objectPosition:position }} />;
+  return <img src={asset.url} alt="" style={{ objectFit:fit, objectPosition:position }} />;
+}
+
+export function TemplateLogo({ asset, name }) {
+  return <>{asset?.url ? <img src={asset.url} alt="" /> : <span className="tpv2-brand-mark">TP</span>}<strong>{name}</strong></>;
+}
+
+export function TemplateCTA({ config = {} }) { return config.enabled ? <span className="tpv2-cta">{config.label || "Saiba mais"}</span> : null; }
+export function TemplateQRCode({ config = {} }) {
+  const source = buildQrUrl(config.value, config.size === "large" ? 720 : config.size === "small" ? 360 : 520);
+  if (!source) return null;
+  return <div className={`tpv2-qr-code is-${config.position || "bottom-right"} size-${config.size || "medium"}`} style={{"--tpv2-qr-margin":`${Math.max(16,Math.min(96,Number(config.margin)||32))}px`}}><img src={source} alt="QR Code"/><span><QrCode/>Aponte a câmera</span></div>;
+}
+export function TemplateNewsTicker({ items = [], config = {}, orientation = "Paisagem" }) {
+  const headlines = items.map((item) => item?.title || item?.headline).filter(Boolean);
+  const content = headlines.length ? headlines : [`Aguardando notícias de ${(config.selectedNewsSources || []).join(", ") || "fonte selecionada"}`];
+  const duration = config.tickerSpeed === "slow" ? 70 : config.tickerSpeed === "fast" ? 28 : 46;
+  const opacity = 100 - Math.max(0, Math.min(100, Number(config.tickerTransparency) || 0));
+  return <div className={`tpv2-news-ticker size-${config.tickerSize || "normal"} ${orientation === "Retrato" ? "is-portrait" : "is-landscape"}`} style={{"--ticker-duration":`${duration}s`,"--ticker-background":config.tickerBackground || "#07111f","--ticker-text":config.tickerTextColor || "#fff","--ticker-opacity":`${opacity}%`}}><strong>{config.tickerLabel || "Últimas notícias"}</strong><div className="tpv2-ticker-window"><div className="tpv2-ticker-track">{[...content,...content].map((title,index) => <span key={`${index}-${title}`}>{title}</span>)}</div></div></div>;
+}
