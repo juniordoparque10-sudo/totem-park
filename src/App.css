@@ -14104,6 +14104,208 @@ button.premium-stat-card{width:100%;font:inherit;text-align:left;color:inherit;c
   -webkit-line-clamp: 2;
 }
 
+/* Hotfix de homologacao: editor com preview sempre visivel e sem overflow. */
+.templates-library-tabs ~ .templates-builder-grid {
+  grid-template-areas: "editor preview";
+}
+
+.templates-library-tabs ~ .templates-builder-grid > .templates-editor-panel {
+  grid-area: editor;
+  min-width: 0;
+}
+
+.templates-library-tabs ~ .templates-builder-grid > .templates-preview-panel {
+  grid-area: preview;
+  align-self: start;
+  min-width: 0;
+  max-width: 100%;
+  box-sizing: border-box;
+}
+
+.templates-editor-panel,
+.templates-editor-panel .form-grid,
+.templates-editor-panel .form-group,
+.templates-editor-panel .panel-actions,
+.tpv2-workspace,
+.tpv2-editor-grid,
+.tpv2-editor-form,
+.tpv2-editor-section,
+.tpv2-editor-section > div,
+.tpv2-preview-panel {
+  min-width: 0;
+  max-width: 100%;
+  box-sizing: border-box;
+}
+
+.templates-editor-panel input,
+.templates-editor-panel select,
+.templates-editor-panel textarea,
+.templates-editor-panel input[type="range"],
+.tpv2-editor-section input,
+.tpv2-editor-section select,
+.tpv2-editor-section textarea,
+.tpv2-editor-section input[type="range"] {
+  min-width: 0;
+  max-width: 100%;
+  box-sizing: border-box;
+}
+
+@media (max-width: 1200px) {
+  .templates-library-tabs ~ .templates-builder-grid {
+    grid-template-areas:
+      "preview"
+      "editor";
+  }
+
+  .templates-library-tabs ~ .templates-builder-grid > .templates-preview-panel,
+  .tpv2-preview-panel {
+    position: sticky;
+    top: 12px;
+    z-index: 18;
+    max-height: min(38vh, 330px);
+    padding: 12px;
+    overflow: hidden;
+    border-color: rgba(103, 232, 249, 0.3);
+    box-shadow: 0 16px 38px rgba(0, 0, 0, 0.38);
+    backdrop-filter: blur(18px);
+  }
+
+  .tpv2-editor-grid {
+    grid-template-columns: minmax(0, 1fr);
+    align-items: start;
+  }
+
+  .tpv2-preview-panel {
+    grid-row: 1;
+  }
+
+  .templates-library-tabs ~ .templates-builder-grid .template-preview-heading,
+  .tpv2-preview-head,
+  .tpv2-preview-controls {
+    margin-bottom: 8px;
+  }
+
+  .templates-library-tabs ~ .templates-builder-grid .template-preview-heading h2 {
+    margin-top: 2px;
+    font-size: 16px;
+  }
+
+  .templates-library-tabs ~ .templates-builder-grid .template-preview-heading p {
+    display: none;
+  }
+
+  .templates-library-tabs ~ .templates-builder-grid .template-scaled-preview-stage,
+  .templates-library-tabs ~ .templates-builder-grid .template-scaled-preview-stage.portrait {
+    height: min(29vh, 245px);
+    min-height: 0;
+    padding: 7px;
+  }
+
+  .templates-library-tabs ~ .templates-builder-grid .template-scaled-preview-stage.portrait .legacy-template-thumbnail {
+    width: min(100%, 128px);
+  }
+
+  .tpv2-preview-viewport,
+  .tpv2-preview-viewport.portrait {
+    height: min(27vh, 225px);
+    min-height: 0;
+    padding: 7px;
+  }
+}
+
+@media (max-width: 760px) {
+  .templates-library-tabs ~ .templates-builder-grid > .templates-preview-panel,
+  .tpv2-preview-panel {
+    top: 62px;
+    max-height: min(34vh, 275px);
+    padding: 9px;
+    border-radius: 17px;
+  }
+
+  .templates-library-tabs ~ .templates-builder-grid .template-preview-heading {
+    align-items: center;
+    flex-direction: row;
+    gap: 8px;
+  }
+
+  .template-orientation-switch button,
+  .tpv2-preview-controls button,
+  .tpv2-preview-controls select {
+    min-height: 30px;
+    padding-inline: 8px;
+  }
+
+  .tpv2-preview-head,
+  .tpv2-preview-controls {
+    align-items: center;
+    flex-direction: row;
+  }
+
+  .tpv2-preview-head strong {
+    font-size: 13px;
+  }
+
+  .templates-library-tabs ~ .templates-builder-grid .template-scaled-preview-stage,
+  .templates-library-tabs ~ .templates-builder-grid .template-scaled-preview-stage.portrait,
+  .tpv2-preview-viewport,
+  .tpv2-preview-viewport.portrait {
+    height: min(23vh, 190px);
+  }
+
+  .templates-editor-panel,
+  .templates-preview-panel {
+    padding: 16px;
+    border-radius: 22px;
+  }
+
+  .templates-editor-panel .panel-actions,
+  .tpv2-editor-actions {
+    display: grid;
+    grid-template-columns: minmax(0, 1fr);
+  }
+
+  .templates-editor-panel .panel-actions > *,
+  .tpv2-editor-actions > * {
+    width: 100%;
+    justify-content: center;
+  }
+}
+
+@media (max-width: 430px) {
+  .templates-library-tabs ~ .templates-builder-grid,
+  .tpv2-editor-grid {
+    gap: 14px;
+  }
+
+  .templates-library-tabs ~ .templates-builder-grid > .templates-preview-panel,
+  .tpv2-preview-panel {
+    max-height: 250px;
+  }
+
+  .templates-library-tabs ~ .templates-builder-grid .template-scaled-preview-stage,
+  .templates-library-tabs ~ .templates-builder-grid .template-scaled-preview-stage.portrait,
+  .tpv2-preview-viewport,
+  .tpv2-preview-viewport.portrait {
+    height: clamp(145px, 21vh, 175px);
+  }
+
+  .templates-library-tabs ~ .templates-builder-grid .template-preview-heading .kicker,
+  .tpv2-preview-head span {
+    display: none;
+  }
+
+  .templates-library-tabs ~ .templates-builder-grid .template-preview-heading h2 {
+    margin: 0;
+    font-size: 14px;
+  }
+
+  .template-orientation-switch button {
+    min-height: 28px;
+    padding-inline: 7px;
+    font-size: 10px;
+  }
+}
+
 /* Telas em tempo real: três áreas legíveis sem mudar os dados exibidos. */
 .premium-screen-row.realtime-screen-card {
   display: grid;
