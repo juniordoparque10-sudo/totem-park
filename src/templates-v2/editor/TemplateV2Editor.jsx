@@ -25,6 +25,7 @@ import TemplateV2ScaledStage from "./TemplateV2ScaledStage";
 import TemplateV2DynamicStage from "./TemplateV2DynamicStage";
 import useTemplateV2DynamicData from "./useTemplateV2DynamicData";
 import PortalModal from "../../PortalModal";
+import PreviewModal from "../../PreviewModal";
 import { getTemplatePlaylistUsage } from "../../template-usage";
 import "./template-v2-editor.css";
 
@@ -44,8 +45,8 @@ function Section({ icon, title, children, initialOpen = false }) {
 }
 
 function PopupPreview({ template, config, orientation, onClose, dynamicData }) {
-  useEffect(() => { const close = (event) => event.key === "Escape" && onClose(); window.addEventListener("keydown", close); return () => window.removeEventListener("keydown", close); }, [onClose]);
-  return <div className="tpv2-preview-modal" onClick={onClose}><div className="tpv2-preview-dialog" onClick={(event) => event.stopPropagation()}><header><div><strong>Prévia ampliada</strong><span>{orientation} · editorDraft</span></div><button type="button" onClick={onClose}>Fechar</button></header><TemplateV2ScaledStage className={`tpv2-preview-dialog-stage ${orientation === "Retrato" ? "portrait" : "landscape"}`} template={template} config={config} orientation={orientation} dynamicData={dynamicData} /></div></div>;
+  const logical = orientation === "Retrato" ? { width: 1080, height: 1920 } : { width: 1920, height: 1080 };
+  return <PreviewModal title="Prévia ampliada" subtitle={`${orientation} · editorDraft`} logicalWidth={logical.width} logicalHeight={logical.height} onClose={onClose}><TemplateV2ScaledStage className="portal-preview-scaled-content" template={template} config={config} orientation={orientation} dynamicData={dynamicData} /></PreviewModal>;
 }
 
 function TypographyControl({ label, value, onChange, sizeLimits, lineLimits = [0.9, 1.7] }) {

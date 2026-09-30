@@ -140,6 +140,7 @@ import TemplateV2Renderer from "./templates-v2/TemplateV2Renderer";
 import TemplateV2DynamicStage from "./templates-v2/editor/TemplateV2DynamicStage";
 import TemplateScaledStage from "./TemplateScaledStage";
 import PortalModal from "./PortalModal";
+import PreviewModal from "./PreviewModal";
 import { getPublishedTemplateV2View, isTemplateV2 } from "./templates-v2/schema";
 import { getTemplatesV2ScreenCapability } from "./templates-v2/player-capability";
 import logo from "./assets/logo.png";
@@ -10723,6 +10724,7 @@ function ClientMarketingPage({ client, access = getClientPlanAccess(client) }) {
   const [saving, setSaving] = useState(false);
   const [sendingArtId, setSendingArtId] = useState("");
   const [editingArt, setEditingArt] = useState(null);
+  const [previewOpen, setPreviewOpen] = useState(false);
   const [form, setForm] = useState(() => ({
     ...getMarketingDefaultForm(),
     logoUrl: client.logoUrl || "",
@@ -11225,11 +11227,14 @@ function ClientMarketingPage({ client, access = getClientPlanAccess(client) }) {
         </div>
 
         <div className="templates-preview-panel">
-          <div style={{ marginBottom: 16 }}>
-            <div className="kicker">Preview</div>
-            <h2 style={{ margin: "6px 0 0" }}>
-              {MARKETING_TYPE_LABELS[form.type]} • {selectedSize}
-            </h2>
+          <div className="marketing-preview-heading">
+            <div>
+              <div className="kicker">Preview ao vivo</div>
+              <h2>{MARKETING_TYPE_LABELS[form.type]} • {selectedSize}</h2>
+            </div>
+            <button className="preview-open-button" type="button" onClick={() => setPreviewOpen(true)}>
+              <Eye size={17} /> Abrir prévia
+            </button>
           </div>
 
           <div className={`marketing-preview-stage format-${form.type}`}>
@@ -11244,6 +11249,25 @@ function ClientMarketingPage({ client, access = getClientPlanAccess(client) }) {
           </div>
         </div>
       </section>
+
+      {previewOpen && (
+        <PreviewModal
+          title="Prévia de Marketing"
+          subtitle={`${MARKETING_TYPE_LABELS[form.type]} · ${selectedSize}`}
+          logicalWidth={getMarketingFormatRatio(form.type).width}
+          logicalHeight={getMarketingFormatRatio(form.type).height}
+          onClose={() => setPreviewOpen(false)}
+        >
+          <TemplateScaledStage
+            className={`portal-preview-scaled-content marketing-modal-preview format-${form.type}`}
+            orientation={form.type === "feed" ? "Paisagem" : "Retrato"}
+            logicalWidth={getMarketingFormatRatio(form.type).width}
+            logicalHeight={getMarketingFormatRatio(form.type).height}
+          >
+            <MarketingArtPreview art={form} />
+          </TemplateScaledStage>
+        </PreviewModal>
+      )}
 
       <section className="templates-list-panel">
         <div className="playlist-editor-header">
@@ -11314,6 +11338,7 @@ function ClientTemplatesPage({ client, access = getClientPlanAccess(client), isA
   const [saving, setSaving] = useState(false);
   const [upgradeMessage, setUpgradeMessage] = useState("");
   const [previewOrientation, setPreviewOrientation] = useState("Paisagem");
+  const [previewOpen, setPreviewOpen] = useState(false);
   const [editingTemplate, setEditingTemplate] = useState(null);
   const canUsePremiumTemplates = hasPremiumTemplates(client);
   const templatesV2Entitlement = getTemplatesV2Entitlement(client, isAdmin);
@@ -13434,8 +13459,11 @@ function ClientTemplatesPage({ client, access = getClientPlanAccess(client), isA
               <h2>{previewOrientation}</h2>
               <p>Atualiza em tempo real conforme você edita o template.</p>
             </div>
-            <div className="template-orientation-switch">
-              <button
+            <div className="template-preview-actions">
+              <button className="preview-open-button" type="button" onClick={() => setPreviewOpen(true)}>
+                <Eye size={17} /> Abrir prévia
+              </button>
+              <div className="template-orientation-switch"><button
                 type="button"
                 className={previewOrientation === "Paisagem" ? "active" : ""}
                 onClick={() => setPreviewOrientation("Paisagem")}
@@ -13450,7 +13478,7 @@ function ClientTemplatesPage({ client, access = getClientPlanAccess(client), isA
                 disabled={form.orientation === "Paisagem"}
               >
                 Retrato
-              </button>
+              </button></div>
             </div>
           </div>
           <div className={`template-scaled-preview-stage ${previewOrientation === "Retrato" ? "portrait" : "landscape"}`}>
@@ -13458,6 +13486,20 @@ function ClientTemplatesPage({ client, access = getClientPlanAccess(client), isA
           </div>
         </div>
       </section>
+
+      {previewOpen && (
+        <PreviewModal
+          title="Prévia do Template"
+          subtitle={`${form.name || "Template"} · ${previewOrientation}`}
+          logicalWidth={previewOrientation === "Retrato" ? 1080 : 1920}
+          logicalHeight={previewOrientation === "Retrato" ? 1920 : 1080}
+          onClose={() => setPreviewOpen(false)}
+        >
+          <TemplateScaledStage className="portal-preview-scaled-content" orientation={previewOrientation}>
+            <LegacyTemplateVisualPreview template={{ ...form, orientation: previewOrientation }} compact={false} />
+          </TemplateScaledStage>
+        </PreviewModal>
+      )}
 
       <section className="templates-list-panel">
         <div className="playlist-editor-header">
