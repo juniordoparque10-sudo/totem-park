@@ -14110,6 +14110,11 @@ button.premium-stat-card{width:100%;font:inherit;text-align:left;color:inherit;c
   overflow-y: visible;
 }
 
+.content:has(.templates-library-tabs) .tpv2-workspace,
+.content:has(.templates-library-tabs) .tpv2-editor-grid {
+  overflow: visible;
+}
+
 .templates-library-tabs ~ .templates-builder-grid {
   grid-template-areas: "editor preview";
 }

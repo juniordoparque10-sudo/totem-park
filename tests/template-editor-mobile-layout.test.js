@@ -9,6 +9,10 @@ test("template page does not create an accidental scroll container", () => {
     css,
     /\.content:has\(\.templates-library-tabs\)\s*\{[^}]*overflow-x:\s*clip;[^}]*overflow-y:\s*visible;/s,
   );
+  assert.match(
+    css,
+    /\.content:has\(\.templates-library-tabs\) \.tpv2-workspace,[\s\S]*?\.content:has\(\.templates-library-tabs\) \.tpv2-editor-grid\s*\{[^}]*overflow:\s*visible;/,
+  );
 });
 
 test("legacy and V2 mobile previews remain sticky below navigation", () => {
