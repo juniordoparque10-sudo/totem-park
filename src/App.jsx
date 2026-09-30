@@ -138,6 +138,7 @@ import { deleteStoredAsset, uploadStorageAsset } from "./storage-service";
 import TemplateV2Editor from "./templates-v2/editor/TemplateV2Editor";
 import TemplateV2Renderer from "./templates-v2/TemplateV2Renderer";
 import TemplateV2ScaledStage from "./templates-v2/editor/TemplateV2ScaledStage";
+import TemplateScaledStage from "./TemplateScaledStage";
 import { getPublishedTemplateV2View, isTemplateV2 } from "./templates-v2/schema";
 import { getTemplatesV2ScreenCapability } from "./templates-v2/player-capability";
 import logo from "./assets/logo.png";
@@ -7186,7 +7187,7 @@ function ClientInternalPanel({ client, onBack, hideBackButton = false, isAdmin =
       {tab === "media" && <ClientMediaPage client={currentClient} access={operationalAccess} />}
       {tab === "playlists" && <ClientPlaylistsPage client={currentClient} access={operationalAccess} isAdmin={isAdmin} />}
       {tab === "screens" && <ClientScreensPage client={currentClient} access={operationalAccess} isAdmin={isAdmin} adminUser={adminUser} />}
-      {tab === "templates" && <ClientTemplatesPage client={currentClient} access={operationalAccess} isAdmin={isAdmin} />}
+      {tab === "templates" && <ClientTemplatesPage client={currentClient} access={operationalAccess} isAdmin={isAdmin} onUseInPlaylist={() => setTab("playlists")} />}
       {tab === "marketing" && <ClientMarketingPage client={currentClient} access={operationalAccess} />}
       {tab === "plans" && <PlansPage clientView />}
         </>
@@ -9042,15 +9043,7 @@ function ClientPlaylistsPage({ client, access = getClientPlanAccess(client), isA
           toggleTemplate(template.id);
         }}
       >
-        {templateV2 ? <TemplateV2ScaledStage className={`playlist-preview-frame tpv2-picker-thumbnail ${template.orientation === "Retrato" ? "portrait" : "landscape"}`} template={template} config={template.published} orientation={template.orientation || "Paisagem"} mode="thumbnail" /> : <UniversalPreview
-          item={{
-            ...template,
-            playerItemType: "template",
-            templateType: template.templateType || template.type,
-          }}
-          className="playlist-preview-frame"
-          compact
-        />}
+        {templateV2 ? <TemplateV2ScaledStage className={`playlist-preview-frame tpv2-picker-thumbnail ${template.orientation === "Retrato" ? "portrait" : "landscape"}`} template={template} config={template.published} orientation={template.orientation || "Paisagem"} mode="thumbnail" /> : <TemplateScaledStage className={`playlist-preview-frame legacy-template-thumbnail ${template.orientation === "Retrato" ? "portrait" : "landscape"}`} orientation={template.orientation || "Paisagem"}><LegacyTemplateVisualPreview template={template} compact /></TemplateScaledStage>}
 
         <strong>{template.name}</strong>
 
@@ -9388,7 +9381,7 @@ function ClientPlaylistsPage({ client, access = getClientPlanAccess(client), isA
               <>
                 <div className="preview-library-group">
                   <h4>Templates Paisagem</h4>
-                  <div className="preview-library-grid">
+                  <div className="preview-library-grid template-library-grid">
                     {landscapeTemplates.length > 0 ? (
                       landscapeTemplates.map(renderSelectableTemplateCard)
                     ) : (
@@ -9399,7 +9392,7 @@ function ClientPlaylistsPage({ client, access = getClientPlanAccess(client), isA
 
                 <div className="preview-library-group">
                   <h4>Templates Retrato</h4>
-                  <div className="preview-library-grid">
+                  <div className="preview-library-grid template-library-grid">
                     {portraitTemplates.length > 0 ? (
                       portraitTemplates.map(renderSelectableTemplateCard)
                     ) : (
@@ -9410,11 +9403,11 @@ function ClientPlaylistsPage({ client, access = getClientPlanAccess(client), isA
                 {availableV2Templates.length > 0 && <>
                   <div className="preview-library-group">
                     <h4>Templates V2 · Paisagem</h4>
-                    <div className="preview-library-grid">{landscapeV2Templates.length ? landscapeV2Templates.map(renderSelectableTemplateCard) : <div className="empty-library compact">Nenhum Template V2 paisagem publicado.</div>}</div>
+                    <div className="preview-library-grid template-library-grid">{landscapeV2Templates.length ? landscapeV2Templates.map(renderSelectableTemplateCard) : <div className="empty-library compact">Nenhum Template V2 paisagem publicado.</div>}</div>
                   </div>
                   <div className="preview-library-group">
                     <h4>Templates V2 · Retrato</h4>
-                    <div className="preview-library-grid">{portraitV2Templates.length ? portraitV2Templates.map(renderSelectableTemplateCard) : <div className="empty-library compact">Nenhum Template V2 retrato publicado.</div>}</div>
+                    <div className="preview-library-grid template-library-grid">{portraitV2Templates.length ? portraitV2Templates.map(renderSelectableTemplateCard) : <div className="empty-library compact">Nenhum Template V2 retrato publicado.</div>}</div>
                   </div>
                 </>}
               </>
@@ -11301,7 +11294,7 @@ function ClientMarketingPage({ client, access = getClientPlanAccess(client) }) {
 }
 
 
-function ClientTemplatesPage({ client, access = getClientPlanAccess(client), isAdmin = false }) {
+function ClientTemplatesPage({ client, access = getClientPlanAccess(client), isAdmin = false, onUseInPlaylist }) {
   const [libraryTab, setLibraryTab] = useState("legacy");
   const [templates, setTemplates] = useState([]);
   const [screens, setScreens] = useState([]);
@@ -12094,7 +12087,7 @@ function ClientTemplatesPage({ client, access = getClientPlanAccess(client), isA
 
       <nav className="templates-library-tabs" aria-label="Bibliotecas de templates"><button type="button" className={libraryTab === "legacy" ? "active" : ""} onClick={() => setLibraryTab("legacy")}>Templates</button><button type="button" className={libraryTab === "v2" ? "active" : ""} onClick={() => setLibraryTab("v2")}>Templates V2 <span>Professional</span></button></nav>
 
-      {libraryTab === "v2" ? <TemplateV2Editor client={client} access={access} entitlement={templatesV2Entitlement} weatherCities={WEATHER_CITY_PRESETS} newsSources={[...Object.entries(NEWS_SOURCE_PRESETS).map(([name,url]) => ({name,url})), ...customNewsSources]} loadWeather={loadTemplateV2Weather} loadNews={loadTemplateV2News} /> : <>
+      {libraryTab === "v2" ? <TemplateV2Editor client={client} access={access} entitlement={templatesV2Entitlement} weatherCities={WEATHER_CITY_PRESETS} newsSources={[...Object.entries(NEWS_SOURCE_PRESETS).map(([name,url]) => ({name,url})), ...customNewsSources]} loadWeather={loadTemplateV2Weather} loadNews={loadTemplateV2News} onUseInPlaylist={onUseInPlaylist} /> : <>
 
       {upgradeMessage && (
         <UpgradeAccessCard
@@ -13447,8 +13440,8 @@ function ClientTemplatesPage({ client, access = getClientPlanAccess(client), isA
               </button>
             </div>
           </div>
-          <div className={`template-preview-stage ${previewOrientation === "Retrato" ? "portrait" : "landscape"}`}>
-            <TemplateVisualPreview template={{ ...form, orientation: previewOrientation }} compact={false} />
+          <div className={`template-scaled-preview-stage ${previewOrientation === "Retrato" ? "portrait" : "landscape"}`}>
+            <TemplateScaledStage className={`legacy-template-thumbnail ${previewOrientation === "Retrato" ? "portrait" : "landscape"}`} orientation={previewOrientation}><LegacyTemplateVisualPreview template={{ ...form, orientation: previewOrientation }} compact={false} /></TemplateScaledStage>
           </div>
         </div>
       </section>
@@ -13467,8 +13460,8 @@ function ClientTemplatesPage({ client, access = getClientPlanAccess(client), isA
           ) : (
             templates.map((template) => (
               <div className="template-saved-card" key={template.id}>
-                <div className={`template-saved-preview-shell ${template.orientation === "Retrato" ? "portrait" : "landscape"}`}>
-                  <TemplateVisualPreview template={template} />
+                <div className={`template-saved-stage-shell ${template.orientation === "Retrato" ? "portrait" : "landscape"}`}>
+                  <TemplateScaledStage className={`legacy-template-thumbnail ${template.orientation === "Retrato" ? "portrait" : "landscape"}`} orientation={template.orientation || "Paisagem"}><LegacyTemplateVisualPreview template={template} compact /></TemplateScaledStage>
                 </div>
 
                 <div className="template-saved-info">

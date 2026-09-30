@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { addDoc, collection, doc, onSnapshot, serverTimestamp, updateDoc } from "firebase/firestore";
 import { ChevronDown, CloudSun, Image, Palette, Plus, RotateCcw, Save, Send, Type } from "lucide-react";
 import { auth, db } from "../../firebase";
@@ -48,7 +48,8 @@ function TypographyControl({ label, value, onChange, sizeLimits, lineLimits = [0
   return <div className="tpv2-typography-control"><strong>{label}</strong><label>Tamanho <input type="range" min={sizeLimits[0]} max={sizeLimits[1]} value={value.fontSize} onChange={(event) => onChange("fontSize", Number(event.target.value))} /><span>{value.fontSize}px</span></label><label>Entrelinhas <input type="range" min={lineLimits[0]} max={lineLimits[1]} step="0.05" value={value.lineHeight} onChange={(event) => onChange("lineHeight", Number(event.target.value))} /><span>{Number(value.lineHeight).toFixed(2)}</span></label></div>;
 }
 
-export default function TemplateV2Editor({ client, access, entitlement = { allowed: true }, weatherCities = [], newsSources = [], loadWeather, loadNews }) {
+export default function TemplateV2Editor({ client, access, entitlement = { allowed: true }, weatherCities = [], newsSources = [], loadWeather, loadNews, onUseInPlaylist }) {
+  const workspaceRef = useRef(null);
   const [templates, setTemplates] = useState([]);
   const [mediaList, setMediaList] = useState([]);
   const [selectedId, setSelectedId] = useState("");
@@ -126,6 +127,28 @@ export default function TemplateV2Editor({ client, access, entitlement = { allow
     } catch (error) { console.error(error); setMessage("Não foi possível salvar o rascunho."); } finally { setSaving(false); }
   }
 
+  async function writePublishedTemplate(item, published) {
+    const publishedRevision = revision("published");
+    const templateName = getTemplateV2Name(item) || definition?.label || "Template V2";
+    const templateType = item.identity?.templateType || item.templateType || activeType;
+    await updateDoc(doc(db, "clients", client.id, "templates", item.id), {
+      published,
+      name: templateName,
+      title: templateName,
+      type: templateType,
+      templateType,
+      duration: Number(published.display.duration || 15),
+      orientation: published.display.defaultOrientation || "Paisagem",
+      enabled: true,
+      "identity.name": templateName,
+      "status.enabled": true,
+      "status.publicationState": "published",
+      "status.publishedRevision": publishedRevision,
+      publishedAt: serverTimestamp(),
+      updatedAt: serverTimestamp(),
+    });
+  }
+
   async function publish() {
     if (!entitlement.allowed) { setMessage("Templates V2 não estão disponíveis no seu plano."); return; }
     if (!selected) { setMessage("Salve o rascunho antes de publicar."); return; }
@@ -134,26 +157,27 @@ export default function TemplateV2Editor({ client, access, entitlement = { allow
     if (draftState.persistedDraft.media?.primary?.type === "video") { setMessage("Substitua o vídeo interno por uma imagem antes de publicar. Vídeo em Template V2 ainda está em homologação."); return; }
     setSaving(true); setMessage("");
     try {
-      const publishedRevision = revision("published");
       const published = cloneTemplateV2Config(draftState.persistedDraft);
-      await updateDoc(doc(db, "clients", client.id, "templates", selected.id), {
-        published,
-        name: name.trim() || definition?.label || "Template V2",
-        title: name.trim() || definition?.label || "Template V2",
-        type: activeType,
-        templateType: activeType,
-        duration: Number(published.display.duration || 15),
-        orientation: published.display.defaultOrientation || "Paisagem",
-        enabled: true,
-        "identity.name": name.trim() || definition?.label || "Template V2",
-        "status.enabled": true,
-        "status.publicationState": "published",
-        "status.publishedRevision": publishedRevision,
-        publishedAt: serverTimestamp(),
-        updatedAt: serverTimestamp(),
-      });
+      await writePublishedTemplate({ ...selected, identity: { ...selected.identity, name: name.trim() || definition?.label || "Template V2" } }, published);
       draftState.markPublished(published);
       setMessage("Template publicado e disponível para seleção em playlists. Nenhuma tela foi alterada.");
+    } catch (error) { console.error(error); setMessage("Não foi possível publicar o template."); } finally { setSaving(false); }
+  }
+
+  function openTemplate(item) {
+    setSelectedId(item.id);
+    setMessage("");
+    requestAnimationFrame(() => workspaceRef.current?.scrollIntoView({ behavior: "smooth", block: "start" }));
+  }
+
+  async function publishFromCard(item) {
+    if (!entitlement.allowed || access?.canEditTemplates === false) { setMessage("Seu plano não permite publicar templates."); return; }
+    const persistedDraft = getTemplateV2DraftConfig(item);
+    if (persistedDraft.media?.primary?.type === "video") { openTemplate(item); setMessage("Substitua o vídeo interno por uma imagem antes de publicar."); return; }
+    setSaving(true); setMessage("");
+    try {
+      await writePublishedTemplate(item, cloneTemplateV2Config(persistedDraft));
+      setMessage("Template publicado e disponível para seleção em playlists.");
     } catch (error) { console.error(error); setMessage("Não foi possível publicar o template."); } finally { setSaving(false); }
   }
 
@@ -202,7 +226,7 @@ export default function TemplateV2Editor({ client, access, entitlement = { allow
   if (!entitlement.allowed) return <div className="tpv2-workspace tpv2-locked"><strong>Hero Business · Templates V2</strong><h2>Disponível nos planos Professional e Enterprise</h2><p>Templates V2 não estão disponíveis no seu plano. Uma publicação existente continuará normalmente nas telas.</p></div>;
 
   return (
-    <div className="tpv2-workspace">
+    <div className="tpv2-workspace" ref={workspaceRef}>
       <div className="tpv2-workspace-title"><div><span>Templates V2 · Professional / Enterprise</span><h2>{definition?.label || "Biblioteca V2"}</h2><p>Edite o rascunho com preview ao vivo e publique somente quando estiver pronto.</p></div><button type="button" onClick={() => { if (!entitlement.allowed) { setMessage("Templates V2 não estão disponíveis no seu plano."); return; } setSelectedId(""); setMessage(""); }}><Plus /> Novo Template</button></div>
       {!selected && <><div className="tpv2-catalog-filters"><select value={catalogCategory} onChange={(event) => setCatalogCategory(event.target.value)}>{TEMPLATE_V2_CATEGORIES.map((category) => <option key={category}>{category}</option>)}</select><select value={catalogOrientation} onChange={(event) => setCatalogOrientation(event.target.value)}><option>Todos</option><option>Paisagem</option><option>Retrato</option></select></div><div className="tpv2-catalog">{catalogItems.map((item) => <button type="button" key={item.type} className={activeType === item.type ? "active" : ""} onClick={() => setNewType(item.type)}><div className={`tpv2-catalog-thumbnail ${item.thumbnail}`}><i/><i/><i/></div><span>{item.category}</span><strong>{item.label}</strong><small>{item.description}</small><em>Paisagem · Retrato · Professional</em></button>)}</div></>}
       <div className="tpv2-template-tabs">{templates.map((item) => <button type="button" key={item.id} className={selectedId === item.id ? "active" : ""} onClick={() => setSelectedId(item.id)}><strong>{getTemplateV2Name(item)}</strong><span>{item.published ? "Publicado" : "Somente rascunho"}</span></button>)}</div>
@@ -255,7 +279,7 @@ export default function TemplateV2Editor({ client, access, entitlement = { allow
         <TemplateV2PreviewPanel template={previewTemplate} config={draftState.editorDraft} orientation={orientation} onOrientationChange={setOrientation} scale={scale} onScaleChange={setScale} onOpen={() => setPreviewOpen(true)} dynamicData={previewDynamicData} />
       </div>
       {previewOpen && <PopupPreview template={previewTemplate} config={draftState.editorDraft} orientation={orientation} onClose={() => setPreviewOpen(false)} dynamicData={previewDynamicData} />}
-      {templates.length > 0 && <div className="tpv2-published-strip"><h3>Meus Templates V2</h3>{templates.map((item) => { const view = getPublishedTemplateV2View(item); const draft = getTemplateV2DraftConfig(item); const hasChanges = Boolean(view && isTemplateV2Dirty(draft,view.published)); const preview = hasChanges ? draft : view?.published || draft; const previewOrientation = preview.display?.defaultOrientation || "Paisagem"; return <article className={previewOrientation === "Retrato" ? "portrait" : "landscape"} key={item.id}><TemplateV2ScaledStage className="tpv2-created-thumbnail" template={item} config={preview} orientation={previewOrientation} mode="thumbnail"/><div className="tpv2-created-meta"><strong>{getTemplateV2Name(item)}</strong><span>{item.identity?.templateType || item.templateType} · {previewOrientation}</span><em className={view ? "published" : "draft"}>{hasChanges ? "Alterações não publicadas" : view ? "Publicado" : "Rascunho"}</em></div></article>; })}</div>}
+      {templates.length > 0 && <div className="tpv2-published-strip"><h3>Meus Templates V2</h3>{templates.map((item) => { const view = getPublishedTemplateV2View(item); const draft = getTemplateV2DraftConfig(item); const hasChanges = Boolean(view && isTemplateV2Dirty(draft,view.published)); const preview = hasChanges ? draft : view?.published || draft; const previewOrientation = preview.display?.defaultOrientation || "Paisagem"; return <article role="button" tabIndex="0" className={previewOrientation === "Retrato" ? "portrait" : "landscape"} key={item.id} onClick={() => openTemplate(item)} onKeyDown={(event) => { if (event.key === "Enter" || event.key === " ") openTemplate(item); }}><TemplateV2ScaledStage className="tpv2-created-thumbnail" template={item} config={preview} orientation={previewOrientation} mode="thumbnail"/><div className="tpv2-created-meta"><strong>{getTemplateV2Name(item)}</strong><span>{item.identity?.templateType || item.templateType} · {previewOrientation}</span><em className={view ? "published" : "draft"}>{hasChanges ? "Alterações não publicadas" : view ? "Publicado" : "Rascunho"}</em></div><div className="tpv2-created-actions"><button type="button" onClick={(event) => { event.stopPropagation(); openTemplate(item); }}>Editar</button>{view && !hasChanges ? <button type="button" className="primary" onClick={(event) => { event.stopPropagation(); onUseInPlaylist?.(); }}>Usar em playlist</button> : <button type="button" className="primary" disabled={saving} onClick={(event) => { event.stopPropagation(); publishFromCard(item); }}>{view ? "Atualizar publicação" : "Publicar"}</button>}</div></article>; })}</div>}
     </div>
   );
 }
