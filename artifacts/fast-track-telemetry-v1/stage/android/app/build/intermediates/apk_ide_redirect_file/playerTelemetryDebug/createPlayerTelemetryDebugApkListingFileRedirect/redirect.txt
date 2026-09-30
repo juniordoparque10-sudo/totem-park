@@ -1,0 +1,2 @@
+#- File Locator -
+listingFile=../../../../outputs/apk/playerTelemetry/debug/output-metadata.json

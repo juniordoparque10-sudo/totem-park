@@ -1,0 +1,7 @@
+import fs from 'node:fs';
+const f='artifacts/homologacao-2a1/fix-diagnostic.mjs';let s=fs.readFileSync(f,'utf8');
+s=s.replace("await inspect(p,'offline-second-restart');await close();",`await inspect(p,'offline-second-restart');await context.setOffline(false);
+async function scenario(action){await new Promise((resolve,reject)=>{const c=spawn(process.execPath,[path.join(root,'scenario.mjs'),action],{windowsHide:true,stdio:'ignore'});c.on('exit',code=>code===0?resolve():reject(Error('Local scenario failed '+action)));});}
+await scenario('schedule');try{await p.waitForFunction(()=>document.body.innerText.includes('Programação ativa: AGENDADA HOMOLOGACAO'),null,{timeout:15000});await inspect(p,'scheduled-online');result.schedule='PASSOU';}finally{await scenario('unschedule');}
+await p.waitForTimeout(4000);const cacheBeforeOwnership=await inv(p);const b=await context.newPage();await b.goto('http://127.0.0.1:5199/player/B/TESTB1');await b.waitForFunction(()=>!!document.querySelector('.is-current .player-media[src^="blob:"]'),null,{timeout:45000});await b.waitForTimeout(4000);const withB=await inv(p);const a2=await context.newPage();await a2.goto('http://127.0.0.1:5199/player/A/TESTA2');await a2.waitForFunction(()=>!!document.querySelector('.is-current .player-media[src^="blob:"]'),null,{timeout:45000});await a2.waitForTimeout(6000);result.ownership={before:cacheBeforeOwnership,withB,after:await inv(p)};await close();`);
+fs.writeFileSync(f,s);

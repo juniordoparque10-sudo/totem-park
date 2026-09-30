@@ -1,0 +1,1722 @@
+{
+  "documents": [
+    {
+      "name": "projects/totem-park/databases/(default)/documents/clients/eCd1q9Dq1SMr9D5FlKN8/media/1l2dgfgf7cvyAUmCZFrk",
+      "fields": {
+        "type": {
+          "stringValue": "Imagem"
+        },
+        "fileName": {
+          "stringValue": "ParkSolutionsQR paisagem (1).png"
+        },
+        "orientation": {
+          "stringValue": "Paisagem"
+        },
+        "sizeBytes": {
+          "integerValue": "161103"
+        },
+        "createdAt": {
+          "timestampValue": "2026-09-12T19:48:49.355Z"
+        },
+        "width": {
+          "integerValue": "1600"
+        },
+        "duration": {
+          "integerValue": "10"
+        },
+        "storageProvider": {
+          "stringValue": "firebase"
+        },
+        "aspectRatio": {
+          "stringValue": "16:9"
+        },
+        "uploadedByUid": {
+          "stringValue": "fiuy77BXZ0daGa3nAk3h1DfVfBu2"
+        },
+        "storagePath": {
+          "stringValue": "clients/eCd1q9Dq1SMr9D5FlKN8/media/1789242526736_ParkSolutionsQR paisagem (1).png"
+        },
+        "preview": {
+          "stringValue": "https://firebasestorage.googleapis.com/v0/b/totem-park.firebasestorage.app/o/clients%2FeCd1q9Dq1SMr9D5FlKN8%2Fmedia%2F1789242526736_ParkSolutionsQR%20paisagem%20(1).png?alt=media&token=bfe6313a-ff0c-4f9d-93f8-29f74262e88e"
+        },
+        "storageKey": {
+          "stringValue": "clients/eCd1q9Dq1SMr9D5FlKN8/media/1789242526736_ParkSolutionsQR paisagem (1).png"
+        },
+        "fileHash": {
+          "stringValue": ""
+        },
+        "naturalDuration": {
+          "nullValue": null
+        },
+        "clientId": {
+          "stringValue": "eCd1q9Dq1SMr9D5FlKN8"
+        },
+        "height": {
+          "integerValue": "900"
+        },
+        "title": {
+          "stringValue": "ParkSolutionsQR paisagem"
+        },
+        "sound": {
+          "booleanValue": false
+        },
+        "uploadedByEmail": {
+          "stringValue": "juniordoparque10@gmail.com"
+        },
+        "etag": {
+          "stringValue": ""
+        }
+      },
+      "createTime": "2026-09-12T19:48:49.376421Z",
+      "updateTime": "2026-09-12T19:48:49.376421Z"
+    },
+    {
+      "name": "projects/totem-park/databases/(default)/documents/clients/eCd1q9Dq1SMr9D5FlKN8/media/4VIWppgYyMl07mHN1E2I",
+      "fields": {
+        "aspectRatio": {
+          "stringValue": "16:9"
+        },
+        "uploadedByUid": {
+          "stringValue": "fiuy77BXZ0daGa3nAk3h1DfVfBu2"
+        },
+        "preview": {
+          "stringValue": "https://firebasestorage.googleapis.com/v0/b/totem-park.firebasestorage.app/o/clients%2FeCd1q9Dq1SMr9D5FlKN8%2Fmedia%2F1787229427343_k1.jpeg?alt=media&token=9b54821d-00fb-4523-bbf9-f3fd9acf863f"
+        },
+        "naturalDuration": {
+          "nullValue": null
+        },
+        "clientId": {
+          "stringValue": "eCd1q9Dq1SMr9D5FlKN8"
+        },
+        "type": {
+          "stringValue": "Imagem"
+        },
+        "orientation": {
+          "stringValue": "Paisagem"
+        },
+        "width": {
+          "integerValue": "1600"
+        },
+        "uploadedByEmail": {
+          "stringValue": "juniordoparque10@gmail.com"
+        },
+        "fileName": {
+          "stringValue": "k1.jpeg"
+        },
+        "updatedAt": {
+          "timestampValue": "2026-08-20T12:37:18.921Z"
+        },
+        "height": {
+          "integerValue": "900"
+        },
+        "sizeBytes": {
+          "integerValue": "227992"
+        },
+        "createdAt": {
+          "timestampValue": "2026-08-20T12:37:09.478Z"
+        },
+        "sound": {
+          "booleanValue": false
+        },
+        "duration": {
+          "integerValue": "10"
+        },
+        "storagePath": {
+          "stringValue": "clients/eCd1q9Dq1SMr9D5FlKN8/media/1787229427343_k1.jpeg"
+        },
+        "title": {
+          "stringValue": "AG Kids"
+        }
+      },
+      "createTime": "2026-08-20T12:37:09.534224Z",
+      "updateTime": "2026-08-20T12:37:18.977802Z"
+    },
+    {
+      "name": "projects/totem-park/databases/(default)/documents/clients/eCd1q9Dq1SMr9D5FlKN8/media/55wn54bqcwsOG8qVdKuX",
+      "fields": {
+        "storagePath": {
+          "stringValue": "clients/eCd1q9Dq1SMr9D5FlKN8/media/1785722032180_Kimura Preto Red P.png"
+        },
+        "fileName": {
+          "stringValue": "Kimura Preto Red P.png"
+        },
+        "preview": {
+          "stringValue": "https://firebasestorage.googleapis.com/v0/b/totem-park.firebasestorage.app/o/clients%2FeCd1q9Dq1SMr9D5FlKN8%2Fmedia%2F1785722032180_Kimura%20Preto%20Red%20P.png?alt=media&token=c06898eb-88f5-41b3-aa31-428756276ef2"
+        },
+        "duration": {
+          "integerValue": "15"
+        },
+        "height": {
+          "integerValue": "941"
+        },
+        "type": {
+          "stringValue": "Imagem"
+        },
+        "width": {
+          "integerValue": "1672"
+        },
+        "sizeBytes": {
+          "integerValue": "880657"
+        },
+        "createdAt": {
+          "timestampValue": "2026-08-03T01:54:00.506Z"
+        },
+        "orientation": {
+          "stringValue": "Paisagem"
+        },
+        "naturalDuration": {
+          "nullValue": null
+        },
+        "sound": {
+          "booleanValue": false
+        },
+        "aspectRatio": {
+          "stringValue": "16:9"
+        },
+        "title": {
+          "stringValue": "Kimura Preto Red P"
+        }
+      },
+      "createTime": "2026-08-03T01:54:00.546967Z",
+      "updateTime": "2026-08-03T01:54:00.546967Z"
+    },
+    {
+      "name": "projects/totem-park/databases/(default)/documents/clients/eCd1q9Dq1SMr9D5FlKN8/media/7RFK6pktPG2x5kaHjHTJ",
+      "fields": {
+        "width": {
+          "integerValue": "1280"
+        },
+        "storagePath": {
+          "stringValue": "clients/eCd1q9Dq1SMr9D5FlKN8/media/1785723731706_1001328716.mp4"
+        },
+        "type": {
+          "stringValue": "Vídeo"
+        },
+        "sizeBytes": {
+          "integerValue": "2534302"
+        },
+        "createdAt": {
+          "timestampValue": "2026-08-03T02:22:15.442Z"
+        },
+        "naturalDuration": {
+          "integerValue": "10"
+        },
+        "title": {
+          "stringValue": "KIMURA An Branco P"
+        },
+        "orientation": {
+          "stringValue": "Paisagem"
+        },
+        "fileName": {
+          "stringValue": "1001328716.mp4"
+        },
+        "sound": {
+          "booleanValue": false
+        },
+        "preview": {
+          "stringValue": "https://firebasestorage.googleapis.com/v0/b/totem-park.firebasestorage.app/o/clients%2FeCd1q9Dq1SMr9D5FlKN8%2Fmedia%2F1785723731706_1001328716.mp4?alt=media&token=906ece89-4340-4f4d-a2fd-171e1dcf0cd6"
+        },
+        "duration": {
+          "integerValue": "10"
+        },
+        "height": {
+          "integerValue": "720"
+        },
+        "aspectRatio": {
+          "stringValue": "16:9"
+        }
+      },
+      "createTime": "2026-08-03T02:22:15.488367Z",
+      "updateTime": "2026-08-03T02:22:15.488367Z"
+    },
+    {
+      "name": "projects/totem-park/databases/(default)/documents/clients/eCd1q9Dq1SMr9D5FlKN8/media/AVwGDQ73WNhEnKaMZj7I",
+      "fields": {
+        "height": {
+          "integerValue": "478"
+        },
+        "sound": {
+          "booleanValue": false
+        },
+        "duration": {
+          "integerValue": "10"
+        },
+        "aspectRatio": {
+          "stringValue": "16:9"
+        },
+        "storageKey": {
+          "stringValue": "clients/eCd1q9Dq1SMr9D5FlKN8/media/1790039504650_PSolutions V1.mp4"
+        },
+        "title": {
+          "stringValue": "PSolutions V1"
+        },
+        "fileName": {
+          "stringValue": "PSolutions V1.mp4"
+        },
+        "orientation": {
+          "stringValue": "Paisagem"
+        },
+        "uploadedByUid": {
+          "stringValue": "fiuy77BXZ0daGa3nAk3h1DfVfBu2"
+        },
+        "storageProvider": {
+          "stringValue": "firebase"
+        },
+        "type": {
+          "stringValue": "Vídeo"
+        },
+        "preview": {
+          "stringValue": "https://firebasestorage.googleapis.com/v0/b/totem-park.firebasestorage.app/o/clients%2FeCd1q9Dq1SMr9D5FlKN8%2Fmedia%2F1790039504650_PSolutions%20V1.mp4?alt=media&token=3c5a8a62-e472-44ed-abd5-1cc32c2c1b52"
+        },
+        "etag": {
+          "stringValue": ""
+        },
+        "naturalDuration": {
+          "integerValue": "10"
+        },
+        "sizeBytes": {
+          "integerValue": "1825834"
+        },
+        "createdAt": {
+          "timestampValue": "2026-09-22T01:11:51.647Z"
+        },
+        "width": {
+          "integerValue": "848"
+        },
+        "uploadedByEmail": {
+          "stringValue": "juniordoparque10@gmail.com"
+        },
+        "storagePath": {
+          "stringValue": "clients/eCd1q9Dq1SMr9D5FlKN8/media/1790039504650_PSolutions V1.mp4"
+        },
+        "fileHash": {
+          "stringValue": ""
+        },
+        "clientId": {
+          "stringValue": "eCd1q9Dq1SMr9D5FlKN8"
+        }
+      },
+      "createTime": "2026-09-22T01:11:51.701064Z",
+      "updateTime": "2026-09-22T01:11:51.701064Z"
+    },
+    {
+      "name": "projects/totem-park/databases/(default)/documents/clients/eCd1q9Dq1SMr9D5FlKN8/media/CiA0UofcTpQjkMSCHsfq",
+      "fields": {
+        "duration": {
+          "integerValue": "32"
+        },
+        "sound": {
+          "booleanValue": false
+        },
+        "title": {
+          "stringValue": "Video Dadai"
+        },
+        "uploadedByEmail": {
+          "stringValue": "juniordoparque10@gmail.com"
+        },
+        "height": {
+          "integerValue": "1052"
+        },
+        "storagePath": {
+          "stringValue": "clients/eCd1q9Dq1SMr9D5FlKN8/media/1787616789324_Video Dadai.mp4"
+        },
+        "fileName": {
+          "stringValue": "Video Dadai.mp4"
+        },
+        "naturalDuration": {
+          "integerValue": "32"
+        },
+        "type": {
+          "stringValue": "Vídeo"
+        },
+        "createdAt": {
+          "timestampValue": "2026-08-25T00:13:26.497Z"
+        },
+        "sizeBytes": {
+          "integerValue": "19921053"
+        },
+        "aspectRatio": {
+          "stringValue": "16:9"
+        },
+        "preview": {
+          "stringValue": "https://firebasestorage.googleapis.com/v0/b/totem-park.firebasestorage.app/o/clients%2FeCd1q9Dq1SMr9D5FlKN8%2Fmedia%2F1787616789324_Video%20Dadai.mp4?alt=media&token=5943231c-84e0-466e-9889-474e4689185d"
+        },
+        "width": {
+          "integerValue": "1920"
+        },
+        "uploadedByUid": {
+          "stringValue": "fiuy77BXZ0daGa3nAk3h1DfVfBu2"
+        },
+        "orientation": {
+          "stringValue": "Paisagem"
+        },
+        "clientId": {
+          "stringValue": "eCd1q9Dq1SMr9D5FlKN8"
+        }
+      },
+      "createTime": "2026-08-25T00:13:26.538214Z",
+      "updateTime": "2026-08-25T00:13:26.538214Z"
+    },
+    {
+      "name": "projects/totem-park/databases/(default)/documents/clients/eCd1q9Dq1SMr9D5FlKN8/media/EiWIvAPJnxcyJr6Vy0b4",
+      "fields": {
+        "height": {
+          "integerValue": "941"
+        },
+        "preview": {
+          "stringValue": "https://firebasestorage.googleapis.com/v0/b/totem-park.firebasestorage.app/o/clients%2FeCd1q9Dq1SMr9D5FlKN8%2Fmedia%2F1789242419196_Prop%20TotemPK%20P%20(1).png?alt=media&token=803ee341-0e79-4f33-a16e-d458b3898166"
+        },
+        "fileName": {
+          "stringValue": "Prop TotemPK P (1).png"
+        },
+        "sound": {
+          "booleanValue": false
+        },
+        "naturalDuration": {
+          "nullValue": null
+        },
+        "aspectRatio": {
+          "stringValue": "16:9"
+        },
+        "title": {
+          "stringValue": "Prop TotemPK P"
+        },
+        "createdAt": {
+          "timestampValue": "2026-09-12T19:47:05.374Z"
+        },
+        "sizeBytes": {
+          "integerValue": "296846"
+        },
+        "duration": {
+          "integerValue": "10"
+        },
+        "orientation": {
+          "stringValue": "Paisagem"
+        },
+        "uploadedByEmail": {
+          "stringValue": "juniordoparque10@gmail.com"
+        },
+        "type": {
+          "stringValue": "Imagem"
+        },
+        "etag": {
+          "stringValue": ""
+        },
+        "uploadedByUid": {
+          "stringValue": "fiuy77BXZ0daGa3nAk3h1DfVfBu2"
+        },
+        "fileHash": {
+          "stringValue": ""
+        },
+        "storageKey": {
+          "stringValue": "clients/eCd1q9Dq1SMr9D5FlKN8/media/1789242419196_Prop TotemPK P (1).png"
+        },
+        "clientId": {
+          "stringValue": "eCd1q9Dq1SMr9D5FlKN8"
+        },
+        "width": {
+          "integerValue": "1672"
+        },
+        "storageProvider": {
+          "stringValue": "firebase"
+        },
+        "storagePath": {
+          "stringValue": "clients/eCd1q9Dq1SMr9D5FlKN8/media/1789242419196_Prop TotemPK P (1).png"
+        }
+      },
+      "createTime": "2026-09-12T19:47:05.428805Z",
+      "updateTime": "2026-09-12T19:47:05.428805Z"
+    },
+    {
+      "name": "projects/totem-park/databases/(default)/documents/clients/eCd1q9Dq1SMr9D5FlKN8/media/GCOk3yDVuiWchLWcIIFg",
+      "fields": {
+        "duration": {
+          "integerValue": "15"
+        },
+        "orientation": {
+          "stringValue": "Paisagem"
+        },
+        "aspectRatio": {
+          "stringValue": "16:9"
+        },
+        "fileName": {
+          "stringValue": "Studio_Fire_15s_Cinematografico.mp4"
+        },
+        "width": {
+          "integerValue": "1920"
+        },
+        "storagePath": {
+          "stringValue": "clients/eCd1q9Dq1SMr9D5FlKN8/media/1786491457119_Studio_Fire_15s_Cinematografico.mp4"
+        },
+        "naturalDuration": {
+          "integerValue": "15"
+        },
+        "createdAt": {
+          "timestampValue": "2026-08-11T23:37:52.184Z"
+        },
+        "sizeBytes": {
+          "integerValue": "11366669"
+        },
+        "sound": {
+          "booleanValue": false
+        },
+        "height": {
+          "integerValue": "1080"
+        },
+        "preview": {
+          "stringValue": "https://firebasestorage.googleapis.com/v0/b/totem-park.firebasestorage.app/o/clients%2FeCd1q9Dq1SMr9D5FlKN8%2Fmedia%2F1786491457119_Studio_Fire_15s_Cinematografico.mp4?alt=media&token=0b7de4be-f306-47a7-be79-9e35ac684e70"
+        },
+        "title": {
+          "stringValue": "Studio Fire"
+        },
+        "type": {
+          "stringValue": "Vídeo"
+        }
+      },
+      "createTime": "2026-08-11T23:37:52.225626Z",
+      "updateTime": "2026-08-11T23:37:52.225626Z"
+    },
+    {
+      "name": "projects/totem-park/databases/(default)/documents/clients/eCd1q9Dq1SMr9D5FlKN8/media/GScYs4NmhKxWea2ncHCs",
+      "fields": {
+        "naturalDuration": {
+          "nullValue": null
+        },
+        "height": {
+          "integerValue": "941"
+        },
+        "type": {
+          "stringValue": "Imagem"
+        },
+        "title": {
+          "stringValue": "Kimura branco Red P"
+        },
+        "storagePath": {
+          "stringValue": "clients/eCd1q9Dq1SMr9D5FlKN8/media/1785722011888_Kimura branco Red P.png"
+        },
+        "sound": {
+          "booleanValue": false
+        },
+        "fileName": {
+          "stringValue": "Kimura branco Red P.png"
+        },
+        "aspectRatio": {
+          "stringValue": "16:9"
+        },
+        "preview": {
+          "stringValue": "https://firebasestorage.googleapis.com/v0/b/totem-park.firebasestorage.app/o/clients%2FeCd1q9Dq1SMr9D5FlKN8%2Fmedia%2F1785722011888_Kimura%20branco%20Red%20P.png?alt=media&token=43096675-b84c-443b-8b2c-0ca057579f49"
+        },
+        "createdAt": {
+          "timestampValue": "2026-08-03T01:53:38.426Z"
+        },
+        "sizeBytes": {
+          "integerValue": "902511"
+        },
+        "duration": {
+          "integerValue": "15"
+        },
+        "orientation": {
+          "stringValue": "Paisagem"
+        },
+        "width": {
+          "integerValue": "1672"
+        }
+      },
+      "createTime": "2026-08-03T01:53:38.460327Z",
+      "updateTime": "2026-08-03T01:53:38.460327Z"
+    },
+    {
+      "name": "projects/totem-park/databases/(default)/documents/clients/eCd1q9Dq1SMr9D5FlKN8/media/HTVYD1hJXx5K73yWgStq",
+      "fields": {
+        "orientation": {
+          "stringValue": "Paisagem"
+        },
+        "duration": {
+          "integerValue": "15"
+        },
+        "preview": {
+          "stringValue": "https://firebasestorage.googleapis.com/v0/b/totem-park.firebasestorage.app/o/clients%2FeCd1q9Dq1SMr9D5FlKN8%2Fmedia%2F1785977711424_Dadai.png?alt=media&token=70d7e4e4-a3d5-46a4-b35c-7c1d9e696c1a"
+        },
+        "aspectRatio": {
+          "stringValue": "16:9"
+        },
+        "fileName": {
+          "stringValue": "Dadai.png"
+        },
+        "title": {
+          "stringValue": "Dadai.png"
+        },
+        "sound": {
+          "booleanValue": false
+        },
+        "storagePath": {
+          "stringValue": "clients/eCd1q9Dq1SMr9D5FlKN8/media/1785977711424_Dadai.png"
+        },
+        "type": {
+          "stringValue": "Imagem"
+        },
+        "height": {
+          "integerValue": "941"
+        },
+        "width": {
+          "integerValue": "1672"
+        },
+        "naturalDuration": {
+          "nullValue": null
+        },
+        "sizeBytes": {
+          "integerValue": "1023408"
+        },
+        "createdAt": {
+          "timestampValue": "2026-08-06T00:55:21.195Z"
+        }
+      },
+      "createTime": "2026-08-06T00:55:21.217708Z",
+      "updateTime": "2026-08-06T00:55:21.217708Z"
+    },
+    {
+      "name": "projects/totem-park/databases/(default)/documents/clients/eCd1q9Dq1SMr9D5FlKN8/media/Lv6lx4SYoY6YBIzfYPOw",
+      "fields": {
+        "orientation": {
+          "stringValue": "Paisagem"
+        },
+        "width": {
+          "integerValue": "1536"
+        },
+        "aspectRatio": {
+          "stringValue": "custom"
+        },
+        "sizeBytes": {
+          "integerValue": "561638"
+        },
+        "createdAt": {
+          "timestampValue": "2026-09-12T19:48:16.136Z"
+        },
+        "type": {
+          "stringValue": "Imagem"
+        },
+        "clientId": {
+          "stringValue": "eCd1q9Dq1SMr9D5FlKN8"
+        },
+        "storageProvider": {
+          "stringValue": "firebase"
+        },
+        "fileHash": {
+          "stringValue": ""
+        },
+        "storagePath": {
+          "stringValue": "clients/eCd1q9Dq1SMr9D5FlKN8/media/1789242489188_Prolider (1).png"
+        },
+        "sound": {
+          "booleanValue": false
+        },
+        "duration": {
+          "integerValue": "10"
+        },
+        "naturalDuration": {
+          "nullValue": null
+        },
+        "preview": {
+          "stringValue": "https://firebasestorage.googleapis.com/v0/b/totem-park.firebasestorage.app/o/clients%2FeCd1q9Dq1SMr9D5FlKN8%2Fmedia%2F1789242489188_Prolider%20(1).png?alt=media&token=b4dbdd1c-3881-4034-bbf0-22ca7a053eaa"
+        },
+        "etag": {
+          "stringValue": ""
+        },
+        "title": {
+          "stringValue": "Prolider"
+        },
+        "height": {
+          "integerValue": "1024"
+        },
+        "uploadedByEmail": {
+          "stringValue": "juniordoparque10@gmail.com"
+        },
+        "fileName": {
+          "stringValue": "Prolider (1).png"
+        },
+        "storageKey": {
+          "stringValue": "clients/eCd1q9Dq1SMr9D5FlKN8/media/1789242489188_Prolider (1).png"
+        },
+        "uploadedByUid": {
+          "stringValue": "fiuy77BXZ0daGa3nAk3h1DfVfBu2"
+        }
+      },
+      "createTime": "2026-09-12T19:48:16.163071Z",
+      "updateTime": "2026-09-12T19:48:16.163071Z"
+    },
+    {
+      "name": "projects/totem-park/databases/(default)/documents/clients/eCd1q9Dq1SMr9D5FlKN8/media/O8gb1EGvvxFXCU2wpmN2",
+      "fields": {
+        "naturalDuration": {
+          "nullValue": null
+        },
+        "width": {
+          "integerValue": "1672"
+        },
+        "height": {
+          "integerValue": "941"
+        },
+        "type": {
+          "stringValue": "Imagem"
+        },
+        "preview": {
+          "stringValue": "https://firebasestorage.googleapis.com/v0/b/totem-park.firebasestorage.app/o/clients%2FeCd1q9Dq1SMr9D5FlKN8%2Fmedia%2F1785722054025_kimura%20Preto%20P.png?alt=media&token=aef39eb6-86ef-4c59-ac1c-b0a6b753912a"
+        },
+        "createdAt": {
+          "timestampValue": "2026-08-03T01:54:20.408Z"
+        },
+        "sizeBytes": {
+          "integerValue": "459229"
+        },
+        "storagePath": {
+          "stringValue": "clients/eCd1q9Dq1SMr9D5FlKN8/media/1785722054025_kimura Preto P.png"
+        },
+        "sound": {
+          "booleanValue": false
+        },
+        "aspectRatio": {
+          "stringValue": "16:9"
+        },
+        "title": {
+          "stringValue": "kimura Preto P"
+        },
+        "fileName": {
+          "stringValue": "kimura Preto P.png"
+        },
+        "orientation": {
+          "stringValue": "Paisagem"
+        },
+        "duration": {
+          "integerValue": "15"
+        }
+      },
+      "createTime": "2026-08-03T01:54:20.457038Z",
+      "updateTime": "2026-08-03T01:54:20.457038Z"
+    },
+    {
+      "name": "projects/totem-park/databases/(default)/documents/clients/eCd1q9Dq1SMr9D5FlKN8/media/OxF3BTa2yiqWBc3vnETv",
+      "fields": {
+        "etag": {
+          "stringValue": ""
+        },
+        "preview": {
+          "stringValue": "https://firebasestorage.googleapis.com/v0/b/totem-park.firebasestorage.app/o/clients%2FeCd1q9Dq1SMr9D5FlKN8%2Fmedia%2F1790031386655_vd%202.mp4?alt=media&token=912a84ce-777a-432d-991f-8720b540d0aa"
+        },
+        "aspectRatio": {
+          "stringValue": "16:9"
+        },
+        "height": {
+          "integerValue": "1080"
+        },
+        "fileHash": {
+          "stringValue": ""
+        },
+        "storageProvider": {
+          "stringValue": "firebase"
+        },
+        "clientId": {
+          "stringValue": "eCd1q9Dq1SMr9D5FlKN8"
+        },
+        "storageKey": {
+          "stringValue": "clients/eCd1q9Dq1SMr9D5FlKN8/media/1790031386655_vd 2.mp4"
+        },
+        "sound": {
+          "booleanValue": false
+        },
+        "orientation": {
+          "stringValue": "Paisagem"
+        },
+        "uploadedByUid": {
+          "stringValue": "fiuy77BXZ0daGa3nAk3h1DfVfBu2"
+        },
+        "title": {
+          "stringValue": "vd 2"
+        },
+        "fileName": {
+          "stringValue": "vd 2.mp4"
+        },
+        "sizeBytes": {
+          "integerValue": "135677009"
+        },
+        "createdAt": {
+          "timestampValue": "2026-09-21T22:57:14.627Z"
+        },
+        "uploadedByEmail": {
+          "stringValue": "juniordoparque10@gmail.com"
+        },
+        "storagePath": {
+          "stringValue": "clients/eCd1q9Dq1SMr9D5FlKN8/media/1790031386655_vd 2.mp4"
+        },
+        "naturalDuration": {
+          "integerValue": "41"
+        },
+        "duration": {
+          "integerValue": "41"
+        },
+        "type": {
+          "stringValue": "Vídeo"
+        },
+        "width": {
+          "integerValue": "1920"
+        }
+      },
+      "createTime": "2026-09-21T22:57:14.641797Z",
+      "updateTime": "2026-09-21T22:57:14.641797Z"
+    },
+    {
+      "name": "projects/totem-park/databases/(default)/documents/clients/eCd1q9Dq1SMr9D5FlKN8/media/QIbRfs8QR57uSPudPDeu",
+      "fields": {
+        "orientation": {
+          "stringValue": "Paisagem"
+        },
+        "uploadedByUid": {
+          "stringValue": "fiuy77BXZ0daGa3nAk3h1DfVfBu2"
+        },
+        "sizeBytes": {
+          "integerValue": "1715102"
+        },
+        "createdAt": {
+          "timestampValue": "2026-09-22T13:48:03.332Z"
+        },
+        "clientId": {
+          "stringValue": "eCd1q9Dq1SMr9D5FlKN8"
+        },
+        "fileHash": {
+          "stringValue": ""
+        },
+        "uploadedByEmail": {
+          "stringValue": "juniordoparque10@gmail.com"
+        },
+        "type": {
+          "stringValue": "Vídeo"
+        },
+        "aspectRatio": {
+          "stringValue": "16:9"
+        },
+        "naturalDuration": {
+          "integerValue": "10"
+        },
+        "title": {
+          "stringValue": "VD PK Solutions B"
+        },
+        "sound": {
+          "booleanValue": false
+        },
+        "storagePath": {
+          "stringValue": "clients/eCd1q9Dq1SMr9D5FlKN8/media/1790084876764_VD PK Solutions B.mp4"
+        },
+        "storageKey": {
+          "stringValue": "clients/eCd1q9Dq1SMr9D5FlKN8/media/1790084876764_VD PK Solutions B.mp4"
+        },
+        "storageProvider": {
+          "stringValue": "firebase"
+        },
+        "fileName": {
+          "stringValue": "VD PK Solutions B.mp4"
+        },
+        "etag": {
+          "stringValue": ""
+        },
+        "width": {
+          "integerValue": "1280"
+        },
+        "duration": {
+          "integerValue": "10"
+        },
+        "height": {
+          "integerValue": "720"
+        },
+        "preview": {
+          "stringValue": "https://firebasestorage.googleapis.com/v0/b/totem-park.firebasestorage.app/o/clients%2FeCd1q9Dq1SMr9D5FlKN8%2Fmedia%2F1790084876764_VD%20PK%20Solutions%20B.mp4?alt=media&token=91471b84-c8ba-4d2a-ae16-a08683585725"
+        }
+      },
+      "createTime": "2026-09-22T13:48:03.365901Z",
+      "updateTime": "2026-09-22T13:48:03.365901Z"
+    },
+    {
+      "name": "projects/totem-park/databases/(default)/documents/clients/eCd1q9Dq1SMr9D5FlKN8/media/RPCgSinZuWgciqqfdlL5",
+      "fields": {
+        "storageProvider": {
+          "stringValue": "firebase"
+        },
+        "title": {
+          "stringValue": "ParkSolutionsQR Retrato"
+        },
+        "fileName": {
+          "stringValue": "ParkSolutionsQR Retrato (1).png"
+        },
+        "uploadedByUid": {
+          "stringValue": "fiuy77BXZ0daGa3nAk3h1DfVfBu2"
+        },
+        "type": {
+          "stringValue": "Imagem"
+        },
+        "sound": {
+          "booleanValue": false
+        },
+        "duration": {
+          "integerValue": "10"
+        },
+        "storagePath": {
+          "stringValue": "clients/eCd1q9Dq1SMr9D5FlKN8/media/1789242379299_ParkSolutionsQR Retrato (1).png"
+        },
+        "preview": {
+          "stringValue": "https://firebasestorage.googleapis.com/v0/b/totem-park.firebasestorage.app/o/clients%2FeCd1q9Dq1SMr9D5FlKN8%2Fmedia%2F1789242379299_ParkSolutionsQR%20Retrato%20(1).png?alt=media&token=6bddf61e-35ae-406a-bb15-2fea607410a0"
+        },
+        "width": {
+          "integerValue": "1672"
+        },
+        "height": {
+          "integerValue": "941"
+        },
+        "uploadedByEmail": {
+          "stringValue": "juniordoparque10@gmail.com"
+        },
+        "aspectRatio": {
+          "stringValue": "16:9"
+        },
+        "fileHash": {
+          "stringValue": ""
+        },
+        "createdAt": {
+          "timestampValue": "2026-09-12T19:46:26.292Z"
+        },
+        "sizeBytes": {
+          "integerValue": "352880"
+        },
+        "clientId": {
+          "stringValue": "eCd1q9Dq1SMr9D5FlKN8"
+        },
+        "orientation": {
+          "stringValue": "Paisagem"
+        },
+        "etag": {
+          "stringValue": ""
+        },
+        "storageKey": {
+          "stringValue": "clients/eCd1q9Dq1SMr9D5FlKN8/media/1789242379299_ParkSolutionsQR Retrato (1).png"
+        },
+        "naturalDuration": {
+          "nullValue": null
+        }
+      },
+      "createTime": "2026-09-12T19:46:26.325790Z",
+      "updateTime": "2026-09-12T19:46:26.325790Z"
+    },
+    {
+      "name": "projects/totem-park/databases/(default)/documents/clients/eCd1q9Dq1SMr9D5FlKN8/media/WRUfV6KMnneH0gT5t8zV",
+      "fields": {
+        "aspectRatio": {
+          "stringValue": "16:9"
+        },
+        "duration": {
+          "integerValue": "41"
+        },
+        "storageProvider": {
+          "stringValue": "firebase"
+        },
+        "uploadedByUid": {
+          "stringValue": "fiuy77BXZ0daGa3nAk3h1DfVfBu2"
+        },
+        "orientation": {
+          "stringValue": "Paisagem"
+        },
+        "fileName": {
+          "stringValue": "vd teste.mp4"
+        },
+        "sound": {
+          "booleanValue": false
+        },
+        "storageKey": {
+          "stringValue": "clients/eCd1q9Dq1SMr9D5FlKN8/media/1790032149910_vd teste.mp4"
+        },
+        "type": {
+          "stringValue": "Vídeo"
+        },
+        "title": {
+          "stringValue": "vd teste"
+        },
+        "preview": {
+          "stringValue": "https://firebasestorage.googleapis.com/v0/b/totem-park.firebasestorage.app/o/clients%2FeCd1q9Dq1SMr9D5FlKN8%2Fmedia%2F1790032149910_vd%20teste.mp4?alt=media&token=deba325a-6c07-4d72-8f02-134f64d26aad"
+        },
+        "etag": {
+          "stringValue": ""
+        },
+        "height": {
+          "integerValue": "1080"
+        },
+        "uploadedByEmail": {
+          "stringValue": "juniordoparque10@gmail.com"
+        },
+        "storagePath": {
+          "stringValue": "clients/eCd1q9Dq1SMr9D5FlKN8/media/1790032149910_vd teste.mp4"
+        },
+        "sizeBytes": {
+          "integerValue": "84023317"
+        },
+        "createdAt": {
+          "timestampValue": "2026-09-21T23:09:53.689Z"
+        },
+        "naturalDuration": {
+          "integerValue": "41"
+        },
+        "fileHash": {
+          "stringValue": ""
+        },
+        "width": {
+          "integerValue": "1920"
+        },
+        "clientId": {
+          "stringValue": "eCd1q9Dq1SMr9D5FlKN8"
+        }
+      },
+      "createTime": "2026-09-21T23:09:53.715830Z",
+      "updateTime": "2026-09-21T23:09:53.715830Z"
+    },
+    {
+      "name": "projects/totem-park/databases/(default)/documents/clients/eCd1q9Dq1SMr9D5FlKN8/media/Y1pnBb34FNQt1Ra2IO9l",
+      "fields": {
+        "preview": {
+          "stringValue": "https://firebasestorage.googleapis.com/v0/b/totem-park.firebasestorage.app/o/clients%2FeCd1q9Dq1SMr9D5FlKN8%2Fmedia%2F1785601461044_PK%20Solutions.mp4?alt=media&token=1d9bb151-384b-462a-9ece-3843e7d2342e"
+        },
+        "createdAt": {
+          "timestampValue": "2026-08-01T16:24:32.487Z"
+        },
+        "sizeBytes": {
+          "integerValue": "8872331"
+        },
+        "width": {
+          "integerValue": "1920"
+        },
+        "storagePath": {
+          "stringValue": "clients/eCd1q9Dq1SMr9D5FlKN8/media/1785601461044_PK Solutions.mp4"
+        },
+        "type": {
+          "stringValue": "Vídeo"
+        },
+        "duration": {
+          "integerValue": "10"
+        },
+        "naturalDuration": {
+          "integerValue": "10"
+        },
+        "height": {
+          "integerValue": "1080"
+        },
+        "aspectRatio": {
+          "stringValue": "16:9"
+        },
+        "fileName": {
+          "stringValue": "PK Solutions.mp4"
+        },
+        "title": {
+          "stringValue": "PK Solutions"
+        },
+        "sound": {
+          "booleanValue": false
+        },
+        "orientation": {
+          "stringValue": "Paisagem"
+        }
+      },
+      "createTime": "2026-08-01T16:24:32.546534Z",
+      "updateTime": "2026-08-01T16:24:32.546534Z"
+    },
+    {
+      "name": "projects/totem-park/databases/(default)/documents/clients/eCd1q9Dq1SMr9D5FlKN8/media/Z63lYYe2yHZZb6j4ZEg6",
+      "fields": {
+        "height": {
+          "integerValue": "478"
+        },
+        "storagePath": {
+          "stringValue": "clients/eCd1q9Dq1SMr9D5FlKN8/media/1787180492493_Turmas Jiujitsu.mp4"
+        },
+        "width": {
+          "integerValue": "848"
+        },
+        "clientId": {
+          "stringValue": "eCd1q9Dq1SMr9D5FlKN8"
+        },
+        "uploadedByUid": {
+          "stringValue": "fiuy77BXZ0daGa3nAk3h1DfVfBu2"
+        },
+        "uploadedByEmail": {
+          "stringValue": "juniordoparque10@gmail.com"
+        },
+        "duration": {
+          "integerValue": "10"
+        },
+        "preview": {
+          "stringValue": "https://firebasestorage.googleapis.com/v0/b/totem-park.firebasestorage.app/o/clients%2FeCd1q9Dq1SMr9D5FlKN8%2Fmedia%2F1787180492493_Turmas%20Jiujitsu.mp4?alt=media&token=72c2d0db-f581-4b01-9b13-9844382402e1"
+        },
+        "aspectRatio": {
+          "stringValue": "16:9"
+        },
+        "fileName": {
+          "stringValue": "Turmas Jiujitsu.mp4"
+        },
+        "sizeBytes": {
+          "integerValue": "1848135"
+        },
+        "createdAt": {
+          "timestampValue": "2026-08-19T23:01:41.880Z"
+        },
+        "orientation": {
+          "stringValue": "Paisagem"
+        },
+        "naturalDuration": {
+          "integerValue": "10"
+        },
+        "sound": {
+          "booleanValue": false
+        },
+        "type": {
+          "stringValue": "Vídeo"
+        },
+        "title": {
+          "stringValue": "Turmas Jiu-Jitsu P"
+        }
+      },
+      "createTime": "2026-08-19T23:01:41.902076Z",
+      "updateTime": "2026-08-19T23:01:41.902076Z"
+    },
+    {
+      "name": "projects/totem-park/databases/(default)/documents/clients/eCd1q9Dq1SMr9D5FlKN8/media/ZADHLvGmRIsrUZ8pSmFU",
+      "fields": {
+        "sound": {
+          "booleanValue": false
+        },
+        "height": {
+          "integerValue": "941"
+        },
+        "storageKey": {
+          "stringValue": "clients/eCd1q9Dq1SMr9D5FlKN8/media/1789242458724_Prop flluxo (1).png"
+        },
+        "etag": {
+          "stringValue": ""
+        },
+        "title": {
+          "stringValue": "Prop Flluxo"
+        },
+        "aspectRatio": {
+          "stringValue": "16:9"
+        },
+        "fileHash": {
+          "stringValue": ""
+        },
+        "storageProvider": {
+          "stringValue": "firebase"
+        },
+        "clientId": {
+          "stringValue": "eCd1q9Dq1SMr9D5FlKN8"
+        },
+        "orientation": {
+          "stringValue": "Paisagem"
+        },
+        "uploadedByUid": {
+          "stringValue": "fiuy77BXZ0daGa3nAk3h1DfVfBu2"
+        },
+        "width": {
+          "integerValue": "1672"
+        },
+        "naturalDuration": {
+          "nullValue": null
+        },
+        "duration": {
+          "integerValue": "10"
+        },
+        "preview": {
+          "stringValue": "https://firebasestorage.googleapis.com/v0/b/totem-park.firebasestorage.app/o/clients%2FeCd1q9Dq1SMr9D5FlKN8%2Fmedia%2F1789242458724_Prop%20flluxo%20(1).png?alt=media&token=5ac70079-f345-4ec8-a2b9-6997a17a7a2a"
+        },
+        "sizeBytes": {
+          "integerValue": "315358"
+        },
+        "createdAt": {
+          "timestampValue": "2026-09-12T19:47:43.292Z"
+        },
+        "type": {
+          "stringValue": "Imagem"
+        },
+        "fileName": {
+          "stringValue": "Prop flluxo (1).png"
+        },
+        "uploadedByEmail": {
+          "stringValue": "juniordoparque10@gmail.com"
+        },
+        "storagePath": {
+          "stringValue": "clients/eCd1q9Dq1SMr9D5FlKN8/media/1789242458724_Prop flluxo (1).png"
+        }
+      },
+      "createTime": "2026-09-12T19:47:43.312629Z",
+      "updateTime": "2026-09-12T19:47:43.312629Z"
+    },
+    {
+      "name": "projects/totem-park/databases/(default)/documents/clients/eCd1q9Dq1SMr9D5FlKN8/media/aISu4csbGskZgxxsiYlB",
+      "fields": {
+        "title": {
+          "stringValue": "Kimura Branco P"
+        },
+        "orientation": {
+          "stringValue": "Paisagem"
+        },
+        "type": {
+          "stringValue": "Imagem"
+        },
+        "sound": {
+          "booleanValue": false
+        },
+        "sizeBytes": {
+          "integerValue": "764089"
+        },
+        "createdAt": {
+          "timestampValue": "2026-08-03T01:54:47.629Z"
+        },
+        "aspectRatio": {
+          "stringValue": "16:9"
+        },
+        "width": {
+          "integerValue": "1672"
+        },
+        "storagePath": {
+          "stringValue": "clients/eCd1q9Dq1SMr9D5FlKN8/media/1785722082772_kimura branco P.png"
+        },
+        "fileName": {
+          "stringValue": "kimura branco P.png"
+        },
+        "height": {
+          "integerValue": "941"
+        },
+        "naturalDuration": {
+          "nullValue": null
+        },
+        "preview": {
+          "stringValue": "https://firebasestorage.googleapis.com/v0/b/totem-park.firebasestorage.app/o/clients%2FeCd1q9Dq1SMr9D5FlKN8%2Fmedia%2F1785722082772_kimura%20branco%20P.png?alt=media&token=25f7b5d0-fd0c-4df6-8acd-aa5381d626b4"
+        },
+        "duration": {
+          "integerValue": "15"
+        }
+      },
+      "createTime": "2026-08-03T01:54:47.673358Z",
+      "updateTime": "2026-08-03T01:54:47.673358Z"
+    },
+    {
+      "name": "projects/totem-park/databases/(default)/documents/clients/eCd1q9Dq1SMr9D5FlKN8/media/blXMV16b5MaqZd98W9N0",
+      "fields": {
+        "orientation": {
+          "stringValue": "Paisagem"
+        },
+        "naturalDuration": {
+          "nullValue": null
+        },
+        "width": {
+          "integerValue": "1536"
+        },
+        "sizeBytes": {
+          "integerValue": "267003"
+        },
+        "createdAt": {
+          "timestampValue": "2026-08-19T23:07:42.859Z"
+        },
+        "type": {
+          "stringValue": "Imagem"
+        },
+        "height": {
+          "integerValue": "1024"
+        },
+        "fileName": {
+          "stringValue": "k2.jpeg"
+        },
+        "aspectRatio": {
+          "stringValue": "custom"
+        },
+        "uploadedByEmail": {
+          "stringValue": "juniordoparque10@gmail.com"
+        },
+        "duration": {
+          "integerValue": "10"
+        },
+        "storagePath": {
+          "stringValue": "clients/eCd1q9Dq1SMr9D5FlKN8/media/1787180857128_k2.jpeg"
+        },
+        "title": {
+          "stringValue": "AG Juvenil"
+        },
+        "clientId": {
+          "stringValue": "eCd1q9Dq1SMr9D5FlKN8"
+        },
+        "sound": {
+          "booleanValue": false
+        },
+        "preview": {
+          "stringValue": "https://firebasestorage.googleapis.com/v0/b/totem-park.firebasestorage.app/o/clients%2FeCd1q9Dq1SMr9D5FlKN8%2Fmedia%2F1787180857128_k2.jpeg?alt=media&token=9db34138-d7c8-4dce-86ec-1af3deeb0529"
+        },
+        "uploadedByUid": {
+          "stringValue": "fiuy77BXZ0daGa3nAk3h1DfVfBu2"
+        }
+      },
+      "createTime": "2026-08-19T23:07:42.904383Z",
+      "updateTime": "2026-08-19T23:07:42.904383Z"
+    },
+    {
+      "name": "projects/totem-park/databases/(default)/documents/clients/eCd1q9Dq1SMr9D5FlKN8/media/dFoeoJKg0UpPmp2vqH45",
+      "fields": {
+        "title": {
+          "stringValue": "StudioPK"
+        },
+        "type": {
+          "stringValue": "Vídeo"
+        },
+        "sound": {
+          "booleanValue": false
+        },
+        "duration": {
+          "integerValue": "10"
+        },
+        "height": {
+          "integerValue": "1080"
+        },
+        "storagePath": {
+          "stringValue": "clients/eCd1q9Dq1SMr9D5FlKN8/media/1785601495112_Prop StudioPK.mp4"
+        },
+        "preview": {
+          "stringValue": "https://firebasestorage.googleapis.com/v0/b/totem-park.firebasestorage.app/o/clients%2FeCd1q9Dq1SMr9D5FlKN8%2Fmedia%2F1785601495112_Prop%20StudioPK.mp4?alt=media&token=0ea6baf4-f971-444c-a4ec-254531106769"
+        },
+        "fileName": {
+          "stringValue": "Prop StudioPK.mp4"
+        },
+        "width": {
+          "integerValue": "1920"
+        },
+        "aspectRatio": {
+          "stringValue": "16:9"
+        },
+        "naturalDuration": {
+          "integerValue": "10"
+        },
+        "createdAt": {
+          "timestampValue": "2026-08-01T16:25:05.981Z"
+        },
+        "sizeBytes": {
+          "integerValue": "8783778"
+        },
+        "orientation": {
+          "stringValue": "Paisagem"
+        }
+      },
+      "createTime": "2026-08-01T16:25:06.028398Z",
+      "updateTime": "2026-08-01T16:25:06.028398Z"
+    },
+    {
+      "name": "projects/totem-park/databases/(default)/documents/clients/eCd1q9Dq1SMr9D5FlKN8/media/enfiqiz94zS2wy4oAaKe",
+      "fields": {
+        "sound": {
+          "booleanValue": false
+        },
+        "storagePath": {
+          "stringValue": "clients/eCd1q9Dq1SMr9D5FlKN8/media/1785781309628_1001327080.mp4"
+        },
+        "title": {
+          "stringValue": "Park Solutions vídeo"
+        },
+        "type": {
+          "stringValue": "Vídeo"
+        },
+        "createdAt": {
+          "timestampValue": "2026-08-03T18:21:52.505Z"
+        },
+        "sizeBytes": {
+          "integerValue": "2564110"
+        },
+        "preview": {
+          "stringValue": "https://firebasestorage.googleapis.com/v0/b/totem-park.firebasestorage.app/o/clients%2FeCd1q9Dq1SMr9D5FlKN8%2Fmedia%2F1785781309628_1001327080.mp4?alt=media&token=126201f6-9262-4a65-84d4-17e52390c071"
+        },
+        "height": {
+          "integerValue": "720"
+        },
+        "naturalDuration": {
+          "integerValue": "10"
+        },
+        "duration": {
+          "integerValue": "10"
+        },
+        "orientation": {
+          "stringValue": "Paisagem"
+        },
+        "width": {
+          "integerValue": "1280"
+        },
+        "fileName": {
+          "stringValue": "1001327080.mp4"
+        },
+        "aspectRatio": {
+          "stringValue": "16:9"
+        }
+      },
+      "createTime": "2026-08-03T18:21:52.559491Z",
+      "updateTime": "2026-08-03T18:21:52.559491Z"
+    },
+    {
+      "name": "projects/totem-park/databases/(default)/documents/clients/eCd1q9Dq1SMr9D5FlKN8/media/fUV0DgUpTLnAbxPoFizN",
+      "fields": {
+        "preview": {
+          "stringValue": "https://firebasestorage.googleapis.com/v0/b/totem-park.firebasestorage.app/o/clients%2FeCd1q9Dq1SMr9D5FlKN8%2Fmedia%2F1785723814875_1001328706.mp4?alt=media&token=fbba9a4b-fed6-4051-86b5-d7a96df34049"
+        },
+        "height": {
+          "integerValue": "720"
+        },
+        "aspectRatio": {
+          "stringValue": "16:9"
+        },
+        "title": {
+          "stringValue": "KIMURA An Prero P"
+        },
+        "sound": {
+          "booleanValue": false
+        },
+        "naturalDuration": {
+          "integerValue": "10"
+        },
+        "orientation": {
+          "stringValue": "Paisagem"
+        },
+        "sizeBytes": {
+          "integerValue": "2903772"
+        },
+        "createdAt": {
+          "timestampValue": "2026-08-03T02:23:38.461Z"
+        },
+        "width": {
+          "integerValue": "1280"
+        },
+        "duration": {
+          "integerValue": "10"
+        },
+        "type": {
+          "stringValue": "Vídeo"
+        },
+        "fileName": {
+          "stringValue": "1001328706.mp4"
+        },
+        "storagePath": {
+          "stringValue": "clients/eCd1q9Dq1SMr9D5FlKN8/media/1785723814875_1001328706.mp4"
+        }
+      },
+      "createTime": "2026-08-03T02:23:38.509801Z",
+      "updateTime": "2026-08-03T02:23:38.509801Z"
+    },
+    {
+      "name": "projects/totem-park/databases/(default)/documents/clients/eCd1q9Dq1SMr9D5FlKN8/media/hQ4GlNCCU1zTCoh3234K",
+      "fields": {
+        "preview": {
+          "stringValue": "https://firebasestorage.googleapis.com/v0/b/totem-park.firebasestorage.app/o/clients%2FeCd1q9Dq1SMr9D5FlKN8%2Fmedia%2F1787180882996_k3.jpeg?alt=media&token=340161ba-b59d-43b3-8151-e66f5a471267"
+        },
+        "aspectRatio": {
+          "stringValue": "16:9"
+        },
+        "height": {
+          "integerValue": "900"
+        },
+        "title": {
+          "stringValue": "AG Competição"
+        },
+        "sizeBytes": {
+          "integerValue": "244749"
+        },
+        "createdAt": {
+          "timestampValue": "2026-08-19T23:08:04.980Z"
+        },
+        "duration": {
+          "integerValue": "10"
+        },
+        "sound": {
+          "booleanValue": false
+        },
+        "type": {
+          "stringValue": "Imagem"
+        },
+        "orientation": {
+          "stringValue": "Paisagem"
+        },
+        "fileName": {
+          "stringValue": "k3.jpeg"
+        },
+        "uploadedByUid": {
+          "stringValue": "fiuy77BXZ0daGa3nAk3h1DfVfBu2"
+        },
+        "width": {
+          "integerValue": "1600"
+        },
+        "naturalDuration": {
+          "nullValue": null
+        },
+        "storagePath": {
+          "stringValue": "clients/eCd1q9Dq1SMr9D5FlKN8/media/1787180882996_k3.jpeg"
+        },
+        "uploadedByEmail": {
+          "stringValue": "juniordoparque10@gmail.com"
+        },
+        "clientId": {
+          "stringValue": "eCd1q9Dq1SMr9D5FlKN8"
+        }
+      },
+      "createTime": "2026-08-19T23:08:05.031605Z",
+      "updateTime": "2026-08-19T23:08:05.031605Z"
+    },
+    {
+      "name": "projects/totem-park/databases/(default)/documents/clients/eCd1q9Dq1SMr9D5FlKN8/media/sc38HvhBNGPHSyNFe2Pm",
+      "fields": {
+        "clientId": {
+          "stringValue": "eCd1q9Dq1SMr9D5FlKN8"
+        },
+        "aspectRatio": {
+          "stringValue": "16:9"
+        },
+        "fileHash": {
+          "stringValue": ""
+        },
+        "preview": {
+          "stringValue": "https://firebasestorage.googleapis.com/v0/b/totem-park.firebasestorage.app/o/clients%2FeCd1q9Dq1SMr9D5FlKN8%2Fmedia%2F1789858861780_CAPA%20DOS%20EPISODIOS%20(2).jpg?alt=media&token=a211a248-1457-4dd8-8c09-2c86b4c67073"
+        },
+        "storageProvider": {
+          "stringValue": "firebase"
+        },
+        "height": {
+          "integerValue": "1080"
+        },
+        "orientation": {
+          "stringValue": "Paisagem"
+        },
+        "type": {
+          "stringValue": "Imagem"
+        },
+        "width": {
+          "integerValue": "1920"
+        },
+        "etag": {
+          "stringValue": ""
+        },
+        "fileName": {
+          "stringValue": "CAPA DOS EPISODIOS (2).jpg"
+        },
+        "sizeBytes": {
+          "integerValue": "1084059"
+        },
+        "createdAt": {
+          "timestampValue": "2026-09-19T23:01:08.608Z"
+        },
+        "uploadedByUid": {
+          "stringValue": "fiuy77BXZ0daGa3nAk3h1DfVfBu2"
+        },
+        "naturalDuration": {
+          "nullValue": null
+        },
+        "duration": {
+          "integerValue": "10"
+        },
+        "sound": {
+          "booleanValue": false
+        },
+        "storagePath": {
+          "stringValue": "clients/eCd1q9Dq1SMr9D5FlKN8/media/1789858861780_CAPA DOS EPISODIOS (2).jpg"
+        },
+        "storageKey": {
+          "stringValue": "clients/eCd1q9Dq1SMr9D5FlKN8/media/1789858861780_CAPA DOS EPISODIOS (2).jpg"
+        },
+        "uploadedByEmail": {
+          "stringValue": "juniordoparque10@gmail.com"
+        },
+        "title": {
+          "stringValue": "amigos"
+        }
+      },
+      "createTime": "2026-09-19T23:01:08.658706Z",
+      "updateTime": "2026-09-19T23:01:08.658706Z"
+    },
+    {
+      "name": "projects/totem-park/databases/(default)/documents/clients/eCd1q9Dq1SMr9D5FlKN8/media/ukZMifeyqQ8mRtd38AKX",
+      "fields": {
+        "preview": {
+          "stringValue": "https://firebasestorage.googleapis.com/v0/b/totem-park.firebasestorage.app/o/clients%2FeCd1q9Dq1SMr9D5FlKN8%2Fmedia%2F1787504712341_VD%20kimura.mp4?alt=media&token=5485781d-084c-446a-89e4-4a8469164f5a"
+        },
+        "title": {
+          "stringValue": "VD Personal Fight"
+        },
+        "aspectRatio": {
+          "stringValue": "16:9"
+        },
+        "sound": {
+          "booleanValue": false
+        },
+        "uploadedByUid": {
+          "stringValue": "fiuy77BXZ0daGa3nAk3h1DfVfBu2"
+        },
+        "orientation": {
+          "stringValue": "Paisagem"
+        },
+        "clientId": {
+          "stringValue": "eCd1q9Dq1SMr9D5FlKN8"
+        },
+        "sizeBytes": {
+          "integerValue": "12771282"
+        },
+        "createdAt": {
+          "timestampValue": "2026-08-23T17:05:25.789Z"
+        },
+        "width": {
+          "integerValue": "1920"
+        },
+        "type": {
+          "stringValue": "Vídeo"
+        },
+        "duration": {
+          "integerValue": "13"
+        },
+        "height": {
+          "integerValue": "1080"
+        },
+        "uploadedByEmail": {
+          "stringValue": "juniordoparque10@gmail.com"
+        },
+        "fileName": {
+          "stringValue": "VD kimura.mp4"
+        },
+        "storagePath": {
+          "stringValue": "clients/eCd1q9Dq1SMr9D5FlKN8/media/1787504712341_VD kimura.mp4"
+        },
+        "naturalDuration": {
+          "integerValue": "13"
+        }
+      },
+      "createTime": "2026-08-23T17:05:25.824317Z",
+      "updateTime": "2026-08-23T17:05:25.824317Z"
+    },
+    {
+      "name": "projects/totem-park/databases/(default)/documents/clients/eCd1q9Dq1SMr9D5FlKN8/media/w0c6F4jhuXy0vvM3SdmR",
+      "fields": {
+        "clientId": {
+          "stringValue": "eCd1q9Dq1SMr9D5FlKN8"
+        },
+        "orientation": {
+          "stringValue": "Paisagem"
+        },
+        "sound": {
+          "booleanValue": false
+        },
+        "type": {
+          "stringValue": "Vídeo"
+        },
+        "preview": {
+          "stringValue": "https://firebasestorage.googleapis.com/v0/b/totem-park.firebasestorage.app/o/clients%2FeCd1q9Dq1SMr9D5FlKN8%2Fmedia%2F1787175692154_Turma%20KIds%20P.mov?alt=media&token=98222c9e-aed1-42e5-8ed5-d48fa3b88e9c"
+        },
+        "title": {
+          "stringValue": "Turma KIds P"
+        },
+        "aspectRatio": {
+          "stringValue": "16:9"
+        },
+        "uploadedByEmail": {
+          "stringValue": "juniordoparque10@gmail.com"
+        },
+        "uploadedByUid": {
+          "stringValue": "fiuy77BXZ0daGa3nAk3h1DfVfBu2"
+        },
+        "createdAt": {
+          "timestampValue": "2026-08-19T21:41:46.529Z"
+        },
+        "sizeBytes": {
+          "integerValue": "22443410"
+        },
+        "fileName": {
+          "stringValue": "Turma KIds P.mov"
+        },
+        "storagePath": {
+          "stringValue": "clients/eCd1q9Dq1SMr9D5FlKN8/media/1787175692154_Turma KIds P.mov"
+        },
+        "naturalDuration": {
+          "integerValue": "23"
+        },
+        "duration": {
+          "integerValue": "23"
+        },
+        "height": {
+          "integerValue": "1080"
+        },
+        "width": {
+          "integerValue": "1920"
+        }
+      },
+      "createTime": "2026-08-19T21:41:46.567562Z",
+      "updateTime": "2026-08-19T21:41:46.567562Z"
+    },
+    {
+      "name": "projects/totem-park/databases/(default)/documents/clients/eCd1q9Dq1SMr9D5FlKN8/media/wpk1xBwBwGYjuBJZPmNT",
+      "fields": {
+        "uploadedByEmail": {
+          "stringValue": "juniordoparque10@gmail.com"
+        },
+        "preview": {
+          "stringValue": "https://firebasestorage.googleapis.com/v0/b/totem-park.firebasestorage.app/o/clients%2FeCd1q9Dq1SMr9D5FlKN8%2Fmedia%2F1789242580099_Prop%20StudioPark%20Paisagem%20(1).png?alt=media&token=5e94b4c8-1dd9-42b2-a23b-54597ebd36f1"
+        },
+        "aspectRatio": {
+          "stringValue": "16:9"
+        },
+        "height": {
+          "integerValue": "941"
+        },
+        "title": {
+          "stringValue": "Prop StudioPark Paisagem"
+        },
+        "sound": {
+          "booleanValue": false
+        },
+        "etag": {
+          "stringValue": ""
+        },
+        "orientation": {
+          "stringValue": "Paisagem"
+        },
+        "naturalDuration": {
+          "nullValue": null
+        },
+        "fileHash": {
+          "stringValue": ""
+        },
+        "clientId": {
+          "stringValue": "eCd1q9Dq1SMr9D5FlKN8"
+        },
+        "uploadedByUid": {
+          "stringValue": "fiuy77BXZ0daGa3nAk3h1DfVfBu2"
+        },
+        "duration": {
+          "integerValue": "10"
+        },
+        "width": {
+          "integerValue": "1672"
+        },
+        "storageKey": {
+          "stringValue": "clients/eCd1q9Dq1SMr9D5FlKN8/media/1789242580099_Prop StudioPark Paisagem (1).png"
+        },
+        "storageProvider": {
+          "stringValue": "firebase"
+        },
+        "type": {
+          "stringValue": "Imagem"
+        },
+        "storagePath": {
+          "stringValue": "clients/eCd1q9Dq1SMr9D5FlKN8/media/1789242580099_Prop StudioPark Paisagem (1).png"
+        },
+        "fileName": {
+          "stringValue": "Prop StudioPark Paisagem (1).png"
+        },
+        "sizeBytes": {
+          "integerValue": "308581"
+        },
+        "createdAt": {
+          "timestampValue": "2026-09-12T19:49:46.113Z"
+        }
+      },
+      "createTime": "2026-09-12T19:49:46.151355Z",
+      "updateTime": "2026-09-12T19:49:46.151355Z"
+    }
+  ]
+}

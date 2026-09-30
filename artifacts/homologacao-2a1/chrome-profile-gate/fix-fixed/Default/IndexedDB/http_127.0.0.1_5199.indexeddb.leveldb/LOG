@@ -1,0 +1,30 @@
+2026/09/16-11:32:11.305 3558 Reusing MANIFEST C:\Users\centr\Desktop\totem-park\artifacts\homologacao-2a1\chrome-profile-gate\fix-fixed\Default\IndexedDB\http_127.0.0.1_5199.indexeddb.leveldb/MANIFEST-000001
+2026/09/16-11:32:11.306 3558 Recovering log #7
+2026/09/16-11:32:11.317 3558 Reusing old log C:\Users\centr\Desktop\totem-park\artifacts\homologacao-2a1\chrome-profile-gate\fix-fixed\Default\IndexedDB\http_127.0.0.1_5199.indexeddb.leveldb/000007.log 
+2026/09/16-11:32:11.347 238c Manual compaction at level-0 from '\x00\x06\x00\x00\x00' @ 72057594037927935 : 1 .. '\x00\x07\x00\x00\x00' @ 0 : 0; will stop at (end)
+2026/09/16-11:32:50.620 c4c Compacting 1@1 + 1@2 files
+2026/09/16-11:32:50.626 c4c Generated table #10@1: 414 keys, 14194 bytes
+2026/09/16-11:32:50.626 c4c Compacted 1@1 + 1@2 files => 14194 bytes
+2026/09/16-11:32:50.628 c4c compacted to: files[ 0 0 1 0 0 0 0 ]
+2026/09/16-11:32:50.629 c4c Delete type=2 #5
+2026/09/16-11:32:50.629 c4c Delete type=2 #8
+2026/09/16-11:33:27.751 5b18 Level-0 table #12: started
+2026/09/16-11:33:27.770 5b18 Level-0 table #12: 1068415 bytes OK
+2026/09/16-11:33:27.771 5b18 Delete type=0 #7
+2026/09/16-11:33:27.773 c4c Manual compaction at level-0 from '\x00\x07\x00\x00\x00' @ 72057594037927935 : 1 .. '\x00\x08\x00\x00\x00' @ 0 : 0; will stop at (end)
+2026/09/16-11:33:27.851 5908 Compacting 1@1 + 1@2 files
+2026/09/16-11:33:27.881 5908 Generated table #13@1: 634 keys, 21976 bytes
+2026/09/16-11:33:27.881 5908 Compacted 1@1 + 1@2 files => 21976 bytes
+2026/09/16-11:33:27.881 5908 compacted to: files[ 0 0 1 0 0 0 0 ]
+2026/09/16-11:33:32.417 59a4 Level-0 table #15: started
+2026/09/16-11:33:32.422 59a4 Level-0 table #15: 159654 bytes OK
+2026/09/16-11:33:32.424 59a4 Delete type=2 #10
+2026/09/16-11:33:32.424 59a4 Delete type=0 #11
+2026/09/16-11:33:32.424 59a4 Delete type=2 #12
+2026/09/16-11:33:32.426 5908 Manual compaction at level-0 from '\x00\x08\x00\x00\x00' @ 72057594037927935 : 1 .. '\x00\x09\x00\x00\x00' @ 0 : 0; will stop at (end)
+2026/09/16-11:33:32.512 5908 Compacting 1@1 + 1@2 files
+2026/09/16-11:33:32.515 5908 Generated table #16@1: 726 keys, 27229 bytes
+2026/09/16-11:33:32.515 5908 Compacted 1@1 + 1@2 files => 27229 bytes
+2026/09/16-11:33:32.515 5908 compacted to: files[ 0 0 1 0 0 0 0 ]
+2026/09/16-11:33:32.516 5908 Delete type=2 #13
+2026/09/16-11:33:32.516 5908 Delete type=2 #15

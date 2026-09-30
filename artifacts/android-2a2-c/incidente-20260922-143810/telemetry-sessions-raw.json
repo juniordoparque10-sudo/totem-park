@@ -1,0 +1,638 @@
+{
+  "documents": [
+    {
+      "name": "projects/totem-park/databases/(default)/documents/clients/eCd1q9Dq1SMr9D5FlKN8/screens/emp3VDKfLzmz1sWJrnbx/telemetrySessions/efa5d675-8ead-47db-b14e-d43b1b289c7a",
+      "fields": {
+        "sequence": {
+          "integerValue": "17"
+        },
+        "session": {
+          "mapValue": {
+            "fields": {
+              "deviceId": {
+                "stringValue": "b148d1ab-5dd6-42b1-98d7-f2ca68024b59"
+              },
+              "sessionId": {
+                "stringValue": "efa5d675-8ead-47db-b14e-d43b1b289c7a"
+              },
+              "screenId": {
+                "stringValue": "emp3VDKfLzmz1sWJrnbx"
+              },
+              "lastHeartbeatAt": {
+                "stringValue": "2026-09-22T17:37:14.631Z"
+              },
+              "clientId": {
+                "stringValue": "eCd1q9Dq1SMr9D5FlKN8"
+              },
+              "startedAt": {
+                "stringValue": "2026-09-22T16:11:43.605Z"
+              },
+              "platform": {
+                "stringValue": "ANDROID"
+              },
+              "endedAt": {
+                "nullValue": null
+              },
+              "sequence": {
+                "integerValue": "17"
+              },
+              "appVersion": {
+                "stringValue": "1.0-player-2a2-c-telemetry-pilot"
+              },
+              "lastActivityAt": {
+                "stringValue": "2026-09-22T17:27:24.109Z"
+              }
+            }
+          }
+        },
+        "transitions": {
+          "arrayValue": {
+            "values": [
+              {
+                "mapValue": {
+                  "fields": {
+                    "toMediaId": {
+                      "stringValue": "enfiqiz94zS2wy4oAaKe"
+                    },
+                    "fromMediaId": {
+                      "stringValue": "AVwGDQ73WNhEnKaMZj7I"
+                    },
+                    "transitionDurationMs": {
+                      "integerValue": "241"
+                    },
+                    "transitionCompletedAt": {
+                      "stringValue": "2026-09-22T17:26:52.432Z"
+                    },
+                    "transitionId": {
+                      "stringValue": "3610877c-0303-487e-83c4-c6ca591f2e96"
+                    },
+                    "transitionStartedAt": {
+                      "stringValue": "2026-09-22T17:26:52.191Z"
+                    },
+                    "reason": {
+                      "stringValue": "VIDEO_TIMER"
+                    },
+                    "result": {
+                      "stringValue": "SUCCESS"
+                    }
+                  }
+                }
+              },
+              {
+                "mapValue": {
+                  "fields": {
+                    "transitionCompletedAt": {
+                      "stringValue": "2026-09-22T17:27:02.739Z"
+                    },
+                    "fromMediaId": {
+                      "stringValue": "enfiqiz94zS2wy4oAaKe"
+                    },
+                    "toMediaId": {
+                      "stringValue": "AVwGDQ73WNhEnKaMZj7I"
+                    },
+                    "transitionId": {
+                      "stringValue": "5f260395-e8ac-4554-b5e1-e7b0df378564"
+                    },
+                    "result": {
+                      "stringValue": "SUCCESS"
+                    },
+                    "reason": {
+                      "stringValue": "VIDEO_TIMER"
+                    },
+                    "transitionStartedAt": {
+                      "stringValue": "2026-09-22T17:27:02.520Z"
+                    },
+                    "transitionDurationMs": {
+                      "integerValue": "219"
+                    }
+                  }
+                }
+              },
+              {
+                "mapValue": {
+                  "fields": {
+                    "reason": {
+                      "stringValue": "VIDEO_TIMER"
+                    },
+                    "result": {
+                      "stringValue": "SUCCESS"
+                    },
+                    "transitionStartedAt": {
+                      "stringValue": "2026-09-22T17:27:12.782Z"
+                    },
+                    "toMediaId": {
+                      "stringValue": "enfiqiz94zS2wy4oAaKe"
+                    },
+                    "transitionId": {
+                      "stringValue": "73312bea-a4f8-40cb-9fe3-b7ac52c33fb7"
+                    },
+                    "fromMediaId": {
+                      "stringValue": "AVwGDQ73WNhEnKaMZj7I"
+                    },
+                    "transitionCompletedAt": {
+                      "stringValue": "2026-09-22T17:27:13.011Z"
+                    },
+                    "transitionDurationMs": {
+                      "integerValue": "229"
+                    }
+                  }
+                }
+              },
+              {
+                "mapValue": {
+                  "fields": {
+                    "transitionId": {
+                      "stringValue": "11bc417d-3ed8-4b07-b301-d01bf82a0225"
+                    },
+                    "fromMediaId": {
+                      "stringValue": "enfiqiz94zS2wy4oAaKe"
+                    },
+                    "transitionStartedAt": {
+                      "stringValue": "2026-09-22T17:27:23.087Z"
+                    },
+                    "reason": {
+                      "stringValue": "VIDEO_ENDED"
+                    },
+                    "result": {
+                      "stringValue": "SUCCESS"
+                    },
+                    "transitionCompletedAt": {
+                      "stringValue": "2026-09-22T17:27:23.308Z"
+                    },
+                    "transitionDurationMs": {
+                      "integerValue": "221"
+                    },
+                    "toMediaId": {
+                      "stringValue": "AVwGDQ73WNhEnKaMZj7I"
+                    }
+                  }
+                }
+              },
+              {
+                "mapValue": {
+                  "fields": {
+                    "transitionCompletedAt": {
+                      "nullValue": null
+                    },
+                    "result": {
+                      "stringValue": "UNKNOWN"
+                    },
+                    "reason": {
+                      "stringValue": "ERROR"
+                    },
+                    "transitionId": {
+                      "stringValue": "d42d9877-5c9f-441a-8c7d-e8237999c73a"
+                    },
+                    "transitionDurationMs": {
+                      "integerValue": "0"
+                    },
+                    "transitionStartedAt": {
+                      "stringValue": "2026-09-22T17:27:24.081Z"
+                    },
+                    "toMediaId": {
+                      "stringValue": "enfiqiz94zS2wy4oAaKe"
+                    },
+                    "fromMediaId": {
+                      "stringValue": "AVwGDQ73WNhEnKaMZj7I"
+                    }
+                  }
+                }
+              }
+            ]
+          }
+        },
+        "lastPlayerEvents": {
+          "arrayValue": {
+            "values": [
+              {
+                "mapValue": {
+                  "fields": {
+                    "paused": {
+                      "booleanValue": false
+                    },
+                    "networkState": {
+                      "integerValue": "0"
+                    },
+                    "mediaId": {
+                      "stringValue": "AVwGDQ73WNhEnKaMZj7I"
+                    },
+                    "readyState": {
+                      "integerValue": "0"
+                    },
+                    "timestamp": {
+                      "stringValue": "2026-09-22T17:27:23.308Z"
+                    },
+                    "errorCode": {
+                      "nullValue": null
+                    },
+                    "mediaSource": {
+                      "stringValue": "UNKNOWN"
+                    },
+                    "duration": {
+                      "integerValue": "0"
+                    },
+                    "event": {
+                      "stringValue": "TRANSITION_COMPLETE"
+                    },
+                    "ended": {
+                      "booleanValue": false
+                    },
+                    "currentTime": {
+                      "integerValue": "0"
+                    }
+                  }
+                }
+              },
+              {
+                "mapValue": {
+                  "fields": {
+                    "mediaSource": {
+                      "stringValue": "CACHE_LOCAL"
+                    },
+                    "readyState": {
+                      "integerValue": "0"
+                    },
+                    "networkState": {
+                      "integerValue": "0"
+                    },
+                    "duration": {
+                      "integerValue": "0"
+                    },
+                    "mediaId": {
+                      "stringValue": "AVwGDQ73WNhEnKaMZj7I"
+                    },
+                    "paused": {
+                      "booleanValue": false
+                    },
+                    "event": {
+                      "stringValue": "PLAYBACK_START"
+                    },
+                    "currentTime": {
+                      "integerValue": "0"
+                    },
+                    "ended": {
+                      "booleanValue": false
+                    },
+                    "errorCode": {
+                      "nullValue": null
+                    },
+                    "timestamp": {
+                      "stringValue": "2026-09-22T17:27:23.344Z"
+                    }
+                  }
+                }
+              },
+              {
+                "mapValue": {
+                  "fields": {
+                    "mediaId": {
+                      "stringValue": "AVwGDQ73WNhEnKaMZj7I"
+                    },
+                    "duration": {
+                      "doubleValue": 10.005333
+                    },
+                    "ended": {
+                      "booleanValue": false
+                    },
+                    "mediaSource": {
+                      "stringValue": "CACHE_LOCAL"
+                    },
+                    "readyState": {
+                      "integerValue": "4"
+                    },
+                    "event": {
+                      "stringValue": "canplaythrough"
+                    },
+                    "paused": {
+                      "booleanValue": false
+                    },
+                    "errorCode": {
+                      "nullValue": null
+                    },
+                    "timestamp": {
+                      "stringValue": "2026-09-22T17:27:23.350Z"
+                    },
+                    "currentTime": {
+                      "doubleValue": 0.008165
+                    },
+                    "networkState": {
+                      "integerValue": "1"
+                    }
+                  }
+                }
+              },
+              {
+                "mapValue": {
+                  "fields": {
+                    "paused": {
+                      "booleanValue": false
+                    },
+                    "duration": {
+                      "doubleValue": 10.005333
+                    },
+                    "mediaId": {
+                      "stringValue": "AVwGDQ73WNhEnKaMZj7I"
+                    },
+                    "errorCode": {
+                      "integerValue": "3"
+                    },
+                    "timestamp": {
+                      "stringValue": "2026-09-22T17:27:24.035Z"
+                    },
+                    "currentTime": {
+                      "doubleValue": 0.641028
+                    },
+                    "readyState": {
+                      "integerValue": "4"
+                    },
+                    "event": {
+                      "stringValue": "error"
+                    },
+                    "networkState": {
+                      "integerValue": "1"
+                    },
+                    "ended": {
+                      "booleanValue": false
+                    },
+                    "mediaSource": {
+                      "stringValue": "CACHE_LOCAL"
+                    }
+                  }
+                }
+              },
+              {
+                "mapValue": {
+                  "fields": {
+                    "currentTime": {
+                      "integerValue": "0"
+                    },
+                    "networkState": {
+                      "integerValue": "0"
+                    },
+                    "timestamp": {
+                      "stringValue": "2026-09-22T17:27:24.036Z"
+                    },
+                    "errorCode": {
+                      "nullValue": null
+                    },
+                    "mediaId": {
+                      "stringValue": "AVwGDQ73WNhEnKaMZj7I"
+                    },
+                    "duration": {
+                      "integerValue": "0"
+                    },
+                    "paused": {
+                      "booleanValue": false
+                    },
+                    "event": {
+                      "stringValue": "PLAYBACK_ERROR"
+                    },
+                    "mediaSource": {
+                      "stringValue": "CACHE_LOCAL"
+                    },
+                    "readyState": {
+                      "integerValue": "0"
+                    },
+                    "ended": {
+                      "booleanValue": false
+                    }
+                  }
+                }
+              },
+              {
+                "mapValue": {
+                  "fields": {
+                    "ended": {
+                      "booleanValue": false
+                    },
+                    "readyState": {
+                      "integerValue": "0"
+                    },
+                    "timestamp": {
+                      "stringValue": "2026-09-22T17:27:24.081Z"
+                    },
+                    "errorCode": {
+                      "nullValue": null
+                    },
+                    "currentTime": {
+                      "integerValue": "0"
+                    },
+                    "event": {
+                      "stringValue": "MEDIA_CHANGE"
+                    },
+                    "networkState": {
+                      "integerValue": "0"
+                    },
+                    "duration": {
+                      "integerValue": "0"
+                    },
+                    "mediaId": {
+                      "stringValue": ""
+                    },
+                    "mediaSource": {
+                      "stringValue": "UNKNOWN"
+                    },
+                    "paused": {
+                      "booleanValue": false
+                    }
+                  }
+                }
+              },
+              {
+                "mapValue": {
+                  "fields": {
+                    "paused": {
+                      "booleanValue": true
+                    },
+                    "mediaSource": {
+                      "stringValue": "CACHE_LOCAL"
+                    },
+                    "errorCode": {
+                      "integerValue": "3"
+                    },
+                    "timestamp": {
+                      "stringValue": "2026-09-22T17:27:24.097Z"
+                    },
+                    "duration": {
+                      "doubleValue": 10.005333
+                    },
+                    "ended": {
+                      "booleanValue": false
+                    },
+                    "currentTime": {
+                      "doubleValue": 0.641028
+                    },
+                    "mediaId": {
+                      "stringValue": "AVwGDQ73WNhEnKaMZj7I"
+                    },
+                    "networkState": {
+                      "integerValue": "1"
+                    },
+                    "readyState": {
+                      "integerValue": "4"
+                    },
+                    "event": {
+                      "stringValue": "pause"
+                    }
+                  }
+                }
+              },
+              {
+                "mapValue": {
+                  "fields": {
+                    "readyState": {
+                      "integerValue": "1"
+                    },
+                    "mediaSource": {
+                      "stringValue": "CACHE_LOCAL"
+                    },
+                    "ended": {
+                      "booleanValue": false
+                    },
+                    "event": {
+                      "stringValue": "waiting"
+                    },
+                    "paused": {
+                      "booleanValue": false
+                    },
+                    "timestamp": {
+                      "stringValue": "2026-09-22T17:27:24.109Z"
+                    },
+                    "errorCode": {
+                      "nullValue": null
+                    },
+                    "duration": {
+                      "doubleValue": 10.005
+                    },
+                    "currentTime": {
+                      "integerValue": "0"
+                    },
+                    "mediaId": {
+                      "stringValue": "enfiqiz94zS2wy4oAaKe"
+                    },
+                    "networkState": {
+                      "integerValue": "1"
+                    }
+                  }
+                }
+              }
+            ]
+          }
+        },
+        "updatedAt": {
+          "timestampValue": "2026-09-22T17:37:10.265Z"
+        },
+        "counters": {
+          "mapValue": {
+            "fields": {
+              "estimatedTrafficSaved": {
+                "integerValue": "913108352"
+              },
+              "stalledCount": {
+                "integerValue": "0"
+              },
+              "downloadStarts": {
+                "integerValue": "0"
+              },
+              "waitingDurationMs": {
+                "integerValue": "85493"
+              },
+              "downloadStalls": {
+                "integerValue": "0"
+              },
+              "cacheHits": {
+                "integerValue": "0"
+              },
+              "downloadCompleted": {
+                "integerValue": "0"
+              },
+              "localPlaybackCount": {
+                "integerValue": "416"
+              },
+              "cacheMisses": {
+                "integerValue": "0"
+              },
+              "remotePlaybackCount": {
+                "integerValue": "0"
+              },
+              "playbackErrors": {
+                "integerValue": "4"
+              },
+              "downloadRetries": {
+                "integerValue": "0"
+              },
+              "bytesDownloaded": {
+                "integerValue": "0"
+              },
+              "displayTimeMs": {
+                "integerValue": "5131026"
+              },
+              "downloadTimeouts": {
+                "integerValue": "0"
+              },
+              "waitingCount": {
+                "integerValue": "418"
+              },
+              "stallDurationMs": {
+                "integerValue": "0"
+              },
+              "downloadFailed": {
+                "integerValue": "0"
+              },
+              "partialBytesObserved": {
+                "integerValue": "0"
+              }
+            }
+          }
+        },
+        "current": {
+          "mapValue": {
+            "fields": {
+              "operatingMode": {
+                "stringValue": "LOCAL"
+              },
+              "mediaType": {
+                "stringValue": "VIDEO"
+              },
+              "mediaName": {
+                "stringValue": "Park Solutions vídeo"
+              },
+              "playlistId": {
+                "stringValue": "NYMMLih50iYxXho5bvRL"
+              },
+              "lastPlayerEvent": {
+                "stringValue": "waiting"
+              },
+              "mediaId": {
+                "stringValue": "enfiqiz94zS2wy4oAaKe"
+              },
+              "lastErrorAt": {
+                "stringValue": "2026-09-22T17:27:24.036Z"
+              },
+              "dynamicDataSource": {
+                "stringValue": "INTERNET"
+              },
+              "mediaSource": {
+                "stringValue": "CACHE_LOCAL"
+              },
+              "connectionStatus": {
+                "stringValue": "ONLINE"
+              },
+              "lastError": {
+                "stringValue": "Erro ao carregar vídeo"
+              },
+              "playbackActive": {
+                "booleanValue": false
+              }
+            }
+          }
+        },
+        "schemaVersion": {
+          "integerValue": "1"
+        }
+      },
+      "createTime": "2026-09-22T16:16:11.225286Z",
+      "updateTime": "2026-09-22T17:37:10.294702Z"
+    }
+  ]
+}

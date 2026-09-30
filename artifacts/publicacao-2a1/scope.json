@@ -1,0 +1,14 @@
+{
+  "productionDeployment": "dpl_AdMkvihNUgSQsWp6vBHohmY3f1Ty",
+  "productionCommit": "b23dea80ed7b676ebfd14c6597f02f4ccac9db27",
+  "gitDirtyAtPreviousDeploy": true,
+  "inputs": 61,
+  "unchangedInputs": 58,
+  "changedProduct": [
+    "public/sw.js",
+    "src/offline-player-cache.js",
+    "src/App.jsx"
+  ],
+  "onlyKnownPatch": true,
+  "release": "C:\\Users\\centr\\Desktop\\totem-park\\artifacts\\publicacao-2a1\\release"
+}

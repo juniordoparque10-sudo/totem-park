@@ -1,0 +1,96 @@
+{
+  "revision": "old",
+  "requests": [
+    {
+      "at": "2026-09-16T14:57:57.190Z",
+      "path": "/media/video01.webm",
+      "method": "GET",
+      "range": null,
+      "ifNoneMatch": null,
+      "status": 200,
+      "bodyBytes": 27656
+    },
+    {
+      "at": "2026-09-16T14:57:57.196Z",
+      "path": "/media/imagem01.png",
+      "method": "GET",
+      "range": null,
+      "ifNoneMatch": null,
+      "status": 200,
+      "bodyBytes": 15649
+    },
+    {
+      "at": "2026-09-16T14:57:57.263Z",
+      "path": "/media/video02.webm",
+      "method": "GET",
+      "range": null,
+      "ifNoneMatch": null,
+      "status": 200,
+      "bodyBytes": 27892
+    },
+    {
+      "at": "2026-09-16T14:57:57.265Z",
+      "path": "/media/imagem02.png",
+      "method": "GET",
+      "range": null,
+      "ifNoneMatch": null,
+      "status": 200,
+      "bodyBytes": 16044
+    },
+    {
+      "at": "2026-09-16T14:57:57.307Z",
+      "path": "/media/videoB.webm",
+      "method": "GET",
+      "range": null,
+      "ifNoneMatch": null,
+      "status": 200,
+      "bodyBytes": 25618
+    },
+    {
+      "at": "2026-09-16T14:57:57.309Z",
+      "path": "/media/imagemB.png",
+      "method": "GET",
+      "range": null,
+      "ifNoneMatch": null,
+      "status": 200,
+      "bodyBytes": 15292
+    },
+    {
+      "at": "2026-09-16T14:57:58.516Z",
+      "path": "/media/video01.webm",
+      "method": "GET",
+      "range": "bytes=0-27655",
+      "ifNoneMatch": "\"fixture-video01.webm-27656\"",
+      "status": 304,
+      "bodyBytes": 0
+    },
+    {
+      "at": "2026-09-16T14:59:31.012Z",
+      "path": "/media/video02.webm",
+      "method": "GET",
+      "range": "bytes=0-27891",
+      "ifNoneMatch": "\"fixture-video02.webm-27892\"",
+      "status": 304,
+      "bodyBytes": 0
+    },
+    {
+      "at": "2026-09-16T14:59:47.376Z",
+      "path": "/media/video01.webm",
+      "method": "GET",
+      "range": "bytes=0-27655",
+      "ifNoneMatch": "\"fixture-video01.webm-27656\"",
+      "status": 304,
+      "bodyBytes": 0
+    },
+    {
+      "at": "2026-09-16T15:00:04.936Z",
+      "path": "/media/imagemNova.png",
+      "method": "GET",
+      "range": null,
+      "ifNoneMatch": null,
+      "status": 200,
+      "bodyBytes": 16378
+    }
+  ],
+  "events": []
+}

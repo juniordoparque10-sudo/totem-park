@@ -1,0 +1,10 @@
+<!doctype html><html lang="pt-BR"><meta charset="utf-8"><title>Totem Park — Homologação 2A.1</title>
+<style>body{font:16px system-ui;background:#0b1220;color:#e6eefc;margin:28px}button{padding:12px;margin:5px;border:0;border-radius:8px;cursor:pointer}section{display:flex;gap:20px}video,img{width:320px;height:180px;background:#14233e;object-fit:contain}pre{white-space:pre-wrap;background:#121e32;padding:18px;max-height:460px;overflow:auto}#status{color:#6ce6b4}small{color:#b4c3dd}</style>
+<h1>Homologação 2A.1</h1><p>Bancada isolada • módulos reais de cache e Service Worker • sem Firebase</p>
+<small>Não é o player completo. As telas e playlists abaixo são fixtures locais.</small>
+<p id="status">Carregando módulos…</p>
+<div><button id="init">1. Preparar SW anterior e mídias</button><button id="a1">2. Cliente A / Tela 01</button><button id="update">3. Ativar SW novo</button><button id="inspect">Inspecionar cache e rede</button></div>
+<div><button id="a2">Cliente A / Tela 02</button><button id="b">Cliente B / Tela 01</button><button id="change">Atualizar playlist Tela 01</button><button id="back">Voltar playlist A</button><button id="off">Indisponibilizar servidor de mídias</button><button id="clear">clearCache Cliente A</button><button id="net">Diagnóstico HTTP separado</button></div>
+<h2 id="playing">Reprodução local de teste</h2><section><video id="video" controls muted loop playsinline></video><img id="image" alt="Imagem da playlist de homologação"></section>
+<pre id="output"></pre>
+<script type="module" src="/harness.js"></script></html>

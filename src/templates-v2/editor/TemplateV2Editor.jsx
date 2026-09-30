@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useRef, useState } from "react";
-import { addDoc, collection, deleteDoc, doc, onSnapshot, serverTimestamp, updateDoc } from "firebase/firestore";
+import { addDoc, collection, doc, onSnapshot, serverTimestamp, updateDoc, writeBatch } from "firebase/firestore";
 import { ChevronDown, CloudSun, Image, Palette, Plus, RotateCcw, Save, Send, Type } from "lucide-react";
 import { auth, db } from "../../firebase";
 import { uploadStorageAsset } from "../../storage-service";
@@ -28,7 +28,7 @@ import useTemplateV2DynamicData from "./useTemplateV2DynamicData";
 import PortalModal from "../../PortalModal";
 import PreviewModal from "../../PreviewModal";
 import QRCodeConfigurator from "../../QRCodeConfigurator";
-import { getTemplatePlaylistUsage } from "../../template-usage";
+import { getTemplatePlaylistUsage, removeTemplateReferences } from "../../template-usage";
 import "./template-v2-editor.css";
 import SportsV2EditorFields from "../sports-v2/SportsV2EditorFields";
 import { getSportsV2Timing, normalizeSportsV2Config, SPORTS_V2_MODES } from "../sports-v2/config";
@@ -55,6 +55,15 @@ function PopupPreview({ template, config, orientation, onClose, dynamicData }) {
 function TypographyControl({ label, value, onChange, sizeLimits, lineLimits = [0.9, 1.7] }) {
   return <div className="tpv2-typography-control"><strong>{label}</strong><label>Tamanho <input type="range" min={sizeLimits[0]} max={sizeLimits[1]} value={value.fontSize} onChange={(event) => onChange("fontSize", Number(event.target.value))} /><span>{value.fontSize}px</span></label><label>Entrelinhas <input type="range" min={lineLimits[0]} max={lineLimits[1]} step="0.05" value={value.lineHeight} onChange={(event) => onChange("lineHeight", Number(event.target.value))} /><span>{Number(value.lineHeight).toFixed(2)}</span></label></div>;
 }
+
+const VISIBILITY_LABELS = {
+  showLogo: "Exibir logo",
+  showContent: "Exibir conteúdo",
+  showHeadline: "Exibir headline",
+  showSubtitle: "Exibir subtítulo",
+  showCta: "Exibir chamada / CTA",
+  showServices: "Exibir cards / serviços",
+};
 
 export default function TemplateV2Editor({ client, access, entitlement = { allowed: true }, weatherCities = [], newsSources = [], loadWeather, loadNews, onUseInPlaylist }) {
   const workspaceRef = useRef(null);
@@ -184,14 +193,28 @@ export default function TemplateV2Editor({ client, access, entitlement = { allow
   }
 
   async function deleteTemplateInstance() {
-    if (!deleteTarget || deleteBlockedBy.length) return;
+    if (!deleteTarget || saving) return;
     try {
       setSaving(true);
-      await deleteDoc(doc(db, "clients", client.id, "templates", deleteTarget.id));
+      const affectedPlaylists = getTemplatePlaylistUsage(playlists, deleteTarget.id);
+      if (affectedPlaylists.length > 498) throw new Error("Limite de playlists excedido para exclusão atômica.");
+      const batch = writeBatch(db);
+      affectedPlaylists.forEach((playlist) => {
+        batch.update(doc(db, "clients", client.id, "playlists", playlist.id), {
+          items: removeTemplateReferences(playlist.items, deleteTarget.id),
+          playlistRevision: `template-delete-${Date.now()}-${Math.random().toString(36).slice(2,8)}`,
+          updatedAt: serverTimestamp(),
+        });
+      });
+      batch.delete(doc(db, "clients", client.id, "templates", deleteTarget.id));
+      await batch.commit();
       if (selectedId === deleteTarget.id) setSelectedId("");
       setDeleteTarget(null);
-      setMessage("Template excluído. As mídias da biblioteca foram preservadas.");
-    } catch (error) { console.error(error); setMessage("Não foi possível excluir o template."); } finally { setSaving(false); }
+      setDeleteBlockedBy([]);
+      setMessage(affectedPlaylists.length
+        ? `Template excluído definitivamente e removido de ${affectedPlaylists.length} playlist(s). As mídias da biblioteca foram preservadas.`
+        : "Template excluído definitivamente. As mídias da biblioteca foram preservadas.");
+    } catch (error) { console.error(error); setMessage("Não foi possível concluir a exclusão. O template e as playlists foram preservados."); } finally { setSaving(false); }
   }
 
   async function uploadMedia(file, event, targetPath = "media.primary") {
@@ -242,12 +265,13 @@ export default function TemplateV2Editor({ client, access, entitlement = { allow
   return (
     <div className="tpv2-workspace" ref={workspaceRef}>
       {deleteTarget && <PortalModal
-        title={deleteBlockedBy.length ? "Este template está sendo usado em uma playlist." : "Excluir template?"}
-        message={deleteBlockedBy.length ? "Remova o template das playlists relacionadas antes de excluí-lo." : "Esta ação removerá o template criado. As mídias da sua biblioteca não serão apagadas."}
+        title={deleteBlockedBy.length ? "Este template está em uso" : "Excluir template definitivamente?"}
+        message={deleteBlockedBy.length ? "Este template está sendo utilizado nas playlists abaixo. Ao excluir definitivamente, ele também será removido dessas playlists. Esta ação não poderá ser desfeita." : "Esta ação removerá definitivamente a instância criada. As mídias da sua biblioteca não serão apagadas. Esta ação não poderá ser desfeita."}
         details={deleteBlockedBy.map((playlist) => playlist.name || playlist.title || playlist.id)}
-        confirmLabel={deleteBlockedBy.length ? "Entendi" : "Excluir template"}
-        danger={!deleteBlockedBy.length}
-        onConfirm={deleteBlockedBy.length ? undefined : deleteTemplateInstance}
+        confirmLabel="Excluir definitivamente"
+        danger
+        confirmDisabled={saving}
+        onConfirm={deleteTemplateInstance}
         onClose={() => { setDeleteTarget(null); setDeleteBlockedBy([]); }}
       />}
       <div className="tpv2-workspace-title"><div><span>Templates V2 · Professional / Enterprise</span><h2>{definition?.label || "Biblioteca V2"}</h2><p>Edite o rascunho com preview ao vivo e publique somente quando estiver pronto.</p></div><button type="button" onClick={() => { if (!entitlement.allowed) { setMessage("Templates V2 não estão disponíveis no seu plano."); return; } setSelectedId(""); setMessage(""); }}><Plus /> Novo Template</button></div>
@@ -256,6 +280,7 @@ export default function TemplateV2Editor({ client, access, entitlement = { allow
       <div className="tpv2-editor-grid">
         <main className="tpv2-editor-form">
           <div className={`tpv2-save-state ${draftState.isDirty ? "dirty" : "saved"}`}><span>{draftState.isDirty ? "Alterações não salvas" : "Rascunho sincronizado"}</span><small>{draftState.publishedSnapshot ? "Existe uma publicação ativa" : "Ainda não publicado"}</small></div>
+          <div className="tpv2-visibility-controls"><strong>Elementos visíveis</strong>{definition?.visibilityControls?.map((key) => <label className="tpv2-check" key={key}><input type="checkbox" checked={draftState.editorDraft.visibility?.[key] !== false} onChange={(event) => draftState.update(`visibility.${key}`, event.target.checked)} /> {VISIBILITY_LABELS[key]}</label>)}</div>
           {activeType === SPORTS_PREMIUM_TYPE ? <Section sectionId="content" icon={<Type />} title="Conteúdo esportivo" open={openSections.content} onToggle={toggleSection}><label>Nome do template<input value={name} onChange={(event) => setName(event.target.value)} /></label><SportsV2EditorFields value={draftState.editorDraft.sports} totalDuration={draftState.editorDraft.display.duration} onChange={(value) => draftState.update("sports", value)} /></Section> : [CLOCK_PRO_TYPE, WEATHER_PREMIUM_TYPE].includes(activeType) ? <Section sectionId="content" icon={<Type />} title={activeType === CLOCK_PRO_TYPE ? "Configuração da hora" : "Dados do clima"} open={openSections.content} onToggle={toggleSection}>
             <label>Nome do template<input value={name} onChange={(event) => setName(event.target.value)} /></label>
             {activeType === CLOCK_PRO_TYPE && <><label className="tpv2-check"><input type="checkbox" checked={draftState.editorDraft.modules.clock.showDate} onChange={(event) => draftState.update("modules.clock.showDate", event.target.checked)} /> Exibir data</label><label className="tpv2-check"><input type="checkbox" checked={draftState.editorDraft.modules.clock.showLocal} onChange={(event) => draftState.update("modules.clock.showLocal", event.target.checked)} /> Exibir local</label></>}

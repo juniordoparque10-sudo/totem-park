@@ -5,6 +5,9 @@ import { buildQRCodeValue, buildQrUrl, normalizeQRCodeConfig } from "./qr-code";
 import QRCodeConfigurator from "./QRCodeConfigurator";
 import QRCodeLayer from "./QRCodeLayer";
 import { normalizeTemplatesV2Override, resolveTemplatesV2Entitlement } from "./templates-v2/entitlement";
+import { normalizeSportsV2Config } from "./templates-v2/sports-v2/config";
+import { resolveSportsDataProvider } from "./templates-v2/sports-v2/data/SportsDataProvider";
+import { getTemplateV2CriticalImageUrl, localizeTemplateV2Assets, preloadImageForPaint } from "./templates-v2/player-preload";
 import { linkedAtForScreen, telemetryStatus } from "./telemetry-v1";
 ﻿import { useEffect, useLayoutEffect, useRef, useState } from "react";
 import { Routes, Route, Navigate, useParams, useNavigate } from "react-router-dom";
@@ -129,7 +132,7 @@ import {
   restartSingleVideo,
 } from "./single-item-loop";
 import { createPlayerTelemetry, readPlayerTelemetryReport, TELEMETRY_DEFAULT_CONFIG } from "./player-telemetry";
-import { comparePortalScreens, getPortalScreenPage, sortClientsAlphabetically } from "./portal-status";
+import { comparePortalScreens, getPortalLastSignalMs, getPortalScreenPage, sortClientsAlphabetically } from "./portal-status";
 import {
   claimPlayerBinding,
   classifyPlayerIdentityFailure,
@@ -380,7 +383,7 @@ function getTimestampMs(value) {
 }
 
 const SCREEN_ONLINE_WINDOW_SECONDS = 45;
-const SCREEN_ATTENTION_WINDOW_SECONDS = 120;
+const SCREEN_ATTENTION_WINDOW_SECONDS = 90;
 const SCREEN_LOCATION_CACHE_KEY = "totempark-screen-location-cache";
 const SCREEN_LOCATION_CACHE_TTL_MS = 30 * 60 * 1000;
 let screenLocationRetryAfter = 0;
@@ -396,12 +399,8 @@ function getScreenDeviceLabel(screen = {}) {
 }
 
 function getScreenLastSeenDate(screen = {}) {
-  // Only timestamps written by the player count as proof of connectivity.
-  const timestamp = Math.max(
-    getTimestampMs(screen.lastSeenAt),
-    getTimestampMs(screen.lastCommandExecutedAt),
-    getTimestampMs(screen.lastMediaUpdateAt)
-  );
+  // A matching V5 checkpoint is also an authenticated operational signal.
+  const timestamp = getPortalLastSignalMs(screen);
   return timestamp ? new Date(timestamp) : null;
 }
 
@@ -411,7 +410,7 @@ function getScreenConnectionStatus(screen = {}, nowValue = Date.now()) {
   const lastSeenMs = lastSeenDate?.getTime?.() || 0;
   const diffInSeconds = lastSeenMs ? (nowMs - lastSeenMs) / 1000 : Infinity;
   const hasDevice = Boolean(screen.connectedDeviceId || screen.activeDeviceId);
-  const isOnline = hasDevice && diffInSeconds <= SCREEN_ONLINE_WINDOW_SECONDS;
+  const isOnline = hasDevice && diffInSeconds < SCREEN_ONLINE_WINDOW_SECONDS;
 
   if (isOnline) {
     return {
@@ -427,7 +426,7 @@ function getScreenConnectionStatus(screen = {}, nowValue = Date.now()) {
     };
   }
 
-  if (hasDevice && diffInSeconds <= SCREEN_ATTENTION_WINDOW_SECONDS) {
+  if (hasDevice && diffInSeconds < SCREEN_ATTENTION_WINDOW_SECONDS) {
     return {
       key: "attention",
       className: "attention",
@@ -3738,6 +3737,11 @@ const IS_PLAYER_BUILD = ["player", "playerLab", "playerCanary", "playerRc", "pla
 const IS_PLAYER_LAB_BUILD = APP_BUILD_MODE === "playerLab";
 const IS_PLAYER_CANARY_BUILD = APP_BUILD_MODE === "playerCanary";
 const IS_PLAYER_RC_BUILD = APP_BUILD_MODE === "playerRc";
+const IS_TEMPLATES_V2_DIAGNOSTIC_BUILD = IS_PLAYER_RC_BUILD;
+function logTemplatesV2Diagnostic(event, payload = {}) {
+  if (!IS_TEMPLATES_V2_DIAGNOSTIC_BUILD) return;
+  console.log(`[TP-V2-DIAG] ${event}`, { timestamp: Date.now(), performanceMs: Math.round(performance.now()), ...payload });
+}
 const IS_PLAYER_TELEMETRY_BUILD = APP_BUILD_MODE === "playerTelemetry";
 const IS_PLAYER_JUMP_DIAG_BUILD = APP_BUILD_MODE === "playerJumpDiag";
 const IS_PLAYER_DECODER_EXPERIMENT_BUILD = APP_BUILD_MODE === "playerDecoderExperiment";
@@ -8750,7 +8754,7 @@ function ClientPlaylistsPage({ client, access = getClientPlanAccess(client), isA
     const item = getSelectedItemByKey(form.selectedMediaIds[index], index);
     const itemName = item?.title || item?.name || `item ${index + 1}`;
 
-    if (!window.confirm(`Remover "${itemName}" apenas desta playlist?`)) return;
+    if (!window.confirm(`Remover "${itemName}" da playlist?\n\nO template continuará disponível em Meus Templates V2 e poderá ser utilizado novamente.`)) return;
 
     setForm((current) => ({
       ...current,
@@ -8766,7 +8770,7 @@ function ClientPlaylistsPage({ client, access = getClientPlanAccess(client), isA
     const item = items[index];
     const itemName = item?.title || item?.name || `item ${index + 1}`;
 
-    if (!window.confirm(`Remover "${itemName}" apenas da playlist "${playlist.name}"?`)) return;
+    if (!window.confirm(`Remover "${itemName}" da playlist "${playlist.name}"?\n\nO template continuará disponível em Meus Templates V2 e poderá ser utilizado novamente.`)) return;
 
     try {
       const updatedItems = items.filter((_, itemIndex) => itemIndex !== index);
@@ -10529,7 +10533,7 @@ function applyOfflineAssetUrls(item, urlMap) {
   const qrUrl = buildQrUrl(buildQRCodeValue(localized.qrCode || localized.qrText || localized.whatsapp || ""));
   if (qrUrl && urlMap[qrUrl]) localized.qrImageUrl = urlMap[qrUrl];
 
-  return localized;
+  return localizeTemplateV2Assets(localized, urlMap);
 }
 
 function readMarketingFile(file, setter, fieldFile, fieldPreview) {
@@ -13603,7 +13607,11 @@ function TemplateV2LivePreview({ template, compact = false, tv = false }) {
   const weatherConfig = config?.modules?.weather || {};
   const newsConfig = config?.modules?.news || {};
   const [dynamicData, setDynamicData] = useState(null);
-  const dynamicKey = JSON.stringify({ city:weatherConfig.city || "", enabledWeather:weatherConfig.enabled, enabledNews:newsConfig.enabled, feed:newsConfig.newsFeedUrl || "", sources:newsConfig.selectedNewsSources || [] });
+  const dynamicKey = JSON.stringify({ city:weatherConfig.city || "", enabledWeather:weatherConfig.enabled, enabledNews:newsConfig.enabled, feed:newsConfig.newsFeedUrl || "", sources:newsConfig.selectedNewsSources || [], sports:config?.sports || null });
+
+  useEffect(() => {
+    logTemplatesV2Diagnostic("T1_RENDERER_MOUNTED", { templateId: template.id || template.templateId || "", templateType: template.identity?.templateType || template.templateType || template.type || "" });
+  }, [template.id, template.templateId, template.identity?.templateType, template.templateType, template.type]);
 
   useEffect(() => {
     let cancelled = false;
@@ -13613,10 +13621,19 @@ function TemplateV2LivePreview({ template, compact = false, tv = false }) {
       if (newsConfig.enabled) {
         next.news = await loadTemplateV2News(newsConfig);
       }
+      if (config?.sports?.provider) {
+        const sports = normalizeSportsV2Config(config.sports);
+        logTemplatesV2Diagnostic("SPORTS_PUBLISHED_CONFIG", { templateId:template.id||template.templateId||"", schemaVersion:template.schemaVersion||null, provider:sports.provider, mode:sports.mode, selectedSports:sports.selectedSports, selectedSport:sports.selectedSport, competitionId:sports.items?.[sports.selectedSport]?.competitionId||"", season:sports.items?.[sports.selectedSport]?.season||"", modules:sports.items?.[sports.selectedSport]?.modules||{} });
+        const provider = resolveSportsDataProvider(sports, { diagnostic:(event,payload)=>logTemplatesV2Diagnostic(`SPORTS_${event}`,{templateId:template.id||template.templateId||"",...payload}) });
+        const settled = await Promise.allSettled(sports.selectedSports.map(async (sport) => [sport,await provider.getSnapshot(sport)]));
+        next.sports = Object.fromEntries(settled.filter((result)=>result.status === "fulfilled").map((result)=>result.value));
+        next.sportsErrors = sports.selectedSports.filter((_,index)=>settled[index].status === "rejected");
+        logTemplatesV2Diagnostic("SPORTS_RENDER_DATA_READY", { templateId:template.id||template.templateId||"", receivedSportsData:Object.keys(next.sports).length>0, sports:Object.fromEntries(Object.entries(next.sports).map(([sport,snapshot])=>[sport,{results:Number(snapshot?.data?.results?.length||0),upcoming:Number(snapshot?.data?.upcoming?.length||0),standings:Number(snapshot?.data?.standings?.length||0),events:Number(snapshot?.data?.events?.length||0)}])), errors:next.sportsErrors });
+      }
       if (!cancelled) setDynamicData(next);
     }
     load().catch(() => { if (!cancelled) setDynamicData({}); });
-    const interval = setInterval(load, 10 * 60 * 1000);
+    const interval = setInterval(load, config?.sports?.provider ? 15 * 60 * 1000 : 10 * 60 * 1000);
     return () => { cancelled = true; clearInterval(interval); };
   // The serialized configuration is the refresh boundary for existing live sources.
   // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -15049,6 +15066,7 @@ function PlayerPage() {
   const [activeMode, setActiveMode] = useState("default");
   const [mediaIndex, setMediaIndex] = useState(0);
   const [previousMediaIndex, setPreviousMediaIndex] = useState(null);
+  const previousMediaIndexRef = useRef(null);
   const [decoderReleasePending, setDecoderReleasePending] = useState(false);
   const [readyMediaKey, setReadyMediaKey] = useState("");
   const [isAndroidTv, setIsAndroidTv] = useState(null);
@@ -15582,6 +15600,57 @@ function PlayerPage() {
     });
   }, [activeItemsKey, mediaIndex]);
 
+  useEffect(() => {
+    if (!playerItems.length) return undefined;
+    const safeIndex = mediaIndex >= playerItems.length ? 0 : mediaIndex;
+    const currentItem = playerItems[safeIndex];
+    if (currentItem?.playerItemType !== "template") return undefined;
+
+    let active = true;
+    const criticalUrl = getTemplateV2CriticalImageUrl(currentItem);
+    const diagnosticPayload = { templateId:currentItem.templateId||currentItem.id||"", itemKey:getPlayerItemKey(currentItem,safeIndex) };
+    logTemplatesV2Diagnostic("T2_ASSET_RESOLVED", { ...diagnosticPayload, hasCriticalAsset:Boolean(criticalUrl), CURRENT_VISIBLE:previousMediaIndexRef.current !== null, NEXT_PENDING:true });
+    logTemplatesV2Diagnostic("T3_ASSET_SOURCE_DEFINED", { ...diagnosticPayload, source:/^(blob:|file:|data:|capacitor:)/i.test(criticalUrl)?"LOCAL":"REMOTE", CURRENT_VISIBLE:previousMediaIndexRef.current !== null, NEXT_PENDING:true });
+    const reveal = () => {
+      if (active) markCurrentMediaReady(currentItem, safeIndex);
+    };
+
+    if (criticalUrl) {
+      preloadImageForPaint(criticalUrl, globalThis.Image, { onEvent:(event,details)=>logTemplatesV2Diagnostic(`${event}_${event === "T4" ? "IMAGE_LOADED" : "IMAGE_DECODED"}`,{...diagnosticPayload,...details,CURRENT_VISIBLE:previousMediaIndexRef.current !== null,NEXT_PENDING:true}) }).then(reveal).catch((error) => {
+        console.log("Falha no preload do fundo V2; exibindo fallback:", error);
+        reveal();
+      });
+    } else {
+      reveal();
+    }
+
+    const nextItem = playerItems[(safeIndex + 1) % playerItems.length];
+    const nextUrl = nextItem?.playerItemType === "template" ? getTemplateV2CriticalImageUrl(nextItem) : "";
+    if (nextUrl) preloadImageForPaint(nextUrl).catch(() => {});
+
+    return () => { active = false; };
+  }, [activeItemsKey, mediaIndex]);
+
+  useEffect(() => {
+    const safeIndex = mediaIndex >= playerItems.length ? 0 : mediaIndex;
+    const item = playerItems[safeIndex];
+    if (!item || item.playerItemType !== "template" || readyMediaKey !== getPlayerItemKey(item,safeIndex)) return undefined;
+    logTemplatesV2Diagnostic("T7_TEMPLATE_VISIBLE", { templateId:item.templateId||item.id||"", itemKey:getPlayerItemKey(item,safeIndex), CURRENT_VISIBLE:previousMediaIndexRef.current !== null, NEXT_PENDING:false, NEXT_VISIBLE:true });
+    if ((activePlaylist?.transition || "Fade suave") === "Corte seco") requestAnimationFrame(() => finishCurrentTransition(item,safeIndex));
+    return undefined;
+  }, [activeItemsKey, mediaIndex, readyMediaKey]);
+
+  useEffect(() => {
+    const safeIndex = mediaIndex >= playerItems.length ? 0 : mediaIndex;
+    const item = playerItems[safeIndex];
+    const itemKey = item ? getPlayerItemKey(item,safeIndex) : "";
+    if (!item || item.playerItemType !== "template" || readyMediaKey === itemKey || previousMediaIndexRef.current === null) return undefined;
+    const timeout = setTimeout(() => {
+      logTemplatesV2Diagnostic("READINESS_TIMEOUT_CURRENT_PRESERVED", { templateId:item.templateId||item.id||"", itemKey, CURRENT_VISIBLE:true, NEXT_PENDING:true, NEXT_VISIBLE:false });
+    }, 15000);
+    return () => clearTimeout(timeout);
+  }, [activeItemsKey, mediaIndex, readyMediaKey]);
+
   const playlistsForOffline = allPlaylists.filter((playlist) => {
     if (playlist.id === screen?.playlistId) return true;
     if (!playlist.scheduleEnabled) return false;
@@ -15917,6 +15986,7 @@ function PlayerPage() {
     }
 
     const nextItemIndex = mediaIndex + 1 >= items.length ? 0 : mediaIndex + 1;
+    logTemplatesV2Diagnostic("T0_NEXT_ITEM_SELECTED", { reason, fromIndex:mediaIndex, toIndex:nextItemIndex, templateId:items[nextItemIndex]?.templateId||items[nextItemIndex]?.id||"", itemKey:getPlayerItemKey(items[nextItemIndex],nextItemIndex), CURRENT_VISIBLE:true, NEXT_PENDING:true });
     const singleDecoderTransition = IS_PLAYER_DECODER_LIFECYCLE_BUILD &&
       isVideoToVideoTransition(items, mediaIndex);
 
@@ -15937,35 +16007,24 @@ function PlayerPage() {
       const release = releaseVideoElement(oldVideo);
       recordJumpEvent("DECODER_SOURCE_CLEARED", { reason, ...release });
       setDecoderReleasePending(true);
+      previousMediaIndexRef.current = null;
       setPreviousMediaIndex(null);
     }
 
-    setMediaIndex((prev) => {
-      const safePrev = prev >= items.length ? 0 : prev;
-      const nextIndex = safePrev + 1 >= items.length ? 0 : safePrev + 1;
-
-      telemetryTransitionRef.current = telemetryRef.current.startTransition({
-        fromMediaId: items[safePrev]?.mediaId || items[safePrev]?.id || "",
-        toMediaId: items[nextIndex]?.mediaId || items[nextIndex]?.id || "",
-        reason,
-      });
-
-      transitionInProgressRef.current = true;
-      if (!singleDecoderTransition) setPreviousMediaIndex(safePrev);
-
-      if (items[nextIndex]?.playerItemType === "template") {
-        setReadyMediaKey(getPlayerItemKey(items[nextIndex], nextIndex));
-        clearTimeout(transitionCleanupRef.current);
-        transitionCleanupRef.current = setTimeout(() => {
-          setPreviousMediaIndex(null);
-          transitionInProgressRef.current = false;
-        }, 1800);
-      } else {
-        setReadyMediaKey("");
-      }
-
-      return nextIndex;
+    const safePrev = mediaIndex >= items.length ? 0 : mediaIndex;
+    const nextIndex = safePrev + 1 >= items.length ? 0 : safePrev + 1;
+    telemetryTransitionRef.current = telemetryRef.current.startTransition({
+      fromMediaId: items[safePrev]?.mediaId || items[safePrev]?.id || "",
+      toMediaId: items[nextIndex]?.mediaId || items[nextIndex]?.id || "",
+      reason,
     });
+    transitionInProgressRef.current = true;
+    if (!singleDecoderTransition) {
+      previousMediaIndexRef.current = safePrev;
+      setPreviousMediaIndex(safePrev);
+    }
+    setReadyMediaKey("");
+    setMediaIndex(nextIndex);
   }
 
   useLayoutEffect(() => {
@@ -15981,13 +16040,16 @@ function PlayerPage() {
     if (itemKey !== getPlayerItemKey(playerItems[mediaIndex], mediaIndex)) return;
 
     setReadyMediaKey(itemKey);
+    logTemplatesV2Diagnostic("T6_TEMPLATE_READY", { templateId:item.templateId||item.id||"", itemKey, CURRENT_VISIBLE:previousMediaIndexRef.current !== null, NEXT_PENDING:false });
     telemetryRef.current.completeTransition(telemetryTransitionRef.current, "SUCCESS");
     telemetryTransitionRef.current = "";
-    clearTimeout(transitionCleanupRef.current);
-    transitionCleanupRef.current = setTimeout(() => {
-      setPreviousMediaIndex(null);
-      transitionInProgressRef.current = false;
-    }, 1800);
+  }
+
+  function finishCurrentTransition(item, index) {
+    if (readyMediaKey !== getPlayerItemKey(item,index)) return;
+    previousMediaIndexRef.current = null;
+    setPreviousMediaIndex(null);
+    transitionInProgressRef.current = false;
   }
 
   function skipFailedMedia() {
@@ -16724,6 +16786,7 @@ function PlayerPage() {
 
     if (nextId && nextId !== previousId) {
       transitionInProgressRef.current = false;
+      previousMediaIndexRef.current = null;
       setPreviousMediaIndex(null);
       setReadyMediaKey("");
       setMediaIndex(0);
@@ -16779,6 +16842,12 @@ function PlayerPage() {
       isAndroidSmartTv &&
       currentItem?.type === "Vídeo" &&
       readyMediaKey !== currentKey;
+    const isWaitingForTemplateAsset =
+      currentItem?.playerItemType === "template" &&
+      readyMediaKey !== currentKey;
+    const isWaitingForTemplateTransition =
+      currentItem?.playerItemType === "template" &&
+      previousMediaIndex !== null;
 
     if (playbackTimingKeyRef.current !== timingKey) {
       if (playbackTimerRef.current) recordJumpEvent("TIMER_CANCELLED", { reason: "timing-key-change", index: safeIndex, mediaId: currentItem?.mediaId || currentItem?.id || "", timingKey: playbackTimingKeyRef.current });
@@ -16790,9 +16859,10 @@ function PlayerPage() {
       advancingRef.current = false;
     }
 
-    if (isPlaybackBlocked || advancingRef.current || isWaitingForAndroidTvVideo) return;
+    if (isPlaybackBlocked || advancingRef.current || isWaitingForAndroidTvVideo || isWaitingForTemplateAsset || isWaitingForTemplateTransition) return;
 
     playbackStartedAtRef.current = Date.now();
+    if (currentItem?.playerItemType === "template") logTemplatesV2Diagnostic("T8_DURATION_STARTED", { templateId:currentItem.templateId||currentItem.id||"", itemKey:currentKey, durationMs });
     const remaining = Math.max(0, playbackRemainingRef.current);
     const expectedFireAt = Date.now() + remaining;
     recordJumpEvent("TIMER_CREATED", { expectedFireAt, remainingMs: remaining, durationMs: durationInMs, index: safeIndex, mediaId: currentItem?.mediaId || currentItem?.id || "", timingKey });
@@ -16816,7 +16886,7 @@ function PlayerPage() {
         playbackRemainingRef.current - (Date.now() - playbackStartedAtRef.current)
       );
     };
-  }, [activePlaylist?.id, activeItemsKey, mediaIndex, readyMediaKey, pauseMode, takeoverMessage, blackoutMode, maintenanceMode, isAndroidSmartTv, singleImageLoopCycle]);
+  }, [activePlaylist?.id, activeItemsKey, mediaIndex, previousMediaIndex, readyMediaKey, pauseMode, takeoverMessage, blackoutMode, maintenanceMode, isAndroidSmartTv, singleImageLoopCycle]);
 
   useEffect(() => {
     const mediaElement = document.querySelector(
@@ -16992,9 +17062,7 @@ function PlayerPage() {
     mediaIndex >= playerItems.length ? 0 : mediaIndex;
   const currentMedia = playerItems[safeMediaIndex] || playerItems[0];
   const currentMediaKey = getPlayerItemKey(currentMedia, safeMediaIndex);
-  const currentMediaReady =
-    currentMedia.playerItemType === "template" ||
-    readyMediaKey === currentMediaKey;
+  const currentMediaReady = readyMediaKey === currentMediaKey;
   const currentTransitionReady = currentMediaReady;
   const transitionClass = getTransitionClass(activePlaylist?.transition || "Fade suave");
   const transitionSpeedClass = getTransitionSpeedClass(activePlaylist?.transitionSpeed || "Normal");
@@ -17009,16 +17077,17 @@ function PlayerPage() {
         : getPlayerOrientationClass();
 
   const visibleLayers = [];
+  const retainedPreviousIndex = previousMediaIndex ?? (!currentMediaReady ? previousMediaIndexRef.current : null);
 
   if (
     !decoderReleasePending &&
-    previousMediaIndex !== null &&
-    previousMediaIndex !== safeMediaIndex &&
-    playerItems[previousMediaIndex]
+    retainedPreviousIndex !== null &&
+    retainedPreviousIndex !== safeMediaIndex &&
+    playerItems[retainedPreviousIndex]
   ) {
     visibleLayers.push({
-      item: playerItems[previousMediaIndex],
-      index: previousMediaIndex,
+      item: playerItems[retainedPreviousIndex],
+      index: retainedPreviousIndex,
       state: "is-previous",
     });
   }
@@ -17244,6 +17313,7 @@ function PlayerPage() {
         <div
           key={`${getPlayerItemKey(item, index)}-${activePlaylistRevision}`}
           className={`player-transition-layer player-buffer-layer ${state} ${transitionClass} ${transitionSpeedClass} ${item.playerItemType === "template" ? "template-layer" : ""}`}
+          onAnimationEnd={() => { if (state.includes("is-current") && state.includes("is-ready")) finishCurrentTransition(item,index); }}
         >
           {renderPlayerItem(item, index, index === safeMediaIndex)}
         </div>

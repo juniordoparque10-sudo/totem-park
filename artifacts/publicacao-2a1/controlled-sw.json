@@ -1,0 +1,47 @@
+{
+  "started": "2026-09-16T14:53:12.126Z",
+  "profile": "C:\\Users\\centr\\Desktop\\totem-park\\artifacts\\publicacao-2a1\\controlled-web-profile",
+  "scope": "Controlled production-origin browser; synthetic local media fixtures, no real client screen or backend writes",
+  "console": [],
+  "before": [
+    {
+      "key": "https://totempark.local/cache/aa0dc5a1",
+      "bytes": 27656,
+      "sha256": "5f5015fbb36a8379f70a8861a71efa490ab4a4945bef4460fd6a71be6a940013"
+    },
+    {
+      "key": "https://totempark.local/cache/3056c0fe",
+      "bytes": 15649,
+      "sha256": "693d9b80d37e3cbb797ae1ae390d6bd9e5b7aff990231b8a58f67b64dccd72fd"
+    }
+  ],
+  "beforeDOM": "Transforme telas em experiências que conectam.\n\nE-mail\nSenha\nEntrarCriar nova conta",
+  "activation": {
+    "states": [
+      "installing",
+      "installed",
+      "activating",
+      "activated"
+    ],
+    "active": "activated",
+    "replaced": true
+  },
+  "after": [
+    {
+      "key": "https://totempark.local/cache/aa0dc5a1",
+      "bytes": 27656,
+      "sha256": "5f5015fbb36a8379f70a8861a71efa490ab4a4945bef4460fd6a71be6a940013"
+    },
+    {
+      "key": "https://totempark.local/cache/3056c0fe",
+      "bytes": 15649,
+      "sha256": "693d9b80d37e3cbb797ae1ae390d6bd9e5b7aff990231b8a58f67b64dccd72fd"
+    }
+  ],
+  "afterDOM": "Transforme telas em experiências que conectam.\n\nE-mail\nSenha\nEntrarCriar nova conta",
+  "fetchedSW": {
+    "sha256": "5b7f0abac7a25de3c969820d78cfbb62a9c3f5eac3ef3da9a26e56e7ef6d8797",
+    "bytes": 1491
+  },
+  "result": "PASSOU"
+}

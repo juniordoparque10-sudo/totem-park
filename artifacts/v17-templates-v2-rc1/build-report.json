@@ -1,0 +1,18 @@
+{
+  "Name": "Totem-Park-Player-V17-Templates-V2-RC1",
+  "Branch": "codex/v11-binary-hotfix-candidate",
+  "Commit": "a7367f8",
+  "Tag": "totempark-player-v17-templates-v2-rc1",
+  "VersionCode": 17,
+  "VersionName": "1.0.0-v17-templates-v2-rc1",
+  "Package": "br.com.parksolutions.totempark",
+  "BuildVariant": "playerRollbackDebug",
+  "BuiltAt": "2026-09-29T17:38:00.7729785-03:00",
+  "Apk": "C:\\Users\\centr\\.codex\\worktrees\\templates-v2-rc1\\totem-park\\artifacts\\v17-templates-v2-rc1\\Totem-Park-Player-V17-Templates-V2-RC1.apk",
+  "ApkSha256": "498D2A6846C9C09AD2402DD77BA2580C5CFF114D8D487F86DDBF6163CEC6A341",
+  "Bundle": "index-C_MTw2-1.js",
+  "BundleSha256": "7202FD52FACA1B77B9F463CE475D8765A49FB4778F7933BB417EAA094FE52C25",
+  "BaseV16ApkSha256": "CBB21CB43D19CBAD57CED3559A719CE8B1DAB161D2D2898788F76D98C7281150",
+  "ServiceWorkerPolicy": "Preserved from V16",
+  "InternalTemplateVideo": "Blocked"
+}

@@ -1,6 +1,6 @@
 import { useEffect } from "react";
 
-export default function PortalModal({ title, message, details = [], confirmLabel = "Entendi", danger = false, onConfirm, onClose }) {
+export default function PortalModal({ title, message, details = [], confirmLabel = "Entendi", danger = false, confirmDisabled = false, onConfirm, onClose }) {
   useEffect(() => {
     const handleKey = (event) => { if (event.key === "Escape") onClose?.(); };
     window.addEventListener("keydown", handleKey);
@@ -16,7 +16,7 @@ export default function PortalModal({ title, message, details = [], confirmLabel
       {details.length > 0 && <ul>{details.map((detail) => <li key={detail}>{detail}</li>)}</ul>}
       <div className="portal-modal-actions">
         {onConfirm && onClose && <button type="button" className="client-action" onClick={onClose}>Cancelar</button>}
-        <button type="button" className={danger ? "client-action danger" : "client-action primary"} onClick={onConfirm || onClose}>{confirmLabel}</button>
+        <button type="button" disabled={confirmDisabled} className={danger ? "client-action danger" : "client-action primary"} onClick={onConfirm || onClose}>{confirmLabel}</button>
       </div>
     </section>
   </div>;

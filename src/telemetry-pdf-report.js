@@ -1,0 +1,52 @@
+const escapeHtml = (value) => String(value ?? "").replace(/[&<>"']/g, (character) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#039;" })[character]);
+
+export function formatActiveTime(value) {
+  if (value === null || value === undefined || !Number.isFinite(Number(value)) || Number(value) < 0) return "—";
+  const minutes = Math.floor(Number(value) / 60000);
+  const days = Math.floor(minutes / 1440);
+  const hours = Math.floor((minutes % 1440) / 60);
+  const rest = minutes % 60;
+  if (days) return `${days}d ${hours}h ${rest}min`;
+  if (hours) return `${hours}h ${rest}min`;
+  return `${minutes} min`;
+}
+
+const safeImageUrl = (value) => {
+  try {
+    const url = new URL(value);
+    return ["https:", "http:"].includes(url.protocol) ? url.href : "";
+  } catch { return ""; }
+};
+
+export function renderTelemetryPdfReport({ rows, clientName, clientLogoUrl, totemLogoUrl, totemIconUrl, generatedAt }) {
+  const brandLogo = safeImageUrl(totemLogoUrl);
+  const brandIcon = safeImageUrl(totemIconUrl);
+  const clientLogo = safeImageUrl(clientLogoUrl);
+  const counts = { ONLINE: 0, ATTENTION: 0, OFFLINE: 0 };
+  rows.forEach((row) => { if (row.status in counts) counts[row.status] += 1; });
+  const tableRows = rows.map((row) => {
+    const status = { ONLINE: "Online", ATTENTION: "Atenção", OFFLINE: "Offline" }[row.status] || "—";
+    const tone = { ONLINE: "online", ATTENTION: "attention", OFFLINE: "offline" }[row.status] || "offline";
+    return `<tr><td class="screen"><strong>${escapeHtml(row.name)}</strong><small>${escapeHtml(row.clientName)}</small></td><td><span class="badge ${tone}"><i></i>${status}</span></td><td>${escapeHtml(row.lastCommunication)}</td><td>${escapeHtml(row.telemetry)}</td><td class="center">—</td><td>${escapeHtml(row.cache)}</td><td class="version">${escapeHtml(row.version)}</td><td>${escapeHtml(row.origin)}</td><td class="time">${escapeHtml(formatActiveTime(row.activeTimeMs))}</td></tr>`;
+  });
+  const date = new Date(generatedAt).toLocaleString("pt-BR", { dateStyle: "short", timeStyle: "short" });
+  const brand = brandLogo ? `<img src="${escapeHtml(brandLogo)}" alt="Totem Park">` : "Totem Park";
+  const clientLogoHtml = clientLogo ? `<img src="${escapeHtml(clientLogo)}" alt="Logo de ${escapeHtml(clientName)}">` : `<span class="client-monogram">${escapeHtml((clientName || "C").trim().charAt(0).toUpperCase())}</span>`;
+  const chunks = [tableRows.slice(0, 5)];
+  for (let index = 5; index < tableRows.length; index += 9) chunks.push(tableRows.slice(index, index + 9));
+  const tableHead = '<thead><tr><th>Tela</th><th>Status</th><th>Última comunicação</th><th>Telemetria</th><th>Tráfego</th><th>Cache</th><th>Versão do app</th><th>Origem</th><th>Tempo ativo</th></tr></thead>';
+  const firstPageHeader = `<header class="institutional"><div class="brand">${brand}</div><div class="institutional-meta"><strong>Relatório de Telemetria</strong>Relatório gerado em ${escapeHtml(date)}<br>${rows.length} tela(s)</div></header><section class="intro"><span class="eyebrow">Totem Park • Relatório operacional</span><h1>Telemetria das Telas</h1><p>Status e informações operacionais das telas do cliente</p></section><section class="client"><div><span class="eyebrow">Cliente</span><h2>${escapeHtml(clientName)}</h2></div><div class="client-logo">${clientLogoHtml}</div></section><section class="summary"><article class="online"><span>Online</span><strong>${counts.ONLINE}</strong></article><article class="attention"><span>Atenção</span><strong>${counts.ATTENTION}</strong></article><article class="offline"><span>Offline</span><strong>${counts.OFFLINE}</strong></article></section>`;
+  const pageSections = chunks.map((chunk, index) => `<section class="report-page">${index === 0 ? firstPageHeader : '<div class="continued">Telemetria das Telas <span>Continuação</span></div>'}<section class="section-title"><h2>Detalhamento das Telas</h2><p>Lista de telas, status e informações de telemetria do cliente.</p></section><div class="table-wrap"><table>${tableHead}<tbody>${chunk.join("")}</tbody></table></div><footer class="footer">${brandIcon ? `<img src="${escapeHtml(brandIcon)}" alt="">` : ""}<span>Totem Park — Park Solutions</span><span class="client-name">• ${escapeHtml(clientName)}</span><span class="site">totempark.com.br • ${escapeHtml(date)}</span><strong class="page-number">Página ${index + 1} de ${chunks.length}</strong></footer></section>`).join("");
+
+  return `<!doctype html><html lang="pt-BR"><head><meta charset="utf-8"><title>Relatório de Telemetria - Totem Park</title><style>
+@page{size:A4 portrait;margin:0}
+*{box-sizing:border-box}html,body{margin:0;padding:0}body{font:9pt Arial,Helvetica,sans-serif;color:#172743;-webkit-print-color-adjust:exact;print-color-adjust:exact}h1,h2,p{margin:0}.report-page{width:210mm;height:296mm;padding:15mm 11mm 18mm;position:relative;break-after:page;page-break-after:always;overflow:hidden}.report-page:last-of-type{break-after:auto;page-break-after:auto}.continued{display:flex;justify-content:space-between;border-bottom:1px solid #dce6ef;padding-bottom:4mm;margin-bottom:6mm;color:#11284a;font-size:12pt;font-weight:700}.continued span{font-size:8pt;color:#60718b;text-transform:uppercase;letter-spacing:1px}
+.institutional{display:flex;justify-content:space-between;align-items:center;gap:14mm;padding:0 0 5mm;border-bottom:1.3pt solid #1bb9d0}.brand{width:43mm;height:31mm;display:flex;align-items:center;justify-content:center;background:#071a37;border-radius:8pt;padding:2mm 5mm;color:white}.brand img{display:block;max-width:100%;max-height:100%;object-fit:contain}.institutional-meta{text-align:right;color:#566984;font-size:8pt;line-height:1.5}.institutional-meta strong{display:block;color:#142d52;font-size:11pt}.eyebrow{color:#0889af;text-transform:uppercase;letter-spacing:1.5px;font-size:8pt;font-weight:700}
+.intro{margin:8mm 0 6mm}.intro h1{font-size:22pt;line-height:1.16;color:#11284a;margin:2mm 0}.intro p{font-size:9pt;color:#60718b}.client{display:flex;justify-content:space-between;align-items:center;gap:7mm;background:#f3f8fc;border:1px solid #dce8f1;border-radius:9pt;padding:5mm 6mm;margin-bottom:6mm;min-height:27mm}.client h2{font-size:15pt;color:#11284a;margin-top:2mm;overflow-wrap:anywhere}.client-logo{display:flex;align-items:center;justify-content:center;width:34mm;height:20mm;flex:none}.client-logo img{max-width:100%;max-height:100%;object-fit:contain}.client-monogram{display:grid;place-items:center;width:14mm;height:14mm;border-radius:50%;background:#dcebf4;color:#426281;font-size:13pt;font-weight:700}
+.summary{display:grid;grid-template-columns:repeat(3,1fr);gap:3mm;margin-bottom:8mm}.summary article{border:1px solid #dce6ef;border-radius:8pt;padding:4mm 5mm;background:#fff}.summary span{display:block;color:#60718b;font-size:8pt;text-transform:uppercase;letter-spacing:.5px}.summary strong{font-size:20pt;line-height:1.25;color:#142d52}.summary .online strong{color:#087e55}.summary .attention strong{color:#a66900}.summary .offline strong{color:#b63848}
+.section-title{margin-bottom:3mm}.section-title h2{font-size:12pt;color:#11284a}.section-title p{font-size:8pt;color:#667891;margin-top:1mm}.table-wrap{width:100%}table{width:100%;border-collapse:collapse;table-layout:fixed;font-size:7.3pt;line-height:1.28}thead{display:table-header-group}th{background:#11284a;color:white;text-align:left;font-weight:700;padding:2.7mm 1.5mm;vertical-align:middle}td{padding:3.2mm 1.5mm;vertical-align:top;border-bottom:1px solid #e1e9f0;overflow-wrap:break-word;word-break:normal}tbody tr:nth-child(even){background:#f8fafc}tr{break-inside:avoid;page-break-inside:avoid}.screen strong{display:block;color:#11284a;font-size:7.8pt}.screen small{display:block;color:#6b7d93;font-size:6.7pt;margin-top:1mm}.badge{display:inline-flex;align-items:center;gap:1mm;font-weight:700;white-space:nowrap}.badge i{width:1.7mm;height:1.7mm;border-radius:50%;background:#9aa9b9;flex:none}.badge.online{color:#087e55}.badge.online i{background:#0fa46a}.badge.attention{color:#a66900}.badge.attention i{background:#d69a17}.badge.offline{color:#b63848}.badge.offline i{background:#dc5966}.center{text-align:center}.version{overflow-wrap:anywhere;font-size:6.7pt}.time{white-space:normal;font-weight:700;color:#142d52}
+th:nth-child(1){width:16%}th:nth-child(2){width:9%}th:nth-child(3){width:11%}th:nth-child(4){width:13%}th:nth-child(5){width:6%}th:nth-child(6){width:12%}th:nth-child(7){width:16%}th:nth-child(8){width:8%}th:nth-child(9){width:9%}
+.footer{position:absolute;bottom:11mm;left:11mm;right:11mm;height:10mm;border-top:1px solid #dce6ef;display:flex;align-items:center;gap:2mm;color:#61738b;font-size:7pt}.footer img{max-width:14mm;max-height:7mm;object-fit:contain}.footer .site{margin-left:auto}.footer .client-name{max-width:35mm;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}.page-number{margin-left:3mm;white-space:nowrap;color:#425a7a}
+@media screen{body{width:210mm;margin:auto;background:#e9eef4}.report-page{background:white;margin:6mm 0;box-shadow:0 0 25px #bbc5d5}}
+</style></head><body>${pageSections}<script>window.addEventListener("load",()=>{Promise.all(Array.from(document.images).map(image=>image.complete?Promise.resolve():new Promise(resolve=>{image.onload=resolve;image.onerror=resolve;setTimeout(resolve,5000)}))).then(()=>window.print())});</script></body></html>`;
+}

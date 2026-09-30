@@ -1,0 +1,22 @@
+#Sat Sep 26 00:30:38 BRT 2026
+base.0=C\:\\Users\\centr\\Desktop\\totem-park\\artifacts\\binary-sealed-telemetry\\stage-20260926-003029\\android\\app\\build\\intermediates\\dex\\playerTelemetryDebug\\mergeExtDexPlayerTelemetryDebug\\classes.dex
+base.1=C\:\\Users\\centr\\Desktop\\totem-park\\artifacts\\binary-sealed-telemetry\\stage-20260926-003029\\android\\app\\build\\intermediates\\dex\\playerTelemetryDebug\\mergeLibDexPlayerTelemetryDebug\\12\\classes.dex
+base.2=C\:\\Users\\centr\\Desktop\\totem-park\\artifacts\\binary-sealed-telemetry\\stage-20260926-003029\\android\\app\\build\\intermediates\\dex\\playerTelemetryDebug\\mergeLibDexPlayerTelemetryDebug\\2\\classes.dex
+base.3=C\:\\Users\\centr\\Desktop\\totem-park\\artifacts\\binary-sealed-telemetry\\stage-20260926-003029\\android\\app\\build\\intermediates\\dex\\playerTelemetryDebug\\mergeLibDexPlayerTelemetryDebug\\5\\classes.dex
+base.4=C\:\\Users\\centr\\Desktop\\totem-park\\artifacts\\binary-sealed-telemetry\\stage-20260926-003029\\android\\app\\build\\intermediates\\dex\\playerTelemetryDebug\\mergeLibDexPlayerTelemetryDebug\\8\\classes.dex
+base.5=C\:\\Users\\centr\\Desktop\\totem-park\\artifacts\\binary-sealed-telemetry\\stage-20260926-003029\\android\\app\\build\\intermediates\\dex\\playerTelemetryDebug\\mergeProjectDexPlayerTelemetryDebug\\0\\classes.dex
+base.6=C\:\\Users\\centr\\Desktop\\totem-park\\artifacts\\binary-sealed-telemetry\\stage-20260926-003029\\android\\app\\build\\intermediates\\dex\\playerTelemetryDebug\\mergeProjectDexPlayerTelemetryDebug\\9\\classes.dex
+path.0=classes.dex
+path.1=12/classes.dex
+path.2=2/classes.dex
+path.3=5/classes.dex
+path.4=8/classes.dex
+path.5=0/classes.dex
+path.6=9/classes.dex
+renamed.0=classes.dex
+renamed.1=classes2.dex
+renamed.2=classes3.dex
+renamed.3=classes4.dex
+renamed.4=classes5.dex
+renamed.5=classes6.dex
+renamed.6=classes7.dex

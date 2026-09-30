@@ -1,0 +1,6 @@
+{
+  "capturedAt": "2026-09-22T15:52:58.992Z",
+  "projectId": "totem-park",
+  "functions": [],
+  "listError": "Request to https://cloudfunctions.googleapis.com/v2/projects/totem-park/locations/-/functions had HTTP Error: 403, Cloud Functions API has not been used in project totem-park before or it is disabled. Enable it by visiting https://console.developers.google.com/apis/api/cloudfunctions.googleapis.com/overview?project=totem-park then retry. If you enabled this API recently, wait a few minutes for the action to propagate to our systems and retry."
+}

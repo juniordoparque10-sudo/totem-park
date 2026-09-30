@@ -1,0 +1,368 @@
+[
+  {
+    "path": ".env.web",
+    "uid": "bb12b324b2bd73c08d9ccbf87ce184713897c9b5",
+    "localExists": true,
+    "matches": true
+  },
+  {
+    "path": "src/assets/logo.png",
+    "uid": "ad7e25a7ec167e4541d157da21394f6eee36ac00",
+    "localExists": true,
+    "matches": true
+  },
+  {
+    "path": "src/assets/isotipo.png",
+    "uid": "cbe4b74eae9c7e06720fbee8eff2d50dafae2954",
+    "localExists": true,
+    "matches": true
+  },
+  {
+    "path": "src/assets/favicon.png",
+    "uid": "da39a3ee5e6b4b0d3255bfef95601890afd80709",
+    "localExists": true,
+    "matches": true
+  },
+  {
+    "path": "src/assets/hero.png",
+    "uid": "013c992c30720bf156b62bd4c8a2760e71fe842a",
+    "localExists": true,
+    "matches": true
+  },
+  {
+    "path": "src/assets/react.svg",
+    "uid": "f505ddc8ebe56bdc51efb721ef04923a8d3068dd",
+    "localExists": true,
+    "matches": true
+  },
+  {
+    "path": "src/assets/vite.svg",
+    "uid": "f08775d18b2161f769267bdc0ebdbcf7aa632099",
+    "localExists": true,
+    "matches": true
+  },
+  {
+    "path": "src/App.css",
+    "uid": "66c48528eefae6fd541a62058e6eb377b8673294",
+    "localExists": true,
+    "matches": true
+  },
+  {
+    "path": "src/App.jsx",
+    "uid": "cf6760ef4d812d8b596510b3afdbb307cb42bd30",
+    "localExists": true,
+    "matches": false
+  },
+  {
+    "path": "src/UploadLimitDialog.jsx",
+    "uid": "7644c81bac617e6554ffdf24fc25b4ca7ecb7007",
+    "localExists": true,
+    "matches": true
+  },
+  {
+    "path": "src/firebase.js",
+    "uid": "4b9486e22b77f5b71788d8d6916f1c014cf9209a",
+    "localExists": true,
+    "matches": true
+  },
+  {
+    "path": "src/firestore-cache-policy.js",
+    "uid": "86e9750b0833d12f3c355d4f7ef5aee1dd5351ca",
+    "localExists": true,
+    "matches": true
+  },
+  {
+    "path": "src/index.css",
+    "uid": "42d1b78b94526135ec1ff4e63781742471ca23ab",
+    "localExists": true,
+    "matches": true
+  },
+  {
+    "path": "src/main.jsx",
+    "uid": "1e80c7dbd4d65482895c5d1431331f59bbed53f4",
+    "localExists": true,
+    "matches": true
+  },
+  {
+    "path": "src/offline-player-cache.js",
+    "uid": "930567ee14b34b041aaaeaf56209b90974d205eb",
+    "localExists": true,
+    "matches": false
+  },
+  {
+    "path": "src/pwa-register.js",
+    "uid": "50d3f69dd81ee17a1b617987fa6e8c20079296c7",
+    "localExists": true,
+    "matches": true
+  },
+  {
+    "path": "src/storage-service.js",
+    "uid": "e1b9800a2b785c1fc136fc1adc33188d9180407e",
+    "localExists": true,
+    "matches": true
+  },
+  {
+    "path": "src/upload-limit-dialog.css",
+    "uid": "ed64338535f4c08edc1a82099644020d69644f07",
+    "localExists": true,
+    "matches": true
+  },
+  {
+    "path": "src/upload-plan-policy.js",
+    "uid": "8f70e1ebeb151ae17a104d6cf378e7eadafd680a",
+    "localExists": true,
+    "matches": true
+  },
+  {
+    "path": "public/favicon.png",
+    "uid": "f38fa015c2cd3e2d83f8caf7641304ec59d685b1",
+    "localExists": true,
+    "matches": true
+  },
+  {
+    "path": "public/icons/icon-32.png",
+    "uid": "f38fa015c2cd3e2d83f8caf7641304ec59d685b1",
+    "localExists": true,
+    "matches": true
+  },
+  {
+    "path": "public/icons/site-icon-32.png",
+    "uid": "f38fa015c2cd3e2d83f8caf7641304ec59d685b1",
+    "localExists": true,
+    "matches": true
+  },
+  {
+    "path": "public/icons/icon-192.png",
+    "uid": "aa6a651721c74ecde56bbfa03a4fcf2d923574b9",
+    "localExists": true,
+    "matches": true
+  },
+  {
+    "path": "public/icons/site-icon-192.png",
+    "uid": "aa6a651721c74ecde56bbfa03a4fcf2d923574b9",
+    "localExists": true,
+    "matches": true
+  },
+  {
+    "path": "public/icons/icon-512.png",
+    "uid": "01ae4a47077294bdd437dafaa77210187b57b10d",
+    "localExists": true,
+    "matches": true
+  },
+  {
+    "path": "public/icons/site-icon-512.png",
+    "uid": "01ae4a47077294bdd437dafaa77210187b57b10d",
+    "localExists": true,
+    "matches": true
+  },
+  {
+    "path": "public/icons/site-icon-128.png",
+    "uid": "0fe60725eff8369bc3b9fcdd00fa95b255921830",
+    "localExists": true,
+    "matches": true
+  },
+  {
+    "path": "public/icons/site-icon-144.png",
+    "uid": "dff2d3f2dfb2b87e36f2771e6754c455c4fd2b04",
+    "localExists": true,
+    "matches": true
+  },
+  {
+    "path": "public/icons/site-icon-180.png",
+    "uid": "9ea01b34a3cb20ef18fa0fbd67973d290f585d3a",
+    "localExists": true,
+    "matches": true
+  },
+  {
+    "path": "public/icons/site-icon-256.png",
+    "uid": "e3185be5040700e4bf83143dd90efc40cbb4ac8f",
+    "localExists": true,
+    "matches": true
+  },
+  {
+    "path": "public/icons/site-icon-384.png",
+    "uid": "599084d352263fd55176a84f0a5b805a2b791a51",
+    "localExists": true,
+    "matches": true
+  },
+  {
+    "path": "public/icons/site-icon-48.png",
+    "uid": "893c57f2617da9a19e2f29bdc31f628491627a28",
+    "localExists": true,
+    "matches": true
+  },
+  {
+    "path": "public/icons/site-icon-72.png",
+    "uid": "0d31510b9e4d85acd5186225bc53a3b967eb6c67",
+    "localExists": true,
+    "matches": true
+  },
+  {
+    "path": "public/icons/site-icon-96.png",
+    "uid": "b59f7c14d6e04984a06afef43babf29df538737d",
+    "localExists": true,
+    "matches": true
+  },
+  {
+    "path": "public/icons/site-maskable-512.png",
+    "uid": "d773534a30b1c8bd127695285de3ddc75dfce7ef",
+    "localExists": true,
+    "matches": true
+  },
+  {
+    "path": "public/icons/site-tv-card-640x360.png",
+    "uid": "519591a9da53be05d4d301885f14de4a037a51a4",
+    "localExists": true,
+    "matches": true
+  },
+  {
+    "path": "public/icons/tv-icon-128.png",
+    "uid": "1454f3e5dfda970fd908dc735bc38e3988904743",
+    "localExists": true,
+    "matches": true
+  },
+  {
+    "path": "public/icons/tv-icon-144.png",
+    "uid": "7c27952d1776a1117ebe21c5acd86c21cde66cbf",
+    "localExists": true,
+    "matches": true
+  },
+  {
+    "path": "public/icons/tv-icon-180.png",
+    "uid": "85d038414bcd30fd44c563135297936a6dcf4625",
+    "localExists": true,
+    "matches": true
+  },
+  {
+    "path": "public/icons/tv-icon-192.png",
+    "uid": "8d9d1cf6fb05f897fadbcb098efa8c84d9ac6924",
+    "localExists": true,
+    "matches": true
+  },
+  {
+    "path": "public/icons/tv-icon-256.png",
+    "uid": "a46f74fb62930a162456c63fc4548ccb9fccfbb2",
+    "localExists": true,
+    "matches": true
+  },
+  {
+    "path": "public/icons/tv-icon-32.png",
+    "uid": "5f0eed81cfe82f7c3e9d4fbd54b56e85c7d01833",
+    "localExists": true,
+    "matches": true
+  },
+  {
+    "path": "public/icons/tv-icon-384.png",
+    "uid": "e93ffc7008d3bf80eb0d566a336b2a03f217b612",
+    "localExists": true,
+    "matches": true
+  },
+  {
+    "path": "public/icons/tv-icon-48.png",
+    "uid": "3df068fdd18f66f6a02b81100f37b92d43bdddec",
+    "localExists": true,
+    "matches": true
+  },
+  {
+    "path": "public/icons/tv-icon-512.png",
+    "uid": "551280f9689ed97c8c06a748d43f98a86a171296",
+    "localExists": true,
+    "matches": true
+  },
+  {
+    "path": "public/icons/tv-icon-72.png",
+    "uid": "fab5d6235b9b842e947d028ff429c04f56c0ce1a",
+    "localExists": true,
+    "matches": true
+  },
+  {
+    "path": "public/icons/tv-icon-96.png",
+    "uid": "dd5b7644703870e8e0bfe5266173b8cfc73a1a71",
+    "localExists": true,
+    "matches": true
+  },
+  {
+    "path": "public/icons/tv-maskable-512.png",
+    "uid": "d6fd1a3fa28bdc46959a4fd93b2260d97dd4e504",
+    "localExists": true,
+    "matches": true
+  },
+  {
+    "path": "public/icons/tv-tv-card-640x360.png",
+    "uid": "5eff8f47a95049ad55a276fa9e418acdbc30582e",
+    "localExists": true,
+    "matches": true
+  },
+  {
+    "path": "public/favicon.svg",
+    "uid": "3f5bb8f3a6a05b7ca68a62581d2dd5bc88812caf",
+    "localExists": true,
+    "matches": true
+  },
+  {
+    "path": "public/icons.svg",
+    "uid": "f9897ac25e13de9ea601d2f1ac5d9353dfbefcda",
+    "localExists": true,
+    "matches": true
+  },
+  {
+    "path": "public/isotipo.png",
+    "uid": "cbe4b74eae9c7e06720fbee8eff2d50dafae2954",
+    "localExists": true,
+    "matches": true
+  },
+  {
+    "path": "public/logo.png",
+    "uid": "cbe4b74eae9c7e06720fbee8eff2d50dafae2954",
+    "localExists": true,
+    "matches": true
+  },
+  {
+    "path": "public/manifest-tv.webmanifest",
+    "uid": "651c98b0e3a62014e57e6c6afc3cf0163c9949e7",
+    "localExists": true,
+    "matches": true
+  },
+  {
+    "path": "public/manifest.webmanifest",
+    "uid": "61d17b146d869b1085cd07cb3388396ec1880b32",
+    "localExists": true,
+    "matches": true
+  },
+  {
+    "path": "public/sw.js",
+    "uid": "be19e3dc7889799f419d8907b48c93b0500bef54",
+    "localExists": true,
+    "matches": false
+  },
+  {
+    "path": "index.html",
+    "uid": "2c36307d1889742a295d4d4cb2da0aab9e1ca38a",
+    "localExists": true,
+    "matches": true
+  },
+  {
+    "path": "package-lock.json",
+    "uid": "1bfb161652ebb8b140f9d4e84a289e086aae65b8",
+    "localExists": true,
+    "matches": true
+  },
+  {
+    "path": "package.json",
+    "uid": "a053752cca999a7f8f6c1abac1d8bc5a0f22dc3d",
+    "localExists": true,
+    "matches": true
+  },
+  {
+    "path": "vercel.json",
+    "uid": "6ed303d3df18a8a55ec93a45f89f0db67a4ea752",
+    "localExists": true,
+    "matches": true
+  },
+  {
+    "path": "vite.config.js",
+    "uid": "2eaa6199953a3624601a25e1158fa4a21d9188a0",
+    "localExists": true,
+    "matches": true
+  }
+]

@@ -1,0 +1,9 @@
+{
+  "changedExistingFiles": [
+    "public/sw.js",
+    "src/offline-player-cache.js"
+  ],
+  "sharedSourceOtherwiseIdentical": true,
+  "nativeSectionIdentical": true,
+  "beforeFiles": 526
+}

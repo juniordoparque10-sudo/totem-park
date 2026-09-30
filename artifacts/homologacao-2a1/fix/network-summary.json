@@ -1,0 +1,63 @@
+{
+  "cachedAt": "2026-09-16T14:30:56.465Z",
+  "videoAdditionalBodyBytes": 0,
+  "imageAdditionalBodyBytes": 0,
+  "cdpRequests": [
+    {
+      "at": 1789569090306,
+      "url": "http://127.0.0.1:5199/media/video01.webm",
+      "encodedBodyBytes": 0,
+      "decodedBodyBytes": 27656,
+      "status": 206,
+      "sw": true,
+      "disk": false,
+      "transferBytes": 0
+    },
+    {
+      "at": 1789569131714,
+      "url": "http://127.0.0.1:5199/media/video01.webm",
+      "encodedBodyBytes": 0,
+      "decodedBodyBytes": 27656,
+      "status": 206,
+      "sw": true,
+      "disk": false,
+      "transferBytes": 0
+    },
+    {
+      "at": 1789569203239,
+      "url": "http://127.0.0.1:5199/media/video01.webm",
+      "encodedBodyBytes": 0,
+      "decodedBodyBytes": 0
+    }
+  ],
+  "serverRequests": [
+    {
+      "at": "2026-09-16T14:31:30.310Z",
+      "path": "/media/video01.webm",
+      "method": "GET",
+      "range": "bytes=0-27655",
+      "ifNoneMatch": "\"fixture-video01.webm-27656\"",
+      "status": 304,
+      "bodyBytes": 0
+    },
+    {
+      "at": "2026-09-16T14:32:11.716Z",
+      "path": "/media/video01.webm",
+      "method": "GET",
+      "range": "bytes=0-27655",
+      "ifNoneMatch": "\"fixture-video01.webm-27656\"",
+      "status": 304,
+      "bodyBytes": 0
+    },
+    {
+      "at": "2026-09-16T14:33:23.247Z",
+      "path": "/media/video01.webm",
+      "method": "GET",
+      "range": "bytes=0-27655",
+      "ifNoneMatch": "\"fixture-video01.webm-27656\"",
+      "status": 304,
+      "bodyBytes": 0
+    }
+  ],
+  "scope": "Media payload bytes, excluding HTTP headers; preparation and isolated decode matrix excluded"
+}

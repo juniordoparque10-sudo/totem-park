@@ -1,6 +1,13 @@
 import test from "node:test";
 import assert from "node:assert/strict";
-import { comparePortalScreens, compareTelemetryScreens, getPortalScreenStatus, getTelemetryVisualState } from "./portal-status.js";
+import { comparePortalScreens, compareTelemetryScreens, getPortalLastSignalMs, getPortalScreenStatus, getTelemetryVisualState } from "./portal-status.js";
+
+const v5Screen = (now, overrides = {}) => ({
+  id: "screen", clientId: "client", connectedDeviceId: "device", lastSeenAt: now - 200_000,
+  telemetryUpdatedAt: now - 10_000,
+  telemetry: { schemaVersion: 3, current: { connectionStatus: "ONLINE" }, session: { screenId: "screen", clientId: "client", deviceId: "device" } },
+  ...overrides,
+});
 
 test("stale telemetry cannot make a connected screen offline", () => {
   const now = 1_000_000;
@@ -10,11 +17,50 @@ test("stale telemetry cannot make a connected screen offline", () => {
   assert.equal(getTelemetryVisualState({ screen, config, now }), "STALE");
 });
 
-test("recent telemetry does not hide a missing Player heartbeat", () => {
+test("first matching V5 checkpoint makes a screen online without waiting for Player heartbeat", () => {
   const now = 1_000_000;
-  const screen = { id: "screen", clientId: "client", lastSeenAt: now - 200_000, telemetryUpdatedAt: now - 10_000, telemetry: { schemaVersion: 3 } };
-  assert.equal(getPortalScreenStatus(screen, now), "OFFLINE");
+  const screen = v5Screen(now);
+  assert.equal(getPortalLastSignalMs(screen), now - 10_000);
+  assert.equal(getPortalScreenStatus(screen, now), "ONLINE");
   assert.equal(getTelemetryVisualState({ screen, config: { enabled: true, screenIds: ["screen"] }, now }), "ACTIVE");
+});
+
+test("V5 checkpoint uses 45-second attention and 90-second offline boundaries", () => {
+  const now = 1_000_000;
+  const screen = v5Screen(now);
+  assert.equal(getPortalScreenStatus(screen, now + 34_000), "ONLINE");
+  assert.equal(getPortalScreenStatus(screen, now + 35_000), "ATTENTION");
+  assert.equal(getPortalScreenStatus(screen, now + 79_000), "ATTENTION");
+  assert.equal(getPortalScreenStatus(screen, now + 80_000), "OFFLINE");
+  screen.telemetryUpdatedAt = now + 80_000;
+  assert.equal(getPortalScreenStatus(screen, now + 80_000), "ONLINE");
+});
+
+test("old, unmatched or legacy telemetry cannot replace Player presence", () => {
+  const now = 1_000_000;
+  assert.equal(getPortalScreenStatus(v5Screen(now, { telemetryUpdatedAt: now - 200_000 }), now), "OFFLINE");
+  assert.equal(getPortalScreenStatus(v5Screen(now, { telemetry: { schemaVersion: 3, current: { connectionStatus: "ONLINE" }, session: { screenId: "other", clientId: "client", deviceId: "device" } } }), now), "OFFLINE");
+  assert.equal(getPortalScreenStatus(v5Screen(now, { telemetry: { schemaVersion: 2 }, lastSeenAt: now - 10_000 }), now), "ONLINE");
+  assert.equal(getPortalScreenStatus(v5Screen(now, { telemetry: { schemaVersion: 2 } }), now), "OFFLINE");
+  const legacy = v5Screen(now, { telemetry: { schemaVersion: 2 }, lastSeenAt: now - 44_000 });
+  assert.equal(getPortalScreenStatus(legacy, now), "ONLINE");
+  legacy.lastSeenAt = now - 45_000;
+  assert.equal(getPortalScreenStatus(legacy, now), "ATTENTION");
+  legacy.lastSeenAt = now - 89_000;
+  assert.equal(getPortalScreenStatus(legacy, now), "ATTENTION");
+  legacy.lastSeenAt = now - 90_000;
+  assert.equal(getPortalScreenStatus(legacy, now), "OFFLINE");
+});
+
+test("V5 checkpoints change presence without reordering screens that remain online", () => {
+  const now = 1_000_000;
+  const first = v5Screen(now, { id: "a", name: "TV A", clientName: "ECO", telemetry: { schemaVersion: 3, current: { connectionStatus: "ONLINE" }, session: { screenId: "a", clientId: "client", deviceId: "device" } } });
+  const second = v5Screen(now, { id: "b", name: "TV B", clientName: "ECO", telemetry: { schemaVersion: 3, current: { connectionStatus: "ONLINE" }, session: { screenId: "b", clientId: "client", deviceId: "device" } } });
+  const order = () => [second, first].sort((left, right) => comparePortalScreens(left, right, now)).map((screen) => screen.id);
+  assert.deepEqual(order(), ["a", "b"]);
+  second.telemetryUpdatedAt = now - 1_000;
+  first.telemetryUpdatedAt = now - 5_000;
+  assert.deepEqual(order(), ["a", "b"]);
 });
 
 test("online screens stay alphabetical as heartbeats change", () => {

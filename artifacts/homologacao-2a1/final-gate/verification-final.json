@@ -1,0 +1,738 @@
+{
+  "checks": [
+    {
+      "name": "Runner completed",
+      "result": "PASSOU"
+    },
+    {
+      "name": "Fresh media cache",
+      "result": "PASSOU"
+    },
+    {
+      "name": "First preparation stored both files",
+      "result": "PASSOU"
+    },
+    {
+      "name": "online-ten",
+      "result": "PASSOU"
+    },
+    {
+      "name": "restart-five",
+      "result": "PASSOU"
+    },
+    {
+      "name": "offline-ten",
+      "result": "PASSOU"
+    },
+    {
+      "name": "Complete process exit and persistence",
+      "result": "PASSOU"
+    },
+    {
+      "name": "Offline remote request rejected",
+      "result": "PASSOU"
+    },
+    {
+      "name": "online-ten stable media payload zero",
+      "result": "PASSOU"
+    },
+    {
+      "name": "reload stable media payload zero",
+      "result": "PASSOU"
+    },
+    {
+      "name": "restartPlayback stable media payload zero",
+      "result": "PASSOU"
+    },
+    {
+      "name": "offline-ten stable media payload zero",
+      "result": "PASSOU"
+    },
+    {
+      "name": "changed stable media payload zero",
+      "result": "PASSOU"
+    },
+    {
+      "name": "ownershipUpdate stable media payload zero",
+      "result": "PASSOU"
+    },
+    {
+      "name": "Playlist addition only new image",
+      "result": "PASSOU"
+    },
+    {
+      "name": "Second screen preserved",
+      "result": "PASSOU"
+    },
+    {
+      "name": "Second client preserved",
+      "result": "PASSOU"
+    },
+    {
+      "name": "All 519 product files unchanged during gate",
+      "result": "PASSOU"
+    },
+    {
+      "name": "Heartbeat observed",
+      "result": "PASSOU"
+    },
+    {
+      "name": "Real SW installation/activation on static page",
+      "result": "PASSOU",
+      "evidence": "sw-activation.json"
+    },
+    {
+      "name": "Production Web build",
+      "result": "PASSOU",
+      "command": "npm.cmd run build",
+      "warning": "Bundle larger than 500 kB; preexisting"
+    },
+    {
+      "name": "Native behavior analysis",
+      "result": "PASSOU",
+      "evidence": "../fix/product-comparison.json; Native image ref is undefined"
+    }
+  ],
+  "decision": "APROVADO",
+  "cycles": {
+    "online-ten": [
+      {
+        "cycle": 1,
+        "start": 1789569576980,
+        "end": 1789569581581,
+        "videoVisible": true,
+        "imageVisible": true,
+        "advance": true,
+        "pending": false,
+        "error": false,
+        "complete": true,
+        "naturalWidthPositive": true,
+        "blobLocal": true,
+        "videoEnded": true
+      },
+      {
+        "cycle": 2,
+        "start": 1789569581581,
+        "end": 1789569586180,
+        "videoVisible": true,
+        "imageVisible": true,
+        "advance": true,
+        "pending": false,
+        "error": false,
+        "complete": true,
+        "naturalWidthPositive": true,
+        "blobLocal": true,
+        "videoEnded": true
+      },
+      {
+        "cycle": 3,
+        "start": 1789569586180,
+        "end": 1789569590881,
+        "videoVisible": true,
+        "imageVisible": true,
+        "advance": true,
+        "pending": false,
+        "error": false,
+        "complete": true,
+        "naturalWidthPositive": true,
+        "blobLocal": true,
+        "videoEnded": true
+      },
+      {
+        "cycle": 4,
+        "start": 1789569590881,
+        "end": 1789569595480,
+        "videoVisible": true,
+        "imageVisible": true,
+        "advance": true,
+        "pending": false,
+        "error": false,
+        "complete": true,
+        "naturalWidthPositive": true,
+        "blobLocal": true,
+        "videoEnded": true
+      },
+      {
+        "cycle": 5,
+        "start": 1789569595480,
+        "end": 1789569600180,
+        "videoVisible": true,
+        "imageVisible": true,
+        "advance": true,
+        "pending": false,
+        "error": false,
+        "complete": true,
+        "naturalWidthPositive": true,
+        "blobLocal": true,
+        "videoEnded": true
+      },
+      {
+        "cycle": 6,
+        "start": 1789569600180,
+        "end": 1789569604780,
+        "videoVisible": true,
+        "imageVisible": true,
+        "advance": true,
+        "pending": false,
+        "error": false,
+        "complete": true,
+        "naturalWidthPositive": true,
+        "blobLocal": true,
+        "videoEnded": true
+      },
+      {
+        "cycle": 7,
+        "start": 1789569604780,
+        "end": 1789569609480,
+        "videoVisible": true,
+        "imageVisible": true,
+        "advance": true,
+        "pending": false,
+        "error": false,
+        "complete": true,
+        "naturalWidthPositive": true,
+        "blobLocal": true,
+        "videoEnded": true
+      },
+      {
+        "cycle": 8,
+        "start": 1789569609480,
+        "end": 1789569614080,
+        "videoVisible": true,
+        "imageVisible": true,
+        "advance": true,
+        "pending": false,
+        "error": false,
+        "complete": true,
+        "naturalWidthPositive": true,
+        "blobLocal": true,
+        "videoEnded": true
+      },
+      {
+        "cycle": 9,
+        "start": 1789569614080,
+        "end": 1789569618681,
+        "videoVisible": true,
+        "imageVisible": true,
+        "advance": true,
+        "pending": false,
+        "error": false,
+        "complete": true,
+        "naturalWidthPositive": true,
+        "blobLocal": true,
+        "videoEnded": true
+      },
+      {
+        "cycle": 10,
+        "start": 1789569618681,
+        "end": 1789569623380,
+        "videoVisible": true,
+        "imageVisible": true,
+        "advance": true,
+        "pending": false,
+        "error": false,
+        "complete": true,
+        "naturalWidthPositive": true,
+        "blobLocal": true,
+        "videoEnded": true
+      },
+      {
+        "cycle": 11,
+        "start": 1789569623380,
+        "end": 1789569627980,
+        "videoVisible": true,
+        "imageVisible": true,
+        "advance": true,
+        "pending": false,
+        "error": false,
+        "complete": true,
+        "naturalWidthPositive": true,
+        "blobLocal": true,
+        "videoEnded": true
+      }
+    ],
+    "reload": [
+      {
+        "cycle": 1,
+        "start": 1789569634277,
+        "end": 1789569638876,
+        "videoVisible": true,
+        "imageVisible": true,
+        "advance": true,
+        "pending": false,
+        "error": false,
+        "complete": true,
+        "naturalWidthPositive": true,
+        "blobLocal": true,
+        "videoEnded": true
+      },
+      {
+        "cycle": 2,
+        "start": 1789569638876,
+        "end": 1789569643477,
+        "videoVisible": true,
+        "imageVisible": true,
+        "advance": true,
+        "pending": false,
+        "error": false,
+        "complete": true,
+        "naturalWidthPositive": true,
+        "blobLocal": true,
+        "videoEnded": true
+      },
+      {
+        "cycle": 3,
+        "start": 1789569643477,
+        "end": 1789569648180,
+        "videoVisible": true,
+        "imageVisible": true,
+        "advance": true,
+        "pending": false,
+        "error": false,
+        "complete": true,
+        "naturalWidthPositive": true,
+        "blobLocal": true,
+        "videoEnded": true
+      },
+      {
+        "cycle": 4,
+        "start": 1789569648180,
+        "end": 1789569652781,
+        "videoVisible": true,
+        "imageVisible": true,
+        "advance": true,
+        "pending": false,
+        "error": false,
+        "complete": true,
+        "naturalWidthPositive": true,
+        "blobLocal": true,
+        "videoEnded": true
+      }
+    ],
+    "restart-five": [
+      {
+        "cycle": 1,
+        "start": 1789569664380,
+        "end": 1789569668980,
+        "videoVisible": true,
+        "imageVisible": true,
+        "advance": true,
+        "pending": false,
+        "error": false,
+        "complete": true,
+        "naturalWidthPositive": true,
+        "blobLocal": true,
+        "videoEnded": true
+      },
+      {
+        "cycle": 2,
+        "start": 1789569668980,
+        "end": 1789569673680,
+        "videoVisible": true,
+        "imageVisible": true,
+        "advance": true,
+        "pending": false,
+        "error": false,
+        "complete": true,
+        "naturalWidthPositive": true,
+        "blobLocal": true,
+        "videoEnded": true
+      },
+      {
+        "cycle": 3,
+        "start": 1789569673680,
+        "end": 1789569678279,
+        "videoVisible": true,
+        "imageVisible": true,
+        "advance": true,
+        "pending": false,
+        "error": false,
+        "complete": true,
+        "naturalWidthPositive": true,
+        "blobLocal": true,
+        "videoEnded": true
+      },
+      {
+        "cycle": 4,
+        "start": 1789569678279,
+        "end": 1789569682880,
+        "videoVisible": true,
+        "imageVisible": true,
+        "advance": true,
+        "pending": false,
+        "error": false,
+        "complete": true,
+        "naturalWidthPositive": true,
+        "blobLocal": true,
+        "videoEnded": true
+      },
+      {
+        "cycle": 5,
+        "start": 1789569682880,
+        "end": 1789569687579,
+        "videoVisible": true,
+        "imageVisible": true,
+        "advance": true,
+        "pending": false,
+        "error": false,
+        "complete": true,
+        "naturalWidthPositive": true,
+        "blobLocal": true,
+        "videoEnded": true
+      },
+      {
+        "cycle": 6,
+        "start": 1789569687579,
+        "end": 1789569692179,
+        "videoVisible": true,
+        "imageVisible": true,
+        "advance": true,
+        "pending": false,
+        "error": false,
+        "complete": true,
+        "naturalWidthPositive": true,
+        "blobLocal": true,
+        "videoEnded": true
+      }
+    ],
+    "offline-ten": [
+      {
+        "cycle": 1,
+        "start": 1789569696893,
+        "end": 1789569701482,
+        "videoVisible": true,
+        "imageVisible": true,
+        "advance": true,
+        "pending": false,
+        "error": false,
+        "complete": true,
+        "naturalWidthPositive": true,
+        "blobLocal": true,
+        "videoEnded": true
+      },
+      {
+        "cycle": 2,
+        "start": 1789569701482,
+        "end": 1789569706079,
+        "videoVisible": true,
+        "imageVisible": true,
+        "advance": true,
+        "pending": false,
+        "error": false,
+        "complete": true,
+        "naturalWidthPositive": true,
+        "blobLocal": true,
+        "videoEnded": true
+      },
+      {
+        "cycle": 3,
+        "start": 1789569706079,
+        "end": 1789569710791,
+        "videoVisible": true,
+        "imageVisible": true,
+        "advance": true,
+        "pending": false,
+        "error": false,
+        "complete": true,
+        "naturalWidthPositive": true,
+        "blobLocal": true,
+        "videoEnded": true
+      },
+      {
+        "cycle": 4,
+        "start": 1789569710791,
+        "end": 1789569715390,
+        "videoVisible": true,
+        "imageVisible": true,
+        "advance": true,
+        "pending": false,
+        "error": false,
+        "complete": true,
+        "naturalWidthPositive": true,
+        "blobLocal": true,
+        "videoEnded": true
+      },
+      {
+        "cycle": 5,
+        "start": 1789569715390,
+        "end": 1789569720083,
+        "videoVisible": true,
+        "imageVisible": true,
+        "advance": true,
+        "pending": false,
+        "error": false,
+        "complete": true,
+        "naturalWidthPositive": true,
+        "blobLocal": true,
+        "videoEnded": true
+      },
+      {
+        "cycle": 6,
+        "start": 1789569720083,
+        "end": 1789569724685,
+        "videoVisible": true,
+        "imageVisible": true,
+        "advance": true,
+        "pending": false,
+        "error": false,
+        "complete": true,
+        "naturalWidthPositive": true,
+        "blobLocal": true,
+        "videoEnded": true
+      },
+      {
+        "cycle": 7,
+        "start": 1789569724685,
+        "end": 1789569729281,
+        "videoVisible": true,
+        "imageVisible": true,
+        "advance": true,
+        "pending": false,
+        "error": false,
+        "complete": true,
+        "naturalWidthPositive": true,
+        "blobLocal": true,
+        "videoEnded": true
+      },
+      {
+        "cycle": 8,
+        "start": 1789569729281,
+        "end": 1789569733981,
+        "videoVisible": true,
+        "imageVisible": true,
+        "advance": true,
+        "pending": false,
+        "error": false,
+        "complete": true,
+        "naturalWidthPositive": true,
+        "blobLocal": true,
+        "videoEnded": true
+      },
+      {
+        "cycle": 9,
+        "start": 1789569733981,
+        "end": 1789569738585,
+        "videoVisible": true,
+        "imageVisible": true,
+        "advance": true,
+        "pending": false,
+        "error": false,
+        "complete": true,
+        "naturalWidthPositive": true,
+        "blobLocal": true,
+        "videoEnded": true
+      },
+      {
+        "cycle": 10,
+        "start": 1789569738585,
+        "end": 1789569743280,
+        "videoVisible": true,
+        "imageVisible": true,
+        "advance": true,
+        "pending": false,
+        "error": false,
+        "complete": true,
+        "naturalWidthPositive": true,
+        "blobLocal": true,
+        "videoEnded": true
+      },
+      {
+        "cycle": 11,
+        "start": 1789569743280,
+        "end": 1789569747886,
+        "videoVisible": true,
+        "imageVisible": true,
+        "advance": true,
+        "pending": false,
+        "error": false,
+        "complete": true,
+        "naturalWidthPositive": true,
+        "blobLocal": true,
+        "videoEnded": true
+      }
+    ],
+    "playlist-add-one": [
+      {
+        "cycle": 1,
+        "start": 1789569756179,
+        "end": 1789569763781,
+        "videoVisible": true,
+        "imageVisible": true,
+        "advance": true,
+        "pending": false,
+        "error": false,
+        "complete": true,
+        "naturalWidthPositive": true,
+        "blobLocal": true,
+        "videoEnded": true
+      }
+    ]
+  },
+  "transfers": {
+    "preparation": {
+      "rows": [
+        {
+          "at": "2026-09-16T14:39:30.891Z",
+          "path": "/media/video01.webm",
+          "method": "GET",
+          "range": "bytes=0-",
+          "ifNoneMatch": null,
+          "status": 206,
+          "bodyBytes": 27656
+        },
+        {
+          "at": "2026-09-16T14:39:31.013Z",
+          "path": "/media/video01.webm",
+          "method": "GET",
+          "range": null,
+          "ifNoneMatch": null,
+          "status": 200,
+          "bodyBytes": 27656
+        },
+        {
+          "at": "2026-09-16T14:39:31.046Z",
+          "path": "/media/imagem01.png",
+          "method": "GET",
+          "range": null,
+          "ifNoneMatch": null,
+          "status": 200,
+          "bodyBytes": 15649
+        }
+      ],
+      "video01": 55312,
+      "imagem01": 15649,
+      "byPath": {
+        "/media/video01.webm": 55312,
+        "/media/imagem01.png": 15649
+      }
+    },
+    "online-ten": {
+      "rows": [],
+      "video01": 0,
+      "imagem01": 0,
+      "byPath": {}
+    },
+    "reload": {
+      "rows": [
+        {
+          "at": "2026-09-16T14:40:29.536Z",
+          "path": "/media/video01.webm",
+          "method": "GET",
+          "range": "bytes=0-27655",
+          "ifNoneMatch": "\"fixture-video01.webm-27656\"",
+          "status": 304,
+          "bodyBytes": 0
+        }
+      ],
+      "video01": 0,
+      "imagem01": 0,
+      "byPath": {
+        "/media/video01.webm": 0
+      }
+    },
+    "restart-five": {
+      "rows": [],
+      "video01": 0,
+      "imagem01": 0,
+      "byPath": {}
+    },
+    "offline-ten": {
+      "rows": [],
+      "video01": 0,
+      "imagem01": 0,
+      "byPath": {}
+    },
+    "playlist-add-one": {
+      "rows": [],
+      "video01": 0,
+      "imagem01": 0,
+      "byPath": {}
+    },
+    "restartPlayback": {
+      "rows": [
+        {
+          "at": "2026-09-16T14:40:59.571Z",
+          "path": "/media/video01.webm",
+          "method": "GET",
+          "range": "bytes=0-27655",
+          "ifNoneMatch": "\"fixture-video01.webm-27656\"",
+          "status": 304,
+          "bodyBytes": 0
+        }
+      ],
+      "video01": 0,
+      "imagem01": 0,
+      "byPath": {
+        "/media/video01.webm": 0
+      }
+    },
+    "changed": {
+      "rows": [
+        {
+          "at": "2026-09-16T14:42:30.113Z",
+          "path": "/media/imagem02.png",
+          "method": "GET",
+          "range": null,
+          "ifNoneMatch": null,
+          "status": 200,
+          "bodyBytes": 16044
+        }
+      ],
+      "video01": 0,
+      "imagem01": 0,
+      "byPath": {
+        "/media/imagem02.png": 16044
+      }
+    },
+    "ownershipUpdate": {
+      "rows": [
+        {
+          "at": "2026-09-16T14:42:56.311Z",
+          "path": "/media/imagemNova.png",
+          "method": "GET",
+          "range": null,
+          "ifNoneMatch": null,
+          "status": 200,
+          "bodyBytes": 16378
+        }
+      ],
+      "video01": 0,
+      "imagem01": 0,
+      "byPath": {
+        "/media/imagemNova.png": 16378
+      }
+    }
+  },
+  "product": {
+    "checked": 519,
+    "changed": []
+  },
+  "firestore": {
+    "primaryLeaseCount": 0,
+    "primaryLease": [],
+    "heartbeat": {
+      "before": {
+        "timestampValue": "2026-09-16T14:39:31.021Z"
+      },
+      "afterOnline": {
+        "timestampValue": "2026-09-16T14:40:15.846Z"
+      },
+      "final": {
+        "timestampValue": "2026-09-16T14:42:59.524Z"
+      }
+    },
+    "realtime": "Playlist changed without reload; new Blob images observed"
+  },
+  "cache": {
+    "initialBytes": 0,
+    "preparedBytes": 43305,
+    "finalBytes": 144529,
+    "finalEntries": 7
+  },
+  "initialSWAttempt": {
+    "result": "INCONCLUSIVO",
+    "detail": "Same existing worker remained active; no activation occurred. Original failed assertion preserved in verification.json. Actual fresh activation validated subsequently without editing SW."
+  },
+  "swActivation": "PASSOU",
+  "scope": "Gate local; no deploy, APK, commit or product code edits"
+}

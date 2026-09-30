@@ -1,0 +1,1 @@
+import fs from 'node:fs';const dir='artifacts/publicacao-2a1/release/dist/assets',f=fs.readdirSync(dir).find(x=>/^index.*js$/.test(x)),s=fs.readFileSync(dir+'/'+f,'utf8');const i=s.indexOf('totem-park.firebaseapp.com');console.log(i,s.slice(i-300,i+1350));

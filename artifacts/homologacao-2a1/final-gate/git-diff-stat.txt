@@ -1,0 +1,36 @@
+ android/app/build.gradle                           |   33 +
+ android/app/src/main/AndroidManifest.xml           |   23 +-
+ android/app/src/main/ic_launcher-playstore.png     |  Bin 17164 -> 129825 bytes
+ .../com/parksolutions/totempark/BootReceiver.java  |  130 +-
+ .../com/parksolutions/totempark/MainActivity.java  |   22 +-
+ .../main/res/drawable/ic_launcher_background.xml   |   85 +-
+ .../app/src/main/res/mipmap-hdpi/ic_launcher.webp  |  Bin 2054 -> 1252 bytes
+ .../res/mipmap-hdpi/ic_launcher_foreground.webp    |  Bin 2494 -> 3878 bytes
+ .../main/res/mipmap-hdpi/ic_launcher_round.webp    |  Bin 4014 -> 1328 bytes
+ .../app/src/main/res/mipmap-mdpi/ic_launcher.webp  |  Bin 1600 -> 746 bytes
+ .../res/mipmap-mdpi/ic_launcher_foreground.webp    |  Bin 1790 -> 2110 bytes
+ .../main/res/mipmap-mdpi/ic_launcher_round.webp    |  Bin 2672 -> 884 bytes
+ .../app/src/main/res/mipmap-xhdpi/ic_launcher.webp |  Bin 2798 -> 1706 bytes
+ .../res/mipmap-xhdpi/ic_launcher_foreground.webp   |  Bin 3000 -> 6248 bytes
+ .../main/res/mipmap-xhdpi/ic_launcher_round.webp   |  Bin 5214 -> 1784 bytes
+ .../src/main/res/mipmap-xxhdpi/ic_launcher.webp    |  Bin 3720 -> 2604 bytes
+ .../res/mipmap-xxhdpi/ic_launcher_foreground.webp  |  Bin 4190 -> 11858 bytes
+ .../main/res/mipmap-xxhdpi/ic_launcher_round.webp  |  Bin 7684 -> 2720 bytes
+ .../src/main/res/mipmap-xxxhdpi/ic_launcher.webp   |  Bin 4758 -> 3762 bytes
+ .../res/mipmap-xxxhdpi/ic_launcher_foreground.webp |  Bin 4682 -> 19446 bytes
+ .../main/res/mipmap-xxxhdpi/ic_launcher_round.webp |  Bin 10166 -> 3906 bytes
+ android/app/src/main/res/totempark_launcher_hd.png |  Bin 11198 -> 340433 bytes
+ index.html                                         |   14 +-
+ package.json                                       |   10 +-
+ public/favicon.png                                 |  Bin 5330 -> 1516 bytes
+ public/icons/icon-192.png                          |  Bin 1679 -> 21743 bytes
+ public/icons/icon-32.png                           |  Bin 2276 -> 1516 bytes
+ public/icons/icon-512.png                          |  Bin 4825 -> 108336 bytes
+ public/manifest.webmanifest                        |   16 +-
+ public/sw.js                                       |   20 +-
+ src/App.css                                        | 4784 ++++++++++-
+ src/App.jsx                                        | 8413 ++++++++++++++++++--
+ src/firebase.js                                    |   12 +-
+ src/offline-player-cache.js                        |  467 +-
+ src/pwa-register.js                                |   21 +-
+ 35 files changed, 12931 insertions(+), 1119 deletions(-)

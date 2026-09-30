@@ -1,0 +1,30 @@
+{
+  "profile": "chrome-profile-1789760123434",
+  "before": [
+    {
+      "key": "https://totempark.local/cache/c7ae631e",
+      "bytes": 27656
+    },
+    {
+      "key": "https://totempark.local/cache/6573e94e",
+      "bytes": 15649
+    }
+  ],
+  "offline": true,
+  "result": [
+    {
+      "name": "small.webm",
+      "source": "cache",
+      "sizeBytes": 27656,
+      "ready": "loadeddata",
+      "src": "blob:http://127.0.0.1:5204/5bbdce68-1793-4eeb-861c-1981a959e389"
+    },
+    {
+      "name": "image.png",
+      "source": "cache",
+      "sizeBytes": 15649,
+      "ready": "loaded",
+      "src": "blob:http://127.0.0.1:5204/3674966c-ae5e-4da6-b183-b8a6614b6700"
+    }
+  ]
+}

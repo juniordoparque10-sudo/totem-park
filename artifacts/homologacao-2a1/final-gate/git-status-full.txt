@@ -1,0 +1,110 @@
+On branch main
+Your branch is ahead of 'origin/main' by 1 commit.
+  (use "git push" to publish your local commits)
+
+Changes not staged for commit:
+  (use "git add <file>..." to update what will be committed)
+  (use "git restore <file>..." to discard changes in working directory)
+	modified:   android/app/build.gradle
+	modified:   android/app/src/main/AndroidManifest.xml
+	modified:   android/app/src/main/ic_launcher-playstore.png
+	modified:   android/app/src/main/java/br/com/parksolutions/totempark/BootReceiver.java
+	modified:   android/app/src/main/java/br/com/parksolutions/totempark/MainActivity.java
+	modified:   android/app/src/main/res/drawable/ic_launcher_background.xml
+	modified:   android/app/src/main/res/mipmap-hdpi/ic_launcher.webp
+	modified:   android/app/src/main/res/mipmap-hdpi/ic_launcher_foreground.webp
+	modified:   android/app/src/main/res/mipmap-hdpi/ic_launcher_round.webp
+	modified:   android/app/src/main/res/mipmap-mdpi/ic_launcher.webp
+	modified:   android/app/src/main/res/mipmap-mdpi/ic_launcher_foreground.webp
+	modified:   android/app/src/main/res/mipmap-mdpi/ic_launcher_round.webp
+	modified:   android/app/src/main/res/mipmap-xhdpi/ic_launcher.webp
+	modified:   android/app/src/main/res/mipmap-xhdpi/ic_launcher_foreground.webp
+	modified:   android/app/src/main/res/mipmap-xhdpi/ic_launcher_round.webp
+	modified:   android/app/src/main/res/mipmap-xxhdpi/ic_launcher.webp
+	modified:   android/app/src/main/res/mipmap-xxhdpi/ic_launcher_foreground.webp
+	modified:   android/app/src/main/res/mipmap-xxhdpi/ic_launcher_round.webp
+	modified:   android/app/src/main/res/mipmap-xxxhdpi/ic_launcher.webp
+	modified:   android/app/src/main/res/mipmap-xxxhdpi/ic_launcher_foreground.webp
+	modified:   android/app/src/main/res/mipmap-xxxhdpi/ic_launcher_round.webp
+	modified:   android/app/src/main/res/totempark_launcher_hd.png
+	modified:   index.html
+	modified:   package.json
+	modified:   public/favicon.png
+	modified:   public/icons/icon-192.png
+	modified:   public/icons/icon-32.png
+	modified:   public/icons/icon-512.png
+	modified:   public/manifest.webmanifest
+	modified:   public/sw.js
+	modified:   src/App.css
+	modified:   src/App.jsx
+	modified:   src/firebase.js
+	modified:   src/offline-player-cache.js
+	modified:   src/pwa-register.js
+
+Untracked files:
+  (use "git add <file>..." to include in what will be committed)
+	.env.player
+	.env.playerTest
+	.env.web
+	.vercelignore
+	android-icon-final-proof.png
+	android-icon-final-purple-tone-proof.png
+	android-icon-preview-purple-tone.png
+	android-icon-preview-totempark-isotipo.png
+	android-icon-preview-totempark.png
+	android-icon-preview-white-center-fixed.png
+	android-manager-logo-dark-blue-preview.png
+	android-manager-logo-variation-preview.png
+	android-tv-tray-icon-preview-totempark.png
+	android/app/src/main/java/br/com/parksolutions/totempark/PlayerBootService.java
+	android/app/src/main/res/drawable-nodpi/
+	android/app/src/main/res/drawable/ic_player_notification.xml
+	android/app/src/player/
+	android/app/src/playerTest/
+	android/app/src/web/
+	artifacts/
+	backup-before-corporate-custom-template.patch
+	backup-before-sports-template.patch
+	backups/
+	docs/
+	firebase.json
+	firebase.test.json
+	firestore.rules
+	public/icons/site-icon-128.png
+	public/icons/site-icon-144.png
+	public/icons/site-icon-180.png
+	public/icons/site-icon-192.png
+	public/icons/site-icon-256.png
+	public/icons/site-icon-32.png
+	public/icons/site-icon-384.png
+	public/icons/site-icon-48.png
+	public/icons/site-icon-512.png
+	public/icons/site-icon-72.png
+	public/icons/site-icon-96.png
+	public/icons/site-maskable-512.png
+	public/icons/site-tv-card-640x360.png
+	public/icons/tv-icon-128.png
+	public/icons/tv-icon-144.png
+	public/icons/tv-icon-180.png
+	public/icons/tv-icon-192.png
+	public/icons/tv-icon-256.png
+	public/icons/tv-icon-32.png
+	public/icons/tv-icon-384.png
+	public/icons/tv-icon-48.png
+	public/icons/tv-icon-512.png
+	public/icons/tv-icon-72.png
+	public/icons/tv-icon-96.png
+	public/icons/tv-maskable-512.png
+	public/icons/tv-tv-card-640x360.png
+	public/manifest-tv.webmanifest
+	src/UploadLimitDialog.jsx
+	src/firestore-cache-policy.js
+	src/storage-service.js
+	src/upload-limit-dialog.css
+	src/upload-plan-policy.js
+	storage.rules
+	tests/
+	totem-park-backup-before-commercial-plans.patch
+	workers/
+
+no changes added to commit (use "git add" and/or "git commit -a")

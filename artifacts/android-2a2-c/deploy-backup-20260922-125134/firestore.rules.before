@@ -1,0 +1,166 @@
+rules_version = '2';
+
+service cloud.firestore {
+  match /databases/{database}/documents {
+    function signedIn() {
+      return request.auth != null;
+    }
+
+    function isMaster() {
+      return signedIn()
+        && (
+          (
+            exists(/databases/$(database)/documents/settings/masterAccess)
+            && request.auth.token.email in get(/databases/$(database)/documents/settings/masterAccess).data.emails
+          )
+          || (
+            !exists(/databases/$(database)/documents/settings/masterAccess)
+            && request.auth.token.email in [
+              "admin@parksolutions.com",
+              "juniordoparque10@gmail.com"
+            ]
+          )
+        );
+    }
+
+    function clientDoc(clientId) {
+      return get(/databases/$(database)/documents/clients/$(clientId));
+    }
+
+    function isClientOwner(clientId) {
+      return signedIn()
+        && (
+          clientDoc(clientId).data.get("uid", "") == request.auth.uid
+          || clientDoc(clientId).data.get("email", "") == request.auth.token.get("email", "missing-email")
+        )
+        && clientDoc(clientId).data.get("accountStatus", "active") != "pending_commercial_validation";
+    }
+
+    function isOwnAccountRequest() {
+      return signedIn()
+        && resource.data.email == request.auth.token.email;
+    }
+
+    function isValidPublicAccountRequestCreate() {
+      return request.resource.data.accountStatus == "pending_commercial_validation"
+        && request.resource.data.status == "Nova solicitação"
+        && request.resource.data.keys().hasAll([
+          "responsibleName",
+          "email",
+          "whatsapp",
+          "role",
+          "companyName",
+          "segment",
+          "city",
+          "state",
+          "screensEstimate",
+          "intendedUse",
+          "accountStatus",
+          "status",
+          "createdAt",
+          "updatedAt"
+        ]);
+    }
+
+    function isAllowedPublicScreenUpdate() {
+      return request.resource.data.diff(resource.data).affectedKeys().hasOnly([
+        "activeDeviceId",
+        "activePlaylistWeightBytes",
+        "cacheSizeBytes",
+        "cacheManifestItems",
+        "cacheManifestKey",
+        "cacheManifestSizeBytes",
+        "cacheDownloadedItems",
+        "cacheRemovedItems",
+        "cacheStatus",
+        "cacheUpdatedAt",
+        "cachedItems",
+        "commandStatus",
+        "connectedDeviceId",
+        "currentMediaSource",
+        "currentPlaylistId",
+        "currentPlaylistMode",
+        "currentPlaylistName",
+        "deviceLocation",
+        "deviceLocationCity",
+        "deviceLocationUpdatedAt",
+        "failedCacheItems",
+        "estimatedMonthlyTrafficBytes",
+        "lastCommandExecuted",
+        "lastCommandExecutedAt",
+        "lastCommandSent",
+        "lastConnection",
+        "lastMediaDownloadAt",
+        "lastMediaDownloadBytes",
+        "lastMediaUpdateAt",
+        "lastSeenAt",
+        "nowPlayingAspectRatio",
+        "nowPlayingDuration",
+        "nowPlayingHeight",
+        "nowPlayingIndex",
+        "nowPlayingItemType",
+        "nowPlayingOrientation",
+        "nowPlayingPreview",
+        "nowPlayingSound",
+        "nowPlayingTemplateType",
+        "nowPlayingTitle",
+        "nowPlayingTotal",
+        "nowPlayingType",
+        "nowPlayingWidth",
+        "remoteCommand",
+        "status",
+        "totalCacheableItems"
+      ]);
+    }
+
+    match /clients/{clientId} {
+      allow read: if true;
+      allow create: if isMaster();
+      allow update, delete: if isMaster() || isClientOwner(clientId);
+
+      match /screens/{screenId} {
+        allow read: if true;
+        allow create, delete: if isMaster() || isClientOwner(clientId);
+        allow update: if isMaster() || isClientOwner(clientId) || isAllowedPublicScreenUpdate();
+      }
+
+      match /media/{mediaId} {
+        allow read: if true;
+        allow create: if isMaster() || isClientOwner(clientId);
+        allow update: if isMaster() || isClientOwner(clientId);
+        allow delete: if isMaster() || isClientOwner(clientId);
+      }
+
+      match /playlists/{playlistId} {
+        allow read: if true;
+        allow create, delete: if isMaster() || isClientOwner(clientId);
+        allow update: if isMaster() || isClientOwner(clientId);
+      }
+
+      match /{subcollection}/{documentId} {
+        allow read: if true;
+        allow write: if isMaster() || isClientOwner(clientId);
+      }
+    }
+
+    match /tv_codes/{code} {
+      allow read: if true;
+      allow write: if isMaster() || signedIn();
+    }
+
+    match /settings/{settingId} {
+      allow read: if true;
+      allow write: if isMaster();
+    }
+
+    match /account_requests/{requestId} {
+      allow create: if isValidPublicAccountRequestCreate();
+      allow get: if isMaster() || isOwnAccountRequest();
+      allow list, update, delete: if isMaster();
+    }
+
+    match /{document=**} {
+      allow read, write: if isMaster();
+    }
+  }
+}

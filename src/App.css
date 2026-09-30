@@ -2333,8 +2333,8 @@
   overflow: hidden;
 }
 
-.screen-live-preview img,
-.screen-live-preview video {
+.screen-live-preview > .screen-universal-preview > img,
+.screen-live-preview > .screen-universal-preview > video {
   width: 100%;
   height: 100%;
   object-fit: cover;
@@ -5522,8 +5522,8 @@
   background: linear-gradient(135deg, #11182f, #3b1767) !important;
 }
 
-.premium-screen-thumb img,
-.premium-screen-thumb video {
+.premium-screen-thumb > .screen-universal-preview > img,
+.premium-screen-thumb > .screen-universal-preview > video {
   width: 100% !important;
   height: 100% !important;
   object-fit: cover !important;
@@ -5726,9 +5726,9 @@ video.player-media::-webkit-media-controls-start-playback-button {
    FIX PREVIEW AO VIVO + VOLTAR DO /TV
 ===================================================== */
 
-.screen-live-preview video,
-.media-preview.screen-preview video,
-.premium-screen-thumb video {
+.screen-live-preview > .screen-universal-preview > video,
+.media-preview.screen-preview > .screen-universal-preview > video,
+.premium-screen-thumb > .screen-universal-preview > video {
   display: block !important;
   background: #000000 !important;
 }
@@ -5767,12 +5767,12 @@ video.player-media::-webkit-media-controls-start-playback-button {
    O texto já mudava; agora a imagem/vídeo também força atualização.
 ===================================================== */
 
-.screen-live-preview video,
-.screen-live-preview img,
-.media-preview.screen-preview video,
-.media-preview.screen-preview img,
-.premium-screen-thumb video,
-.premium-screen-thumb img {
+.screen-live-preview > .screen-universal-preview > video,
+.screen-live-preview > .screen-universal-preview > img,
+.media-preview.screen-preview > .screen-universal-preview > video,
+.media-preview.screen-preview > .screen-universal-preview > img,
+.premium-screen-thumb > .screen-universal-preview > video,
+.premium-screen-thumb > .screen-universal-preview > img {
   width: 100% !important;
   height: 100% !important;
   object-fit: cover !important;
@@ -5785,12 +5785,12 @@ video.player-media::-webkit-media-controls-start-playback-button {
    FIX DEFINITIVO PREVIEW AO VIVO + TRANSIÇÕES DO PLAYER
 ===================================================== */
 
-.screen-live-preview img,
-.screen-live-preview video,
-.media-preview.screen-preview img,
-.media-preview.screen-preview video,
-.premium-screen-thumb img,
-.premium-screen-thumb video {
+.screen-live-preview > .screen-universal-preview > img,
+.screen-live-preview > .screen-universal-preview > video,
+.media-preview.screen-preview > .screen-universal-preview > img,
+.media-preview.screen-preview > .screen-universal-preview > video,
+.premium-screen-thumb > .screen-universal-preview > img,
+.premium-screen-thumb > .screen-universal-preview > video {
   width: 100% !important;
   height: 100% !important;
   object-fit: cover !important;

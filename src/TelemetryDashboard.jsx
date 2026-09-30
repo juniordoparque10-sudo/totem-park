@@ -2,9 +2,11 @@ import { useEffect, useMemo, useState } from "react";
 import { Activity, AlertTriangle, Clock3, Database, Download, FileText, Monitor, RefreshCw, Search, Wifi, X } from "lucide-react";
 import { collection, doc, onSnapshot, serverTimestamp, setDoc } from "firebase/firestore";
 import { db } from "./firebase";
-import { compareTelemetryScreens, formatRelativeCommunication, getPortalScreenStatus, getTelemetryVisualState, sortClientsAlphabetically, timestampMs } from "./portal-status";
+import { compareTelemetryScreens, formatRelativeCommunication, getPortalLastSignalMs, getPortalScreenStatus, getTelemetryVisualState, sortClientsAlphabetically, timestampMs } from "./portal-status";
 import { bindingForScreen, linkedAtForScreen, measured } from "./telemetry-v1";
 import { getTelemetryCardData, reportedAppVersion } from "./telemetry-card-data";
+import { renderTelemetryPdfReport } from "./telemetry-pdf-report";
+import totemLogo from "./assets/logo.png";
 
 const EMPTY = "—";
 const TELEMETRY_LABELS = { DISABLED: "Telemetria Off", WAITING_FIRST_SIGNAL: "Aguardando primeiro sinal", ACTIVE: "Ativa", STALE: "Dados desatualizados", SCREEN_OFFLINE: "Tela offline", NO_DATA_PERIOD: "Sem dados no período", READ_ERROR: "Erro de leitura" };
@@ -50,9 +52,7 @@ const cacheLabel = (screen) => cacheStatus(screen)
   : screen?.telemetry?.schemaVersion >= 3 ? "Cache não instrumentado" : "Cache não informado";
 const appVersion = (screen) => reportedAppVersion(screen) || EMPTY;
 const mediaCounters = (screen) => screen?.telemetry?.schemaVersion >= 3 ? null : screen?.telemetry?.counters;
-const lastCommunication = (screen) => [screen?.lastSeenAt, screen?.lastCommandExecutedAt, screen?.lastMediaUpdateAt]
-  .reduce((latest, value) => timestampMs(value) > timestampMs(latest) ? value : latest, null);
-const escapeHtml = (value) => String(value ?? "").replace(/[&<>"']/g, (character) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#039;" })[character]);
+const lastCommunication = (screen) => getPortalLastSignalMs(screen);
 const scrollToTelemetry = (id) => document.getElementById(id)?.scrollIntoView({ behavior: "smooth", block: "start" });
 
 function MetricCard({ icon, title, value, detail, tone = "blue" }) {
@@ -152,16 +152,44 @@ export default function TelemetryDashboard({ focusScreen }) {
   const originSegments = [{ label: "Local (cache)", value: originCounts.local, color: "#34d399" }, { label: "Internet", value: originCounts.internet, color: "#ff647c" }, { label: "Sem informação", value: originCounts.unknown, color: "#7188ad" }];
   const statusSegments = [{ label: "Online", value: countStatus("ONLINE"), color: "#34d399" }, { label: "Atenção", value: countStatus("ATTENTION"), color: "#f8c963" }, { label: "Offline", value: countStatus("OFFLINE"), color: "#7188ad" }];
   const clearFilters = () => { setSearch(""); setClientId("all"); setScreenId("all"); setStatus("all"); setSource("all"); setVersion("all"); };
-  const reportScreens = reportScope === "client" ? enriched.filter((item) => item.clientId === reportTarget) : reportScope === "screen" ? enriched.filter((item) => `${item.clientId}:${item.id}` === reportTarget) : enriched;
+  const reportScreens = filtered.filter((item) => {
+    if (reportScope === "client" && item.clientId !== reportTarget) return false;
+    if (reportScope === "screen" && `${item.clientId}:${item.id}` !== reportTarget) return false;
+    const communicatedAt = timestampMs(lastCommunication(item));
+    if (!communicatedAt) return false;
+    if (period === "today") return communicatedAt >= new Date(now).setHours(0, 0, 0, 0);
+    if (period === "7d") return communicatedAt >= now - 7 * 86400000;
+    if (period === "30d") return communicatedAt >= now - 30 * 86400000;
+    return true;
+  });
   const generatePdfReport = () => {
     const ordered = [...reportScreens].sort((left, right) => compareTelemetryScreens(left, right, now));
-    if (!ordered.length) { window.alert("Selecione um cliente ou uma tela com dados para gerar o relatório."); return; }
-    const scopeLabel = reportScope === "client" ? `Cliente: ${ordered[0].clientName}` : reportScope === "screen" ? `Tela: ${ordered[0].name || ordered[0].code || ordered[0].id}` : "Relatório geral";
-    const rows = ordered.map((item) => `<tr><td><b>${escapeHtml(item.name || item.code || item.id)}</b><small>${escapeHtml(item.clientName)}</small></td><td>${escapeHtml(STATUS_LABELS[item.portalStatus])}</td><td>${escapeHtml(formatRelativeCommunication(lastCommunication(item), now))}</td><td>${escapeHtml(telemetryLabel(item, now))}</td><td>${escapeHtml(fmtBytes(mediaCounters(item)?.bytesDownloaded))}</td><td>${escapeHtml(cacheLabel(item))}</td><td>${escapeHtml(appVersion(item))}</td><td>${escapeHtml(sourceMeta(item).label)}</td></tr>`).join("");
+    if (!ordered.length) { window.alert("Nenhuma tela corresponde ao escopo, período e filtros selecionados."); return; }
+    const reportClientId = ordered.every((item) => item.clientId === ordered[0].clientId) ? ordered[0].clientId : null;
+    const reportClient = clients.find((item) => item.id === reportClientId);
+    const rows = ordered.map((item) => ({
+      name: item.name || item.code || item.id,
+      clientName: item.clientName,
+      status: item.portalStatus,
+      lastCommunication: formatRelativeCommunication(lastCommunication(item), now),
+      telemetry: telemetryLabel(item, now),
+      cache: cacheStatus(item) ? `${cacheLabel(item)}${measured(item.cachedItems) && measured(item.totalCacheableItems) ? ` ${item.cachedItems}/${item.totalCacheableItems}` : ""}` : cacheLabel(item),
+      version: appVersion(item),
+      origin: sourceMeta(item).label,
+      activeTimeMs: item.telemetry?.schemaVersion >= 3 ? item.telemetry?.counters?.activeTimeMs : null,
+    }));
+    const html = renderTelemetryPdfReport({
+      rows,
+      clientName: reportClient?.name || (reportScope === "screen" ? ordered[0].clientName : "Todos os clientes"),
+      clientLogoUrl: reportClient?.logoUrl || "",
+      totemLogoUrl: new URL(totemLogo, window.location.origin).href,
+      totemIconUrl: new URL("/logo.png", window.location.origin).href,
+      generatedAt: now,
+    });
     const popup = window.open("", "_blank");
     if (!popup) { window.alert("O navegador bloqueou a janela do relatório. Libere pop-ups e tente novamente."); return; }
     popup.opener = null;
-    popup.document.write(`<!doctype html><html lang="pt-BR"><head><meta charset="utf-8"><title>Relatório de Telemetria - Totem Park</title><style>@page{size:A4 landscape;margin:12mm}*{box-sizing:border-box}body{font-family:Arial,sans-serif;color:#14213d;margin:0}header{display:flex;justify-content:space-between;align-items:flex-end;border-bottom:3px solid #1677ff;padding-bottom:12px;margin-bottom:18px}h1{font-size:24px;margin:0 0 5px}p{margin:0;color:#52627a}.meta{text-align:right;font-size:12px}.summary{display:flex;gap:12px;margin-bottom:16px}.summary div{border:1px solid #ccd7e6;border-radius:8px;padding:10px 14px}.summary b{display:block;font-size:20px;color:#1677ff}table{width:100%;border-collapse:collapse;font-size:10px}th{background:#11284a;color:white;text-align:left;padding:8px}td{border-bottom:1px solid #d9e1ec;padding:8px;vertical-align:top}td small{display:block;color:#64748b;margin-top:3px}footer{margin-top:14px;text-align:right;color:#64748b;font-size:10px}@media print{button{display:none}}</style></head><body><header><div><h1>Totem Park - Telemetria das Telas</h1><p>${escapeHtml(scopeLabel)}</p></div><div class="meta">Gerado em ${escapeHtml(new Date(now).toLocaleString("pt-BR"))}<br>${ordered.length} tela(s)</div></header><div class="summary"><div><b>${ordered.filter((item) => item.portalStatus === "ONLINE").length}</b>Online</div><div><b>${ordered.filter((item) => item.portalStatus === "ATTENTION").length}</b>Atenção</div><div><b>${ordered.filter((item) => item.portalStatus === "OFFLINE").length}</b>Offline</div></div><table><thead><tr><th>Tela / cliente</th><th>Status</th><th>Última comunicação</th><th>Telemetria</th><th>Tráfego</th><th>Cache</th><th>Versão do app</th><th>Origem</th></tr></thead><tbody>${rows}</tbody></table><footer>Totem Park - Park Solutions</footer><script>window.onload=()=>window.print();</script></body></html>`);
+    popup.document.write(html);
     popup.document.close();
   };
 

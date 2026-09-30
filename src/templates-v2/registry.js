@@ -19,8 +19,17 @@ const entries = [
   [SPORTS_PREMIUM_TYPE,"Resultados Esportivos Premium V2","Esportes","Cards modulares, rotação multiesportes e tela dividida.","sports",["news"]],
 ];
 
+const VISIBILITY_CONTROLS = {
+  [HERO_BUSINESS_TYPE]: ["showLogo","showContent","showHeadline","showSubtitle","showCta","showServices"],
+  [SMART_LOBBY_TYPE]: ["showLogo","showContent","showHeadline","showSubtitle","showCta","showServices"],
+  [CLOCK_PRO_TYPE]: ["showLogo","showContent"],
+  [WEATHER_PREMIUM_TYPE]: ["showLogo","showContent"],
+  [SPORTS_PREMIUM_TYPE]: ["showLogo","showContent"],
+};
+
 export const TEMPLATE_V2_REGISTRY = Object.fromEntries(entries.map(([type,label,category,description,preset,modules]) => [type, {
   type, label, category, description, preset, modules, newsTicker:modules.includes("news"), orientations:["Paisagem","Retrato"], thumbnail:`template-v2-${type}`,
+  visibilityControls: VISIBILITY_CONTROLS[type] || ["showLogo","showContent","showHeadline","showSubtitle","showCta","showServices"],
   createDraft:(overrides) => createTemplateV2Draft(type, overrides),
 }]));
 

@@ -1,0 +1,9 @@
+{
+  "schemaVersion": true,
+  "rendererContract": true,
+  "heroBusiness": true,
+  "clockPro": true,
+  "weatherPremium": true,
+  "published": true,
+  "availableSoon": true
+}

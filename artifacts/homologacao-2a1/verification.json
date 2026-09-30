@@ -1,0 +1,179 @@
+{
+  "sw": {
+    "before": {
+      "at": "2026-09-15T21:17:57.532Z",
+      "type": "snapshot",
+      "label": "antes-ativacao",
+      "names": [
+        "totem-park-pwa-v3",
+        "totem-park-pwa-v2",
+        "totempark-player-media-v1",
+        "cache-de-teste-nao-relacionado"
+      ],
+      "entries": [
+        {
+          "key": "https://totempark.local/cache/2227105d",
+          "bytes": 27656
+        },
+        {
+          "key": "https://totempark.local/cache/7f26b8e4",
+          "bytes": 15649
+        }
+      ],
+      "count": 2,
+      "bytes": 43305
+    },
+    "after": {
+      "at": "2026-09-15T21:18:36.812Z",
+      "type": "snapshot",
+      "label": "abertura-pagina",
+      "names": [
+        "totem-park-pwa-v3",
+        "totempark-player-media-v1",
+        "cache-de-teste-nao-relacionado"
+      ],
+      "entries": [
+        {
+          "key": "https://totempark.local/cache/2227105d",
+          "bytes": 27656
+        },
+        {
+          "key": "https://totempark.local/cache/7f26b8e4",
+          "bytes": 15649
+        }
+      ],
+      "count": 2,
+      "bytes": 43305
+    },
+    "states": [
+      {
+        "at": "2026-09-15T21:17:57.545Z",
+        "type": "worker-state",
+        "state": "installing"
+      },
+      {
+        "at": "2026-09-15T21:17:57.605Z",
+        "type": "worker-state",
+        "state": "installed",
+        "waiting": true
+      }
+    ]
+  },
+  "realPlayerGrowth": {
+    "before": {
+      "at": "2026-09-15T21:25:11.057Z",
+      "count": 6,
+      "bytes": 128151
+    },
+    "after": {
+      "at": "2026-09-16T01:40:38.714Z",
+      "count": 7,
+      "bytes": 144529
+    }
+  },
+  "clearCache": {
+    "after": {
+      "at": "2026-09-16T01:41:48.713Z",
+      "count": 2,
+      "bytes": 40910
+    },
+    "afterReload": {
+      "at": "2026-09-16T01:42:13.899Z",
+      "count": 4,
+      "bytes": 84215
+    }
+  },
+  "mediaOutage": {
+    "from": "2026-09-16T01:43:50.186Z",
+    "to": "2026-09-16T01:44:11.768Z",
+    "seconds": 21.582,
+    "playEvents": 5,
+    "endedEvents": 4,
+    "cacheSnapshots": [
+      {
+        "at": "2026-09-16T01:43:54.975Z",
+        "count": 6,
+        "bytes": 128151
+      },
+      {
+        "at": "2026-09-16T01:43:59.978Z",
+        "count": 6,
+        "bytes": 128151
+      },
+      {
+        "at": "2026-09-16T01:44:04.981Z",
+        "count": 6,
+        "bytes": 128151
+      },
+      {
+        "at": "2026-09-16T01:44:09.984Z",
+        "count": 6,
+        "bytes": 128151
+      }
+    ],
+    "fullOfflineTest": false
+  },
+  "network": {
+    "firstReload": [
+      {
+        "at": "2026-09-15T21:18:15.094Z",
+        "path": "/media/imagem01.png",
+        "method": "GET",
+        "range": null,
+        "ifNoneMatch": "\"fixture-imagem01.png-15649\"",
+        "status": 304,
+        "bodyBytes": 0
+      },
+      {
+        "at": "2026-09-15T21:18:15.096Z",
+        "path": "/media/video01.webm",
+        "method": "GET",
+        "range": "bytes=0-27655",
+        "ifNoneMatch": "\"fixture-video01.webm-27656\"",
+        "status": 304,
+        "bodyBytes": 0
+      }
+    ],
+    "diagnostic": {
+      "at": "2026-09-16T01:41:52.990Z",
+      "type": "http-diagnostic-not-playback",
+      "full": 200,
+      "conditional": 304,
+      "range": 206,
+      "rangeBytes": 100
+    },
+    "samples": [
+      {
+        "at": "2026-09-15T21:17:53.342Z",
+        "path": "/media/imagem01.png",
+        "method": "GET",
+        "range": null,
+        "ifNoneMatch": null,
+        "status": 200,
+        "bodyBytes": 15649
+      },
+      {
+        "at": "2026-09-15T21:17:53.347Z",
+        "path": "/media/video01.webm",
+        "method": "GET",
+        "range": "bytes=0-",
+        "ifNoneMatch": null,
+        "status": 206,
+        "bodyBytes": 27656
+      },
+      {
+        "at": "2026-09-15T21:18:15.094Z",
+        "path": "/media/imagem01.png",
+        "method": "GET",
+        "range": null,
+        "ifNoneMatch": "\"fixture-imagem01.png-15649\"",
+        "status": 304,
+        "bodyBytes": 0
+      }
+    ]
+  },
+  "pending": [
+    "Full browser process restart",
+    "DevTools Offline / complete network disconnection"
+  ]
+}

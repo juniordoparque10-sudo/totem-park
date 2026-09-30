@@ -1,0 +1,49 @@
+import fs from 'node:fs';
+import path from 'node:path';
+import http from 'node:http';
+import crypto from 'node:crypto';
+import { chromium } from 'file:///C:/Users/centr/.cache/codex-runtimes/codex-primary-runtime/dependencies/node/node_modules/playwright/index.mjs';
+const root=path.dirname(new URL(import.meta.url).pathname.replace(/^\/([A-Z]:)/,'$1'));
+const repo=path.resolve(root,'../..');
+const hash=b=>crypto.createHash('sha256').update(b).digest('hex');
+const protectedFiles=['src/App.jsx','src/offline-player-cache.js','public/sw.js','src/firebase.js','firestore.rules','storage.rules','package.json'];
+const baseline=Object.fromEntries(protectedFiles.map(p=>[p,hash(fs.readFileSync(path.join(repo,p)))]));
+fs.writeFileSync(path.join(root,'product-before.json'),JSON.stringify(baseline,null,2));
+let source=fs.readFileSync(path.join(repo,'src/offline-player-cache.js'),'utf8').replace(/^import .*;\r?\n/gm,'');
+source='const Capacitor={isNativePlatform:()=>false};\n'+source;
+// In-memory observation only; preserve cache/fetch operations and ordering.
+source=source.replace('const response = await fetch(remoteUrl, { cache: "no-store" });','window.ev("T5-cache-fetch",{remoteUrl}); const response = await fetch(remoteUrl, { cache: "no-store" }); window.ev("T6-cache-response",{remoteUrl,status:response.status});');
+source=source.replace('await cache.put(request, response.clone());','await cache.put(request, response.clone()); window.ev("T7-cache-stored",{remoteUrl});');
+source=source.replace('url: URL.createObjectURL(blob),','url: (()=>{const u=URL.createObjectURL(blob);window.ev("T8-blob",{url:u,bytes:blob.size});return u;})(),');
+const media=new Map([['small.webm',fs.readFileSync(path.join(repo,'artifacts/homologacao-2a1/fixtures/video01.webm'))],['image.png',fs.readFileSync(path.join(repo,'artifacts/homologacao-2a1/fixtures/imagem01.png'))]]);
+const wire=[];let phase='setup';
+const html=`<!doctype html><body><script>window.events=[];window.ev=(kind,data={})=>events.push({kind,t:performance.now(),...data});</script><script type="module">import * as cache from '/module.js';window.cacheModule=cache;window.ready=true;</script>`;
+const server=http.createServer((req,res)=>{const u=new URL(req.url,'http://127.0.0.1:5204');
+ if(u.pathname==='/module.js'){res.writeHead(200,{'Content-Type':'application/javascript'});return res.end(source);}
+ if(u.pathname==='/sw.js'){res.writeHead(200,{'Content-Type':'application/javascript'});return res.end(fs.readFileSync(path.join(repo,'public/sw.js')));}
+ if(u.pathname.startsWith('/media/')){const name=u.pathname.split('/').pop(),b=media.get(name);if(!b){res.writeHead(404);return res.end();} const etag='"'+hash(b)+'"';let status=200,start=0,end=b.length-1;let headers={'Content-Type':name.endsWith('.png')?'image/png':'video/webm','Cache-Control':'private, max-age=0',ETag:etag,'Accept-Ranges':'bytes'};
+ if(req.headers['if-none-match']===etag)status=304;else if(req.headers.range){const m=/bytes=(\d+)-(\d*)/.exec(req.headers.range);if(m){start=+m[1];end=Math.min(m[2]?+m[2]:end,end);status=206;headers['Content-Range']=`bytes ${start}-${end}/${b.length}`;}}
+ const data=status===304?Buffer.alloc(0):b.subarray(start,end+1);if(status!==304)headers['Content-Length']=data.length;const row={phase,at:Date.now(),url:u.href,method:req.method,range:req.headers.range||null,ifNoneMatch:req.headers['if-none-match']||null,status,contentLength:data.length,bodyBytes:0};wire.push(row);res.writeHead(status,headers);res.end(data,()=>row.bodyBytes=data.length);return;}
+ res.writeHead(200,{'Content-Type':'text/html','Cache-Control':'no-store'});res.end(html);
+});
+await new Promise(r=>server.listen(5204,'127.0.0.1',r));
+const launch=()=>chromium.launchPersistentContext(path.join(root,'chrome-profile-'+runId),{executablePath:'C:/Program Files/Google/Chrome/Application/chrome.exe',headless:true,args:['--autoplay-policy=no-user-gesture-required'],viewport:{width:1280,height:720}});
+const runId=Date.now();let ctx;const runs=[];const network=[];
+async function page(){const p=await ctx.newPage();const cdp=await ctx.newCDPSession(p);await cdp.send('Network.enable');cdp.on('Network.requestWillBeSent',e=>{if(e.request.url.includes('/media/'))network.push({phase,type:'request',id:e.requestId,url:e.request.url,initiator:e.initiator,method:e.request.method,headers:e.request.headers,timestamp:e.timestamp});});cdp.on('Network.responseReceived',e=>{if(e.response.url.includes('/media/'))network.push({phase,type:'response',id:e.requestId,url:e.response.url,status:e.response.status,headers:e.response.headers,fromDiskCache:e.response.fromDiskCache,fromServiceWorker:e.response.fromServiceWorker,timestamp:e.timestamp});});cdp.on('Network.loadingFinished',e=>network.push({phase,type:'finished',id:e.requestId,encodedDataLength:e.encodedDataLength,timestamp:e.timestamp}));await p.goto('http://127.0.0.1:5204/');await p.waitForFunction(()=>window.ready);return p;}
+async function run(p,name,mode,sw){phase=`${sw?'sw':'no-sw'}-${name}-${mode}`;const before=wire.length;const result=await p.evaluate(async({name,mode})=>{
+ events=[];ev('T0-playlist');const item={id:name,type:name.endsWith('.png')?'Imagem':'Vídeo',preview:location.origin+'/media/'+name,remotePreview:location.origin+'/media/'+name};ev('T1-selected');const v=document.createElement(name.endsWith('.png')?'img':'video');if(v.tagName==='VIDEO'){v.autoplay=true;v.muted=true;v.preload='auto';v.requestVideoFrameCallback(()=>ev('T10-first-frame',{src:v.currentSrc}));}else v.onload=()=>ev('T10-image-loaded',{src:v.currentSrc||v.src,width:v.naturalWidth});document.body.append(v);
+ const cached=mode==='empty'?null:await cacheModule.getCachedMediaUrl('audit',item);ev('T2-src',{src:cached?.url||item.preview});v.src=cached?.url||item.preview;
+ await new Promise(r=>setTimeout(r,20));ev('T4-prepare');const r=await cacheModule.cachePlaylistMedia({clientId:'audit',items:[item],concurrency:1});ev('T9-map-updated');if(Object.values(r.results)[0])v.src=Object.values(r.results)[0].url;else ev('cache-error',{failures:r.failures});
+ await new Promise(r=>setTimeout(r,3500));const output={events,summary:{downloaded:r.downloaded,downloadedBytes:r.downloadedBytes,cached:r.cached,failed:r.failed,failures:r.failures},resources:performance.getEntriesByType('resource').filter(x=>x.name.includes('/media/')).map(x=>({url:x.name,initiatorType:x.initiatorType,startTime:x.startTime,duration:x.duration,transferSize:x.transferSize,encodedBodySize:x.encodedBodySize,decodedBodySize:x.decodedBodySize})),src:v.currentSrc||v.src,readyState:v.readyState,width:v.naturalWidth};v.remove();performance.clearResourceTimings();return output;
+ },{name,mode});runs.push({phase,...result,wire:wire.slice(before)});}
+try{ctx=await launch();let p=await page();
+ // Real 720p changing-noise video: codec output, never padded.
+ const encoded=fs.existsSync(path.join(root,'big.webm'))?fs.readFileSync(path.join(root,'big.webm')).toString('base64'):await p.evaluate(async()=>{const c=document.createElement('canvas');c.width=1280;c.height=720;const g=c.getContext('2d');const stream=c.captureStream(30);const rec=new MediaRecorder(stream,{mimeType:'video/webm;codecs=vp8',videoBitsPerSecond:8000000});const chunks=[];rec.ondataavailable=e=>chunks.push(e.data);const done=new Promise(r=>rec.onstop=r);let n=0;const timer=setInterval(()=>{const d=g.createImageData(1280,720);const a=new Uint32Array(d.data.buffer);let s=++n*101;for(let i=0;i<a.length;i++){s=(Math.imul(s,1664525)+1013904223)|0;a[i]=0xff000000|(s&0xffffff);}g.putImageData(d,0,0);},33);rec.start();await new Promise(r=>setTimeout(r,12000));rec.stop();await done;clearInterval(timer);stream.getTracks().forEach(t=>t.stop());const b=new Uint8Array(await new Blob(chunks).arrayBuffer());let s='';for(let i=0;i<b.length;i+=32768)s+=String.fromCharCode(...b.subarray(i,i+32768));return btoa(s);});const big=Buffer.from(encoded,'base64');media.set('big.webm',big);fs.writeFileSync(path.join(root,'big.webm'),big);
+ for(const sw of [false,true]){if(sw){await p.evaluate(async()=>{await navigator.serviceWorker.register('/sw.js');await navigator.serviceWorker.ready;});await p.reload();await p.waitForFunction(()=>window.ready&&navigator.serviceWorker.controller);}
+ await p.evaluate(()=>caches.delete('totempark-player-media-v1'));for(const name of media.keys()){await run(p,name,'empty',sw);await run(p,name,'ready',sw);await p.reload();await p.waitForFunction(()=>window.ready);await run(p,name,'reload',sw);}}
+ const inventory=await p.evaluate(async()=>{const c=await caches.open('totempark-player-media-v1');return Promise.all((await c.keys()).map(async k=>{const b=await(await c.match(k)).arrayBuffer();return {key:k.url,bytes:b.byteLength,sha256:Array.from(new Uint8Array(await crypto.subtle.digest('SHA-256',b))).map(x=>x.toString(16).padStart(2,'0')).join('')};}));});
+ await ctx.close();ctx=await launch();p=await page();await run(p,'image.png','restart',true);await ctx.setOffline(true);await run(p,'image.png','offline',true);await ctx.setOffline(false);
+ const after=Object.fromEntries(protectedFiles.map(p=>[p,hash(fs.readFileSync(path.join(repo,p)))]));fs.writeFileSync(path.join(root,'measurement.json'),JSON.stringify({scope:'Real Chromium + actual Web cache module; DOM reproduction of remote-src then effect preparation, NOT full React/Firebase player; SW actual unmodified; isolated fixtures only',bigBytes:big.length,baseline,after,productUnchanged:JSON.stringify(baseline)===JSON.stringify(after),inventory,runs,wire,network},null,2));console.log(JSON.stringify({bigBytes:big.length,runs:runs.map(r=>({phase:r.phase,bodyBytes:r.wire.reduce((s,x)=>s+x.bodyBytes,0),...r.summary})),productUnchanged:JSON.stringify(baseline)===JSON.stringify(after)}));
+}catch(error){fs.writeFileSync(path.join(root,'attempt-error.json'),JSON.stringify({error:String(error),runs,wire,network},null,2));throw error;}finally{await ctx?.close();await new Promise(r=>server.close(r));}
+
+

@@ -1,0 +1,1191 @@
+{
+  "started": "2026-09-16T14:07:03.537Z",
+  "profile": "C:\\Users\\centr\\Desktop\\totem-park\\artifacts\\homologacao-2a1\\chrome-profile-gate",
+  "network": [
+    {
+      "phase": "first-launch",
+      "requestId": "21464.77",
+      "url": "http://127.0.0.1:5199/media/video01.webm",
+      "method": "GET",
+      "requestHeaders": {
+        "sec-ch-ua-platform": "\"Windows\"",
+        "Referer": "http://127.0.0.1:5199/player/A/TESTA1",
+        "Accept-Encoding": "identity;q=1, *;q=0",
+        "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) HeadlessChrome/152.0.0.0 Safari/537.36",
+        "sec-ch-ua": "\"Chromium\";v=\"152\", \"Not?A_Brand\";v=\"24\", \"Google Chrome\";v=\"152\"",
+        "Range": "bytes=0-",
+        "sec-ch-ua-mobile": "?0"
+      },
+      "encodedBodyBytes": 0,
+      "decodedBodyBytes": 0,
+      "failure": "net::ERR_ABORTED"
+    }
+  ],
+  "console": [
+    {
+      "phase": "first-launch",
+      "at": "2026-09-16T14:07:09.034Z",
+      "type": "error",
+      "text": "Failed to load resource: the server responded with a status of 502 (Bad Gateway)"
+    },
+    {
+      "phase": "first-launch",
+      "at": "2026-09-16T14:07:10.802Z",
+      "type": "error",
+      "text": "Failed to load resource: net::ERR_CONNECTION_REFUSED"
+    },
+    {
+      "phase": "first-launch",
+      "at": "2026-09-16T14:07:10.804Z",
+      "type": "warning",
+      "text": "[2026-09-16T14:07:10.803Z]  @firebase/firestore: Firestore (12.14.0): WebChannelConnection RPC 'Listen' stream 0x5780b586 transport errored. Name: undefined Message: undefined"
+    },
+    {
+      "phase": "first-launch",
+      "at": "2026-09-16T14:07:10.804Z",
+      "type": "error",
+      "text": "Loading the image 'https://www.google.com/images/cleardot.gif?zx=xmax3krqfe4v' violates the following Content Security Policy directive: \"img-src 'self' blob: data:\". The action has been blocked."
+    },
+    {
+      "phase": "first-launch",
+      "at": "2026-09-16T14:07:10.805Z",
+      "type": "error",
+      "text": "[2026-09-16T14:07:10.805Z]  @firebase/firestore: Firestore (12.14.0): Could not reach Cloud Firestore backend. Connection failed 1 times. Most recent error: FirebaseError: [code=unavailable]: The operation could not be completed\nThis typically indicates that your device does not have a healthy Internet connection at the moment. The client will operate in offline mode until it is able to successfully connect to the backend."
+    },
+    {
+      "phase": "first-launch",
+      "at": "2026-09-16T14:07:10.827Z",
+      "type": "error",
+      "text": "Connecting to 'https://ipapi.co/json/' violates the following Content Security Policy directive: \"connect-src 'self' http://127.0.0.1:* ws://127.0.0.1:*\". The action has been blocked."
+    },
+    {
+      "phase": "first-launch",
+      "at": "2026-09-16T14:07:10.827Z",
+      "type": "error",
+      "text": "Fetch API cannot load https://ipapi.co/json/. Refused to connect because it violates the document's Content Security Policy."
+    },
+    {
+      "phase": "first-launch",
+      "at": "2026-09-16T14:07:11.050Z",
+      "type": "error",
+      "text": "Failed to load resource: net::ERR_CONNECTION_REFUSED"
+    },
+    {
+      "phase": "first-launch",
+      "at": "2026-09-16T14:07:11.050Z",
+      "type": "warning",
+      "text": "[2026-09-16T14:07:11.050Z]  @firebase/firestore: Firestore (12.14.0): WebChannelConnection RPC 'Listen' stream 0x5780b587 transport errored. Name: undefined Message: undefined"
+    },
+    {
+      "phase": "first-launch",
+      "at": "2026-09-16T14:07:11.050Z",
+      "type": "error",
+      "text": "Loading the image 'https://www.google.com/images/cleardot.gif?zx=p3n2m6e32el3' violates the following Content Security Policy directive: \"img-src 'self' blob: data:\". The action has been blocked."
+    },
+    {
+      "phase": "first-launch",
+      "at": "2026-09-16T14:07:12.333Z",
+      "type": "error",
+      "text": "Failed to load resource: net::ERR_CONNECTION_REFUSED"
+    },
+    {
+      "phase": "first-launch",
+      "at": "2026-09-16T14:07:12.582Z",
+      "type": "error",
+      "text": "Failed to load resource: net::ERR_CONNECTION_REFUSED"
+    },
+    {
+      "phase": "first-launch",
+      "at": "2026-09-16T14:07:12.847Z",
+      "type": "error",
+      "text": "Failed to load resource: net::ERR_CONNECTION_REFUSED"
+    },
+    {
+      "phase": "first-launch",
+      "at": "2026-09-16T14:07:12.847Z",
+      "type": "warning",
+      "text": "[2026-09-16T14:07:12.847Z]  @firebase/firestore: Firestore (12.14.0): WebChannelConnection RPC 'Write' stream 0x5780b588 transport errored. Name: undefined Message: undefined"
+    },
+    {
+      "phase": "first-launch",
+      "at": "2026-09-16T14:07:12.847Z",
+      "type": "error",
+      "text": "Loading the image 'https://www.google.com/images/cleardot.gif?zx=n58szyjy6dw2' violates the following Content Security Policy directive: \"img-src 'self' blob: data:\". The action has been blocked."
+    },
+    {
+      "phase": "first-launch",
+      "at": "2026-09-16T14:07:12.863Z",
+      "type": "error",
+      "text": "Failed to load resource: net::ERR_CONNECTION_REFUSED"
+    },
+    {
+      "phase": "first-launch",
+      "at": "2026-09-16T14:07:12.939Z",
+      "type": "error",
+      "text": "Failed to load resource: net::ERR_CONNECTION_REFUSED"
+    },
+    {
+      "phase": "first-launch",
+      "at": "2026-09-16T14:07:12.939Z",
+      "type": "error",
+      "text": "Failed to load resource: net::ERR_CONNECTION_REFUSED"
+    },
+    {
+      "phase": "first-launch",
+      "at": "2026-09-16T14:07:12.956Z",
+      "type": "error",
+      "text": "Failed to load resource: net::ERR_FAILED"
+    },
+    {
+      "phase": "first-launch",
+      "at": "2026-09-16T14:07:13.017Z",
+      "type": "error",
+      "text": "Failed to load resource: net::ERR_CONNECTION_REFUSED"
+    },
+    {
+      "phase": "first-launch",
+      "at": "2026-09-16T14:07:13.017Z",
+      "type": "warning",
+      "text": "[2026-09-16T14:07:13.017Z]  @firebase/firestore: Firestore (12.14.0): WebChannelConnection RPC 'Listen' stream 0x5780b589 transport errored. Name: undefined Message: undefined"
+    },
+    {
+      "phase": "first-launch",
+      "at": "2026-09-16T14:07:13.018Z",
+      "type": "error",
+      "text": "Loading the image 'https://www.google.com/images/cleardot.gif?zx=ed5h9rdwnnq' violates the following Content Security Policy directive: \"img-src 'self' blob: data:\". The action has been blocked."
+    },
+    {
+      "phase": "first-launch",
+      "at": "2026-09-16T14:07:13.450Z",
+      "type": "error",
+      "text": "Failed to load resource: net::ERR_CONNECTION_REFUSED"
+    },
+    {
+      "phase": "first-launch",
+      "at": "2026-09-16T14:07:13.451Z",
+      "type": "warning",
+      "text": "[2026-09-16T14:07:13.450Z]  @firebase/firestore: Firestore (12.14.0): WebChannelConnection RPC 'Write' stream 0x5780b58a transport errored. Name: undefined Message: undefined"
+    },
+    {
+      "phase": "first-launch",
+      "at": "2026-09-16T14:07:13.451Z",
+      "type": "error",
+      "text": "Loading the image 'https://www.google.com/images/cleardot.gif?zx=ixxdokdl411' violates the following Content Security Policy directive: \"img-src 'self' blob: data:\". The action has been blocked."
+    },
+    {
+      "phase": "first-launch",
+      "at": "2026-09-16T14:07:14.588Z",
+      "type": "error",
+      "text": "Failed to load resource: net::ERR_CONNECTION_REFUSED"
+    },
+    {
+      "phase": "first-launch",
+      "at": "2026-09-16T14:07:14.897Z",
+      "type": "error",
+      "text": "Failed to load resource: net::ERR_CONNECTION_REFUSED"
+    },
+    {
+      "phase": "first-launch",
+      "at": "2026-09-16T14:07:14.898Z",
+      "type": "warning",
+      "text": "[2026-09-16T14:07:14.897Z]  @firebase/firestore: Firestore (12.14.0): WebChannelConnection RPC 'Listen' stream 0x5780b58b transport errored. Name: undefined Message: undefined"
+    },
+    {
+      "phase": "first-launch",
+      "at": "2026-09-16T14:07:14.898Z",
+      "type": "error",
+      "text": "Loading the image 'https://www.google.com/images/cleardot.gif?zx=64drdzaewljm' violates the following Content Security Policy directive: \"img-src 'self' blob: data:\". The action has been blocked."
+    },
+    {
+      "phase": "first-launch",
+      "at": "2026-09-16T14:07:15.611Z",
+      "type": "error",
+      "text": "Failed to load resource: net::ERR_CONNECTION_REFUSED"
+    },
+    {
+      "phase": "first-launch",
+      "at": "2026-09-16T14:07:15.612Z",
+      "type": "warning",
+      "text": "[2026-09-16T14:07:15.611Z]  @firebase/firestore: Firestore (12.14.0): WebChannelConnection RPC 'Write' stream 0x5780b58c transport errored. Name: undefined Message: undefined"
+    },
+    {
+      "phase": "first-launch",
+      "at": "2026-09-16T14:07:15.612Z",
+      "type": "error",
+      "text": "Loading the image 'https://www.google.com/images/cleardot.gif?zx=wqez778hihjx' violates the following Content Security Policy directive: \"img-src 'self' blob: data:\". The action has been blocked."
+    },
+    {
+      "phase": "first-launch",
+      "at": "2026-09-16T14:07:15.687Z",
+      "type": "error",
+      "text": "Failed to load resource: net::ERR_CONNECTION_REFUSED"
+    },
+    {
+      "phase": "first-launch",
+      "at": "2026-09-16T14:07:15.860Z",
+      "type": "error",
+      "text": "Failed to load resource: net::ERR_CONNECTION_REFUSED"
+    },
+    {
+      "phase": "first-launch",
+      "at": "2026-09-16T14:07:15.862Z",
+      "type": "warning",
+      "text": "[2026-09-16T14:07:15.860Z]  @firebase/firestore: Firestore (12.14.0): WebChannelConnection RPC 'Write' stream 0x5780b58d transport errored. Name: undefined Message: undefined"
+    },
+    {
+      "phase": "first-launch",
+      "at": "2026-09-16T14:07:15.862Z",
+      "type": "error",
+      "text": "Loading the image 'https://www.google.com/images/cleardot.gif?zx=3ll1yglz68ze' violates the following Content Security Policy directive: \"img-src 'self' blob: data:\". The action has been blocked."
+    },
+    {
+      "phase": "reopened-before-player",
+      "at": "2026-09-16T14:07:19.763Z",
+      "type": "error",
+      "text": "Failed to load resource: net::ERR_FAILED"
+    },
+    {
+      "phase": "reopened-before-player",
+      "at": "2026-09-16T14:07:21.556Z",
+      "type": "error",
+      "text": "Failed to load resource: net::ERR_FAILED"
+    },
+    {
+      "phase": "reopened-before-player",
+      "at": "2026-09-16T14:07:21.556Z",
+      "type": "error",
+      "text": "Failed to load resource: net::ERR_FAILED"
+    },
+    {
+      "phase": "reopened-player",
+      "at": "2026-09-16T14:07:23.899Z",
+      "type": "error",
+      "text": "Failed to load resource: net::ERR_FAILED"
+    },
+    {
+      "phase": "reopened-player",
+      "at": "2026-09-16T14:07:25.687Z",
+      "type": "error",
+      "text": "Failed to load resource: net::ERR_FAILED"
+    },
+    {
+      "phase": "reopened-player",
+      "at": "2026-09-16T14:07:25.687Z",
+      "type": "error",
+      "text": "Failed to load resource: net::ERR_FAILED"
+    }
+  ],
+  "closures": [
+    {
+      "phase": "first-launch",
+      "pid": 24108,
+      "exited": true,
+      "at": "2026-09-16T14:07:16.922Z"
+    },
+    {
+      "phase": "reopened-player",
+      "pid": 24044,
+      "exited": true,
+      "at": "2026-09-16T14:07:32.889Z"
+    }
+  ],
+  "version": "152.0.7977.84",
+  "before": {
+    "names": [
+      "totem-park-pwa-v3",
+      "totempark-player-media-v1"
+    ],
+    "entries": [
+      {
+        "key": "https://totempark.local/cache/3056c0fe",
+        "bytes": 15649,
+        "sha256": "693d9b80d37e3cbb797ae1ae390d6bd9e5b7aff990231b8a58f67b64dccd72fd"
+      },
+      {
+        "key": "https://totempark.local/cache/aa0dc5a1",
+        "bytes": 27656,
+        "sha256": "5f5015fbb36a8379f70a8861a71efa490ab4a4945bef4460fd6a71be6a940013"
+      }
+    ],
+    "count": 2,
+    "bytes": 43305,
+    "worker": {
+      "registered": true,
+      "active": "activated",
+      "script": "http://127.0.0.1:5199/sw.js"
+    }
+  },
+  "singleTab": {
+    "samples": [
+      {
+        "at": 1789567627681,
+        "tag": null,
+        "src": "",
+        "error": null,
+        "classes": "",
+        "visible": false
+      },
+      {
+        "at": 1789567627787,
+        "tag": null,
+        "src": "",
+        "error": null,
+        "classes": "",
+        "visible": false
+      },
+      {
+        "at": 1789567627881,
+        "tag": null,
+        "src": "",
+        "error": null,
+        "classes": "",
+        "visible": false
+      },
+      {
+        "at": 1789567627992,
+        "tag": null,
+        "src": "",
+        "error": null,
+        "classes": "",
+        "visible": false
+      },
+      {
+        "at": 1789567628087,
+        "tag": null,
+        "src": "",
+        "error": null,
+        "classes": "",
+        "visible": false
+      },
+      {
+        "at": 1789567628195,
+        "tag": null,
+        "src": "",
+        "error": null,
+        "classes": "",
+        "visible": false
+      },
+      {
+        "at": 1789567628289,
+        "tag": null,
+        "src": "",
+        "error": null,
+        "classes": "",
+        "visible": false
+      },
+      {
+        "at": 1789567628597,
+        "tag": null,
+        "src": "",
+        "error": null,
+        "classes": "",
+        "visible": false
+      },
+      {
+        "at": 1789567628682,
+        "tag": null,
+        "src": "",
+        "error": null,
+        "classes": "",
+        "visible": false
+      },
+      {
+        "at": 1789567628781,
+        "tag": null,
+        "src": "",
+        "error": null,
+        "classes": "",
+        "visible": false
+      },
+      {
+        "at": 1789567628884,
+        "tag": null,
+        "src": "",
+        "error": null,
+        "classes": "",
+        "visible": false
+      },
+      {
+        "at": 1789567628993,
+        "tag": null,
+        "src": "",
+        "error": null,
+        "classes": "",
+        "visible": false
+      },
+      {
+        "at": 1789567629087,
+        "tag": null,
+        "src": "",
+        "error": null,
+        "classes": "",
+        "visible": false
+      },
+      {
+        "at": 1789567629196,
+        "tag": null,
+        "src": "",
+        "error": null,
+        "classes": "",
+        "visible": false
+      },
+      {
+        "at": 1789567629290,
+        "tag": null,
+        "src": "",
+        "error": null,
+        "classes": "",
+        "visible": false
+      },
+      {
+        "at": 1789567629385,
+        "tag": null,
+        "src": "",
+        "error": null,
+        "classes": "",
+        "visible": false
+      },
+      {
+        "at": 1789567629496,
+        "tag": null,
+        "src": "",
+        "error": null,
+        "classes": "",
+        "visible": false
+      },
+      {
+        "at": 1789567629590,
+        "tag": null,
+        "src": "",
+        "error": null,
+        "classes": "",
+        "visible": false
+      },
+      {
+        "at": 1789567629683,
+        "tag": null,
+        "src": "",
+        "error": null,
+        "classes": "",
+        "visible": false
+      },
+      {
+        "at": 1789567629792,
+        "tag": null,
+        "src": "",
+        "error": null,
+        "classes": "",
+        "visible": false
+      },
+      {
+        "at": 1789567629887,
+        "tag": null,
+        "src": "",
+        "error": null,
+        "classes": "",
+        "visible": false
+      },
+      {
+        "at": 1789567629982,
+        "tag": null,
+        "src": "",
+        "error": null,
+        "classes": "",
+        "visible": false
+      },
+      {
+        "at": 1789567630082,
+        "tag": null,
+        "src": "",
+        "error": null,
+        "classes": "",
+        "visible": false
+      },
+      {
+        "at": 1789567630186,
+        "tag": null,
+        "src": "",
+        "error": null,
+        "classes": "",
+        "visible": false
+      },
+      {
+        "at": 1789567630281,
+        "tag": null,
+        "src": "",
+        "error": null,
+        "classes": "",
+        "visible": false
+      },
+      {
+        "at": 1789567630390,
+        "tag": null,
+        "src": "",
+        "error": null,
+        "classes": "",
+        "visible": false
+      },
+      {
+        "at": 1789567630485,
+        "tag": null,
+        "src": "",
+        "error": null,
+        "classes": "",
+        "visible": false
+      },
+      {
+        "at": 1789567630595,
+        "tag": null,
+        "src": "",
+        "error": null,
+        "classes": "",
+        "visible": false
+      },
+      {
+        "at": 1789567630689,
+        "tag": null,
+        "src": "",
+        "error": null,
+        "classes": "",
+        "visible": false
+      },
+      {
+        "at": 1789567630784,
+        "tag": null,
+        "src": "",
+        "error": null,
+        "classes": "",
+        "visible": false
+      },
+      {
+        "at": 1789567630903,
+        "tag": "VIDEO",
+        "src": "http://127.0.0.1:5199/media/video01.webm",
+        "time": 0,
+        "ready": 0,
+        "error": null,
+        "classes": "player-transition-layer player-buffer-layer is-current is-pending transition-fade speed-normal ",
+        "visible": false
+      },
+      {
+        "at": 1789567630980,
+        "tag": "VIDEO",
+        "src": "blob:http://127.0.0.1:5199/7c433eab-790a-4f97-8c3e-589c36d0ef0c",
+        "time": 0.055839,
+        "ready": 4,
+        "error": null,
+        "classes": "player-transition-layer player-buffer-layer is-current is-ready transition-active transition-fade speed-normal ",
+        "visible": true
+      },
+      {
+        "at": 1789567631091,
+        "tag": "VIDEO",
+        "src": "blob:http://127.0.0.1:5199/7c433eab-790a-4f97-8c3e-589c36d0ef0c",
+        "time": 0.167056,
+        "ready": 4,
+        "error": null,
+        "classes": "player-transition-layer player-buffer-layer is-current is-ready transition-active transition-fade speed-normal ",
+        "visible": true
+      },
+      {
+        "at": 1789567631188,
+        "tag": "VIDEO",
+        "src": "blob:http://127.0.0.1:5199/7c433eab-790a-4f97-8c3e-589c36d0ef0c",
+        "time": 0.263985,
+        "ready": 4,
+        "error": null,
+        "classes": "player-transition-layer player-buffer-layer is-current is-ready transition-active transition-fade speed-normal ",
+        "visible": true
+      },
+      {
+        "at": 1789567631283,
+        "tag": "VIDEO",
+        "src": "blob:http://127.0.0.1:5199/7c433eab-790a-4f97-8c3e-589c36d0ef0c",
+        "time": 0.359032,
+        "ready": 4,
+        "error": null,
+        "classes": "player-transition-layer player-buffer-layer is-current is-ready transition-active transition-fade speed-normal ",
+        "visible": true
+      },
+      {
+        "at": 1789567631392,
+        "tag": "VIDEO",
+        "src": "blob:http://127.0.0.1:5199/7c433eab-790a-4f97-8c3e-589c36d0ef0c",
+        "time": 0.467189,
+        "ready": 4,
+        "error": null,
+        "classes": "player-transition-layer player-buffer-layer is-current is-ready transition-active transition-fade speed-normal ",
+        "visible": true
+      },
+      {
+        "at": 1789567631487,
+        "tag": "VIDEO",
+        "src": "blob:http://127.0.0.1:5199/7c433eab-790a-4f97-8c3e-589c36d0ef0c",
+        "time": 0.562972,
+        "ready": 4,
+        "error": null,
+        "classes": "player-transition-layer player-buffer-layer is-current is-ready transition-active transition-fade speed-normal ",
+        "visible": true
+      },
+      {
+        "at": 1789567631582,
+        "tag": "VIDEO",
+        "src": "blob:http://127.0.0.1:5199/7c433eab-790a-4f97-8c3e-589c36d0ef0c",
+        "time": 0.658023,
+        "ready": 4,
+        "error": null,
+        "classes": "player-transition-layer player-buffer-layer is-current is-ready transition-active transition-fade speed-normal ",
+        "visible": true
+      },
+      {
+        "at": 1789567631693,
+        "tag": "VIDEO",
+        "src": "blob:http://127.0.0.1:5199/7c433eab-790a-4f97-8c3e-589c36d0ef0c",
+        "time": 0.768388,
+        "ready": 4,
+        "error": null,
+        "classes": "player-transition-layer player-buffer-layer is-current is-ready transition-active transition-fade speed-normal ",
+        "visible": true
+      },
+      {
+        "at": 1789567631787,
+        "tag": "VIDEO",
+        "src": "blob:http://127.0.0.1:5199/7c433eab-790a-4f97-8c3e-589c36d0ef0c",
+        "time": 0.862205,
+        "ready": 4,
+        "error": null,
+        "classes": "player-transition-layer player-buffer-layer is-current is-ready transition-active transition-fade speed-normal ",
+        "visible": true
+      },
+      {
+        "at": 1789567631881,
+        "tag": "VIDEO",
+        "src": "blob:http://127.0.0.1:5199/7c433eab-790a-4f97-8c3e-589c36d0ef0c",
+        "time": 0.956448,
+        "ready": 4,
+        "error": null,
+        "classes": "player-transition-layer player-buffer-layer is-current is-ready transition-active transition-fade speed-normal ",
+        "visible": true
+      },
+      {
+        "at": 1789567631990,
+        "tag": "VIDEO",
+        "src": "blob:http://127.0.0.1:5199/7c433eab-790a-4f97-8c3e-589c36d0ef0c",
+        "time": 1.065134,
+        "ready": 4,
+        "error": null,
+        "classes": "player-transition-layer player-buffer-layer is-current is-ready transition-active transition-fade speed-normal ",
+        "visible": true
+      },
+      {
+        "at": 1789567632084,
+        "tag": "VIDEO",
+        "src": "blob:http://127.0.0.1:5199/7c433eab-790a-4f97-8c3e-589c36d0ef0c",
+        "time": 1.159098,
+        "ready": 4,
+        "error": null,
+        "classes": "player-transition-layer player-buffer-layer is-current is-ready transition-active transition-fade speed-normal ",
+        "visible": true
+      },
+      {
+        "at": 1789567632192,
+        "tag": "VIDEO",
+        "src": "blob:http://127.0.0.1:5199/7c433eab-790a-4f97-8c3e-589c36d0ef0c",
+        "time": 1.267105,
+        "ready": 4,
+        "error": null,
+        "classes": "player-transition-layer player-buffer-layer is-current is-ready transition-active transition-fade speed-normal ",
+        "visible": true
+      },
+      {
+        "at": 1789567632285,
+        "tag": "VIDEO",
+        "src": "blob:http://127.0.0.1:5199/7c433eab-790a-4f97-8c3e-589c36d0ef0c",
+        "time": 1.360427,
+        "ready": 4,
+        "error": null,
+        "classes": "player-transition-layer player-buffer-layer is-current is-ready transition-active transition-fade speed-normal ",
+        "visible": true
+      },
+      {
+        "at": 1789567632393,
+        "tag": "VIDEO",
+        "src": "blob:http://127.0.0.1:5199/7c433eab-790a-4f97-8c3e-589c36d0ef0c",
+        "time": 1.468868,
+        "ready": 4,
+        "error": null,
+        "classes": "player-transition-layer player-buffer-layer is-current is-ready transition-active transition-fade speed-normal ",
+        "visible": true
+      },
+      {
+        "at": 1789567632487,
+        "tag": "VIDEO",
+        "src": "blob:http://127.0.0.1:5199/7c433eab-790a-4f97-8c3e-589c36d0ef0c",
+        "time": 1.550828,
+        "ready": 4,
+        "error": null,
+        "classes": "player-transition-layer player-buffer-layer is-current is-ready transition-active transition-fade speed-normal ",
+        "visible": true
+      },
+      {
+        "at": 1789567632582,
+        "tag": "IMG",
+        "src": "blob:http://127.0.0.1:5199/80c42ed0-1146-4099-a527-019de20c4471",
+        "width": 640,
+        "error": null,
+        "classes": "player-transition-layer player-buffer-layer is-current is-ready transition-active transition-fade speed-normal ",
+        "visible": true
+      },
+      {
+        "at": 1789567632690,
+        "tag": "IMG",
+        "src": "blob:http://127.0.0.1:5199/80c42ed0-1146-4099-a527-019de20c4471",
+        "width": 640,
+        "error": null,
+        "classes": "player-transition-layer player-buffer-layer is-current is-ready transition-active transition-fade speed-normal ",
+        "visible": true
+      },
+      {
+        "at": 1789567632783,
+        "tag": "IMG",
+        "src": "blob:http://127.0.0.1:5199/80c42ed0-1146-4099-a527-019de20c4471",
+        "width": 640,
+        "error": null,
+        "classes": "player-transition-layer player-buffer-layer is-current is-ready transition-active transition-fade speed-normal ",
+        "visible": true
+      },
+      {
+        "at": 1789567632891,
+        "tag": "IMG",
+        "src": "blob:http://127.0.0.1:5199/80c42ed0-1146-4099-a527-019de20c4471",
+        "width": 640,
+        "error": null,
+        "classes": "player-transition-layer player-buffer-layer is-current is-ready transition-active transition-fade speed-normal ",
+        "visible": true
+      },
+      {
+        "at": 1789567632986,
+        "tag": "IMG",
+        "src": "blob:http://127.0.0.1:5199/80c42ed0-1146-4099-a527-019de20c4471",
+        "width": 640,
+        "error": null,
+        "classes": "player-transition-layer player-buffer-layer is-current is-ready transition-active transition-fade speed-normal ",
+        "visible": true
+      },
+      {
+        "at": 1789567633091,
+        "tag": "IMG",
+        "src": "blob:http://127.0.0.1:5199/80c42ed0-1146-4099-a527-019de20c4471",
+        "width": 640,
+        "error": null,
+        "classes": "player-transition-layer player-buffer-layer is-current is-ready transition-active transition-fade speed-normal ",
+        "visible": true
+      },
+      {
+        "at": 1789567633181,
+        "tag": "IMG",
+        "src": "blob:http://127.0.0.1:5199/80c42ed0-1146-4099-a527-019de20c4471",
+        "width": 640,
+        "error": null,
+        "classes": "player-transition-layer player-buffer-layer is-current is-ready transition-active transition-fade speed-normal ",
+        "visible": true
+      },
+      {
+        "at": 1789567633294,
+        "tag": "IMG",
+        "src": "blob:http://127.0.0.1:5199/80c42ed0-1146-4099-a527-019de20c4471",
+        "width": 640,
+        "error": null,
+        "classes": "player-transition-layer player-buffer-layer is-current is-ready transition-active transition-fade speed-normal ",
+        "visible": true
+      },
+      {
+        "at": 1789567633387,
+        "tag": "IMG",
+        "src": "blob:http://127.0.0.1:5199/80c42ed0-1146-4099-a527-019de20c4471",
+        "width": 640,
+        "error": null,
+        "classes": "player-transition-layer player-buffer-layer is-current is-ready transition-active transition-fade speed-normal ",
+        "visible": true
+      },
+      {
+        "at": 1789567633481,
+        "tag": "IMG",
+        "src": "blob:http://127.0.0.1:5199/80c42ed0-1146-4099-a527-019de20c4471",
+        "width": 640,
+        "error": null,
+        "classes": "player-transition-layer player-buffer-layer is-current is-ready transition-active transition-fade speed-normal ",
+        "visible": true
+      },
+      {
+        "at": 1789567633591,
+        "tag": "IMG",
+        "src": "blob:http://127.0.0.1:5199/80c42ed0-1146-4099-a527-019de20c4471",
+        "width": 640,
+        "error": null,
+        "classes": "player-transition-layer player-buffer-layer is-current is-ready transition-active transition-fade speed-normal ",
+        "visible": true
+      },
+      {
+        "at": 1789567633684,
+        "tag": "IMG",
+        "src": "blob:http://127.0.0.1:5199/80c42ed0-1146-4099-a527-019de20c4471",
+        "width": 640,
+        "error": null,
+        "classes": "player-transition-layer player-buffer-layer is-current is-ready transition-active transition-fade speed-normal ",
+        "visible": true
+      },
+      {
+        "at": 1789567633794,
+        "tag": "IMG",
+        "src": "blob:http://127.0.0.1:5199/80c42ed0-1146-4099-a527-019de20c4471",
+        "width": 640,
+        "error": null,
+        "classes": "player-transition-layer player-buffer-layer is-current is-ready transition-active transition-fade speed-normal ",
+        "visible": true
+      },
+      {
+        "at": 1789567633887,
+        "tag": "IMG",
+        "src": "blob:http://127.0.0.1:5199/80c42ed0-1146-4099-a527-019de20c4471",
+        "width": 640,
+        "error": null,
+        "classes": "player-transition-layer player-buffer-layer is-current is-ready transition-active transition-fade speed-normal ",
+        "visible": true
+      },
+      {
+        "at": 1789567633994,
+        "tag": "IMG",
+        "src": "blob:http://127.0.0.1:5199/80c42ed0-1146-4099-a527-019de20c4471",
+        "width": 640,
+        "error": null,
+        "classes": "player-transition-layer player-buffer-layer is-current is-ready transition-active transition-fade speed-normal ",
+        "visible": true
+      },
+      {
+        "at": 1789567634086,
+        "tag": "IMG",
+        "src": "blob:http://127.0.0.1:5199/80c42ed0-1146-4099-a527-019de20c4471",
+        "width": 640,
+        "error": null,
+        "classes": "player-transition-layer player-buffer-layer is-current is-ready transition-active transition-fade speed-normal ",
+        "visible": true
+      },
+      {
+        "at": 1789567634194,
+        "tag": "IMG",
+        "src": "blob:http://127.0.0.1:5199/80c42ed0-1146-4099-a527-019de20c4471",
+        "width": 640,
+        "error": null,
+        "classes": "player-transition-layer player-buffer-layer is-current is-ready transition-active transition-fade speed-normal ",
+        "visible": true
+      },
+      {
+        "at": 1789567634288,
+        "tag": "IMG",
+        "src": "blob:http://127.0.0.1:5199/80c42ed0-1146-4099-a527-019de20c4471",
+        "width": 640,
+        "error": null,
+        "classes": "player-transition-layer player-buffer-layer is-current is-ready transition-active transition-fade speed-normal ",
+        "visible": true
+      },
+      {
+        "at": 1789567634382,
+        "tag": "IMG",
+        "src": "blob:http://127.0.0.1:5199/80c42ed0-1146-4099-a527-019de20c4471",
+        "width": 640,
+        "error": null,
+        "classes": "player-transition-layer player-buffer-layer is-current is-ready transition-active transition-fade speed-normal ",
+        "visible": true
+      },
+      {
+        "at": 1789567634491,
+        "tag": "IMG",
+        "src": "blob:http://127.0.0.1:5199/80c42ed0-1146-4099-a527-019de20c4471",
+        "width": 640,
+        "error": null,
+        "classes": "player-transition-layer player-buffer-layer is-current is-ready transition-active transition-fade speed-normal ",
+        "visible": true
+      },
+      {
+        "at": 1789567634586,
+        "tag": "IMG",
+        "src": "blob:http://127.0.0.1:5199/80c42ed0-1146-4099-a527-019de20c4471",
+        "width": 640,
+        "error": null,
+        "classes": "player-transition-layer player-buffer-layer is-current is-ready transition-active transition-fade speed-normal ",
+        "visible": true
+      },
+      {
+        "at": 1789567634695,
+        "tag": "IMG",
+        "src": "blob:http://127.0.0.1:5199/80c42ed0-1146-4099-a527-019de20c4471",
+        "width": 640,
+        "error": null,
+        "classes": "player-transition-layer player-buffer-layer is-current is-ready transition-active transition-fade speed-normal ",
+        "visible": true
+      },
+      {
+        "at": 1789567634789,
+        "tag": "IMG",
+        "src": "blob:http://127.0.0.1:5199/80c42ed0-1146-4099-a527-019de20c4471",
+        "width": 640,
+        "error": null,
+        "classes": "player-transition-layer player-buffer-layer is-current is-ready transition-active transition-fade speed-normal ",
+        "visible": true
+      },
+      {
+        "at": 1789567634896,
+        "tag": "IMG",
+        "src": "blob:http://127.0.0.1:5199/80c42ed0-1146-4099-a527-019de20c4471",
+        "width": 640,
+        "error": null,
+        "classes": "player-transition-layer player-buffer-layer is-current is-ready transition-active transition-fade speed-normal ",
+        "visible": true
+      },
+      {
+        "at": 1789567634990,
+        "tag": "IMG",
+        "src": "blob:http://127.0.0.1:5199/80c42ed0-1146-4099-a527-019de20c4471",
+        "width": 640,
+        "error": null,
+        "classes": "player-transition-layer player-buffer-layer is-current is-ready transition-active transition-fade speed-normal ",
+        "visible": true
+      },
+      {
+        "at": 1789567635082,
+        "tag": "IMG",
+        "src": "blob:http://127.0.0.1:5199/80c42ed0-1146-4099-a527-019de20c4471",
+        "width": 640,
+        "error": null,
+        "classes": "player-transition-layer player-buffer-layer is-current is-ready transition-active transition-fade speed-normal ",
+        "visible": true
+      },
+      {
+        "at": 1789567635191,
+        "tag": "IMG",
+        "src": "blob:http://127.0.0.1:5199/80c42ed0-1146-4099-a527-019de20c4471",
+        "width": 640,
+        "error": null,
+        "classes": "player-transition-layer player-buffer-layer is-current is-ready transition-active transition-fade speed-normal ",
+        "visible": true
+      },
+      {
+        "at": 1789567635284,
+        "tag": "IMG",
+        "src": "blob:http://127.0.0.1:5199/80c42ed0-1146-4099-a527-019de20c4471",
+        "width": 640,
+        "error": null,
+        "classes": "player-transition-layer player-buffer-layer is-current is-ready transition-active transition-fade speed-normal ",
+        "visible": true
+      },
+      {
+        "at": 1789567635393,
+        "tag": "IMG",
+        "src": "blob:http://127.0.0.1:5199/80c42ed0-1146-4099-a527-019de20c4471",
+        "width": 640,
+        "error": null,
+        "classes": "player-transition-layer player-buffer-layer is-current is-ready transition-active transition-fade speed-normal ",
+        "visible": true
+      },
+      {
+        "at": 1789567635486,
+        "tag": "IMG",
+        "src": "blob:http://127.0.0.1:5199/80c42ed0-1146-4099-a527-019de20c4471",
+        "width": 640,
+        "error": null,
+        "classes": "player-transition-layer player-buffer-layer is-current is-ready transition-active transition-fade speed-normal ",
+        "visible": true
+      },
+      {
+        "at": 1789567635591,
+        "tag": "VIDEO",
+        "src": "blob:http://127.0.0.1:5199/7c433eab-790a-4f97-8c3e-589c36d0ef0c",
+        "time": 0.025512,
+        "ready": 4,
+        "error": null,
+        "classes": "player-transition-layer player-buffer-layer is-current is-ready transition-active transition-fade speed-normal ",
+        "visible": true
+      },
+      {
+        "at": 1789567635687,
+        "tag": "VIDEO",
+        "src": "blob:http://127.0.0.1:5199/7c433eab-790a-4f97-8c3e-589c36d0ef0c",
+        "time": 0.121035,
+        "ready": 4,
+        "error": null,
+        "classes": "player-transition-layer player-buffer-layer is-current is-ready transition-active transition-fade speed-normal ",
+        "visible": true
+      },
+      {
+        "at": 1789567635792,
+        "tag": "VIDEO",
+        "src": "blob:http://127.0.0.1:5199/7c433eab-790a-4f97-8c3e-589c36d0ef0c",
+        "time": 0.225923,
+        "ready": 4,
+        "error": null,
+        "classes": "player-transition-layer player-buffer-layer is-current is-ready transition-active transition-fade speed-normal ",
+        "visible": true
+      },
+      {
+        "at": 1789567635888,
+        "tag": "VIDEO",
+        "src": "blob:http://127.0.0.1:5199/7c433eab-790a-4f97-8c3e-589c36d0ef0c",
+        "time": 0.321996,
+        "ready": 4,
+        "error": null,
+        "classes": "player-transition-layer player-buffer-layer is-current is-ready transition-active transition-fade speed-normal ",
+        "visible": true
+      },
+      {
+        "at": 1789567635982,
+        "tag": "VIDEO",
+        "src": "blob:http://127.0.0.1:5199/7c433eab-790a-4f97-8c3e-589c36d0ef0c",
+        "time": 0.41653,
+        "ready": 4,
+        "error": null,
+        "classes": "player-transition-layer player-buffer-layer is-current is-ready transition-active transition-fade speed-normal ",
+        "visible": true
+      },
+      {
+        "at": 1789567636092,
+        "tag": "VIDEO",
+        "src": "blob:http://127.0.0.1:5199/7c433eab-790a-4f97-8c3e-589c36d0ef0c",
+        "time": 0.525855,
+        "ready": 4,
+        "error": null,
+        "classes": "player-transition-layer player-buffer-layer is-current is-ready transition-active transition-fade speed-normal ",
+        "visible": true
+      },
+      {
+        "at": 1789567636181,
+        "tag": "VIDEO",
+        "src": "blob:http://127.0.0.1:5199/7c433eab-790a-4f97-8c3e-589c36d0ef0c",
+        "time": 0.614994,
+        "ready": 4,
+        "error": null,
+        "classes": "player-transition-layer player-buffer-layer is-current is-ready transition-active transition-fade speed-normal ",
+        "visible": true
+      },
+      {
+        "at": 1789567636294,
+        "tag": "VIDEO",
+        "src": "blob:http://127.0.0.1:5199/7c433eab-790a-4f97-8c3e-589c36d0ef0c",
+        "time": 0.728782,
+        "ready": 4,
+        "error": null,
+        "classes": "player-transition-layer player-buffer-layer is-current is-ready transition-active transition-fade speed-normal ",
+        "visible": true
+      },
+      {
+        "at": 1789567636388,
+        "tag": "VIDEO",
+        "src": "blob:http://127.0.0.1:5199/7c433eab-790a-4f97-8c3e-589c36d0ef0c",
+        "time": 0.822441,
+        "ready": 4,
+        "error": null,
+        "classes": "player-transition-layer player-buffer-layer is-current is-ready transition-active transition-fade speed-normal ",
+        "visible": true
+      },
+      {
+        "at": 1789567636481,
+        "tag": "VIDEO",
+        "src": "blob:http://127.0.0.1:5199/7c433eab-790a-4f97-8c3e-589c36d0ef0c",
+        "time": 0.915436,
+        "ready": 4,
+        "error": null,
+        "classes": "player-transition-layer player-buffer-layer is-current is-ready transition-active transition-fade speed-normal ",
+        "visible": true
+      },
+      {
+        "at": 1789567636589,
+        "tag": "VIDEO",
+        "src": "blob:http://127.0.0.1:5199/7c433eab-790a-4f97-8c3e-589c36d0ef0c",
+        "time": 1.023232,
+        "ready": 4,
+        "error": null,
+        "classes": "player-transition-layer player-buffer-layer is-current is-ready transition-active transition-fade speed-normal ",
+        "visible": true
+      }
+    ],
+    "events": [
+      {
+        "at": 1789567630903,
+        "event": "play",
+        "tag": "VIDEO",
+        "src": "http://127.0.0.1:5199/media/video01.webm",
+        "current": true,
+        "code": null
+      },
+      {
+        "at": 1789567630921,
+        "event": "play",
+        "tag": "VIDEO",
+        "src": "blob:http://127.0.0.1:5199/7c433eab-790a-4f97-8c3e-589c36d0ef0c",
+        "current": true,
+        "code": null
+      },
+      {
+        "at": 1789567630927,
+        "event": "loadeddata",
+        "tag": "VIDEO",
+        "src": "blob:http://127.0.0.1:5199/7c433eab-790a-4f97-8c3e-589c36d0ef0c",
+        "current": true,
+        "code": null
+      },
+      {
+        "at": 1789567632542,
+        "event": "ended",
+        "tag": "VIDEO",
+        "src": "blob:http://127.0.0.1:5199/7c433eab-790a-4f97-8c3e-589c36d0ef0c",
+        "current": true,
+        "code": null
+      },
+      {
+        "at": 1789567635557,
+        "event": "play",
+        "tag": "VIDEO",
+        "src": "blob:http://127.0.0.1:5199/7c433eab-790a-4f97-8c3e-589c36d0ef0c",
+        "current": true,
+        "code": null
+      },
+      {
+        "at": 1789567635567,
+        "event": "loadeddata",
+        "tag": "VIDEO",
+        "src": "blob:http://127.0.0.1:5199/7c433eab-790a-4f97-8c3e-589c36d0ef0c",
+        "current": true,
+        "code": null
+      }
+    ]
+  },
+  "after": {
+    "names": [
+      "totem-park-pwa-v3",
+      "totempark-player-media-v1"
+    ],
+    "entries": [
+      {
+        "key": "https://totempark.local/cache/3056c0fe",
+        "bytes": 15649,
+        "sha256": "693d9b80d37e3cbb797ae1ae390d6bd9e5b7aff990231b8a58f67b64dccd72fd"
+      },
+      {
+        "key": "https://totempark.local/cache/aa0dc5a1",
+        "bytes": 27656,
+        "sha256": "5f5015fbb36a8379f70a8861a71efa490ab4a4945bef4460fd6a71be6a940013"
+      }
+    ],
+    "count": 2,
+    "bytes": 43305,
+    "worker": {
+      "registered": true,
+      "active": "activated",
+      "script": "http://127.0.0.1:5199/sw.js"
+    }
+  },
+  "persistence": "PASSOU",
+  "reopenNetworkStart": "2026-09-16T14:07:21.583Z",
+  "error": "AssertionError [ERR_ASSERTION]: Player must still be rendering cached media BEFORE offline\n    at file:///C:/Users/centr/Desktop/totem-park/artifacts/homologacao-2a1/automated-gate.mjs:140:10",
+  "finished": "2026-09-16T14:07:32.890Z"
+}

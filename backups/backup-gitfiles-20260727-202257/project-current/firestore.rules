@@ -1,0 +1,104 @@
+rules_version = '2';
+
+service cloud.firestore {
+  match /databases/{database}/documents {
+    function signedIn() {
+      return request.auth != null;
+    }
+
+    function isMaster() {
+      return signedIn()
+        && (
+          (
+            exists(/databases/$(database)/documents/settings/masterAccess)
+            && request.auth.token.email in get(/databases/$(database)/documents/settings/masterAccess).data.emails
+          )
+          || (
+            !exists(/databases/$(database)/documents/settings/masterAccess)
+            && request.auth.token.email in [
+              "admin@parksolutions.com",
+              "juniordoparque10@gmail.com"
+            ]
+          )
+        );
+    }
+
+    function clientDoc(clientId) {
+      return get(/databases/$(database)/documents/clients/$(clientId));
+    }
+
+    function isClientOwner(clientId) {
+      return signedIn() && clientDoc(clientId).data.uid == request.auth.uid;
+    }
+
+    function isAllowedPublicScreenUpdate() {
+      return request.resource.data.diff(resource.data).affectedKeys().hasOnly([
+        "activeDeviceId",
+        "cacheSizeBytes",
+        "cacheStatus",
+        "cacheUpdatedAt",
+        "cachedItems",
+        "commandStatus",
+        "connectedDeviceId",
+        "currentMediaSource",
+        "currentPlaylistId",
+        "currentPlaylistMode",
+        "currentPlaylistName",
+        "failedCacheItems",
+        "lastCommandExecuted",
+        "lastCommandExecutedAt",
+        "lastCommandSent",
+        "lastConnection",
+        "lastMediaUpdateAt",
+        "lastSeenAt",
+        "nowPlayingAspectRatio",
+        "nowPlayingDuration",
+        "nowPlayingHeight",
+        "nowPlayingIndex",
+        "nowPlayingItemType",
+        "nowPlayingOrientation",
+        "nowPlayingPreview",
+        "nowPlayingSound",
+        "nowPlayingTemplateType",
+        "nowPlayingTitle",
+        "nowPlayingTotal",
+        "nowPlayingType",
+        "nowPlayingWidth",
+        "remoteCommand",
+        "status",
+        "totalCacheableItems"
+      ]);
+    }
+
+    match /clients/{clientId} {
+      allow read: if true;
+      allow create: if isMaster();
+      allow update, delete: if isMaster() || isClientOwner(clientId);
+
+      match /screens/{screenId} {
+        allow read: if true;
+        allow create, delete: if isMaster() || isClientOwner(clientId);
+        allow update: if isMaster() || isClientOwner(clientId) || isAllowedPublicScreenUpdate();
+      }
+
+      match /{subcollection}/{documentId} {
+        allow read: if true;
+        allow write: if isMaster() || isClientOwner(clientId);
+      }
+    }
+
+    match /tv_codes/{code} {
+      allow read: if true;
+      allow write: if isMaster() || signedIn();
+    }
+
+    match /settings/{settingId} {
+      allow read: if true;
+      allow write: if isMaster();
+    }
+
+    match /{document=**} {
+      allow read, write: if isMaster();
+    }
+  }
+}

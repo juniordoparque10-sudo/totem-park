@@ -1,0 +1,114 @@
+{
+  "current": {
+    "lastError": "Erro ao carregar vídeo",
+    "mediaName": "Park Solutions vídeo",
+    "operatingMode": "LOCAL",
+    "mediaType": "VIDEO",
+    "lastPlayerEvent": "waiting",
+    "playlistId": "NYMMLih50iYxXho5bvRL",
+    "dynamicDataSource": "INTERNET",
+    "mediaId": "enfiqiz94zS2wy4oAaKe",
+    "connectionStatus": "ONLINE",
+    "lastErrorAt": "2026-09-22T17:27:24.036Z",
+    "playbackActive": false,
+    "mediaSource": "CACHE_LOCAL"
+  },
+  "counters": {
+    "downloadTimeouts": "0",
+    "stallDurationMs": "0",
+    "downloadStalls": "0",
+    "remotePlaybackCount": "0",
+    "cacheMisses": "0",
+    "displayTimeMs": "5131026",
+    "bytesDownloaded": "0",
+    "cacheHits": "0",
+    "partialBytesObserved": "0",
+    "waitingCount": "418",
+    "downloadRetries": "0",
+    "localPlaybackCount": "416",
+    "downloadFailed": "0",
+    "downloadCompleted": "0",
+    "playbackErrors": "4",
+    "estimatedTrafficSaved": "913108352",
+    "stalledCount": "0",
+    "waitingDurationMs": "85493",
+    "downloadStarts": "0"
+  },
+  "transitions": [
+    {
+      "transitionStartedAt": "2026-09-22T17:27:23.087Z",
+      "fromMediaId": "enfiqiz94zS2wy4oAaKe",
+      "transitionCompletedAt": "2026-09-22T17:27:23.308Z",
+      "transitionId": "11bc417d-3ed8-4b07-b301-d01bf82a0225",
+      "transitionDurationMs": "221",
+      "toMediaId": "AVwGDQ73WNhEnKaMZj7I",
+      "result": "SUCCESS",
+      "reason": "VIDEO_ENDED"
+    },
+    {
+      "transitionStartedAt": "2026-09-22T17:27:24.081Z",
+      "transitionCompletedAt": null,
+      "result": "UNKNOWN",
+      "reason": "ERROR",
+      "toMediaId": "enfiqiz94zS2wy4oAaKe",
+      "fromMediaId": "AVwGDQ73WNhEnKaMZj7I",
+      "transitionDurationMs": "0",
+      "transitionId": "d42d9877-5c9f-441a-8c7d-e8237999c73a"
+    }
+  ],
+  "lastPlayerEvents": [
+    {
+      "duration": "0",
+      "event": "MEDIA_CHANGE",
+      "readyState": "0",
+      "currentTime": "0",
+      "networkState": "0",
+      "mediaId": "",
+      "timestamp": "2026-09-22T17:27:24.081Z",
+      "errorCode": null,
+      "ended": false,
+      "paused": false,
+      "mediaSource": "UNKNOWN"
+    },
+    {
+      "ended": false,
+      "duration": 10.005333,
+      "mediaSource": "CACHE_LOCAL",
+      "timestamp": "2026-09-22T17:27:24.097Z",
+      "networkState": "1",
+      "mediaId": "AVwGDQ73WNhEnKaMZj7I",
+      "errorCode": "3",
+      "paused": true,
+      "event": "pause",
+      "currentTime": 0.641028,
+      "readyState": "4"
+    },
+    {
+      "duration": 10.005,
+      "ended": false,
+      "timestamp": "2026-09-22T17:27:24.109Z",
+      "errorCode": null,
+      "readyState": "1",
+      "currentTime": "0",
+      "paused": false,
+      "mediaSource": "CACHE_LOCAL",
+      "event": "waiting",
+      "networkState": "1",
+      "mediaId": "enfiqiz94zS2wy4oAaKe"
+    }
+  ],
+  "schemaVersion": "1",
+  "session": {
+    "endedAt": null,
+    "lastHeartbeatAt": "2026-09-22T17:37:14.631Z",
+    "screenId": "emp3VDKfLzmz1sWJrnbx",
+    "clientId": "eCd1q9Dq1SMr9D5FlKN8",
+    "deviceId": "b148d1ab-5dd6-42b1-98d7-f2ca68024b59",
+    "appVersion": "1.0-player-2a2-c-telemetry-pilot",
+    "sessionId": "efa5d675-8ead-47db-b14e-d43b1b289c7a",
+    "platform": "ANDROID",
+    "lastActivityAt": "2026-09-22T17:27:24.109Z",
+    "startedAt": "2026-09-22T16:11:43.605Z",
+    "sequence": "17"
+  }
+}

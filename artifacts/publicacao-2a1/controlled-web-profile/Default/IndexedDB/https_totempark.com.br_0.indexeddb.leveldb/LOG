@@ -1,0 +1,10 @@
+2026/09/16-11:53:14.038 c9c Creating DB C:\Users\centr\Desktop\totem-park\artifacts\publicacao-2a1\controlled-web-profile\Default\IndexedDB\https_totempark.com.br_0.indexeddb.leveldb since it was missing.
+2026/09/16-11:53:14.045 c9c Reusing MANIFEST C:\Users\centr\Desktop\totem-park\artifacts\publicacao-2a1\controlled-web-profile\Default\IndexedDB\https_totempark.com.br_0.indexeddb.leveldb/MANIFEST-000001
+2026/09/16-11:53:14.071 2fdc Level-0 table #5: started
+2026/09/16-11:53:14.074 2fdc Level-0 table #5: 1274 bytes OK
+2026/09/16-11:53:14.075 2fdc Delete type=0 #3
+2026/09/16-11:53:14.076 c9c Manual compaction at level-0 from '\x00\x01\x00\x00\x00' @ 72057594037927935 : 1 .. '\x00\x02\x00\x00\x00' @ 0 : 0; will stop at (end)
+2026/09/16-11:54:16.181 574 Level-0 table #7: started
+2026/09/16-11:54:16.183 574 Level-0 table #7: 1993 bytes OK
+2026/09/16-11:54:16.184 574 Delete type=0 #4
+2026/09/16-11:54:16.184 c9c Manual compaction at level-0 from '\x00\x04\x00\x00\x00' @ 72057594037927935 : 1 .. '\x00\x05\x00\x00\x00' @ 0 : 0; will stop at (end)

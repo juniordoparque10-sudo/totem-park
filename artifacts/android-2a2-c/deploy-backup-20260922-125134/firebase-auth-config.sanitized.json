@@ -1,0 +1,20 @@
+{
+  "capturedAt": "2026-09-22T15:52:09.542Z",
+  "projectId": "totem-park",
+  "signIn": {
+    "email": {
+      "enabled": true,
+      "passwordRequired": true
+    },
+    "anonymous": {
+      "enabled": false
+    }
+  },
+  "authorizedDomains": [
+    "localhost",
+    "totem-park.firebaseapp.com",
+    "totem-park.web.app",
+    "totem-park-bkbt27f7b-junior-pk-s-projects.vercel.app"
+  ],
+  "blockingFunctions": {}
+}

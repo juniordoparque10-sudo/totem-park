@@ -1,0 +1,10 @@
+{
+  "Apk": "C:\\Users\\centr\\Desktop\\totem-park\\artifacts\\v14-field-candidate\\Totem-Park-Player-V14-Field-Candidate.apk",
+  "ApkSha256": "8381D63430DD7E34414C9F4F4C2FC0A6BD72946D5C3C8510511CCA1BE9046A95",
+  "BaselineApkSha256": "6C6E47166D761ABD4711B43FC109AA8961DF6777EE4B8A203FF17955BD55C139",
+  "Package": "br.com.parksolutions.totempark",
+  "VersionCode": 14,
+  "VersionName": "1.0.0-v13-operational-telemetry-field-candidate",
+  "PlayerBundleSha256": "0EF4A671B144589C5977F4985F9FE66579EE50E444F1F4E76B9C7D1F2B31F3BD",
+  "SidecarSha256": "ED262E6B7BD50D9A01FE24BCF02384447F12343BC733B6EE7AB00A1A4550791E"
+}

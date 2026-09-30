@@ -1,0 +1,28 @@
+{
+  "name": "projects/totem-park/databases/(default)/documents/settings/telemetry2a2c",
+  "fields": {
+    "syncIntervalMs": {
+      "integerValue": "300000"
+    },
+    "enabled": {
+      "booleanValue": true
+    },
+    "clientIds": {
+      "arrayValue": {}
+    },
+    "screenIds": {
+      "arrayValue": {
+        "values": [
+          {
+            "stringValue": "emp3VDKfLzmz1sWJrnbx"
+          }
+        ]
+      }
+    },
+    "deviceIds": {
+      "arrayValue": {}
+    }
+  },
+  "createTime": "2026-09-22T15:58:00.893362Z",
+  "updateTime": "2026-09-22T16:16:08.764472Z"
+}

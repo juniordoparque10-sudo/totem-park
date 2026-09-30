@@ -1,0 +1,2590 @@
+diff --git a/src/App.css b/src/App.css
+index 470d4f4..d43ae46 100644
+--- a/src/App.css
++++ b/src/App.css
+@@ -596,9 +596,9 @@
+ 
+ .playlist-item {
+   display: grid;
+-  grid-template-columns: 46px 90px 1fr auto;
++  grid-template-columns: 46px minmax(150px, 220px) 1fr auto;
+   gap: 16px;
+-  align-items: center;
++  align-items: start;
+   padding: 14px;
+   border-radius: 22px;
+   background: rgba(255, 255, 255, 0.045);
+@@ -617,10 +617,58 @@
+ }
+ 
+ .playlist-thumb {
+-  height: 62px;
++  min-height: 126px;
+   border-radius: 16px;
+   overflow: hidden;
+   background: linear-gradient(135deg, #11182f, #3b1767);
++  display: flex;
++  align-items: center;
++  justify-content: center;
++  padding: 10px;
++  box-sizing: border-box;
++}
++
++.playlist-created-item {
++  grid-template-columns: 46px minmax(128px, 190px) 1fr auto;
++}
++
++.playlist-created-item-frame {
++  min-height: 0;
++  height: auto;
++}
++
++.playlist-created-item-frame.landscape {
++  aspect-ratio: 16 / 9;
++}
++
++.playlist-created-item-frame.portrait {
++  min-height: 158px;
++}
++
++.playlist-created-item-frame.square {
++  min-height: 140px;
++}
++
++.playlist-created-item-info {
++  align-self: center;
++  min-width: 0;
++}
++
++.playlist-created-item-info strong {
++  overflow-wrap: anywhere;
++}
++
++.playlist-created-orientation {
++  display: inline-flex;
++  margin-top: 8px;
++  padding: 5px 9px;
++  border-radius: 999px;
++  background: rgba(34, 211, 238, 0.1);
++  color: #67e8f9;
++  font-size: 10px;
++  font-weight: 900;
++  letter-spacing: 0.06em;
++  text-transform: uppercase;
+ }
+ 
+ .playlist-item-info strong {
+@@ -703,7 +751,7 @@
+   }
+ 
+   .playlist-item {
+-    grid-template-columns: 40px 80px 1fr;
++    grid-template-columns: 44px minmax(120px, 180px) 1fr;
+   }
+ 
+   .playlist-actions {
+@@ -716,6 +764,72 @@
+     padding: 24px;
+   }
+ 
++  .playlist-card {
++    padding: 18px;
++    border-radius: 24px;
++  }
++
++  .playlist-item {
++    grid-template-columns: 42px 1fr;
++    gap: 12px;
++    padding: 12px;
++  }
++
++  .playlist-thumb {
++    grid-column: 1 / -1;
++    min-height: 170px;
++    padding: 12px;
++  }
++
++  .playlist-items .playlist-thumb .media-preview-frame.landscape {
++    max-height: 150px;
++  }
++
++  .playlist-items .playlist-thumb .media-preview-frame.portrait {
++    width: min(100%, 96px);
++    max-height: 170px;
++  }
++
++  .playlist-items .playlist-thumb .media-preview-frame.square {
++    width: min(100%, 150px);
++    max-height: 150px;
++  }
++
++  .playlist-item-info {
++    grid-column: 2;
++  }
++
++  .playlist-created-item {
++    grid-template-columns: 38px 1fr;
++  }
++
++  .playlist-created-item .playlist-number {
++    grid-column: 1;
++    grid-row: 1;
++  }
++
++  .playlist-created-item-frame {
++    grid-column: 1 / -1;
++    justify-self: center;
++    width: 100%;
++  }
++
++  .playlist-created-item-frame.landscape {
++    min-height: 0;
++  }
++
++  .playlist-created-item-frame.portrait {
++    min-height: 176px;
++  }
++
++  .playlist-created-item-frame.square {
++    min-height: 150px;
++  }
++
++  .playlist-created-item-info {
++    grid-column: 1 / -1;
++  }
++
+   .stats,
+   .cards-grid,
+   .form-grid,
+@@ -732,13 +846,9 @@
+     font-size: 34px;
+   }
+ 
+-  .playlist-item {
++  .playlist-item:not(.playlist-created-item) {
+     grid-template-columns: 1fr;
+   }
+-
+-  .playlist-thumb {
+-    height: 150px;
+-  }
+ }
+ 
+ /* PAINEL INTERNO DO CLIENTE */
+@@ -2229,6 +2339,124 @@
+   margin-bottom: 24px;
+ }
+ 
++.admin-data-alert {
++  margin: 0 0 20px;
++  padding: 16px 18px;
++  border-radius: 18px;
++  background: linear-gradient(135deg, rgba(239, 68, 68, 0.15), rgba(15, 23, 42, 0.92));
++  border: 1px solid rgba(248, 113, 113, 0.28);
++  color: #fee2e2;
++}
++
++.admin-data-alert strong,
++.admin-data-alert span {
++  display: block;
++}
++
++.admin-data-alert strong {
++  color: #fecaca;
++  font-size: 14px;
++  font-weight: 900;
++}
++
++.admin-data-alert span {
++  margin-top: 4px;
++  color: #fca5a5;
++  font-size: 13px;
++  line-height: 1.4;
++}
++
++.developer-mode-panel {
++  margin-top: 24px;
++  padding: 22px;
++  border-radius: 24px;
++  background:
++    radial-gradient(circle at top left, rgba(34, 211, 238, 0.09), transparent 34%),
++    rgba(15, 23, 42, 0.72);
++  border: 1px solid rgba(34, 211, 238, 0.15);
++}
++
++.developer-mode-header {
++  display: flex;
++  align-items: flex-start;
++  justify-content: space-between;
++  gap: 16px;
++  margin-bottom: 16px;
++}
++
++.developer-mode-header h3,
++.developer-actions-box h4 {
++  margin: 0;
++  color: #fff;
++}
++
++.developer-mode-header p,
++.developer-actions-box p {
++  margin: 5px 0 0;
++  color: #94a3b8;
++  line-height: 1.45;
++}
++
++.developer-mode-header > span {
++  padding: 7px 11px;
++  border-radius: 999px;
++  color: #67e8f9;
++  background: rgba(34, 211, 238, 0.1);
++  border: 1px solid rgba(34, 211, 238, 0.22);
++  font-size: 11px;
++  font-weight: 900;
++  text-transform: uppercase;
++}
++
++.developer-unlock-row {
++  display: flex;
++  gap: 10px;
++  align-items: center;
++  flex-wrap: wrap;
++}
++
++.developer-unlock-row input {
++  min-height: 42px;
++  min-width: min(100%, 280px);
++  flex: 1 1 240px;
++  border-radius: 14px;
++  border: 1px solid rgba(148, 163, 184, 0.18);
++  background: rgba(2, 6, 23, 0.55);
++  color: #fff;
++  padding: 0 14px;
++}
++
++.developer-master-grid {
++  display: grid;
++  grid-template-columns: repeat(auto-fit, minmax(230px, 1fr));
++  gap: 12px;
++}
++
++.developer-master-card,
++.developer-actions-box {
++  padding: 16px;
++  border-radius: 18px;
++  background: rgba(255, 255, 255, 0.045);
++  border: 1px solid rgba(255, 255, 255, 0.08);
++}
++
++.developer-master-card small {
++  display: block;
++  color: #94a3b8;
++  font-weight: 800;
++}
++
++.developer-master-card strong {
++  display: block;
++  margin: 5px 0 12px;
++  color: #fff;
++  overflow-wrap: anywhere;
++}
++
++.developer-actions-box {
++  margin-top: 12px;
++}
++
+ .premium-stat-card {
+   min-height: 210px;
+   border-radius: 24px;
+@@ -2930,6 +3158,11 @@
+   background: rgba(34, 211, 238, 0.12);
+ }
+ 
++.client-action.warning {
++  color: #fbbf24;
++  background: rgba(245, 158, 11, 0.13);
++}
++
+ .client-action.danger {
+   color: #f87171;
+   background: rgba(239, 68, 68, 0.14);
+@@ -3775,9 +4008,9 @@
+ }
+ 
+ .remote-mini-button.maintenance {
+-  padding-inline: 3px;
+-  gap: 2px;
+-  font-size: 8px;
++  padding-inline: 6px;
++  gap: 4px;
++  font-size: clamp(8px, 0.7vw, 10px);
+   background: linear-gradient(180deg, rgba(139, 92, 246, 0.17), rgba(109, 40, 217, 0.09));
+   border-color: rgba(167, 139, 250, 0.18);
+   color: #ddd6fe;
+@@ -3790,9 +4023,9 @@
+ 
+ .remote-mini-button.maintenance span {
+   flex: 0 1 auto;
+-  font-size: 8px;
+-  letter-spacing: -0.35px;
+-  white-space: nowrap;
++  font-size: inherit;
++  letter-spacing: -0.25px;
++  white-space: normal;
+ }
+ 
+ .remote-mini-button.blackout {
+@@ -4841,6 +5074,60 @@ video.player-media::-webkit-media-controls-start-playback-button {
+   animation: none !important;
+ }
+ 
++@media (max-width: 1280px) {
++  .remote-control-panel-inline {
++    padding: 16px;
++  }
++
++  .remote-control-heading {
++    align-items: flex-start;
++    gap: 8px;
++  }
++
++  .remote-control-title {
++    min-width: 0;
++    font-size: 12px;
++    line-height: 1.12;
++    letter-spacing: 0.55px;
++  }
++
++  .remote-live-label {
++    flex: 0 0 auto;
++    font-size: 9px;
++    line-height: 1.05;
++    text-align: center;
++  }
++
++  .remote-control-grid-inline {
++    grid-template-columns: repeat(2, minmax(0, 1fr));
++    gap: 9px;
++  }
++
++  .remote-mini-button {
++    min-height: 48px;
++    padding: 6px 7px;
++    gap: 5px;
++    font-size: 10px;
++    line-height: 1.08;
++  }
++
++  .remote-mini-button svg {
++    width: 14px;
++    height: 14px;
++  }
++
++  .remote-mini-button span {
++    max-width: 100%;
++    line-height: 1.08;
++    overflow-wrap: anywhere;
++    word-break: normal;
++  }
++
++  .remote-mini-button.exit-tv {
++    grid-column: 1 / -1;
++  }
++}
++
+ /* Planos comerciais e identidade visual do cliente. */
+ .client-avatar {
+   overflow: hidden;
+@@ -6386,6 +6673,22 @@ video.player-media::-webkit-media-controls-start-playback-button {
+     grid-template-columns: 1fr;
+   }
+ 
++  .templates-preview-panel {
++    position: static;
++  }
++
++  .templates-editor-panel .form-grid,
++  .templates-editor-panel .marketing-assets-grid {
++    grid-template-columns: minmax(0, 1fr);
++  }
++
++  .templates-editor-panel input:not([type="file"]),
++  .templates-editor-panel textarea,
++  .templates-editor-panel select {
++    min-width: 0;
++    width: 100%;
++  }
++
+   .templates-hero {
+     flex-direction: column;
+     align-items: flex-start;
+@@ -7552,6 +7855,55 @@ video.player-media::-webkit-media-controls-start-playback-button {
+   white-space: nowrap;
+ }
+ 
++@media (max-width: 1400px) {
++  .native-rotation-content .templates-builder-grid,
++  .native-rotation-content .marketing-page .templates-builder-grid {
++    grid-template-columns: minmax(0, 1fr) !important;
++    gap: 18px;
++  }
++
++  .native-rotation-content .templates-preview-panel,
++  .native-rotation-content .marketing-page .templates-preview-panel {
++    position: static;
++  }
++
++  .native-rotation-content .templates-editor-panel,
++  .native-rotation-content .templates-preview-panel,
++  .native-rotation-content .templates-list-panel,
++  .native-rotation-content .marketing-page .templates-editor-panel,
++  .native-rotation-content .marketing-page .templates-preview-panel,
++  .native-rotation-content .marketing-page .templates-list-panel {
++    min-width: 0;
++    max-width: 100%;
++    overflow: hidden;
++  }
++
++  .native-rotation-content .templates-editor-panel .form-grid,
++  .native-rotation-content .templates-editor-panel .marketing-assets-grid,
++  .native-rotation-content .marketing-page .form-grid,
++  .native-rotation-content .marketing-page .marketing-assets-grid {
++    grid-template-columns: minmax(0, 1fr) !important;
++  }
++
++  .native-rotation-content .templates-editor-panel input:not([type="file"]),
++  .native-rotation-content .templates-editor-panel textarea,
++  .native-rotation-content .templates-editor-panel select,
++  .native-rotation-content .marketing-page input:not([type="file"]),
++  .native-rotation-content .marketing-page textarea,
++  .native-rotation-content .marketing-page select {
++    width: 100%;
++    min-width: 0;
++  }
++
++  .native-rotation-content .visibility-controls-grid {
++    grid-template-columns: repeat(2, minmax(0, 1fr));
++  }
++
++  .native-rotation-content .template-color-grid {
++    grid-template-columns: repeat(2, minmax(0, 1fr));
++  }
++}
++
+ @media (max-width: 760px) {
+   .native-rotation-content .content {
+     padding: 14px !important;
+@@ -9653,6 +10005,56 @@ video.player-media::-webkit-media-controls-start-playback-button {
+   background: #020617 !important;
+ }
+ 
++.media-preview-frame > video.preview-video {
++  pointer-events: none;
++}
++
++.media-preview-frame > video.preview-video::-webkit-media-controls,
++.media-preview-frame > video.preview-video::-webkit-media-controls-panel,
++.media-preview-frame > video.preview-video::-webkit-media-controls-start-playback-button,
++.media-preview-frame > video.preview-video::-webkit-media-controls-play-button {
++  display: none !important;
++  opacity: 0 !important;
++}
++
++.video-preview-fallback {
++  width: 100%;
++  height: 100%;
++  display: grid;
++  place-items: center;
++  gap: 8px;
++  padding: 18px;
++  text-align: center;
++  background:
++    radial-gradient(circle at 50% 35%, rgba(34, 211, 238, 0.18), transparent 32%),
++    linear-gradient(135deg, rgba(15, 23, 42, 0.95), rgba(49, 20, 92, 0.9));
++}
++
++.video-preview-play {
++  width: 48px;
++  height: 48px;
++  border-radius: 999px;
++  background: rgba(226, 232, 240, 0.14);
++  border: 1px solid rgba(226, 232, 240, 0.26);
++  position: relative;
++}
++
++.video-preview-play::after {
++  content: "";
++  position: absolute;
++  left: 19px;
++  top: 14px;
++  border-left: 15px solid #e0f2fe;
++  border-top: 10px solid transparent;
++  border-bottom: 10px solid transparent;
++}
++
++.video-preview-fallback span {
++  color: #bae6fd;
++  font-size: 11px;
++  font-weight: 800;
++}
++
+ .media-preview-frame .template-tv-preview,
+ .media-preview-frame .marketing-art-preview {
+   width: 100% !important;
+@@ -9781,6 +10183,164 @@ video.player-media::-webkit-media-controls-start-playback-button {
+   max-height: 62px;
+ }
+ 
++.playlist-created-item-frame.landscape .media-preview-frame.landscape,
++.playlist-items .playlist-thumb .media-preview-frame.landscape {
++  width: 100%;
++  max-height: 126px;
++}
++
++.playlist-created-item-frame.portrait .media-preview-frame.portrait,
++.playlist-items .playlist-thumb .media-preview-frame.portrait {
++  width: min(100%, 88px);
++  max-height: 158px;
++}
++
++.playlist-created-item-frame.square .media-preview-frame.square,
++.playlist-items .playlist-thumb .media-preview-frame.square {
++  width: min(100%, 140px);
++  max-height: 140px;
++}
++
++.playlist-items .playlist-thumb .orientation-badge {
++  top: 6px;
++  right: 6px;
++  padding: 4px 8px;
++  font-size: 9px;
++}
++
++.playlist-order-item-card {
++  grid-template-columns: 38px 44px minmax(112px, 170px) minmax(0, 1fr) auto;
++  grid-template-areas: "drag position preview info actions";
++}
++
++.playlist-order-preview {
++  width: 100%;
++  height: auto;
++  min-height: 0;
++  padding: 7px;
++  display: flex;
++  align-items: center;
++  justify-content: center;
++}
++
++.playlist-order-preview.landscape {
++  aspect-ratio: 16 / 9;
++}
++
++.playlist-order-preview.portrait {
++  width: min(100%, 96px);
++  aspect-ratio: 9 / 16;
++  justify-self: center;
++}
++
++.playlist-order-preview.square {
++  width: min(100%, 116px);
++  aspect-ratio: 1 / 1;
++  justify-self: center;
++}
++
++.playlist-order-preview .media-preview-frame,
++.playlist-order-preview .media-preview-frame.landscape,
++.playlist-order-preview .media-preview-frame.portrait,
++.playlist-order-preview .media-preview-frame.square {
++  width: 100% !important;
++  height: 100% !important;
++  max-height: 100% !important;
++  border-radius: 12px;
++}
++
++.playlist-order-info .playlist-created-orientation {
++  margin-top: 8px;
++}
++
++.playlist-order-item-card .drag-handle {
++  grid-area: drag;
++}
++
++.playlist-order-item-card .playlist-order-position {
++  grid-area: position;
++}
++
++.playlist-order-item-card .playlist-order-preview {
++  grid-area: preview;
++}
++
++.playlist-order-item-card .playlist-order-info {
++  grid-area: info;
++  min-width: 0;
++}
++
++.playlist-order-item-card .order-buttons {
++  grid-area: actions;
++}
++
++@media (max-width: 700px) {
++  .playlist-order-list {
++    padding: 16px;
++    border-radius: 24px;
++  }
++
++  .playlist-order-item-card {
++    grid-template-columns: 34px 52px minmax(0, 1fr);
++    grid-template-areas:
++      "drag position info"
++      "preview preview info"
++      "actions actions actions";
++    align-items: start;
++    gap: 10px 12px;
++    padding: 12px;
++    min-width: 0;
++  }
++
++  .playlist-order-item-card .playlist-order-thumb {
++    grid-column: auto;
++    height: auto;
++  }
++
++  .playlist-order-item-card .playlist-order-info {
++    grid-column: auto;
++    min-width: 0;
++    padding-top: 2px;
++  }
++
++  .playlist-order-item-card .order-buttons {
++    grid-column: auto;
++    justify-content: center;
++    padding-top: 4px;
++  }
++
++  .playlist-order-info strong {
++    font-size: 15px;
++    line-height: 1.18;
++    overflow-wrap: anywhere;
++    word-break: normal;
++  }
++
++  .playlist-order-info span {
++    font-size: 12px;
++    line-height: 1.35;
++  }
++
++  .playlist-order-preview.landscape {
++    width: 94px;
++  }
++
++  .playlist-order-preview.portrait {
++    width: 64px;
++  }
++
++  .playlist-order-preview.square {
++    width: 78px;
++  }
++
++  .playlist-order-preview .orientation-badge {
++    top: 5px;
++    right: 5px;
++    padding: 3px 7px;
++    font-size: 8px;
++  }
++}
++
+ .media-preview .media-preview-frame.landscape,
+ .upload-preview-box .media-preview-frame.landscape {
+   width: 100%;
+@@ -9846,6 +10406,41 @@ video.player-media::-webkit-media-controls-start-playback-button {
+   font-size: 10px;
+ }
+ 
++.screen-cache-box {
++  margin-top: 12px;
++  padding: 12px;
++  border-radius: 16px;
++  background: rgba(15, 23, 42, 0.62);
++  border: 1px solid rgba(34, 211, 238, 0.14);
++}
++
++.screen-cache-box small,
++.screen-cache-box span {
++  display: block;
++  color: #93c5fd;
++  font-size: 11px;
++}
++
++.screen-cache-box strong {
++  display: block;
++  margin-top: 4px;
++  color: #67e8f9;
++  font-size: 13px;
++}
++
++.screen-cache-box span {
++  margin-top: 4px;
++  color: #cbd5e1;
++}
++
++.manager-cache-line {
++  display: block;
++  margin-top: 4px;
++  color: #67e8f9 !important;
++  font-size: 11px;
++  font-weight: 800;
++}
++
+ @media (max-width: 760px) {
+   .preview-library-grid {
+     grid-template-columns: repeat(auto-fit, minmax(150px, 1fr));
+diff --git a/src/App.jsx b/src/App.jsx
+index 101d007..6ce3e7d 100644
+--- a/src/App.jsx
++++ b/src/App.jsx
+@@ -46,6 +46,7 @@ import {
+   signOut,
+   sendPasswordResetEmail,
+   getAuth,
++  updatePassword,
+ } from "firebase/auth";
+ 
+ import {
+@@ -61,6 +62,7 @@ import {
+   setDoc,
+   getDoc,
+   getDocs,
++  getDocsFromServer,
+   runTransaction,
+   deleteField,
+ } from "firebase/firestore";
+@@ -75,12 +77,23 @@ import {
+ import { auth, db, storage } from "./firebase";
+ import {
+   cacheOfflineAssets,
++  cachePlaylistMedia,
++  clearScreenMediaCache,
++  getMediaCacheKey,
++  getMediaCacheStats,
++  isCacheableMediaItem,
++  removeUnusedCachedMedia,
+   restoreOfflineAssetMap,
+ } from "./offline-player-cache";
+ import logo from "./assets/logo.png";
+ import "./App.css";
+ 
+ const PUBLIC_WEB_URL = "https://totempark.com.br";
++const MASTER_EMAILS = [
++  "admin@parksolutions.com",
++  "juniordoparque10@gmail.com",
++];
++const DEVELOPER_MODE_PASSWORD = "654";
+ const TotemDevice = registerPlugin("TotemDevice");
+ 
+ function isNativeApp() {
+@@ -334,6 +347,128 @@ function detectMediaFileMetadata(file) {
+   });
+ }
+ 
++function VideoPreviewMedia({ src, title, compact, onDetectedSize }) {
++  const [thumbnail, setThumbnail] = useState("");
++  const [failed, setFailed] = useState(false);
++  const [directVideoFailed, setDirectVideoFailed] = useState(false);
++
++  useEffect(() => {
++    if (!src) {
++      setThumbnail("");
++      setFailed(true);
++      setDirectVideoFailed(true);
++      return undefined;
++    }
++
++    let active = true;
++    setThumbnail("");
++    setFailed(false);
++    setDirectVideoFailed(false);
++
++    const video = document.createElement("video");
++    video.crossOrigin = "anonymous";
++    video.muted = true;
++    video.playsInline = true;
++    video.preload = "metadata";
++
++    function fail() {
++      if (!active) return;
++      setFailed(true);
++    }
++
++    function captureFrame() {
++      if (!active) return;
++
++      try {
++        const width = video.videoWidth || 0;
++        const height = video.videoHeight || 0;
++
++        if (!width || !height) {
++          fail();
++          return;
++        }
++
++        onDetectedSize?.(width, height);
++
++        const canvas = document.createElement("canvas");
++        canvas.width = width;
++        canvas.height = height;
++        const context = canvas.getContext("2d");
++        context.drawImage(video, 0, 0, width, height);
++        const dataUrl = canvas.toDataURL("image/jpeg", compact ? 0.68 : 0.78);
++
++        setThumbnail(dataUrl);
++        setFailed(false);
++      } catch {
++        fail();
++      }
++    }
++
++    video.onloadedmetadata = () => {
++      if (!active) return;
++
++      onDetectedSize?.(video.videoWidth, video.videoHeight);
++
++      if (Number.isFinite(video.duration) && video.duration > 0.25) {
++        try {
++          video.currentTime = Math.min(0.2, video.duration / 2);
++          return;
++        } catch {}
++      }
++
++      captureFrame();
++    };
++    video.onseeked = captureFrame;
++    video.onloadeddata = () => {
++      if (!thumbnail) captureFrame();
++    };
++    video.onerror = fail;
++    video.src = src;
++    video.load();
++
++    return () => {
++      active = false;
++      video.removeAttribute("src");
++      video.load();
++    };
++  }, [src, compact]);
++
++  if (thumbnail) {
++    return <img src={thumbnail} alt={title || "Preview do vídeo"} />;
++  }
++
++  if (failed && src && !directVideoFailed) {
++    return (
++      <video
++        src={src}
++        muted
++        autoPlay
++        loop
++        playsInline
++        preload="metadata"
++        className={compact ? "preview-video is-compact" : "preview-video"}
++        onLoadedMetadata={(event) => {
++          onDetectedSize?.(
++            event.currentTarget.videoWidth,
++            event.currentTarget.videoHeight
++          );
++        }}
++        onCanPlay={(event) => {
++          event.currentTarget.play().catch(() => {});
++        }}
++        onError={() => setDirectVideoFailed(true)}
++      />
++    );
++  }
++
++  return (
++    <div className="video-preview-fallback">
++      <div className="video-preview-play"></div>
++      <span>{failed ? "Preview do vídeo indisponível" : "Carregando preview"}</span>
++    </div>
++  );
++}
++
+ function UniversalPreview({
+   item,
+   className = "",
+@@ -344,6 +479,11 @@ function UniversalPreview({
+   fallbackIcon = <Monitor size={34} />,
+ }) {
+   const [detectedDimensions, setDetectedDimensions] = useState(null);
++  const [sourceFallbackIndex, setSourceFallbackIndex] = useState(0);
++
++  useEffect(() => {
++    setSourceFallbackIndex(0);
++  }, [item?.id, item?.preview, item?.remotePreview, item?.imageUrl, item?.logoUrl]);
+ 
+   if (!item) {
+     return (
+@@ -360,6 +500,22 @@ function UniversalPreview({
+   const aspectClass = getPreviewAspectClass(measuredItem);
+   const badgeLabel = getPreviewOrientationLabel(measuredItem);
+   const frameClass = `media-preview-frame ${aspectClass} ${className}`.trim();
++  const mediaSources = [
++    measuredItem.preview,
++    measuredItem.remotePreview,
++    measuredItem.imageUrl,
++    measuredItem.logoUrl,
++  ].filter((value, index, list) => value && list.indexOf(value) === index);
++  const mediaSrc = mediaSources[sourceFallbackIndex] || mediaSources[0] || "";
++
++  function tryNextPreviewSource() {
++    if (sourceFallbackIndex < mediaSources.length - 1) {
++      setSourceFallbackIndex((current) => current + 1);
++      return true;
++    }
++
++    return false;
++  }
+ 
+   function handleDetectedSize(width, height) {
+     const cleanWidth = Number(width || 0);
+@@ -396,27 +552,51 @@ function UniversalPreview({
+     content = <MarketingArtPreview art={measuredItem} compact={compact} />;
+   } else if (isTemplate) {
+     content = <TemplateVisualPreview template={measuredItem} compact={compact} />;
+-  } else if (measuredItem.preview) {
+-    content = isVideoItem(measuredItem) ? (
++  } else if (mediaSrc) {
++    content = isVideoItem(measuredItem) && !(controls && !compact) ? (
++      <VideoPreviewMedia
++        src={mediaSrc}
++        title={measuredItem.title || measuredItem.name}
++        compact={compact}
++        onDetectedSize={handleDetectedSize}
++      />
++    ) : isVideoItem(measuredItem) ? (
+       <video
+-        src={measuredItem.preview}
+-        muted={!controls}
+-        controls={controls}
+-        autoPlay={autoPlay}
+-        loop={autoPlay}
++        src={mediaSrc}
++        muted
++        controls={controls && !compact}
++        autoPlay={autoPlay || compact}
++        loop={autoPlay || compact}
+         playsInline
+-        preload="metadata"
++        preload={compact ? "auto" : "metadata"}
++        className={compact ? "preview-video is-compact" : "preview-video"}
+         onLoadedMetadata={(event) => {
+           handleDetectedSize(event.currentTarget.videoWidth, event.currentTarget.videoHeight);
++          if (compact && event.currentTarget.duration > 0.2) {
++            try {
++              event.currentTarget.currentTime = Math.min(0.15, event.currentTarget.duration / 2);
++            } catch {}
++          }
++        }}
++        onCanPlay={(event) => {
++          if (compact) {
++            event.currentTarget.play().catch(() => {});
++          }
++        }}
++        onError={() => {
++          tryNextPreviewSource();
+         }}
+       />
+     ) : (
+       <img
+-        src={measuredItem.preview}
++        src={mediaSrc}
+         alt={measuredItem.title || measuredItem.name || "Preview"}
+         onLoad={(event) => {
+           handleDetectedSize(event.currentTarget.naturalWidth, event.currentTarget.naturalHeight);
+         }}
++        onError={() => {
++          tryNextPreviewSource();
++        }}
+       />
+     );
+   } else {
+@@ -897,6 +1077,41 @@ function formatStorageSize(bytes, fractionDigits = 2) {
+   return `${(safeBytes / STORAGE_GB).toFixed(fractionDigits)} GB`;
+ }
+ 
++function getCacheStatusLabel(screen = {}) {
++  const status = screen.cacheStatus || "";
++  const cached = Number(screen.cachedItems || 0);
++  const total = Number(screen.totalCacheableItems || 0);
++
++  if (status === "preparando") return `Preparando ${cached}/${total}`;
++  if (status === "pronto") return `Pronto ${cached}/${total}`;
++  if (status === "parcial") return `Parcial ${cached}/${total}`;
++  if (status === "erro") return "Erro";
++  if (total > 0) return `${cached}/${total}`;
++  return "Sem mídias";
++}
++
++function getMediaSourceLabel(source) {
++  return source === "cache" ? "Cache local" : "Internet";
++}
++
++function formatFirestoreDate(value) {
++  const ms = getTimestampMs(value);
++  if (!ms) return "--";
++  return new Date(ms).toLocaleString("pt-BR");
++}
++
++function getFirestoreReadErrorMessage(error) {
++  if (error?.code === "permission-denied") {
++    return "Sem permissão para carregar clientes. Verifique se este login está como administrador.";
++  }
++
++  if (error?.code === "unavailable") {
++    return "Não foi possível conectar ao Firestore agora. Verifique a internet e tente atualizar.";
++  }
++
++  return error?.message || "Não foi possível carregar os clientes.";
++}
++
+ function formatFileSizeMb(bytes) {
+   return `${(Math.max(0, Number(bytes) || 0) / STORAGE_MB).toFixed(2)} MB`;
+ }
+@@ -1217,10 +1432,12 @@ function AdminApp({ screenRotation, onScreenRotationChange }) {
+         return;
+       }
+ 
+-      if (firebaseUser.email === "admin@parksolutions.com") {
++      const userEmail = String(firebaseUser.email || "").trim().toLowerCase();
++
++      if (MASTER_EMAILS.includes(userEmail)) {
+         setUser({
+           uid: firebaseUser.uid,
+-          email: firebaseUser.email,
++          email: userEmail,
+           role: "admin",
+         });
+ 
+@@ -1239,7 +1456,7 @@ function AdminApp({ screenRotation, onScreenRotationChange }) {
+           if (snapshot.empty) {
+             setUser({
+               uid: firebaseUser.uid,
+-              email: firebaseUser.email,
++              email: userEmail,
+               role: "client",
+               clientData: null,
+             });
+@@ -1248,7 +1465,7 @@ function AdminApp({ screenRotation, onScreenRotationChange }) {
+ 
+             setUser({
+               uid: firebaseUser.uid,
+-              email: firebaseUser.email,
++              email: userEmail,
+               role: "client",
+               clientData: {
+                 id: clientDoc.id,
+@@ -1634,16 +1851,18 @@ function LoginPage() {
+   const [form, setForm] = useState({ email: "", password: "" });
+ 
+   async function handleAuth() {
+-    if (!form.email || !form.password) {
++    const email = form.email.trim().toLowerCase();
++
++    if (!email || !form.password) {
+       alert("Preencha e-mail e senha.");
+       return;
+     }
+ 
+     try {
+       if (mode === "login") {
+-        await signInWithEmailAndPassword(auth, form.email, form.password);
++        await signInWithEmailAndPassword(auth, email, form.password);
+       } else {
+-        await createUserWithEmailAndPassword(auth, form.email, form.password);
++        await createUserWithEmailAndPassword(auth, email, form.password);
+       }
+     } catch (error) {
+       console.log(error);
+@@ -1697,6 +1916,7 @@ function LoginPage() {
+ 
+ function Dashboard() {
+   const [clients, setClients] = useState([]);
++  const [clientsError, setClientsError] = useState("");
+   const [screensData, setScreensData] = useState([]);
+   const [playlistsData, setPlaylistsData] = useState([]);
+   const [now, setNow] = useState(Date.now());
+@@ -1712,13 +1932,16 @@ function Dashboard() {
+   useEffect(() => {
+     let unsubScreens = [];
+     let unsubPlaylists = [];
++    let active = true;
++    const clientsRef = collection(db, "clients");
+ 
+-    const unsubscribeClients = onSnapshot(collection(db, "clients"), (snapshot) => {
++    function applyClientsSnapshot(snapshot) {
+       const clientsList = snapshot.docs.map((clientDoc) => ({
+         id: clientDoc.id,
+         ...clientDoc.data(),
+       }));
+ 
++      setClientsError("");
+       setClients(clientsList);
+       setScreensData([]);
+       setPlaylistsData([]);
+@@ -1764,9 +1987,30 @@ function Dashboard() {
+         unsubScreens.push(screenUnsub);
+         unsubPlaylists.push(playlistUnsub);
+       });
+-    });
++    }
++
++    getDocsFromServer(clientsRef)
++      .then((snapshot) => {
++        if (!active) return;
++        applyClientsSnapshot(snapshot);
++      })
++      .catch((error) => {
++        if (!active) return;
++        console.log("Erro ao carregar clientes do servidor:", error);
++        setClientsError(getFirestoreReadErrorMessage(error));
++      });
++
++    const unsubscribeClients = onSnapshot(
++      clientsRef,
++      applyClientsSnapshot,
++      (error) => {
++        console.log("Erro no realtime de clientes:", error);
++        setClientsError(getFirestoreReadErrorMessage(error));
++      }
++    );
+ 
+     return () => {
++      active = false;
+       unsubscribeClients();
+       unsubScreens.forEach((unsub) => unsub());
+       unsubPlaylists.forEach((unsub) => unsub());
+@@ -1938,6 +2182,13 @@ function Dashboard() {
+         </div>
+       </header>
+ 
++      {clientsError && (
++        <div className="admin-data-alert">
++          <strong>Clientes não carregados</strong>
++          <span>{clientsError}</span>
++        </div>
++      )}
++
+       <section className="premium-stats">
+         <PremiumStatCard
+           title="Clientes"
+@@ -2027,6 +2278,9 @@ function Dashboard() {
+                       <div className="manager-now-playing">
+                         <small>{screen.currentPlaylistName || "Playlist não informada"}</small>
+                         <b>{screen.nowPlayingTitle || "Aguardando mídia"}</b>
++                        <span className="manager-cache-line">
++                          Cache: {getCacheStatusLabel(screen)} • {getMediaSourceLabel(screen.currentMediaSource)}
++                        </span>
+                       </div>
+                     </div>
+ 
+@@ -2178,6 +2432,7 @@ function PremiumStatCard({ title, value, icon, status, link, color }) {
+ 
+ function ClientsPage({ onOpenClient }) {
+   const [clients, setClients] = useState([]);
++  const [clientsError, setClientsError] = useState("");
+   const [showCreateModal, setShowCreateModal] = useState(false);
+   const [editingClient, setEditingClient] = useState(null);
+   const [savingClient, setSavingClient] = useState(false);
+@@ -2200,16 +2455,43 @@ function ClientsPage({ onOpenClient }) {
+   });
+ 
+   useEffect(() => {
+-    const unsubscribe = onSnapshot(collection(db, "clients"), (snapshot) => {
++    let active = true;
++    const clientsRef = collection(db, "clients");
++
++    function applyClientsSnapshot(snapshot) {
+       const list = snapshot.docs.map((clientDoc) => ({
+         id: clientDoc.id,
+         ...clientDoc.data(),
+       }));
+ 
++      setClientsError("");
+       setClients(list);
+-    });
++    }
+ 
+-    return () => unsubscribe();
++    getDocsFromServer(clientsRef)
++      .then((snapshot) => {
++        if (!active) return;
++        applyClientsSnapshot(snapshot);
++      })
++      .catch((error) => {
++        if (!active) return;
++        console.log("Erro ao carregar clientes do servidor:", error);
++        setClientsError(getFirestoreReadErrorMessage(error));
++      });
++
++    const unsubscribe = onSnapshot(
++      clientsRef,
++      applyClientsSnapshot,
++      (error) => {
++        console.log("Erro no realtime de clientes:", error);
++        setClientsError(getFirestoreReadErrorMessage(error));
++      }
++    );
++
++    return () => {
++      active = false;
++      unsubscribe();
++    };
+   }, []);
+ 
+   function getDaysToDue(dueDate) {
+@@ -2507,6 +2789,37 @@ function ClientsPage({ onOpenClient }) {
+     }
+   }
+ 
++  async function toggleClientSuspension(client) {
++    const isSuspended = getClientPlanAccess(client).isSuspended;
++    const nextStatus = isSuspended ? "Ativo" : "Suspenso";
++    const confirmMessage = isSuspended
++      ? `Retornar o cliente ${client.name} para Ativo?`
++      : `Suspender o cliente ${client.name}?`;
++
++    if (!window.confirm(confirmMessage)) return;
++
++    try {
++      await updateDoc(doc(db, "clients", client.id), {
++        status: nextStatus,
++        ...(nextStatus === "Ativo"
++          ? {
++              suspendedAt: deleteField(),
++              suspensionReason: deleteField(),
++            }
++          : {
++              suspendedAt: serverTimestamp(),
++              suspensionReason: "Suspenso pelo modo gestor",
++            }),
++        updatedAt: serverTimestamp(),
++      });
++
++      alert(nextStatus === "Ativo" ? "Cliente reativado." : "Cliente suspenso.");
++    } catch (error) {
++      console.log(error);
++      alert("Erro ao alterar status do cliente.");
++    }
++  }
++
+   return (
+     <>
+       <header className="clients-premium-header">
+@@ -2525,6 +2838,13 @@ function ClientsPage({ onOpenClient }) {
+         </button>
+       </header>
+ 
++      {clientsError && (
++        <div className="admin-data-alert">
++          <strong>Clientes não carregados</strong>
++          <span>{clientsError}</span>
++        </div>
++      )}
++
+       <section className="clients-kpi-grid">
+         <div className="clients-kpi-card">
+           <span>Total</span>
+@@ -2655,6 +2975,13 @@ function ClientsPage({ onOpenClient }) {
+                     Editar
+                   </button>
+ 
++                  <button
++                    className={planAccess.isSuspended ? "client-action primary" : "client-action warning"}
++                    onClick={() => toggleClientSuspension(client)}
++                  >
++                    {planAccess.isSuspended ? "Retornar" : "Suspender"}
++                  </button>
++
+                   <button
+                     className="client-action danger"
+                     onClick={() => deleteClient(client.id)}
+@@ -3286,6 +3613,15 @@ function ClientDashboard({ client, access = getClientPlanAccess(client) }) {
+                           : "Sem progresso"} • {previewMedia?.type || screen.nowPlayingType || "Mídia"}
+                       </span>
+                     </div>
++
++                    <div className="screen-cache-box">
++                      <small>Cache</small>
++                      <strong>{getCacheStatusLabel(screen)}</strong>
++                      <span>
++                        {getMediaSourceLabel(screen.currentMediaSource)} • {formatStorageSize(screen.cacheSizeBytes || 0)} estimado
++                      </span>
++                      <span>Atualizado: {formatFirestoreDate(screen.cacheUpdatedAt)}</span>
++                    </div>
+                   </div>
+                 </div>
+               );
+@@ -3761,7 +4097,7 @@ function ClientMediaPage({ client, access = getClientPlanAccess(client) }) {
+           mediaList.map((media) => (
+             <div className="media-card" key={media.id}>
+               <div className="media-preview">
+-                <UniversalPreview item={media} controls compact={false} />
++                <UniversalPreview item={media} compact={false} />
+               </div>
+ 
+               <div className="media-info">
+@@ -3798,6 +4134,7 @@ function ClientPlaylistsPage({ client, access = getClientPlanAccess(client) }) {
+   const [screens, setScreens] = useState([]);
+   const [editingPlaylist, setEditingPlaylist] = useState(null);
+   const [draggedMediaId, setDraggedMediaId] = useState(null);
++  const [draftPlaylistItems, setDraftPlaylistItems] = useState([]);
+   const playlistEditorRef = useRef(null);
+   const canUsePremiumTemplates = hasPremiumTemplates(client);
+ 
+@@ -3880,25 +4217,33 @@ function ClientPlaylistsPage({ client, access = getClientPlanAccess(client) }) {
+     return `template:${templateId}`;
+   }
+ 
+-  function getPlaylistItemKey(item) {
++  function getPlaylistItemKey(item, index = 0) {
+     if (item?.playerItemType === "template" || item?.templateType) {
+-      return getTemplateKey(item.id);
++      const templateId = item.id || item.templateId || item.sourceTemplateId || item.sourceMarketingId;
++      return templateId ? getTemplateKey(templateId) : `legacy:${index}`;
+     }
+ 
+-    return getMediaKey(item.id);
++    const mediaId = item?.id || item?.mediaId || item?.sourceMediaId;
++    return mediaId ? getMediaKey(mediaId) : `legacy:${index}`;
+   }
+ 
+-  function getSelectedItemByKey(key) {
++  function getSelectedItemByKey(key, index = 0) {
++    const legacyItem = draftPlaylistItems[index] || null;
++
++    if (key?.startsWith("legacy:")) {
++      return legacyItem;
++    }
++
+     if (key?.startsWith("template:")) {
+       const templateId = key.replace("template:", "");
+       const template = templates.find((item) => item.id === templateId);
+ 
+-      if (!template) return null;
++      if (!template) return legacyItem;
+ 
+       return {
+         ...template,
+         title: template.name,
+-        preview: "",
++        preview: template.preview || template.previewUrl || template.thumbnailUrl || template.imageUrl || "",
+         sound: false,
+         playerItemType: "template",
+         templateType: template.type,
+@@ -3910,7 +4255,7 @@ function ClientPlaylistsPage({ client, access = getClientPlanAccess(client) }) {
+     const mediaId = key?.startsWith("media:") ? key.replace("media:", "") : key;
+     const media = mediaList.find((item) => item.id === mediaId);
+ 
+-    if (!media) return null;
++    if (!media) return legacyItem;
+ 
+     return {
+       ...media,
+@@ -3948,10 +4293,98 @@ function ClientPlaylistsPage({ client, access = getClientPlanAccess(client) }) {
+     toggleItemKey(getTemplateKey(templateId));
+   }
+ 
++  function isValidPreviewSource(value) {
++    if (typeof value !== "string") return false;
++    const clean = value.trim();
++    if (!clean) return false;
++    if (clean === "undefined" || clean === "null") return false;
++    return /^(https?:|blob:|data:|capacitor:|file:)/i.test(clean);
++  }
++
++  function resolvePreviewSource(item = {}) {
++    const candidates = [
++      item.preview,
++      item.previewUrl,
++      item.thumbnailUrl,
++      item.remotePreview,
++      item.imageUrl,
++      item.url,
++      item.downloadURL,
++      item.fileUrl,
++      item.marketingArt?.imageUrl,
++      item.marketingArt?.imagePreview,
++      item.templateData?.imageUrl,
++      item.logoUrl,
++    ];
++
++    return candidates.find(isValidPreviewSource) || "";
++  }
++
++  function resolveItemOrientation(item = {}, playlistOrientation = "Paisagem") {
++    const marketingType = item.marketingType || item.formatType || item.format || item.type;
++
++    if (item.templateType === "marketing_art" || item.playerItemType === "marketing_art" || item.type === "marketing_art") {
++      if (marketingType === "feed") return "Quadrado";
++      if (marketingType === "story" || marketingType === "reels") return "Retrato";
++    }
++
++    const aspect = String(item.aspectRatio || "").trim();
++    if (aspect === "1:1") return "Quadrado";
++    if (aspect === "9:16") return "Retrato";
++    if (aspect === "16:9") return "Paisagem";
++
++    const width = Number(item.width || item.videoWidth || item.naturalWidth || 0);
++    const height = Number(item.height || item.videoHeight || item.naturalHeight || 0);
++
++    if (width > 0 && height > 0) {
++      const diff = Math.abs(width - height) / Math.max(width, height);
++      if (diff < 0.08) return "Quadrado";
++      return height > width ? "Retrato" : "Paisagem";
++    }
++
++    if (item.orientation === "Retrato" || item.orientation === "Paisagem") return item.orientation;
++    if (playlistOrientation === "Retrato" || playlistOrientation === "Paisagem") return playlistOrientation;
++
++    return "Paisagem";
++  }
++
++  function hydratePlaylistItem(item = {}, playlistOrientation = "Paisagem") {
++    const isTemplateItem = item.playerItemType === "template" || item.templateType;
++    const sourceList = isTemplateItem ? templates : mediaList;
++    const source =
++      sourceList.find((candidate) => candidate.id === item.id) ||
++      sourceList.find((candidate) => candidate.id === item.templateId || candidate.id === item.mediaId) ||
++      {};
++    const hydrated = {
++      ...source,
++      ...item,
++    };
++    const preview = resolvePreviewSource(hydrated);
++    const orientation = resolveItemOrientation(hydrated, playlistOrientation);
++
++    return {
++      ...hydrated,
++      preview,
++      resolvedPreview: preview,
++      orientation: orientation === "Quadrado" ? hydrated.orientation || "Paisagem" : orientation,
++      resolvedOrientation: orientation,
++      aspectRatio:
++        orientation === "Quadrado"
++          ? "1:1"
++          : orientation === "Retrato"
++            ? hydrated.aspectRatio || "9:16"
++            : hydrated.aspectRatio || "16:9",
++      playerItemType: item.playerItemType || (isTemplateItem ? "template" : "media"),
++      templateType: item.templateType || source.templateType || source.type,
++      duration: item.duration || source.duration,
++      sound: item.sound ?? source.sound,
++    };
++  }
++
+   function renderPlaylistMiniPreview(item) {
+     if (!item) return <Monitor size={26} />;
+ 
+-    return <UniversalPreview item={item} className="playlist-preview-frame" compact />;
++    return <UniversalPreview item={item} className="playlist-created-item-preview playlist-preview-frame" compact />;
+   }
+ 
+   function getPlaylistItemLabel(item) {
+@@ -4033,24 +4466,22 @@ function ClientPlaylistsPage({ client, access = getClientPlanAccess(client) }) {
+   }
+ 
+ 
+-  function handleDragStart(itemKey) {
+-    setDraggedMediaId(itemKey);
++  function handleDragStart(index) {
++    setDraggedMediaId(index);
+   }
+ 
+   function handleDragOver(e) {
+     e.preventDefault();
+   }
+ 
+-  function handleDrop(targetItemKey) {
+-    if (!draggedMediaId || draggedMediaId === targetItemKey) {
++  function handleDrop(targetIndex) {
++    if (draggedMediaId === null || draggedMediaId === targetIndex) {
+       setDraggedMediaId(null);
+       return;
+     }
+ 
+     const updated = [...form.selectedMediaIds];
+-
+-    const draggedIndex = updated.indexOf(draggedMediaId);
+-    const targetIndex = updated.indexOf(targetItemKey);
++    const draggedIndex = draggedMediaId;
+ 
+     if (draggedIndex === -1 || targetIndex === -1) {
+       setDraggedMediaId(null);
+@@ -4089,6 +4520,7 @@ function ClientPlaylistsPage({ client, access = getClientPlanAccess(client) }) {
+ 
+   function resetPlaylistForm() {
+     setEditingPlaylist(null);
++    setDraftPlaylistItems([]);
+ 
+     setForm({
+       name: "",
+@@ -4109,13 +4541,14 @@ function ClientPlaylistsPage({ client, access = getClientPlanAccess(client) }) {
+     if (!requirePlanPermission(access, "canEditPlaylists", "editar playlists")) return;
+ 
+     setEditingPlaylist(playlist);
++    setDraftPlaylistItems(playlist.items || []);
+ 
+     setForm({
+       name: playlist.name || "",
+       transition: playlist.transition || "Fade suave",
+       transitionSpeed: playlist.transitionSpeed || "Normal",
+       orientation: playlist.orientation || "Paisagem",
+-      selectedMediaIds: playlist.items?.map((item) => getPlaylistItemKey(item)) || [],
++      selectedMediaIds: playlist.items?.map((item, index) => getPlaylistItemKey(item, index)) || [],
+       scheduleEnabled: playlist.scheduleEnabled || false,
+       targetScreenIds: playlist.targetScreenIds || [],
+       startDate: playlist.startDate || "",
+@@ -4171,7 +4604,7 @@ function ClientPlaylistsPage({ client, access = getClientPlanAccess(client) }) {
+ 
+     try {
+       const selectedItems = form.selectedMediaIds
+-        .map((key) => getSelectedItemByKey(key))
++        .map((key, index) => getSelectedItemByKey(key, index))
+         .filter(Boolean);
+ 
+       const playlistData = {
+@@ -4677,22 +5110,30 @@ function ClientPlaylistsPage({ client, access = getClientPlanAccess(client) }) {
+               </div>
+ 
+               {form.selectedMediaIds.map((itemKey, index) => {
+-                const item = getSelectedItemByKey(itemKey);
++                const item = getSelectedItemByKey(itemKey, index);
+ 
+                 if (!item) return null;
+ 
++                const hydratedItem = hydratePlaylistItem(item, form.orientation);
++                const orientationClass =
++                  hydratedItem.resolvedOrientation === "Retrato"
++                    ? "portrait"
++                    : hydratedItem.resolvedOrientation === "Quadrado"
++                      ? "square"
++                      : "landscape";
++
+                 return (
+                   <div
+-                    key={itemKey}
++                    key={`${itemKey}-${index}`}
+                     className={
+-                      draggedMediaId === itemKey
+-                        ? "playlist-order-item dragging"
+-                        : "playlist-order-item"
++                      draggedMediaId === index
++                        ? `playlist-order-item playlist-order-item-card ${orientationClass} dragging`
++                        : `playlist-order-item playlist-order-item-card ${orientationClass}`
+                     }
+                     draggable
+-                    onDragStart={() => handleDragStart(itemKey)}
++                    onDragStart={() => handleDragStart(index)}
+                     onDragOver={handleDragOver}
+-                    onDrop={() => handleDrop(itemKey)}
++                    onDrop={() => handleDrop(index)}
+                     onDragEnd={() => setDraggedMediaId(null)}
+                   >
+                     <div className="drag-handle">
+@@ -4703,16 +5144,20 @@ function ClientPlaylistsPage({ client, access = getClientPlanAccess(client) }) {
+                       {index + 1}
+                     </div>
+ 
+-                    <div className="playlist-order-thumb">
+-                      {renderPlaylistMiniPreview(item)}
++                    <div className={`playlist-order-thumb playlist-order-preview ${orientationClass}`}>
++                      {renderPlaylistMiniPreview(hydratedItem)}
+                     </div>
+ 
+                     <div className="playlist-order-info">
+-                      <strong>{item.title || item.name}</strong>
++                      <strong>{hydratedItem.title || hydratedItem.name}</strong>
+ 
+                       <span>
+-                        {getPlaylistItemLabel(item)}
++                        {getPlaylistItemLabel(hydratedItem)}
+                       </span>
++
++                      <small className={`playlist-created-orientation ${orientationClass}`}>
++                        {hydratedItem.resolvedOrientation || "Paisagem"}
++                      </small>
+                     </div>
+ 
+                     <div className="order-buttons">
+@@ -4810,35 +5255,49 @@ function ClientPlaylistsPage({ client, access = getClientPlanAccess(client) }) {
+               </div>
+ 
+               <div className="playlist-items">
+-                {playlist.items?.map((item, index) => (
+-                  <div className="playlist-item" key={`${playlist.id}-${index}`}>
++                {playlist.items?.map((item, index) => {
++                  const hydratedItem = hydratePlaylistItem(item, playlist.orientation);
++                  const orientationClass =
++                    hydratedItem.resolvedOrientation === "Retrato"
++                      ? "portrait"
++                      : hydratedItem.resolvedOrientation === "Quadrado"
++                        ? "square"
++                        : "landscape";
++
++                  return (
++                  <div className={`playlist-item playlist-created-item ${orientationClass}`} key={`${playlist.id}-${index}`}>
+                     <div className="playlist-number">
+                       {index + 1}
+                     </div>
+ 
+-                    <div className="playlist-thumb">
+-                      {renderPlaylistMiniPreview(item)}
++                    <div className={`playlist-thumb playlist-created-item-frame ${orientationClass}`}>
++                      {renderPlaylistMiniPreview(hydratedItem)}
+                     </div>
+ 
+-                    <div className="playlist-item-info">
+-                      <strong>{item.title || item.name}</strong>
++                    <div className="playlist-item-info playlist-created-item-info">
++                      <strong>{hydratedItem.title || hydratedItem.name}</strong>
+ 
+                       <span>
+-                        {getPlaylistItemLabel(item)}
++                        {getPlaylistItemLabel(hydratedItem)}
+                       </span>
++
++                      <small className={`playlist-created-orientation ${orientationClass}`}>
++                        {hydratedItem.resolvedOrientation || "Paisagem"}
++                      </small>
+                     </div>
+ 
+                     <div>
+-                      {item.playerItemType === "template" || item.templateType ? (
++                      {hydratedItem.playerItemType === "template" || hydratedItem.templateType ? (
+                         <Newspaper size={18} />
+-                      ) : item.sound ? (
++                      ) : hydratedItem.sound ? (
+                         <Volume2 size={18} />
+                       ) : (
+                         <VolumeX size={18} />
+                       )}
+                     </div>
+                   </div>
+-                ))}
++                );
++                })}
+               </div>
+             </div>
+           ))
+@@ -5404,6 +5863,15 @@ function ClientScreensPage({ client, access = getClientPlanAccess(client) }) {
+                           : "Sem progresso"} • {previewMedia?.type || screen.nowPlayingType || "Mídia"}
+                       </span>
+                     </div>
++
++                    <div className="screen-cache-box">
++                      <small>Cache</small>
++                      <strong>{getCacheStatusLabel(screen)}</strong>
++                      <span>
++                        {getMediaSourceLabel(screen.currentMediaSource)} • {formatStorageSize(screen.cacheSizeBytes || 0)} estimado
++                      </span>
++                      <span>Atualizado: {formatFirestoreDate(screen.cacheUpdatedAt)}</span>
++                    </div>
+                   </div>
+ 
+                   <div className="screen-code-box">
+@@ -5510,6 +5978,14 @@ function ClientScreensPage({ client, access = getClientPlanAccess(client) }) {
+                         <span>Limpar</span>
+                       </button>
+ 
++                      <button
++                        className="remote-mini-button info"
++                        onClick={() => sendRemoteCommand(screen.id, { type: "clearCache" })}
++                      >
++                        <RefreshCw size={16} />
++                        <span>Limpar cache</span>
++                      </button>
++
+                       <button
+                         className="remote-mini-button danger"
+                         onClick={() => sendRemoteCommand(screen.id, { type: "reload" })}
+@@ -8747,7 +9223,16 @@ function PlayerPage() {
+   const [offlineAssetMap, setOfflineAssetMap] = useState(() =>
+     isNativeApp() ? restoreOfflineAssetMap(offlineStorageKey) : {}
+   );
++  const [mediaCacheMap, setMediaCacheMap] = useState({});
+   const [offlineCacheStatus, setOfflineCacheStatus] = useState("");
++  const [playerCacheStatus, setPlayerCacheStatus] = useState({
++    cacheStatus: "",
++    cachedItems: 0,
++    totalCacheableItems: 0,
++    failedCacheItems: 0,
++    cacheSizeBytes: 0,
++    currentMediaSource: "remote",
++  });
+   const [loading, setLoading] = useState(true);
+   const [now, setNow] = useState(new Date());
+   const [remoteOverlay, setRemoteOverlay] = useState(null);
+@@ -8761,6 +9246,9 @@ function PlayerPage() {
+   const transitionCleanupRef = useRef(null);
+   const offlineStatusTimerRef = useRef(null);
+   const cacheQueueRef = useRef(Promise.resolve());
++  const mediaCacheRunRef = useRef(0);
++  const mediaCacheObjectUrlsRef = useRef(new Set());
++  const lastCacheStatusPayloadRef = useRef("");
+   const playbackTimerRef = useRef(null);
+   const playbackTimingKeyRef = useRef("");
+   const playbackRemainingRef = useRef(0);
+@@ -8784,6 +9272,10 @@ function PlayerPage() {
+       clearTimeout(transitionCleanupRef.current);
+       clearTimeout(offlineStatusTimerRef.current);
+       clearTimeout(playbackTimerRef.current);
++      mediaCacheObjectUrlsRef.current.forEach((url) => {
++        if (String(url).startsWith("blob:")) URL.revokeObjectURL(url);
++      });
++      mediaCacheObjectUrlsRef.current.clear();
+     };
+   }, []);
+ 
+@@ -8887,35 +9379,137 @@ function PlayerPage() {
+     };
+   }
+ 
++  function updateLocalMediaCacheMap(results = {}) {
++    setMediaCacheMap((previous) => {
++      Object.values(previous).forEach((entry) => {
++        if (entry?.url && String(entry.url).startsWith("blob:")) {
++          URL.revokeObjectURL(entry.url);
++          mediaCacheObjectUrlsRef.current.delete(entry.url);
++        }
++      });
++
++      const next = {};
++
++      Object.entries(results).forEach(([key, value]) => {
++        if (!value?.url) return;
++        next[key] = value;
++        if (String(value.url).startsWith("blob:")) {
++          mediaCacheObjectUrlsRef.current.add(value.url);
++        }
++      });
++
++      return next;
++    });
++  }
++
++  function applyPlayerMediaCache(item) {
++    if (!item || !isCacheableMediaItem(item)) return item;
++
++    const remotePreview = item.remotePreview || item.preview;
++    const mediaCacheKey = getMediaCacheKey(clientId, item);
++    const cached = mediaCacheMap[mediaCacheKey];
++
++    if (cached?.url) {
++      return {
++        ...item,
++        remotePreview,
++        preview: cached.url,
++        mediaCacheKey,
++        currentMediaSource: "cache",
++      };
++    }
++
++    return {
++      ...item,
++      remotePreview,
++      mediaCacheKey,
++      currentMediaSource: "remote",
++    };
++  }
++
++  function fallbackToRemoteMedia(item) {
++    if (item?.currentMediaSource !== "cache" || !item.mediaCacheKey || !item.remotePreview) {
++      return false;
++    }
++
++    setMediaCacheMap((previous) => {
++      const cached = previous[item.mediaCacheKey];
++
++      if (cached?.url && String(cached.url).startsWith("blob:")) {
++        URL.revokeObjectURL(cached.url);
++        mediaCacheObjectUrlsRef.current.delete(cached.url);
++      }
++
++      const next = { ...previous };
++      delete next[item.mediaCacheKey];
++      return next;
++    });
++
++    setPlayerCacheStatus((previous) => ({
++      ...previous,
++      currentMediaSource: "remote",
++    }));
++
++    return true;
++  }
++
++  async function reportCacheStatus(payload) {
++    if (!screen?.id || !clientId) return;
++
++    const normalized = {
++      cacheStatus: payload.cacheStatus || "",
++      cachedItems: Number(payload.cachedItems || 0),
++      totalCacheableItems: Number(payload.totalCacheableItems || 0),
++      failedCacheItems: Number(payload.failedCacheItems || 0),
++      cacheSizeBytes: Number(payload.cacheSizeBytes || 0),
++      currentMediaSource: payload.currentMediaSource || playerCacheStatus.currentMediaSource || "remote",
++    };
++    const signature = JSON.stringify(normalized);
++
++    if (lastCacheStatusPayloadRef.current === signature) return;
++    lastCacheStatusPayloadRef.current = signature;
++
++    try {
++      await updateDoc(doc(db, "clients", clientId, "screens", screen.id), {
++        ...normalized,
++        cacheUpdatedAt: serverTimestamp(),
++      });
++    } catch (error) {
++      console.log("Erro ao atualizar status do cache:", error);
++    }
++  }
++
+   const playerItems = [
+     ...(activePlaylist?.items || []).map((item) => {
+       const localizedItem = applyOfflineAssetUrls(item, offlineAssetMap);
++      const cachedItem = applyPlayerMediaCache(localizedItem);
+ 
+       if (item?.playerItemType === "template" || item?.templateType) {
+         return {
+-          ...localizedItem,
+-          title: localizedItem.title || localizedItem.name,
+-          templateType: localizedItem.templateType || localizedItem.type,
+-          type: localizedItem.templateType || localizedItem.type,
+-          duration: Number(localizedItem.duration || 15),
++          ...cachedItem,
++          title: cachedItem.title || cachedItem.name,
++          templateType: cachedItem.templateType || cachedItem.type,
++          type: cachedItem.templateType || cachedItem.type,
++          duration: Number(cachedItem.duration || 15),
+           playerItemType: "template",
+         };
+       }
+ 
+       return {
+-        ...localizedItem,
++        ...cachedItem,
+         playerItemType: "media",
+       };
+     }),
+     ...screenTemplates.map((template) => {
+       const localizedTemplate = applyOfflineAssetUrls(template, offlineAssetMap);
++      const cachedTemplate = applyPlayerMediaCache(localizedTemplate);
+ 
+       return {
+-        ...localizedTemplate,
+-        title: localizedTemplate.name,
+-        templateType: localizedTemplate.type,
+-        type: localizedTemplate.type,
+-        duration: Number(localizedTemplate.duration || 15),
++        ...cachedTemplate,
++        title: cachedTemplate.name,
++        templateType: cachedTemplate.type,
++        type: cachedTemplate.type,
++        duration: Number(cachedTemplate.duration || 15),
+         playerItemType: "template",
+       };
+     }),
+@@ -8929,8 +9523,9 @@ function PlayerPage() {
+     activePlaylist?.updatedAt?.nanoseconds || "",
+   ].join("-");
+   const activeItemsKey = `${activePlaylistRevision}|${playerItems
+-    .map((item) => `${item.playerItemType}-${item.id || item.preview || item.title}-${Number(item.duration || 0)}-${item.updatedAt?.seconds || ""}`)
++    .map((item) => `${item.playerItemType}-${item.id || item.remotePreview || item.preview || item.title}-${Number(item.duration || 0)}-${item.updatedAt?.seconds || ""}-${item.sizeBytes || ""}`)
+     .join("|")}`;
++  const mediaCacheReadyKey = Object.keys(mediaCacheMap).sort().join("|");
+ 
+   const playlistsForOffline = allPlaylists.filter((playlist) => {
+     if (playlist.id === screen?.playlistId) return true;
+@@ -9004,6 +9599,100 @@ function PlayerPage() {
+     };
+   }, [offlineAssetsKey, offlineReadyMessageKey, offlineScope, offlineStorageKey]);
+ 
++  useEffect(() => {
++    if (!screen?.id || !clientId || playerItems.length === 0) return;
++
++    const cacheableItems = playerItems.filter(isCacheableMediaItem);
++    const totalCacheableItems = cacheableItems.length;
++    const runId = mediaCacheRunRef.current + 1;
++    mediaCacheRunRef.current = runId;
++
++    if (totalCacheableItems === 0) {
++      const stats = getMediaCacheStats(clientId);
++      const emptyStatus = {
++        cacheStatus: "pronto",
++        cachedItems: 0,
++        totalCacheableItems: 0,
++        failedCacheItems: 0,
++        cacheSizeBytes: stats.cacheSizeBytes,
++        currentMediaSource: "remote",
++      };
++      setPlayerCacheStatus(emptyStatus);
++      reportCacheStatus(emptyStatus);
++      return;
++    }
++
++    const currentItem = playerItems[mediaIndex] || playerItems[0];
++    const currentKey = currentItem ? getMediaCacheKey(clientId, currentItem) : "";
++    const initialStatus = {
++      cacheStatus: "preparando",
++      cachedItems: 0,
++      totalCacheableItems,
++      failedCacheItems: 0,
++      cacheSizeBytes: getMediaCacheStats(clientId).cacheSizeBytes,
++      currentMediaSource: currentItem?.currentMediaSource || "remote",
++    };
++
++    setPlayerCacheStatus(initialStatus);
++    reportCacheStatus(initialStatus);
++
++    cachePlaylistMedia({
++      clientId,
++      items: playerItems,
++      currentIndex: mediaIndex,
++      concurrency: isAndroidSmartTv ? 1 : 2,
++      onProgress: ({ completed, total, failed }) => {
++        if (mediaCacheRunRef.current !== runId) return;
++
++        setPlayerCacheStatus((previous) => ({
++          ...previous,
++          cacheStatus: "preparando",
++          cachedItems: Math.max(0, completed - failed),
++          totalCacheableItems: total,
++          failedCacheItems: failed,
++        }));
++      },
++    })
++      .then(async (result) => {
++        if (mediaCacheRunRef.current !== runId) return;
++
++        updateLocalMediaCacheMap(result.results);
++
++        const keepKeys = cacheableItems.map((item) => getMediaCacheKey(clientId, item));
++        await removeUnusedCachedMedia(keepKeys, [currentKey]).catch(() => ({ removed: 0 }));
++
++        const stats = getMediaCacheStats(clientId);
++        const finalStatus = {
++          cacheStatus: result.failed > 0 ? "parcial" : "pronto",
++          cachedItems: result.cached,
++          totalCacheableItems: result.total,
++          failedCacheItems: result.failed,
++          cacheSizeBytes: stats.cacheSizeBytes,
++          currentMediaSource: currentKey && result.results[currentKey] ? "cache" : currentItem?.currentMediaSource || "remote",
++        };
++
++        setPlayerCacheStatus(finalStatus);
++        reportCacheStatus(finalStatus);
++      })
++      .catch((error) => {
++        if (mediaCacheRunRef.current !== runId) return;
++
++        console.log("Erro ao preparar cache inteligente:", error);
++        const stats = getMediaCacheStats(clientId);
++        const errorStatus = {
++          cacheStatus: "erro",
++          cachedItems: 0,
++          totalCacheableItems,
++          failedCacheItems: totalCacheableItems,
++          cacheSizeBytes: stats.cacheSizeBytes,
++          currentMediaSource: currentItem?.currentMediaSource || "remote",
++        };
++
++        setPlayerCacheStatus(errorStatus);
++        reportCacheStatus(errorStatus);
++      });
++  }, [screen?.id, clientId, activeItemsKey, mediaIndex, isAndroidSmartTv]);
++
+   function getPlayerItemKey(item, index) {
+     return `${activePlaylist?.id || "templates"}-${activePlaylistRevision}-${item?.id || item?.preview || item?.title || "item"}-${index}`;
+   }
+@@ -9292,6 +9981,29 @@ function PlayerPage() {
+         return;
+       }
+ 
++      if (remoteCommand.type === "clearCache") {
++        clearScreenMediaCache(clientId)
++          .then((result) => {
++            updateLocalMediaCacheMap({});
++            const stats = getMediaCacheStats(clientId);
++            const clearedStatus = {
++              cacheStatus: "preparando",
++              cachedItems: 0,
++              totalCacheableItems: 0,
++              failedCacheItems: 0,
++              cacheSizeBytes: stats.cacheSizeBytes,
++              currentMediaSource: "remote",
++            };
++            setPlayerCacheStatus(clearedStatus);
++            reportCacheStatus(clearedStatus);
++            console.log(`Cache da tela limpo: ${result.removed} arquivo(s).`);
++          })
++          .catch((error) => {
++            console.log("Erro ao limpar cache da tela:", error);
++          });
++        return;
++      }
++
+       if (remoteCommand.type === "pause") {
+         if (!maintenanceMode && !blackoutMode && !takeoverMessage) {
+           setPauseMode(true);
+@@ -9400,6 +10112,7 @@ function PlayerPage() {
+           nowPlayingTemplateType: currentItem.templateType || "",
+           nowPlayingItemType: currentItem.playerItemType || "",
+           nowPlayingSound: currentItem.sound || false,
++          currentMediaSource: currentItem.currentMediaSource || "remote",
+           nowPlayingIndex: safeIndex + 1,
+           nowPlayingTotal: items.length,
+           currentPlaylistId: activePlaylist.id || "",
+@@ -9413,7 +10126,7 @@ function PlayerPage() {
+     }
+ 
+     updateNowPlaying();
+-  }, [screen?.id, clientId, activePlaylist?.id, activeMode, mediaIndex, activeItemsKey]);
++  }, [screen?.id, clientId, activePlaylist?.id, activeMode, mediaIndex, activeItemsKey, mediaCacheReadyKey]);
+ 
+   useEffect(() => {
+     if (!clientId) return;
+@@ -9807,6 +10520,7 @@ function PlayerPage() {
+           onStalled={() => {}}
+           onError={() => {
+             if (!isCurrent) return;
++            if (fallbackToRemoteMedia(item)) return;
+             console.log("Erro ao carregar video. Pulando midia.");
+             skipFailedMedia();
+           }}
+@@ -9824,6 +10538,7 @@ function PlayerPage() {
+         }}
+         onError={() => {
+           if (!isCurrent) return;
++          if (fallbackToRemoteMedia(item)) return;
+           console.log("Erro ao carregar imagem. Pulando midia.");
+           skipFailedMedia();
+         }}
+@@ -9913,6 +10628,83 @@ function PlansPage() {
+ }
+ 
+ function SettingsPage({ user }) {
++  const [developerPassword, setDeveloperPassword] = useState("");
++  const [developerUnlocked, setDeveloperUnlocked] = useState(false);
++  const [newMasterPassword, setNewMasterPassword] = useState("");
++  const [savingDeveloperAction, setSavingDeveloperAction] = useState(false);
++
++  function unlockDeveloperMode() {
++    if (developerPassword !== DEVELOPER_MODE_PASSWORD) {
++      alert("Senha do modo desenvolvedor inválida.");
++      return;
++    }
++
++    setDeveloperUnlocked(true);
++    setDeveloperPassword("");
++  }
++
++  async function createJuniorMasterAccount() {
++    const email = "juniordoparque10@gmail.com";
++    const password = "123456";
++    const secondaryApp = initializeApp(firebaseConfig, `secondary-master-${Date.now()}`);
++    const secondaryAuth = getAuth(secondaryApp);
++
++    try {
++      setSavingDeveloperAction(true);
++      await createUserWithEmailAndPassword(secondaryAuth, email, password);
++      alert("Master Junior cadastrado no Firebase Auth com senha inicial 123456.");
++    } catch (error) {
++      console.log(error);
++
++      if (error.code === "auth/email-already-in-use") {
++        alert("Este master já existe no Firebase Auth. Ele já está autorizado como master no sistema.");
++        return;
++      }
++
++      alert("Erro ao cadastrar o master Junior.");
++    } finally {
++      await deleteApp(secondaryApp).catch(() => {});
++      setSavingDeveloperAction(false);
++    }
++  }
++
++  async function sendMasterPasswordReset(email) {
++    try {
++      setSavingDeveloperAction(true);
++      await sendPasswordResetEmail(auth, email);
++      alert(`E-mail de redefinição enviado para ${email}.`);
++    } catch (error) {
++      console.log(error);
++      alert("Erro ao enviar redefinição de senha do master.");
++    } finally {
++      setSavingDeveloperAction(false);
++    }
++  }
++
++  async function updateLoggedMasterPassword() {
++    if (!newMasterPassword || newMasterPassword.length < 6) {
++      alert("Informe uma nova senha com pelo menos 6 caracteres.");
++      return;
++    }
++
++    if (!auth.currentUser) {
++      alert("Nenhum usuário logado no Firebase Auth.");
++      return;
++    }
++
++    try {
++      setSavingDeveloperAction(true);
++      await updatePassword(auth.currentUser, newMasterPassword);
++      setNewMasterPassword("");
++      alert("Senha do master logado atualizada.");
++    } catch (error) {
++      console.log(error);
++      alert("Não foi possível alterar a senha. Por segurança, faça logout, entre novamente e tente de novo.");
++    } finally {
++      setSavingDeveloperAction(false);
++    }
++  }
++
+   return (
+     <section className="panel">
+       <h2>Configurações</h2>
+@@ -9923,6 +10715,93 @@ function SettingsPage({ user }) {
+           <input value={user?.email || ""} readOnly />
+         </div>
+       </div>
++
++      <section className="developer-mode-panel">
++        <div className="developer-mode-header">
++          <div>
++            <div className="kicker">Acesso restrito</div>
++            <h3>Modo desenvolvedor</h3>
++            <p>Gerencie perfis master e ações sensíveis do sistema.</p>
++          </div>
++          <span>{developerUnlocked ? "Liberado" : "Bloqueado"}</span>
++        </div>
++
++        {!developerUnlocked ? (
++          <div className="developer-unlock-row">
++            <input
++              type="password"
++              value={developerPassword}
++              placeholder="Senha do desenvolvedor"
++              onChange={(event) => setDeveloperPassword(event.target.value)}
++              onKeyDown={(event) => {
++                if (event.key === "Enter") unlockDeveloperMode();
++              }}
++            />
++            <button className="client-action primary" onClick={unlockDeveloperMode}>
++              Entrar
++            </button>
++          </div>
++        ) : (
++          <>
++            <div className="developer-master-grid">
++              {MASTER_EMAILS.map((email) => (
++                <div className="developer-master-card" key={email}>
++                  <small>Perfil master</small>
++                  <strong>{email}</strong>
++                  <button
++                    className="client-action"
++                    disabled={savingDeveloperAction}
++                    onClick={() => sendMasterPasswordReset(email)}
++                  >
++                    Redefinir senha por e-mail
++                  </button>
++                </div>
++              ))}
++            </div>
++
++            <div className="developer-actions-box">
++              <h4>Cadastrar master Junior</h4>
++              <p>
++                Autoriza e cria o login <strong>juniordoparque10@gmail.com</strong> com senha inicial <strong>123456</strong>, caso ainda não exista.
++              </p>
++              <button
++                className="client-action primary"
++                disabled={savingDeveloperAction}
++                onClick={createJuniorMasterAccount}
++              >
++                Cadastrar / validar master Junior
++              </button>
++            </div>
++
++            <div className="developer-actions-box">
++              <h4>Senha do master logado</h4>
++              <p>Por regra do Firebase, o painel só altera diretamente a senha do usuário master atualmente logado.</p>
++              <div className="developer-unlock-row">
++                <input
++                  type="password"
++                  value={newMasterPassword}
++                  placeholder="Nova senha do master logado"
++                  onChange={(event) => setNewMasterPassword(event.target.value)}
++                />
++                <button
++                  className="client-action primary"
++                  disabled={savingDeveloperAction}
++                  onClick={updateLoggedMasterPassword}
++                >
++                  Alterar senha
++                </button>
++              </div>
++            </div>
++
++            <div className="developer-actions-box">
++              <h4>Clientes</h4>
++              <p>
++                Cadastro, edição, suspensão e retorno ficam na aba <strong>Clientes</strong>. Senhas de clientes são redefinidas pelo botão <strong>Senha</strong>, usando o fluxo seguro do Firebase.
++              </p>
++            </div>
++          </>
++        )}
++      </section>
+     </section>
+   );
+ }
+diff --git a/src/firebase.js b/src/firebase.js
+index 8c2a3a6..7952ca4 100644
+--- a/src/firebase.js
++++ b/src/firebase.js
+@@ -23,6 +23,7 @@ const app = initializeApp(firebaseConfig);
+ 
+ export const auth = getAuth(app);
+ export const db = initializeFirestore(app, {
++  experimentalAutoDetectLongPolling: true,
+   localCache: persistentLocalCache({
+     tabManager: persistentMultipleTabManager(),
+   }),
+diff --git a/src/offline-player-cache.js b/src/offline-player-cache.js
+index 34be848..474b785 100644
+--- a/src/offline-player-cache.js
++++ b/src/offline-player-cache.js
+@@ -2,6 +2,10 @@ import { Capacitor } from "@capacitor/core";
+ import { FileTransfer } from "@capacitor/file-transfer";
+ import { Directory, Filesystem } from "@capacitor/filesystem";
+ 
++const MEDIA_CACHE_NAME = "totempark-player-media-v1";
++const MEDIA_CACHE_META_KEY = "totempark-player-media-cache-meta";
++const CACHE_URL_PREFIX = "https://totempark.local/cache/";
++
+ function hashUrl(value) {
+   let hash = 2166136261;
+ 
+@@ -13,6 +17,314 @@ function hashUrl(value) {
+   return (hash >>> 0).toString(16);
+ }
+ 
++function safeJsonParse(value, fallback) {
++  try {
++    return JSON.parse(value || "");
++  } catch {
++    return fallback;
++  }
++}
++
++function getMetaStore() {
++  if (typeof localStorage === "undefined") return {};
++  return safeJsonParse(localStorage.getItem(MEDIA_CACHE_META_KEY), {});
++}
++
++function saveMetaStore(meta) {
++  if (typeof localStorage === "undefined") return;
++  localStorage.setItem(MEDIA_CACHE_META_KEY, JSON.stringify(meta));
++}
++
++function getTimestampVersion(value) {
++  if (!value) return "";
++  if (typeof value === "string" || typeof value === "number") return String(value);
++  if (value.seconds) return `${value.seconds}-${value.nanoseconds || 0}`;
++  if (value.toMillis) return String(value.toMillis());
++  return "";
++}
++
++function getMediaRemoteUrl(item = {}) {
++  return item.remotePreview || item.preview || item.imageUrl || "";
++}
++
++export function isCacheableMediaItem(item = {}) {
++  const url = getMediaRemoteUrl(item);
++  const type = String(item.type || "").normalize("NFD").replace(/[\u0300-\u036f]/g, "").toLowerCase();
++
++  if (!/^https?:\/\//i.test(url)) return false;
++  if (item.playerItemType === "template" || item.templateType) return false;
++
++  return type.includes("video") || type.includes("imagem") || Boolean(item.preview);
++}
++
++export function getMediaCacheKey(clientId, item = {}) {
++  const url = getMediaRemoteUrl(item);
++  const versionParts = [
++    clientId || "client",
++    item.id || item.mediaId || hashUrl(url),
++    item.storagePath || "",
++    getTimestampVersion(item.updatedAt),
++    item.sizeBytes || "",
++    url,
++  ];
++
++  return hashUrl(versionParts.join("|"));
++}
++
++function getCacheRequest(key) {
++  return new Request(`${CACHE_URL_PREFIX}${key}`);
++}
++
++async function openMediaCache() {
++  if (typeof caches === "undefined") return null;
++  return caches.open(MEDIA_CACHE_NAME);
++}
++
++async function responseToObjectUrl(response) {
++  const blob = await response.blob();
++  return {
++    url: URL.createObjectURL(blob),
++    sizeBytes: blob.size || 0,
++  };
++}
++
++export async function getCachedMediaUrl(clientId, item = {}) {
++  if (!isCacheableMediaItem(item)) {
++    return {
++      url: getMediaRemoteUrl(item),
++      source: "remote",
++      key: "",
++      sizeBytes: Number(item.sizeBytes || 0),
++    };
++  }
++
++  const key = getMediaCacheKey(clientId, item);
++  const cache = await openMediaCache();
++
++  if (!cache) {
++    return {
++      url: getMediaRemoteUrl(item),
++      source: "remote",
++      key,
++      sizeBytes: Number(item.sizeBytes || 0),
++    };
++  }
++
++  const response = await cache.match(getCacheRequest(key));
++
++  if (!response) {
++    return {
++      url: getMediaRemoteUrl(item),
++      source: "remote",
++      key,
++      sizeBytes: Number(item.sizeBytes || 0),
++    };
++  }
++
++  const objectUrl = await responseToObjectUrl(response);
++
++  return {
++    ...objectUrl,
++    source: "cache",
++    key,
++  };
++}
++
++async function cacheSingleMedia(clientId, item = {}) {
++  const remoteUrl = getMediaRemoteUrl(item);
++  const key = getMediaCacheKey(clientId, item);
++  const cache = await openMediaCache();
++
++  if (!cache) {
++    return {
++      key,
++      remoteUrl,
++      status: "unsupported",
++      sizeBytes: Number(item.sizeBytes || 0),
++    };
++  }
++
++  const request = getCacheRequest(key);
++  const existing = await cache.match(request);
++
++  if (existing) {
++    const cached = await responseToObjectUrl(existing.clone());
++    const meta = getMetaStore();
++    meta[key] = {
++      ...(meta[key] || {}),
++      key,
++      remoteUrl,
++      clientId,
++      lastUsedAt: Date.now(),
++      sizeBytes: cached.sizeBytes || meta[key]?.sizeBytes || Number(item.sizeBytes || 0),
++    };
++    saveMetaStore(meta);
++
++    return {
++      ...cached,
++      key,
++      remoteUrl,
++      status: "hit",
++      source: "cache",
++    };
++  }
++
++  const response = await fetch(remoteUrl, { cache: "no-store" });
++
++  if (!response.ok) {
++    throw new Error(`HTTP ${response.status}`);
++  }
++
++  await cache.put(request, response.clone());
++
++  const cached = await responseToObjectUrl(response);
++  const meta = getMetaStore();
++  meta[key] = {
++    key,
++    remoteUrl,
++    clientId,
++    storagePath: item.storagePath || "",
++    updatedAt: getTimestampVersion(item.updatedAt),
++    sizeBytes: cached.sizeBytes || Number(item.sizeBytes || 0),
++    cachedAt: Date.now(),
++    lastUsedAt: Date.now(),
++  };
++  saveMetaStore(meta);
++
++  return {
++    ...cached,
++    key,
++    remoteUrl,
++    status: "miss",
++    source: "cache",
++  };
++}
++
++export async function cachePlaylistMedia({
++  clientId,
++  items = [],
++  currentIndex = 0,
++  concurrency = 1,
++  onProgress,
++} = {}) {
++  const unique = new Map();
++
++  items.filter(isCacheableMediaItem).forEach((item, index) => {
++    const key = getMediaCacheKey(clientId, item);
++    if (!unique.has(key)) unique.set(key, { item, index });
++  });
++
++  const ordered = [...unique.values()].sort((a, b) => {
++    if (a.index === currentIndex) return -1;
++    if (b.index === currentIndex) return 1;
++    if (a.index === currentIndex + 1) return -1;
++    if (b.index === currentIndex + 1) return 1;
++    return a.index - b.index;
++  });
++  const results = {};
++  const failures = [];
++  let completed = 0;
++  let cursor = 0;
++
++  async function worker() {
++    while (cursor < ordered.length) {
++      const entry = ordered[cursor];
++      cursor += 1;
++
++      try {
++        const result = await cacheSingleMedia(clientId, entry.item);
++        results[result.key] = result;
++      } catch (error) {
++        failures.push({
++          key: getMediaCacheKey(clientId, entry.item),
++          url: getMediaRemoteUrl(entry.item),
++          message: error?.message || "Falha ao baixar",
++        });
++      } finally {
++        completed += 1;
++        onProgress?.({
++          completed,
++          total: ordered.length,
++          failed: failures.length,
++          results,
++          failures,
++        });
++      }
++    }
++  }
++
++  await Promise.all(
++    Array.from({ length: Math.max(1, Math.min(concurrency, ordered.length || 1)) }, worker)
++  );
++
++  return {
++    total: ordered.length,
++    cached: Object.keys(results).length,
++    failed: failures.length,
++    results,
++    failures,
++  };
++}
++
++export async function removeUnusedCachedMedia(keepKeys = [], protectedKeys = []) {
++  const cache = await openMediaCache();
++  if (!cache) return { removed: 0, sizeBytes: 0 };
++
++  const keep = new Set([...keepKeys, ...protectedKeys].filter(Boolean));
++  const meta = getMetaStore();
++  const requests = await cache.keys();
++  let removed = 0;
++  let sizeBytes = 0;
++
++  for (const request of requests) {
++    const key = request.url.replace(CACHE_URL_PREFIX, "");
++    if (keep.has(key)) continue;
++
++    sizeBytes += Number(meta[key]?.sizeBytes || 0);
++    await cache.delete(request);
++    delete meta[key];
++    removed += 1;
++  }
++
++  saveMetaStore(meta);
++  return { removed, sizeBytes };
++}
++
++export async function clearScreenMediaCache(clientId) {
++  const cache = await openMediaCache();
++  if (!cache) return { removed: 0, sizeBytes: 0 };
++
++  const meta = getMetaStore();
++  const requests = await cache.keys();
++  let removed = 0;
++  let sizeBytes = 0;
++
++  for (const request of requests) {
++    const key = request.url.replace(CACHE_URL_PREFIX, "");
++    if (meta[key]?.clientId !== clientId) continue;
++
++    sizeBytes += Number(meta[key]?.sizeBytes || 0);
++    await cache.delete(request);
++    delete meta[key];
++    removed += 1;
++  }
++
++  saveMetaStore(meta);
++  return { removed, sizeBytes };
++}
++
++export function getMediaCacheStats(clientId) {
++  const meta = getMetaStore();
++  const entries = Object.values(meta).filter((entry) => !clientId || entry.clientId === clientId);
++  const cacheSizeBytes = entries.reduce((total, entry) => total + Number(entry.sizeBytes || 0), 0);
++
++  return {
++    items: entries.length,
++    cacheSizeBytes,
++    updatedAt: entries.reduce((latest, entry) => Math.max(latest, Number(entry.cachedAt || 0), Number(entry.lastUsedAt || 0)), 0),
++  };
++}
++
+ function getFileExtension(url) {
+   try {
+     const pathname = decodeURIComponent(new URL(url).pathname);

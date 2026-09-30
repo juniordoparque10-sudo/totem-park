@@ -1,0 +1,110 @@
+{
+  "hash": "62a27db5",
+  "configHash": "17f1fe26",
+  "lockfileHash": "24034f87",
+  "browserHash": "31767302",
+  "optimized": {
+    "@capacitor/core": {
+      "src": "../../../../node_modules/@capacitor/core/dist/index.js",
+      "file": "@capacitor_core.js",
+      "fileHash": "5cf708de",
+      "needsInterop": false
+    },
+    "@capacitor/file-transfer": {
+      "src": "../../../../node_modules/@capacitor/file-transfer/dist/plugin.mjs",
+      "file": "@capacitor_file-transfer.js",
+      "fileHash": "0a41d422",
+      "needsInterop": false
+    },
+    "@capacitor/filesystem": {
+      "src": "../../../../node_modules/@capacitor/filesystem/dist/esm/index.js",
+      "file": "@capacitor_filesystem.js",
+      "fileHash": "48ce87d1",
+      "needsInterop": false
+    },
+    "firebase/app": {
+      "src": "../../../../node_modules/firebase/app/dist/esm/index.esm.js",
+      "file": "firebase_app.js",
+      "fileHash": "c69f093c",
+      "needsInterop": false
+    },
+    "firebase/auth": {
+      "src": "../../../../node_modules/firebase/auth/dist/esm/index.esm.js",
+      "file": "firebase_auth.js",
+      "fileHash": "0d7b8d8f",
+      "needsInterop": false
+    },
+    "firebase/firestore": {
+      "src": "../../../../node_modules/firebase/firestore/dist/esm/index.esm.js",
+      "file": "firebase_firestore.js",
+      "fileHash": "f0fe4e0e",
+      "needsInterop": false
+    },
+    "firebase/storage": {
+      "src": "../../../../node_modules/firebase/storage/dist/esm/index.esm.js",
+      "file": "firebase_storage.js",
+      "fileHash": "168954b4",
+      "needsInterop": false
+    },
+    "lucide-react": {
+      "src": "../../../../node_modules/lucide-react/dist/esm/lucide-react.mjs",
+      "file": "lucide-react.js",
+      "fileHash": "bf71c2ba",
+      "needsInterop": false
+    },
+    "react-dom": {
+      "src": "../../../../node_modules/react-dom/index.js",
+      "file": "react-dom.js",
+      "fileHash": "c38a8edd",
+      "needsInterop": true
+    },
+    "react-dom/client": {
+      "src": "../../../../node_modules/react-dom/client.js",
+      "file": "react-dom_client.js",
+      "fileHash": "864c5450",
+      "needsInterop": true
+    },
+    "react-router-dom": {
+      "src": "../../../../node_modules/react-router-dom/dist/index.mjs",
+      "file": "react-router-dom.js",
+      "fileHash": "3e17bf1c",
+      "needsInterop": false
+    },
+    "react": {
+      "src": "../../../../node_modules/react/index.js",
+      "file": "react.js",
+      "fileHash": "7a4a9a85",
+      "needsInterop": true
+    },
+    "react/jsx-dev-runtime": {
+      "src": "../../../../node_modules/react/jsx-dev-runtime.js",
+      "file": "react_jsx-dev-runtime.js",
+      "fileHash": "5c18c6e1",
+      "needsInterop": true
+    },
+    "react/jsx-runtime": {
+      "src": "../../../../node_modules/react/jsx-runtime.js",
+      "file": "react_jsx-runtime.js",
+      "fileHash": "f08caa6c",
+      "needsInterop": true
+    }
+  },
+  "chunks": {
+    "index.esm-Rr-3tvL0": {
+      "file": "index.esm-Rr-3tvL0.js",
+      "isDynamicEntry": false
+    },
+    "react-CZunmVaX": {
+      "file": "react-CZunmVaX.js",
+      "isDynamicEntry": false
+    },
+    "web-B_JAPfM0": {
+      "file": "web-B_JAPfM0.js",
+      "isDynamicEntry": true
+    },
+    "web-BjKL51lK-DzFq92c9": {
+      "file": "web-BjKL51lK-DzFq92c9.js",
+      "isDynamicEntry": true
+    }
+  }
+}

@@ -31,6 +31,7 @@ const HERO_DEFAULTS = {
     ],
     cta: { enabled: true, label: "Conheça nossas soluções", url: "" },
   },
+  visibility: { showLogo:true, showContent:true, showHeadline:true, showSubtitle:true, showCta:true, showServices:true },
   media: {
     primary: null,
   },
@@ -76,7 +77,7 @@ const TEMPLATE_PRESETS = {
   [DIGITAL_MENU_TYPE]: { content:{headline:"Menu especial",subtitle:"Produtos preparados para bons momentos",services:[{id:"1",title:"Produto destaque",description:"R$ 0,00"},{id:"2",title:"Produto",description:"R$ 0,00"},{id:"3",title:"Produto",description:"R$ 0,00"},{id:"4",title:"Produto",description:"R$ 0,00"}]},style:{preset:"cafe",primaryColor:"#d97706",secondaryColor:"#f59e0b",backgroundColor:"#1c1009"} },
   [KPI_INDICATORS_TYPE]: { content:{headline:"Indicadores",subtitle:"Visão geral do período",services:[{id:"1",title:"Indicador 01",description:"0"},{id:"2",title:"Indicador 02",description:"0"},{id:"3",title:"Meta",description:"0%"},{id:"4",title:"Variação",description:"0%"}]},style:{preset:"data",primaryColor:"#8b5cf6",secondaryColor:"#22d3ee",backgroundColor:"#07111f"} },
   [QR_INTERACTION_TYPE]: { content:{headline:"Acompanhe nosso conteúdo!",subtitle:"Aponte a câmera e conecte-se.",services:[],cta:{enabled:true,label:"Acesse agora",url:""}},style:{preset:"social",primaryColor:"#ef4444",secondaryColor:"#ffffff",backgroundColor:"#18050a"},modules:{qrCode:{enabled:true,value:""}} },
-  [SPORTS_PREMIUM_TYPE]: { content:{headline:"Resultados Esportivos Premium",subtitle:"Sistema visual multiesportes",services:[]},style:{preset:"broadcast-dark",primaryColor:"#22d3ee",secondaryColor:"#8b5cf6",backgroundColor:"#07111f",overlayOpacity:58},modules:{news:{enabled:false,newsSource:"",newsFeedUrl:"",selectedNewsSources:[],tickerSpeed:"normal",tickerSize:"normal",tickerBackground:"#07111f",tickerTextColor:"#ffffff",tickerTransparency:8,tickerLabel:"Notícias esportivas"}},sports:{provider:"manual",mode:"single",selectedSport:"football",selectedSports:["football"],primarySport:"football",transition:"fade",visualPreset:"broadcast-dark"} },
+  [SPORTS_PREMIUM_TYPE]: { content:{headline:"Resultados Esportivos Premium",subtitle:"Sistema visual multiesportes",services:[]},style:{preset:"broadcast-dark",primaryColor:"#22d3ee",secondaryColor:"#8b5cf6",backgroundColor:"#07111f",overlayOpacity:58},modules:{news:{enabled:false,newsSource:"",newsFeedUrl:"",selectedNewsSources:[],tickerSpeed:"normal",tickerSize:"normal",tickerBackground:"#07111f",tickerTextColor:"#ffffff",tickerTransparency:8,tickerLabel:"Notícias esportivas"}},sports:{provider:"thesportsdb",mode:"single",selectedSport:"football",selectedSports:["football"],primarySport:"football",transition:"fade",visualPreset:"broadcast-dark"} },
 };
 
 export function cloneTemplateV2Config(config = HERO_DEFAULTS) {
@@ -91,6 +92,7 @@ export function createHeroBusinessDraft(overrides = {}) {
     ...overrides,
     display: { ...base.display, ...(overrides.display || {}) },
     content: { ...base.content, ...(overrides.content || {}) },
+    visibility: { ...base.visibility, ...(overrides.visibility || {}) },
     media: { ...base.media, ...(overrides.media || {}) },
     style: {
       ...base.style,

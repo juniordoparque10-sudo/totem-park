@@ -1,0 +1,28 @@
+ M functions/index.js
+ M src/App.css
+ M src/App.jsx
+ M src/TelemetryDashboard.jsx
+ M tests/firestore-player-identity.rules.test.mjs
+ M tests/player-binding-functions.test.mjs
+?? android-icon-final-proof.png
+?? android-icon-final-purple-tone-proof.png
+?? android-icon-preview-purple-tone.png
+?? android-icon-preview-totempark-isotipo.png
+?? android-icon-preview-totempark.png
+?? android-icon-preview-white-center-fixed.png
+?? android-manager-logo-dark-blue-preview.png
+?? android-manager-logo-variation-preview.png
+?? android-tv-tray-icon-preview-totempark.png
+?? artifacts/
+?? backup-before-corporate-custom-template.patch
+?? backup-before-sports-template.patch
+?? backups/
+?? docs/r2-storage-transition.md
+?? docs/storage-production-permissions.md
+?? scripts/
+?? sealed-telemetry/
+?? src/TelemetryDashboardV1.jsx
+?? src/telemetry-v1.js
+?? src/telemetry-v1.test.js
+?? totem-park-backup-before-commercial-plans.patch
+?? workers/

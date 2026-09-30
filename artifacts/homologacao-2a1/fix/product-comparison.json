@@ -1,0 +1,10 @@
+{
+  "checked": 519,
+  "changed": [
+    "src/App.jsx"
+  ],
+  "onlyChange": "10 lines added to renderPlayerItem image ref",
+  "nativeGuard": "PASSOU",
+  "remotePath": "UNCHANGED",
+  "productOutsideCallback": "UNCHANGED"
+}

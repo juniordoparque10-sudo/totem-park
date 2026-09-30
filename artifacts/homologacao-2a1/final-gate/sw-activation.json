@@ -1,0 +1,98 @@
+{
+  "started": "2026-09-16T14:44:15.823Z",
+  "profile": "C:\\Users\\centr\\Desktop\\totem-park\\artifacts\\homologacao-2a1\\chrome-profile-gate\\final-1789569564205",
+  "initialAttempt": "No new activation occurred; original update attempt remains documented in evidence.json and verification.json",
+  "before": [
+    {
+      "key": "https://totempark.local/cache/aa0dc5a1",
+      "size": 27656,
+      "hash": "5f5015fbb36a8379f70a8861a71efa490ab4a4945bef4460fd6a71be6a940013"
+    },
+    {
+      "key": "https://totempark.local/cache/3056c0fe",
+      "size": 15649,
+      "hash": "693d9b80d37e3cbb797ae1ae390d6bd9e5b7aff990231b8a58f67b64dccd72fd"
+    },
+    {
+      "key": "https://totempark.local/cache/885d3f32",
+      "size": 16044,
+      "hash": "79a4e1277b6d3c33e4b1247d3a0e9a1842dd2c86f8650c05d47d32889bfe41b3"
+    },
+    {
+      "key": "https://totempark.local/cache/a6a74c01",
+      "size": 27892,
+      "hash": "071dbf19c3c24ebfae14251a2c1cfc1c90479b0c483852be501e1a5d359ca02b"
+    },
+    {
+      "key": "https://totempark.local/cache/2f190ad0",
+      "size": 25618,
+      "hash": "c2a24c92b790ee902256876a9d147aaf7585aa60f385621e8f499745fd026438"
+    },
+    {
+      "key": "https://totempark.local/cache/1c37a343",
+      "size": 15292,
+      "hash": "168def6c63b7c2cac5dc71c4a5b6a275a61fc7a80bf866695f3d83ed4610eba4"
+    },
+    {
+      "key": "https://totempark.local/cache/599474",
+      "size": 16378,
+      "hash": "1fb65ee80e2993387bfd5d52c09ef6a27917ea60ba4331110d7ec1650a1ee587"
+    }
+  ],
+  "unregistered": true,
+  "controllerBefore": null,
+  "activation": {
+    "states": [
+      "installing",
+      "installed",
+      "activating",
+      "activated"
+    ],
+    "active": "activated",
+    "script": "http://127.0.0.1:5199/sw.js",
+    "names": [
+      "totempark-player-media-v1",
+      "totem-park-pwa-v3",
+      "gate-unknown-cache"
+    ],
+    "unknownBody": "gate-unknown-cache"
+  },
+  "after": [
+    {
+      "key": "https://totempark.local/cache/aa0dc5a1",
+      "size": 27656,
+      "hash": "5f5015fbb36a8379f70a8861a71efa490ab4a4945bef4460fd6a71be6a940013"
+    },
+    {
+      "key": "https://totempark.local/cache/3056c0fe",
+      "size": 15649,
+      "hash": "693d9b80d37e3cbb797ae1ae390d6bd9e5b7aff990231b8a58f67b64dccd72fd"
+    },
+    {
+      "key": "https://totempark.local/cache/885d3f32",
+      "size": 16044,
+      "hash": "79a4e1277b6d3c33e4b1247d3a0e9a1842dd2c86f8650c05d47d32889bfe41b3"
+    },
+    {
+      "key": "https://totempark.local/cache/a6a74c01",
+      "size": 27892,
+      "hash": "071dbf19c3c24ebfae14251a2c1cfc1c90479b0c483852be501e1a5d359ca02b"
+    },
+    {
+      "key": "https://totempark.local/cache/2f190ad0",
+      "size": 25618,
+      "hash": "c2a24c92b790ee902256876a9d147aaf7585aa60f385621e8f499745fd026438"
+    },
+    {
+      "key": "https://totempark.local/cache/1c37a343",
+      "size": 15292,
+      "hash": "168def6c63b7c2cac5dc71c4a5b6a275a61fc7a80bf866695f3d83ed4610eba4"
+    },
+    {
+      "key": "https://totempark.local/cache/599474",
+      "size": 16378,
+      "hash": "1fb65ee80e2993387bfd5d52c09ef6a27917ea60ba4331110d7ec1650a1ee587"
+    }
+  ],
+  "result": "PASSOU"
+}

@@ -1,0 +1,69 @@
+{
+  "estimate": {
+    "quota": 10737418240,
+    "usage": 0,
+    "usageDetails": {}
+  },
+  "cases": [
+    {
+      "case": "synthetic",
+      "size": 15649,
+      "result": "PASS"
+    },
+    {
+      "case": "synthetic",
+      "size": 5242880,
+      "result": "PASS"
+    },
+    {
+      "case": "synthetic",
+      "size": 10485760,
+      "result": "PASS"
+    },
+    {
+      "case": "synthetic",
+      "size": 28947112,
+      "result": "PASS"
+    }
+  ],
+  "fetchStatus": 200,
+  "headers": {
+    "cache-control": "no-store",
+    "connection": "keep-alive",
+    "content-length": "28947112",
+    "content-type": "video/webm",
+    "date": "Fri, 18 Sep 2026 19:39:09 GMT",
+    "keep-alive": "timeout=5"
+  },
+  "stage": "blob",
+  "actualCache": "TypeError: Failed to fetch",
+  "reads": [
+    {
+      "mode": "arrayBuffer",
+      "bytes": 28947112
+    },
+    {
+      "mode": "blob",
+      "error": "TypeError: Failed to fetch"
+    },
+    {
+      "mode": "stream",
+      "bytes": 28947112
+    }
+  ],
+  "after": {
+    "quota": 10782111488,
+    "usage": 44693248,
+    "usageDetails": {
+      "caches": 44693248
+    }
+  },
+  "failedRequests": [
+    {
+      "url": "http://127.0.0.1:5205/big",
+      "failure": {
+        "errorText": "net::ERR_FAILED"
+      }
+    }
+  ]
+}

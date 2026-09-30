@@ -1,0 +1,26 @@
+{
+  "name": "Totem Park | TVs Corporativas e Digital Signage",
+  "short_name": "Totem Park",
+  "description": "Sistema profissional para TVs corporativas, cardápios digitais, comunicação interna, notícias, marketing digital, playlists e digital signage.",
+  "id": "/tv",
+  "start_url": "/tv",
+  "scope": "/",
+  "display": "standalone",
+  "orientation": "landscape",
+  "background_color": "#050816",
+  "theme_color": "#050816",
+  "icons": [
+    {
+      "src": "/icons/icon-192.png",
+      "sizes": "192x192",
+      "type": "image/png",
+      "purpose": "any maskable"
+    },
+    {
+      "src": "/icons/icon-512.png",
+      "sizes": "512x512",
+      "type": "image/png",
+      "purpose": "any maskable"
+    }
+  ]
+}

@@ -1,0 +1,37 @@
+{
+  "name": "projects/totem-park/databases/(default)/documents/playerDeviceBindings/zs8bACp67ibGv3v66vf570MDpLQ2",
+  "fields": {
+    "appVersion": {
+      "stringValue": "1.0-player-2a2-c-telemetry-pilot"
+    },
+    "uid": {
+      "stringValue": "zs8bACp67ibGv3v66vf570MDpLQ2"
+    },
+    "pairedAt": {
+      "timestampValue": "2026-09-22T16:11:38.591Z"
+    },
+    "updatedAt": {
+      "timestampValue": "2026-09-22T16:11:40.348Z"
+    },
+    "deviceId": {
+      "stringValue": "b148d1ab-5dd6-42b1-98d7-f2ca68024b59"
+    },
+    "createdAt": {
+      "timestampValue": "2026-09-22T16:11:38.591Z"
+    },
+    "revokedAt": {
+      "nullValue": null
+    },
+    "screenId": {
+      "stringValue": "emp3VDKfLzmz1sWJrnbx"
+    },
+    "clientId": {
+      "stringValue": "eCd1q9Dq1SMr9D5FlKN8"
+    },
+    "status": {
+      "stringValue": "ACTIVE"
+    }
+  },
+  "createTime": "2026-09-22T16:11:38.612335Z",
+  "updateTime": "2026-09-22T16:11:40.366917Z"
+}

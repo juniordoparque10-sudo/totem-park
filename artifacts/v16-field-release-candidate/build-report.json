@@ -1,0 +1,9 @@
+{
+  "Apk": "C:\\Users\\centr\\Desktop\\totem-park\\artifacts\\v16-field-release-candidate\\Totem-Park-Player-V16-Field-Release-Candidate.apk",
+  "ApkSha256": "CBB21CB43D19CBAD57CED3559A719CE8B1DAB161D2D2898788F76D98C7281150",
+  "BaselineApkSha256": "12AEBA1F1529AC9311732F773383C99E4076FE5DBC399EB23B5C04B399561A6A",
+  "Package": "br.com.parksolutions.totempark",
+  "VersionCode": 16,
+  "VersionName": "1.0.0-v16-field-release-candidate",
+  "PlayerBundleSha256": "634CE7D2AEA6B6F3875609DECE0AA4FD4DCC3F9A962FAF7243F2FDAB56C8CFF4"
+}

@@ -1,0 +1,3045 @@
+{
+  "started": "2026-09-16T02:02:43.966Z",
+  "profile": "C:\\Users\\centr\\Desktop\\totem-park\\artifacts\\homologacao-2a1\\chrome-profile-gate",
+  "network": [
+    {
+      "phase": "first-launch",
+      "requestId": "27024.59",
+      "url": "http://127.0.0.1:5199/media/video01.webm",
+      "method": "GET",
+      "requestHeaders": {
+        "sec-ch-ua-platform": "\"Windows\"",
+        "Referer": "http://127.0.0.1:5199/player/A/TESTA1",
+        "Accept-Encoding": "identity;q=1, *;q=0",
+        "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) HeadlessChrome/152.0.0.0 Safari/537.36",
+        "sec-ch-ua": "\"Chromium\";v=\"152\", \"Not?A_Brand\";v=\"24\", \"Google Chrome\";v=\"152\"",
+        "Range": "bytes=0-",
+        "sec-ch-ua-mobile": "?0"
+      },
+      "encodedBodyBytes": 27656,
+      "decodedBodyBytes": 27656,
+      "wireStatus": 206,
+      "status": 206,
+      "fromDiskCache": false,
+      "fromServiceWorker": false,
+      "protocol": "http/1.1",
+      "responseHeaders": {
+        "cache-control": "private, max-age=0",
+        "etag": "\"fixture-video01.webm-27656\"",
+        "connection": "close",
+        "Content-Range": "bytes 0-27655/27656",
+        "accept-ranges": "bytes",
+        "Content-Length": "27656",
+        "date": "Wed, 16 Sep 2026 02:02:46 GMT",
+        "content-type": "video/webm",
+        "Vary": "Origin"
+      },
+      "encodedTransferBytes": 27936
+    },
+    {
+      "phase": "first-launch",
+      "requestId": "27024.61",
+      "url": "http://127.0.0.1:5199/media/video01.webm",
+      "method": "GET",
+      "requestHeaders": {
+        "sec-ch-ua-platform": "\"Windows\"",
+        "Referer": "http://127.0.0.1:5199/player/A/TESTA1",
+        "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) HeadlessChrome/152.0.0.0 Safari/537.36",
+        "sec-ch-ua": "\"Chromium\";v=\"152\", \"Not?A_Brand\";v=\"24\", \"Google Chrome\";v=\"152\"",
+        "sec-ch-ua-mobile": "?0"
+      },
+      "encodedBodyBytes": 27656,
+      "decodedBodyBytes": 27656,
+      "wireStatus": 200,
+      "status": 200,
+      "fromDiskCache": false,
+      "fromServiceWorker": false,
+      "protocol": "http/1.1",
+      "responseHeaders": {
+        "cache-control": "private, max-age=0",
+        "etag": "\"fixture-video01.webm-27656\"",
+        "connection": "close",
+        "accept-ranges": "bytes",
+        "content-length": "27656",
+        "date": "Wed, 16 Sep 2026 02:02:46 GMT",
+        "content-type": "video/webm",
+        "Vary": "Origin"
+      },
+      "encodedTransferBytes": 27887
+    },
+    {
+      "phase": "first-launch",
+      "requestId": "27024.62",
+      "url": "http://127.0.0.1:5199/media/imagem01.png",
+      "method": "GET",
+      "requestHeaders": {
+        "sec-ch-ua-platform": "\"Windows\"",
+        "Referer": "http://127.0.0.1:5199/player/A/TESTA1",
+        "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) HeadlessChrome/152.0.0.0 Safari/537.36",
+        "sec-ch-ua": "\"Chromium\";v=\"152\", \"Not?A_Brand\";v=\"24\", \"Google Chrome\";v=\"152\"",
+        "sec-ch-ua-mobile": "?0"
+      },
+      "encodedBodyBytes": 15649,
+      "decodedBodyBytes": 15649,
+      "wireStatus": 200,
+      "status": 200,
+      "fromDiskCache": false,
+      "fromServiceWorker": false,
+      "protocol": "http/1.1",
+      "responseHeaders": {
+        "cache-control": "private, max-age=0",
+        "etag": "\"fixture-imagem01.png-15649\"",
+        "connection": "close",
+        "accept-ranges": "bytes",
+        "content-length": "15649",
+        "date": "Wed, 16 Sep 2026 02:02:46 GMT",
+        "content-type": "image/png",
+        "Vary": "Origin"
+      },
+      "encodedTransferBytes": 15879
+    },
+    {
+      "phase": "offline",
+      "requestId": "36684.27",
+      "url": "http://127.0.0.1:5199/media/video01.webm?offline-probe=1789524190391",
+      "method": "GET",
+      "requestHeaders": {
+        "sec-ch-ua-platform": "\"Windows\"",
+        "Referer": "http://127.0.0.1:5199/player/A/TESTA1",
+        "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) HeadlessChrome/152.0.0.0 Safari/537.36",
+        "sec-ch-ua": "\"Chromium\";v=\"152\", \"Not?A_Brand\";v=\"24\", \"Google Chrome\";v=\"152\"",
+        "sec-ch-ua-mobile": "?0"
+      },
+      "encodedBodyBytes": 0,
+      "decodedBodyBytes": 0,
+      "failure": "net::ERR_FAILED"
+    }
+  ],
+  "console": [
+    {
+      "phase": "first-launch",
+      "at": "2026-09-16T02:02:46.109Z",
+      "type": "error",
+      "text": "Connecting to 'https://ipapi.co/json/' violates the following Content Security Policy directive: \"connect-src 'self' http://127.0.0.1:* ws://127.0.0.1:*\". The action has been blocked."
+    },
+    {
+      "phase": "first-launch",
+      "at": "2026-09-16T02:02:46.109Z",
+      "type": "error",
+      "text": "Fetch API cannot load https://ipapi.co/json/. Refused to connect because it violates the document's Content Security Policy."
+    },
+    {
+      "phase": "first-launch",
+      "at": "2026-09-16T02:02:49.995Z",
+      "type": "error",
+      "text": "Failed to load resource: net::ERR_CONNECTION_REFUSED"
+    },
+    {
+      "phase": "first-launch",
+      "at": "2026-09-16T02:02:49.995Z",
+      "type": "error",
+      "text": "Failed to load resource: net::ERR_CONNECTION_REFUSED"
+    },
+    {
+      "phase": "first-launch",
+      "at": "2026-09-16T02:02:52.953Z",
+      "type": "error",
+      "text": "Failed to load resource: net::ERR_CONNECTION_REFUSED"
+    },
+    {
+      "phase": "first-launch",
+      "at": "2026-09-16T02:02:53.002Z",
+      "type": "error",
+      "text": "Failed to load resource: net::ERR_CONNECTION_REFUSED"
+    },
+    {
+      "phase": "first-launch",
+      "at": "2026-09-16T02:02:53.018Z",
+      "type": "error",
+      "text": "Failed to load resource: net::ERR_CONNECTION_REFUSED"
+    },
+    {
+      "phase": "first-launch",
+      "at": "2026-09-16T02:02:53.222Z",
+      "type": "error",
+      "text": "Failed to load resource: net::ERR_CONNECTION_REFUSED"
+    },
+    {
+      "phase": "reopened-before-player",
+      "at": "2026-09-16T02:02:57.149Z",
+      "type": "error",
+      "text": "Failed to load resource: net::ERR_FAILED"
+    },
+    {
+      "phase": "reopened-before-player",
+      "at": "2026-09-16T02:02:57.374Z",
+      "type": "error",
+      "text": "Failed to load resource: net::ERR_FAILED"
+    },
+    {
+      "phase": "reopened-before-player",
+      "at": "2026-09-16T02:02:59.161Z",
+      "type": "error",
+      "text": "Failed to load resource: net::ERR_FAILED"
+    },
+    {
+      "phase": "reopened-player",
+      "at": "2026-09-16T02:03:01.514Z",
+      "type": "error",
+      "text": "Failed to load resource: net::ERR_FAILED"
+    },
+    {
+      "phase": "reopened-player",
+      "at": "2026-09-16T02:03:03.319Z",
+      "type": "error",
+      "text": "Failed to load resource: net::ERR_FAILED"
+    },
+    {
+      "phase": "reopened-player",
+      "at": "2026-09-16T02:03:03.319Z",
+      "type": "error",
+      "text": "Failed to load resource: net::ERR_FAILED"
+    },
+    {
+      "phase": "offline",
+      "at": "2026-09-16T02:03:10.395Z",
+      "type": "error",
+      "text": "Failed to load resource: net::ERR_FAILED"
+    },
+    {
+      "phase": "offline",
+      "at": "2026-09-16T02:03:10.397Z",
+      "type": "error",
+      "text": "Failed to load resource: net::ERR_FAILED"
+    }
+  ],
+  "closures": [
+    {
+      "phase": "first-launch",
+      "pid": 14652,
+      "exited": true,
+      "at": "2026-09-16T02:02:54.272Z"
+    },
+    {
+      "phase": "offline",
+      "pid": 27896,
+      "exited": true,
+      "at": "2026-09-16T02:03:32.663Z"
+    }
+  ],
+  "version": "152.0.7977.84",
+  "before": {
+    "names": [
+      "totem-park-pwa-v3",
+      "totempark-player-media-v1"
+    ],
+    "entries": [
+      {
+        "key": "https://totempark.local/cache/3056c0fe",
+        "bytes": 15649,
+        "sha256": "693d9b80d37e3cbb797ae1ae390d6bd9e5b7aff990231b8a58f67b64dccd72fd"
+      },
+      {
+        "key": "https://totempark.local/cache/aa0dc5a1",
+        "bytes": 27656,
+        "sha256": "5f5015fbb36a8379f70a8861a71efa490ab4a4945bef4460fd6a71be6a940013"
+      }
+    ],
+    "count": 2,
+    "bytes": 43305,
+    "worker": {
+      "registered": true,
+      "active": "activated",
+      "script": "http://127.0.0.1:5199/sw.js"
+    }
+  },
+  "singleTab": {
+    "samples": [
+      {
+        "at": 1789524164788,
+        "tag": null,
+        "src": "",
+        "error": null,
+        "classes": "",
+        "visible": false
+      },
+      {
+        "at": 1789524164892,
+        "tag": null,
+        "src": "",
+        "error": null,
+        "classes": "",
+        "visible": false
+      },
+      {
+        "at": 1789524164994,
+        "tag": null,
+        "src": "",
+        "error": null,
+        "classes": "",
+        "visible": false
+      },
+      {
+        "at": 1789524165090,
+        "tag": null,
+        "src": "",
+        "error": null,
+        "classes": "",
+        "visible": false
+      },
+      {
+        "at": 1789524165190,
+        "tag": null,
+        "src": "",
+        "error": null,
+        "classes": "",
+        "visible": false
+      },
+      {
+        "at": 1789524165288,
+        "tag": null,
+        "src": "",
+        "error": null,
+        "classes": "",
+        "visible": false
+      },
+      {
+        "at": 1789524165388,
+        "tag": null,
+        "src": "",
+        "error": null,
+        "classes": "",
+        "visible": false
+      },
+      {
+        "at": 1789524165500,
+        "tag": null,
+        "src": "",
+        "error": null,
+        "classes": "",
+        "visible": false
+      },
+      {
+        "at": 1789524165594,
+        "tag": null,
+        "src": "",
+        "error": null,
+        "classes": "",
+        "visible": false
+      },
+      {
+        "at": 1789524165689,
+        "tag": null,
+        "src": "",
+        "error": null,
+        "classes": "",
+        "visible": false
+      },
+      {
+        "at": 1789524165878,
+        "tag": null,
+        "src": "",
+        "error": null,
+        "classes": "",
+        "visible": false
+      },
+      {
+        "at": 1789524165914,
+        "tag": null,
+        "src": "",
+        "error": null,
+        "classes": "",
+        "visible": false
+      },
+      {
+        "at": 1789524165988,
+        "tag": null,
+        "src": "",
+        "error": null,
+        "classes": "",
+        "visible": false
+      },
+      {
+        "at": 1789524166107,
+        "tag": null,
+        "src": "",
+        "error": null,
+        "classes": "",
+        "visible": false
+      },
+      {
+        "at": 1789524166189,
+        "tag": "VIDEO",
+        "src": "http://127.0.0.1:5199/media/video01.webm",
+        "time": 0,
+        "ready": 0,
+        "error": null,
+        "classes": "player-transition-layer player-buffer-layer is-current is-pending transition-fade speed-normal ",
+        "visible": false
+      },
+      {
+        "at": 1789524166289,
+        "tag": "VIDEO",
+        "src": "http://127.0.0.1:5199/media/video01.webm",
+        "time": 0.028539,
+        "ready": 4,
+        "error": null,
+        "classes": "player-transition-layer player-buffer-layer is-current is-ready transition-active transition-fade speed-normal ",
+        "visible": true
+      },
+      {
+        "at": 1789524166389,
+        "tag": "VIDEO",
+        "src": "blob:http://127.0.0.1:5199/84e00162-1561-4b4d-ba3a-99958d68df8c",
+        "time": 0.037864,
+        "ready": 4,
+        "error": null,
+        "classes": "player-transition-layer player-buffer-layer is-current is-ready transition-active transition-fade speed-normal ",
+        "visible": true
+      },
+      {
+        "at": 1789524166488,
+        "tag": "VIDEO",
+        "src": "blob:http://127.0.0.1:5199/84e00162-1561-4b4d-ba3a-99958d68df8c",
+        "time": 0.136764,
+        "ready": 4,
+        "error": null,
+        "classes": "player-transition-layer player-buffer-layer is-current is-ready transition-active transition-fade speed-normal ",
+        "visible": true
+      },
+      {
+        "at": 1789524166589,
+        "tag": "VIDEO",
+        "src": "blob:http://127.0.0.1:5199/84e00162-1561-4b4d-ba3a-99958d68df8c",
+        "time": 0.237799,
+        "ready": 4,
+        "error": null,
+        "classes": "player-transition-layer player-buffer-layer is-current is-ready transition-active transition-fade speed-normal ",
+        "visible": true
+      },
+      {
+        "at": 1789524166689,
+        "tag": "VIDEO",
+        "src": "blob:http://127.0.0.1:5199/84e00162-1561-4b4d-ba3a-99958d68df8c",
+        "time": 0.337995,
+        "ready": 4,
+        "error": null,
+        "classes": "player-transition-layer player-buffer-layer is-current is-ready transition-active transition-fade speed-normal ",
+        "visible": true
+      },
+      {
+        "at": 1789524166793,
+        "tag": "VIDEO",
+        "src": "blob:http://127.0.0.1:5199/84e00162-1561-4b4d-ba3a-99958d68df8c",
+        "time": 0.441402,
+        "ready": 4,
+        "error": null,
+        "classes": "player-transition-layer player-buffer-layer is-current is-ready transition-active transition-fade speed-normal ",
+        "visible": true
+      },
+      {
+        "at": 1789524166888,
+        "tag": "VIDEO",
+        "src": "blob:http://127.0.0.1:5199/84e00162-1561-4b4d-ba3a-99958d68df8c",
+        "time": 0.53716,
+        "ready": 4,
+        "error": null,
+        "classes": "player-transition-layer player-buffer-layer is-current is-ready transition-active transition-fade speed-normal ",
+        "visible": true
+      },
+      {
+        "at": 1789524166999,
+        "tag": "VIDEO",
+        "src": "blob:http://127.0.0.1:5199/84e00162-1561-4b4d-ba3a-99958d68df8c",
+        "time": 0.647466,
+        "ready": 4,
+        "error": null,
+        "classes": "player-transition-layer player-buffer-layer is-current is-ready transition-active transition-fade speed-normal ",
+        "visible": true
+      },
+      {
+        "at": 1789524167094,
+        "tag": "VIDEO",
+        "src": "blob:http://127.0.0.1:5199/84e00162-1561-4b4d-ba3a-99958d68df8c",
+        "time": 0.74273,
+        "ready": 4,
+        "error": null,
+        "classes": "player-transition-layer player-buffer-layer is-current is-ready transition-active transition-fade speed-normal ",
+        "visible": true
+      },
+      {
+        "at": 1789524167188,
+        "tag": "VIDEO",
+        "src": "blob:http://127.0.0.1:5199/84e00162-1561-4b4d-ba3a-99958d68df8c",
+        "time": 0.836802,
+        "ready": 4,
+        "error": null,
+        "classes": "player-transition-layer player-buffer-layer is-current is-ready transition-active transition-fade speed-normal ",
+        "visible": true
+      },
+      {
+        "at": 1789524167299,
+        "tag": "VIDEO",
+        "src": "blob:http://127.0.0.1:5199/84e00162-1561-4b4d-ba3a-99958d68df8c",
+        "time": 0.948076,
+        "ready": 4,
+        "error": null,
+        "classes": "player-transition-layer player-buffer-layer is-current is-ready transition-active transition-fade speed-normal ",
+        "visible": true
+      },
+      {
+        "at": 1789524167394,
+        "tag": "VIDEO",
+        "src": "blob:http://127.0.0.1:5199/84e00162-1561-4b4d-ba3a-99958d68df8c",
+        "time": 1.042656,
+        "ready": 4,
+        "error": null,
+        "classes": "player-transition-layer player-buffer-layer is-current is-ready transition-active transition-fade speed-normal ",
+        "visible": true
+      },
+      {
+        "at": 1789524167504,
+        "tag": "VIDEO",
+        "src": "blob:http://127.0.0.1:5199/84e00162-1561-4b4d-ba3a-99958d68df8c",
+        "time": 1.152661,
+        "ready": 4,
+        "error": null,
+        "classes": "player-transition-layer player-buffer-layer is-current is-ready transition-active transition-fade speed-normal ",
+        "visible": true
+      },
+      {
+        "at": 1789524167599,
+        "tag": "VIDEO",
+        "src": "blob:http://127.0.0.1:5199/84e00162-1561-4b4d-ba3a-99958d68df8c",
+        "time": 1.247726,
+        "ready": 4,
+        "error": null,
+        "classes": "player-transition-layer player-buffer-layer is-current is-ready transition-active transition-fade speed-normal ",
+        "visible": true
+      },
+      {
+        "at": 1789524167693,
+        "tag": "VIDEO",
+        "src": "blob:http://127.0.0.1:5199/84e00162-1561-4b4d-ba3a-99958d68df8c",
+        "time": 1.342085,
+        "ready": 4,
+        "error": null,
+        "classes": "player-transition-layer player-buffer-layer is-current is-ready transition-active transition-fade speed-normal ",
+        "visible": true
+      },
+      {
+        "at": 1789524167789,
+        "tag": "VIDEO",
+        "src": "blob:http://127.0.0.1:5199/84e00162-1561-4b4d-ba3a-99958d68df8c",
+        "time": 1.437509,
+        "ready": 4,
+        "error": null,
+        "classes": "player-transition-layer player-buffer-layer is-current is-ready transition-active transition-fade speed-normal ",
+        "visible": true
+      },
+      {
+        "at": 1789524167901,
+        "tag": "VIDEO",
+        "src": "blob:http://127.0.0.1:5199/84e00162-1561-4b4d-ba3a-99958d68df8c",
+        "time": 1.549507,
+        "ready": 4,
+        "error": null,
+        "classes": "player-transition-layer player-buffer-layer is-current is-ready transition-active transition-fade speed-normal ",
+        "visible": true
+      },
+      {
+        "at": 1789524167988,
+        "tag": "IMG",
+        "src": "blob:http://127.0.0.1:5199/398b7530-3c3a-4401-b4f3-755976b9ed70",
+        "width": 640,
+        "error": null,
+        "classes": "player-transition-layer player-buffer-layer is-current is-ready transition-active transition-fade speed-normal ",
+        "visible": false
+      },
+      {
+        "at": 1789524168089,
+        "tag": "IMG",
+        "src": "blob:http://127.0.0.1:5199/398b7530-3c3a-4401-b4f3-755976b9ed70",
+        "width": 640,
+        "error": null,
+        "classes": "player-transition-layer player-buffer-layer is-current is-ready transition-active transition-fade speed-normal ",
+        "visible": true
+      },
+      {
+        "at": 1789524168192,
+        "tag": "IMG",
+        "src": "blob:http://127.0.0.1:5199/398b7530-3c3a-4401-b4f3-755976b9ed70",
+        "width": 640,
+        "error": null,
+        "classes": "player-transition-layer player-buffer-layer is-current is-ready transition-active transition-fade speed-normal ",
+        "visible": true
+      },
+      {
+        "at": 1789524168292,
+        "tag": "IMG",
+        "src": "blob:http://127.0.0.1:5199/398b7530-3c3a-4401-b4f3-755976b9ed70",
+        "width": 640,
+        "error": null,
+        "classes": "player-transition-layer player-buffer-layer is-current is-ready transition-active transition-fade speed-normal ",
+        "visible": true
+      },
+      {
+        "at": 1789524168392,
+        "tag": "IMG",
+        "src": "blob:http://127.0.0.1:5199/398b7530-3c3a-4401-b4f3-755976b9ed70",
+        "width": 640,
+        "error": null,
+        "classes": "player-transition-layer player-buffer-layer is-current is-ready transition-active transition-fade speed-normal ",
+        "visible": true
+      },
+      {
+        "at": 1789524168492,
+        "tag": "IMG",
+        "src": "blob:http://127.0.0.1:5199/398b7530-3c3a-4401-b4f3-755976b9ed70",
+        "width": 640,
+        "error": null,
+        "classes": "player-transition-layer player-buffer-layer is-current is-ready transition-active transition-fade speed-normal ",
+        "visible": true
+      },
+      {
+        "at": 1789524168592,
+        "tag": "IMG",
+        "src": "blob:http://127.0.0.1:5199/398b7530-3c3a-4401-b4f3-755976b9ed70",
+        "width": 640,
+        "error": null,
+        "classes": "player-transition-layer player-buffer-layer is-current is-ready transition-active transition-fade speed-normal ",
+        "visible": true
+      },
+      {
+        "at": 1789524168702,
+        "tag": "IMG",
+        "src": "blob:http://127.0.0.1:5199/398b7530-3c3a-4401-b4f3-755976b9ed70",
+        "width": 640,
+        "error": null,
+        "classes": "player-transition-layer player-buffer-layer is-current is-ready transition-active transition-fade speed-normal ",
+        "visible": true
+      },
+      {
+        "at": 1789524168797,
+        "tag": "IMG",
+        "src": "blob:http://127.0.0.1:5199/398b7530-3c3a-4401-b4f3-755976b9ed70",
+        "width": 640,
+        "error": null,
+        "classes": "player-transition-layer player-buffer-layer is-current is-ready transition-active transition-fade speed-normal ",
+        "visible": true
+      },
+      {
+        "at": 1789524168893,
+        "tag": "IMG",
+        "src": "blob:http://127.0.0.1:5199/398b7530-3c3a-4401-b4f3-755976b9ed70",
+        "width": 640,
+        "error": null,
+        "classes": "player-transition-layer player-buffer-layer is-current is-ready transition-active transition-fade speed-normal ",
+        "visible": true
+      },
+      {
+        "at": 1789524169002,
+        "tag": "IMG",
+        "src": "blob:http://127.0.0.1:5199/398b7530-3c3a-4401-b4f3-755976b9ed70",
+        "width": 640,
+        "error": null,
+        "classes": "player-transition-layer player-buffer-layer is-current is-ready transition-active transition-fade speed-normal ",
+        "visible": true
+      },
+      {
+        "at": 1789524169097,
+        "tag": "IMG",
+        "src": "blob:http://127.0.0.1:5199/398b7530-3c3a-4401-b4f3-755976b9ed70",
+        "width": 640,
+        "error": null,
+        "classes": "player-transition-layer player-buffer-layer is-current is-ready transition-active transition-fade speed-normal ",
+        "visible": true
+      },
+      {
+        "at": 1789524169191,
+        "tag": "IMG",
+        "src": "blob:http://127.0.0.1:5199/398b7530-3c3a-4401-b4f3-755976b9ed70",
+        "width": 640,
+        "error": null,
+        "classes": "player-transition-layer player-buffer-layer is-current is-ready transition-active transition-fade speed-normal ",
+        "visible": true
+      },
+      {
+        "at": 1789524169301,
+        "tag": "IMG",
+        "src": "blob:http://127.0.0.1:5199/398b7530-3c3a-4401-b4f3-755976b9ed70",
+        "width": 640,
+        "error": null,
+        "classes": "player-transition-layer player-buffer-layer is-current is-ready transition-active transition-fade speed-normal ",
+        "visible": true
+      },
+      {
+        "at": 1789524169396,
+        "tag": "IMG",
+        "src": "blob:http://127.0.0.1:5199/398b7530-3c3a-4401-b4f3-755976b9ed70",
+        "width": 640,
+        "error": null,
+        "classes": "player-transition-layer player-buffer-layer is-current is-ready transition-active transition-fade speed-normal ",
+        "visible": true
+      },
+      {
+        "at": 1789524169490,
+        "tag": "IMG",
+        "src": "blob:http://127.0.0.1:5199/398b7530-3c3a-4401-b4f3-755976b9ed70",
+        "width": 640,
+        "error": null,
+        "classes": "player-transition-layer player-buffer-layer is-current is-ready transition-active transition-fade speed-normal ",
+        "visible": true
+      },
+      {
+        "at": 1789524169597,
+        "tag": "IMG",
+        "src": "blob:http://127.0.0.1:5199/398b7530-3c3a-4401-b4f3-755976b9ed70",
+        "width": 640,
+        "error": null,
+        "classes": "player-transition-layer player-buffer-layer is-current is-ready transition-active transition-fade speed-normal ",
+        "visible": true
+      },
+      {
+        "at": 1789524169694,
+        "tag": "IMG",
+        "src": "blob:http://127.0.0.1:5199/398b7530-3c3a-4401-b4f3-755976b9ed70",
+        "width": 640,
+        "error": null,
+        "classes": "player-transition-layer player-buffer-layer is-current is-ready transition-active transition-fade speed-normal ",
+        "visible": true
+      },
+      {
+        "at": 1789524169789,
+        "tag": "IMG",
+        "src": "blob:http://127.0.0.1:5199/398b7530-3c3a-4401-b4f3-755976b9ed70",
+        "width": 640,
+        "error": null,
+        "classes": "player-transition-layer player-buffer-layer is-current is-ready transition-active transition-fade speed-normal ",
+        "visible": true
+      },
+      {
+        "at": 1789524169898,
+        "tag": "IMG",
+        "src": "blob:http://127.0.0.1:5199/398b7530-3c3a-4401-b4f3-755976b9ed70",
+        "width": 640,
+        "error": null,
+        "classes": "player-transition-layer player-buffer-layer is-current is-ready transition-active transition-fade speed-normal ",
+        "visible": true
+      },
+      {
+        "at": 1789524169992,
+        "tag": "IMG",
+        "src": "blob:http://127.0.0.1:5199/398b7530-3c3a-4401-b4f3-755976b9ed70",
+        "width": 640,
+        "error": null,
+        "classes": "player-transition-layer player-buffer-layer is-current is-ready transition-active transition-fade speed-normal ",
+        "visible": true
+      },
+      {
+        "at": 1789524170101,
+        "tag": "IMG",
+        "src": "blob:http://127.0.0.1:5199/398b7530-3c3a-4401-b4f3-755976b9ed70",
+        "width": 640,
+        "error": null,
+        "classes": "player-transition-layer player-buffer-layer is-current is-ready transition-active transition-fade speed-normal ",
+        "visible": true
+      },
+      {
+        "at": 1789524170195,
+        "tag": "IMG",
+        "src": "blob:http://127.0.0.1:5199/398b7530-3c3a-4401-b4f3-755976b9ed70",
+        "width": 640,
+        "error": null,
+        "classes": "player-transition-layer player-buffer-layer is-current is-ready transition-active transition-fade speed-normal ",
+        "visible": true
+      },
+      {
+        "at": 1789524170289,
+        "tag": "IMG",
+        "src": "blob:http://127.0.0.1:5199/398b7530-3c3a-4401-b4f3-755976b9ed70",
+        "width": 640,
+        "error": null,
+        "classes": "player-transition-layer player-buffer-layer is-current is-ready transition-active transition-fade speed-normal ",
+        "visible": true
+      },
+      {
+        "at": 1789524170398,
+        "tag": "IMG",
+        "src": "blob:http://127.0.0.1:5199/398b7530-3c3a-4401-b4f3-755976b9ed70",
+        "width": 640,
+        "error": null,
+        "classes": "player-transition-layer player-buffer-layer is-current is-ready transition-active transition-fade speed-normal ",
+        "visible": true
+      },
+      {
+        "at": 1789524170491,
+        "tag": "IMG",
+        "src": "blob:http://127.0.0.1:5199/398b7530-3c3a-4401-b4f3-755976b9ed70",
+        "width": 640,
+        "error": null,
+        "classes": "player-transition-layer player-buffer-layer is-current is-ready transition-active transition-fade speed-normal ",
+        "visible": true
+      },
+      {
+        "at": 1789524170599,
+        "tag": "IMG",
+        "src": "blob:http://127.0.0.1:5199/398b7530-3c3a-4401-b4f3-755976b9ed70",
+        "width": 640,
+        "error": null,
+        "classes": "player-transition-layer player-buffer-layer is-current is-ready transition-active transition-fade speed-normal ",
+        "visible": true
+      },
+      {
+        "at": 1789524170694,
+        "tag": "IMG",
+        "src": "blob:http://127.0.0.1:5199/398b7530-3c3a-4401-b4f3-755976b9ed70",
+        "width": 640,
+        "error": null,
+        "classes": "player-transition-layer player-buffer-layer is-current is-ready transition-active transition-fade speed-normal ",
+        "visible": true
+      },
+      {
+        "at": 1789524170803,
+        "tag": "IMG",
+        "src": "blob:http://127.0.0.1:5199/398b7530-3c3a-4401-b4f3-755976b9ed70",
+        "width": 640,
+        "error": null,
+        "classes": "player-transition-layer player-buffer-layer is-current is-ready transition-active transition-fade speed-normal ",
+        "visible": true
+      },
+      {
+        "at": 1789524170896,
+        "tag": "IMG",
+        "src": "blob:http://127.0.0.1:5199/398b7530-3c3a-4401-b4f3-755976b9ed70",
+        "width": 640,
+        "error": null,
+        "classes": "player-transition-layer player-buffer-layer is-current is-ready transition-active transition-fade speed-normal ",
+        "visible": true
+      },
+      {
+        "at": 1789524170988,
+        "tag": "VIDEO",
+        "src": "blob:http://127.0.0.1:5199/84e00162-1561-4b4d-ba3a-99958d68df8c",
+        "time": 0.003038,
+        "ready": 4,
+        "error": null,
+        "classes": "player-transition-layer player-buffer-layer is-current is-ready transition-active transition-fade speed-normal ",
+        "visible": false
+      },
+      {
+        "at": 1789524171092,
+        "tag": "VIDEO",
+        "src": "blob:http://127.0.0.1:5199/84e00162-1561-4b4d-ba3a-99958d68df8c",
+        "time": 0.107234,
+        "ready": 4,
+        "error": null,
+        "classes": "player-transition-layer player-buffer-layer is-current is-ready transition-active transition-fade speed-normal ",
+        "visible": true
+      },
+      {
+        "at": 1789524171189,
+        "tag": "VIDEO",
+        "src": "blob:http://127.0.0.1:5199/84e00162-1561-4b4d-ba3a-99958d68df8c",
+        "time": 0.203981,
+        "ready": 4,
+        "error": null,
+        "classes": "player-transition-layer player-buffer-layer is-current is-ready transition-active transition-fade speed-normal ",
+        "visible": true
+      },
+      {
+        "at": 1789524171292,
+        "tag": "VIDEO",
+        "src": "blob:http://127.0.0.1:5199/84e00162-1561-4b4d-ba3a-99958d68df8c",
+        "time": 0.307044,
+        "ready": 4,
+        "error": null,
+        "classes": "player-transition-layer player-buffer-layer is-current is-ready transition-active transition-fade speed-normal ",
+        "visible": true
+      },
+      {
+        "at": 1789524171391,
+        "tag": "VIDEO",
+        "src": "blob:http://127.0.0.1:5199/84e00162-1561-4b4d-ba3a-99958d68df8c",
+        "time": 0.405774,
+        "ready": 4,
+        "error": null,
+        "classes": "player-transition-layer player-buffer-layer is-current is-ready transition-active transition-fade speed-normal ",
+        "visible": true
+      },
+      {
+        "at": 1789524171493,
+        "tag": "VIDEO",
+        "src": "blob:http://127.0.0.1:5199/84e00162-1561-4b4d-ba3a-99958d68df8c",
+        "time": 0.508139,
+        "ready": 4,
+        "error": null,
+        "classes": "player-transition-layer player-buffer-layer is-current is-ready transition-active transition-fade speed-normal ",
+        "visible": true
+      },
+      {
+        "at": 1789524171592,
+        "tag": "VIDEO",
+        "src": "blob:http://127.0.0.1:5199/84e00162-1561-4b4d-ba3a-99958d68df8c",
+        "time": 0.607071,
+        "ready": 4,
+        "error": null,
+        "classes": "player-transition-layer player-buffer-layer is-current is-ready transition-active transition-fade speed-normal ",
+        "visible": true
+      },
+      {
+        "at": 1789524171688,
+        "tag": "VIDEO",
+        "src": "blob:http://127.0.0.1:5199/84e00162-1561-4b4d-ba3a-99958d68df8c",
+        "time": 0.703491,
+        "ready": 4,
+        "error": null,
+        "classes": "player-transition-layer player-buffer-layer is-current is-ready transition-active transition-fade speed-normal ",
+        "visible": true
+      },
+      {
+        "at": 1789524171795,
+        "tag": "VIDEO",
+        "src": "blob:http://127.0.0.1:5199/84e00162-1561-4b4d-ba3a-99958d68df8c",
+        "time": 0.81025,
+        "ready": 4,
+        "error": null,
+        "classes": "player-transition-layer player-buffer-layer is-current is-ready transition-active transition-fade speed-normal ",
+        "visible": true
+      },
+      {
+        "at": 1789524171889,
+        "tag": "VIDEO",
+        "src": "blob:http://127.0.0.1:5199/84e00162-1561-4b4d-ba3a-99958d68df8c",
+        "time": 0.904285,
+        "ready": 4,
+        "error": null,
+        "classes": "player-transition-layer player-buffer-layer is-current is-ready transition-active transition-fade speed-normal ",
+        "visible": true
+      },
+      {
+        "at": 1789524171999,
+        "tag": "VIDEO",
+        "src": "blob:http://127.0.0.1:5199/84e00162-1561-4b4d-ba3a-99958d68df8c",
+        "time": 1.014329,
+        "ready": 4,
+        "error": null,
+        "classes": "player-transition-layer player-buffer-layer is-current is-ready transition-active transition-fade speed-normal ",
+        "visible": true
+      },
+      {
+        "at": 1789524172093,
+        "tag": "VIDEO",
+        "src": "blob:http://127.0.0.1:5199/84e00162-1561-4b4d-ba3a-99958d68df8c",
+        "time": 1.107877,
+        "ready": 4,
+        "error": null,
+        "classes": "player-transition-layer player-buffer-layer is-current is-ready transition-active transition-fade speed-normal ",
+        "visible": true
+      },
+      {
+        "at": 1789524172202,
+        "tag": "VIDEO",
+        "src": "blob:http://127.0.0.1:5199/84e00162-1561-4b4d-ba3a-99958d68df8c",
+        "time": 1.2171,
+        "ready": 4,
+        "error": null,
+        "classes": "player-transition-layer player-buffer-layer is-current is-ready transition-active transition-fade speed-normal ",
+        "visible": true
+      },
+      {
+        "at": 1789524172294,
+        "tag": "VIDEO",
+        "src": "blob:http://127.0.0.1:5199/84e00162-1561-4b4d-ba3a-99958d68df8c",
+        "time": 1.309283,
+        "ready": 4,
+        "error": null,
+        "classes": "player-transition-layer player-buffer-layer is-current is-ready transition-active transition-fade speed-normal ",
+        "visible": true
+      },
+      {
+        "at": 1789524172403,
+        "tag": "VIDEO",
+        "src": "blob:http://127.0.0.1:5199/84e00162-1561-4b4d-ba3a-99958d68df8c",
+        "time": 1.418058,
+        "ready": 4,
+        "error": null,
+        "classes": "player-transition-layer player-buffer-layer is-current is-ready transition-active transition-fade speed-normal ",
+        "visible": true
+      },
+      {
+        "at": 1789524172498,
+        "tag": "VIDEO",
+        "src": "blob:http://127.0.0.1:5199/84e00162-1561-4b4d-ba3a-99958d68df8c",
+        "time": 1.51279,
+        "ready": 4,
+        "error": null,
+        "classes": "player-transition-layer player-buffer-layer is-current is-ready transition-active transition-fade speed-normal ",
+        "visible": true
+      },
+      {
+        "at": 1789524172592,
+        "tag": "VIDEO",
+        "src": "blob:http://127.0.0.1:5199/84e00162-1561-4b4d-ba3a-99958d68df8c",
+        "time": 1.550828,
+        "ready": 4,
+        "error": null,
+        "classes": "player-transition-layer player-buffer-layer is-current is-ready transition-active transition-fade speed-normal ",
+        "visible": true
+      },
+      {
+        "at": 1789524172690,
+        "tag": "IMG",
+        "src": "blob:http://127.0.0.1:5199/398b7530-3c3a-4401-b4f3-755976b9ed70",
+        "width": 640,
+        "error": null,
+        "classes": "player-transition-layer player-buffer-layer is-current is-pending transition-fade speed-normal ",
+        "visible": false
+      },
+      {
+        "at": 1789524172796,
+        "tag": "IMG",
+        "src": "blob:http://127.0.0.1:5199/398b7530-3c3a-4401-b4f3-755976b9ed70",
+        "width": 640,
+        "error": null,
+        "classes": "player-transition-layer player-buffer-layer is-current is-pending transition-fade speed-normal ",
+        "visible": false
+      },
+      {
+        "at": 1789524172904,
+        "tag": "IMG",
+        "src": "blob:http://127.0.0.1:5199/398b7530-3c3a-4401-b4f3-755976b9ed70",
+        "width": 640,
+        "error": null,
+        "classes": "player-transition-layer player-buffer-layer is-current is-pending transition-fade speed-normal ",
+        "visible": false
+      },
+      {
+        "at": 1789524173000,
+        "tag": "IMG",
+        "src": "blob:http://127.0.0.1:5199/398b7530-3c3a-4401-b4f3-755976b9ed70",
+        "width": 640,
+        "error": null,
+        "classes": "player-transition-layer player-buffer-layer is-current is-pending transition-fade speed-normal ",
+        "visible": false
+      },
+      {
+        "at": 1789524173094,
+        "tag": "IMG",
+        "src": "blob:http://127.0.0.1:5199/398b7530-3c3a-4401-b4f3-755976b9ed70",
+        "width": 640,
+        "error": null,
+        "classes": "player-transition-layer player-buffer-layer is-current is-pending transition-fade speed-normal ",
+        "visible": false
+      },
+      {
+        "at": 1789524173203,
+        "tag": "IMG",
+        "src": "blob:http://127.0.0.1:5199/398b7530-3c3a-4401-b4f3-755976b9ed70",
+        "width": 640,
+        "error": null,
+        "classes": "player-transition-layer player-buffer-layer is-current is-pending transition-fade speed-normal ",
+        "visible": false
+      },
+      {
+        "at": 1789524173298,
+        "tag": "IMG",
+        "src": "blob:http://127.0.0.1:5199/398b7530-3c3a-4401-b4f3-755976b9ed70",
+        "width": 640,
+        "error": null,
+        "classes": "player-transition-layer player-buffer-layer is-current is-pending transition-fade speed-normal ",
+        "visible": false
+      },
+      {
+        "at": 1789524173394,
+        "tag": "IMG",
+        "src": "blob:http://127.0.0.1:5199/398b7530-3c3a-4401-b4f3-755976b9ed70",
+        "width": 640,
+        "error": null,
+        "classes": "player-transition-layer player-buffer-layer is-current is-pending transition-fade speed-normal ",
+        "visible": false
+      },
+      {
+        "at": 1789524173488,
+        "tag": "IMG",
+        "src": "blob:http://127.0.0.1:5199/398b7530-3c3a-4401-b4f3-755976b9ed70",
+        "width": 640,
+        "error": null,
+        "classes": "player-transition-layer player-buffer-layer is-current is-pending transition-fade speed-normal ",
+        "visible": false
+      },
+      {
+        "at": 1789524173600,
+        "tag": "IMG",
+        "src": "blob:http://127.0.0.1:5199/398b7530-3c3a-4401-b4f3-755976b9ed70",
+        "width": 640,
+        "error": null,
+        "classes": "player-transition-layer player-buffer-layer is-current is-pending transition-fade speed-normal ",
+        "visible": false
+      },
+      {
+        "at": 1789524173695,
+        "tag": "IMG",
+        "src": "blob:http://127.0.0.1:5199/398b7530-3c3a-4401-b4f3-755976b9ed70",
+        "width": 640,
+        "error": null,
+        "classes": "player-transition-layer player-buffer-layer is-current is-pending transition-fade speed-normal ",
+        "visible": false
+      },
+      {
+        "at": 1789524173790,
+        "tag": "IMG",
+        "src": "blob:http://127.0.0.1:5199/398b7530-3c3a-4401-b4f3-755976b9ed70",
+        "width": 640,
+        "error": null,
+        "classes": "player-transition-layer player-buffer-layer is-current is-pending transition-fade speed-normal ",
+        "visible": false
+      },
+      {
+        "at": 1789524173902,
+        "tag": "IMG",
+        "src": "blob:http://127.0.0.1:5199/398b7530-3c3a-4401-b4f3-755976b9ed70",
+        "width": 640,
+        "error": null,
+        "classes": "player-transition-layer player-buffer-layer is-current is-pending transition-fade speed-normal ",
+        "visible": false
+      }
+    ],
+    "events": [
+      {
+        "at": 1789524166178,
+        "event": "play",
+        "tag": "VIDEO",
+        "src": "http://127.0.0.1:5199/media/video01.webm",
+        "current": true,
+        "code": null
+      },
+      {
+        "at": 1789524166264,
+        "event": "loadeddata",
+        "tag": "VIDEO",
+        "src": "http://127.0.0.1:5199/media/video01.webm",
+        "current": true,
+        "code": null
+      },
+      {
+        "at": 1789524166340,
+        "event": "play",
+        "tag": "VIDEO",
+        "src": "blob:http://127.0.0.1:5199/84e00162-1561-4b4d-ba3a-99958d68df8c",
+        "current": true,
+        "code": null
+      },
+      {
+        "at": 1789524166352,
+        "event": "loadeddata",
+        "tag": "VIDEO",
+        "src": "blob:http://127.0.0.1:5199/84e00162-1561-4b4d-ba3a-99958d68df8c",
+        "current": true,
+        "code": null
+      },
+      {
+        "at": 1789524167966,
+        "event": "ended",
+        "tag": "VIDEO",
+        "src": "blob:http://127.0.0.1:5199/84e00162-1561-4b4d-ba3a-99958d68df8c",
+        "current": true,
+        "code": null
+      },
+      {
+        "at": 1789524170978,
+        "event": "play",
+        "tag": "VIDEO",
+        "src": "blob:http://127.0.0.1:5199/84e00162-1561-4b4d-ba3a-99958d68df8c",
+        "current": true,
+        "code": null
+      },
+      {
+        "at": 1789524170985,
+        "event": "loadeddata",
+        "tag": "VIDEO",
+        "src": "blob:http://127.0.0.1:5199/84e00162-1561-4b4d-ba3a-99958d68df8c",
+        "current": true,
+        "code": null
+      },
+      {
+        "at": 1789524172608,
+        "event": "ended",
+        "tag": "VIDEO",
+        "src": "blob:http://127.0.0.1:5199/84e00162-1561-4b4d-ba3a-99958d68df8c",
+        "current": true,
+        "code": null
+      }
+    ]
+  },
+  "after": {
+    "names": [
+      "totem-park-pwa-v3",
+      "totempark-player-media-v1"
+    ],
+    "entries": [
+      {
+        "key": "https://totempark.local/cache/3056c0fe",
+        "bytes": 15649,
+        "sha256": "693d9b80d37e3cbb797ae1ae390d6bd9e5b7aff990231b8a58f67b64dccd72fd"
+      },
+      {
+        "key": "https://totempark.local/cache/aa0dc5a1",
+        "bytes": 27656,
+        "sha256": "5f5015fbb36a8379f70a8861a71efa490ab4a4945bef4460fd6a71be6a940013"
+      }
+    ],
+    "count": 2,
+    "bytes": 43305,
+    "worker": {
+      "registered": true,
+      "active": "activated",
+      "script": "http://127.0.0.1:5199/sw.js"
+    }
+  },
+  "persistence": "PASSOU",
+  "reopenNetworkStart": "2026-09-16T02:02:59.203Z",
+  "reopenNetworkEnd": "2026-09-16T02:03:10.341Z",
+  "afterPlayer": {
+    "names": [
+      "totem-park-pwa-v3",
+      "totempark-player-media-v1"
+    ],
+    "entries": [
+      {
+        "key": "https://totempark.local/cache/3056c0fe",
+        "bytes": 15649,
+        "sha256": "693d9b80d37e3cbb797ae1ae390d6bd9e5b7aff990231b8a58f67b64dccd72fd"
+      },
+      {
+        "key": "https://totempark.local/cache/aa0dc5a1",
+        "bytes": 27656,
+        "sha256": "5f5015fbb36a8379f70a8861a71efa490ab4a4945bef4460fd6a71be6a940013"
+      }
+    ],
+    "count": 2,
+    "bytes": 43305,
+    "worker": {
+      "registered": true,
+      "active": "activated",
+      "script": "http://127.0.0.1:5199/sw.js"
+    }
+  },
+  "offlineProbes": [
+    {
+      "url": "http://127.0.0.1:5199/media/video01.webm?offline-probe=1789524190391",
+      "failed": true,
+      "error": "TypeError: Failed to fetch"
+    },
+    {
+      "url": "http://127.0.0.1:8288/v1/projects/demo-totem-homolog/databases/(default)/documents/clients/A?offline=1789524190391",
+      "failed": true,
+      "error": "TypeError: Failed to fetch"
+    },
+    {
+      "url": "https://example.com",
+      "failed": true,
+      "error": "Error: page.goto: net::ERR_INTERNET_DISCONNECTED at https://example.com/?offline-gate=1789524190432\nCall log:\n\u001b[2m  - navigating to \"https://example.com/?offline-gate=1789524190432\", waiting until \"load\"\u001b[22m\n"
+    }
+  ],
+  "offlineObservation": {
+    "samples": [
+      {
+        "at": 1789524190497,
+        "tag": null,
+        "src": "",
+        "error": null,
+        "classes": "",
+        "visible": false
+      },
+      {
+        "at": 1789524190591,
+        "tag": null,
+        "src": "",
+        "error": null,
+        "classes": "",
+        "visible": false
+      },
+      {
+        "at": 1789524190702,
+        "tag": null,
+        "src": "",
+        "error": null,
+        "classes": "",
+        "visible": false
+      },
+      {
+        "at": 1789524190795,
+        "tag": null,
+        "src": "",
+        "error": null,
+        "classes": "",
+        "visible": false
+      },
+      {
+        "at": 1789524190889,
+        "tag": null,
+        "src": "",
+        "error": null,
+        "classes": "",
+        "visible": false
+      },
+      {
+        "at": 1789524190999,
+        "tag": null,
+        "src": "",
+        "error": null,
+        "classes": "",
+        "visible": false
+      },
+      {
+        "at": 1789524191092,
+        "tag": null,
+        "src": "",
+        "error": null,
+        "classes": "",
+        "visible": false
+      },
+      {
+        "at": 1789524191186,
+        "tag": null,
+        "src": "",
+        "error": null,
+        "classes": "",
+        "visible": false
+      },
+      {
+        "at": 1789524191296,
+        "tag": null,
+        "src": "",
+        "error": null,
+        "classes": "",
+        "visible": false
+      },
+      {
+        "at": 1789524191388,
+        "tag": null,
+        "src": "",
+        "error": null,
+        "classes": "",
+        "visible": false
+      },
+      {
+        "at": 1789524191498,
+        "tag": null,
+        "src": "",
+        "error": null,
+        "classes": "",
+        "visible": false
+      },
+      {
+        "at": 1789524191590,
+        "tag": null,
+        "src": "",
+        "error": null,
+        "classes": "",
+        "visible": false
+      },
+      {
+        "at": 1789524191699,
+        "tag": null,
+        "src": "",
+        "error": null,
+        "classes": "",
+        "visible": false
+      },
+      {
+        "at": 1789524191792,
+        "tag": null,
+        "src": "",
+        "error": null,
+        "classes": "",
+        "visible": false
+      },
+      {
+        "at": 1789524191901,
+        "tag": null,
+        "src": "",
+        "error": null,
+        "classes": "",
+        "visible": false
+      },
+      {
+        "at": 1789524191995,
+        "tag": null,
+        "src": "",
+        "error": null,
+        "classes": "",
+        "visible": false
+      },
+      {
+        "at": 1789524192087,
+        "tag": null,
+        "src": "",
+        "error": null,
+        "classes": "",
+        "visible": false
+      },
+      {
+        "at": 1789524192197,
+        "tag": null,
+        "src": "",
+        "error": null,
+        "classes": "",
+        "visible": false
+      },
+      {
+        "at": 1789524192290,
+        "tag": null,
+        "src": "",
+        "error": null,
+        "classes": "",
+        "visible": false
+      },
+      {
+        "at": 1789524192397,
+        "tag": null,
+        "src": "",
+        "error": null,
+        "classes": "",
+        "visible": false
+      },
+      {
+        "at": 1789524192492,
+        "tag": null,
+        "src": "",
+        "error": null,
+        "classes": "",
+        "visible": false
+      },
+      {
+        "at": 1789524192601,
+        "tag": null,
+        "src": "",
+        "error": null,
+        "classes": "",
+        "visible": false
+      },
+      {
+        "at": 1789524192694,
+        "tag": null,
+        "src": "",
+        "error": null,
+        "classes": "",
+        "visible": false
+      },
+      {
+        "at": 1789524192788,
+        "tag": null,
+        "src": "",
+        "error": null,
+        "classes": "",
+        "visible": false
+      },
+      {
+        "at": 1789524192896,
+        "tag": null,
+        "src": "",
+        "error": null,
+        "classes": "",
+        "visible": false
+      },
+      {
+        "at": 1789524192991,
+        "tag": null,
+        "src": "",
+        "error": null,
+        "classes": "",
+        "visible": false
+      },
+      {
+        "at": 1789524193100,
+        "tag": null,
+        "src": "",
+        "error": null,
+        "classes": "",
+        "visible": false
+      },
+      {
+        "at": 1789524193195,
+        "tag": null,
+        "src": "",
+        "error": null,
+        "classes": "",
+        "visible": false
+      },
+      {
+        "at": 1789524193288,
+        "tag": null,
+        "src": "",
+        "error": null,
+        "classes": "",
+        "visible": false
+      },
+      {
+        "at": 1789524193397,
+        "tag": null,
+        "src": "",
+        "error": null,
+        "classes": "",
+        "visible": false
+      },
+      {
+        "at": 1789524193489,
+        "tag": null,
+        "src": "",
+        "error": null,
+        "classes": "",
+        "visible": false
+      },
+      {
+        "at": 1789524193598,
+        "tag": null,
+        "src": "",
+        "error": null,
+        "classes": "",
+        "visible": false
+      },
+      {
+        "at": 1789524193690,
+        "tag": null,
+        "src": "",
+        "error": null,
+        "classes": "",
+        "visible": false
+      },
+      {
+        "at": 1789524193799,
+        "tag": null,
+        "src": "",
+        "error": null,
+        "classes": "",
+        "visible": false
+      },
+      {
+        "at": 1789524193892,
+        "tag": null,
+        "src": "",
+        "error": null,
+        "classes": "",
+        "visible": false
+      },
+      {
+        "at": 1789524193999,
+        "tag": null,
+        "src": "",
+        "error": null,
+        "classes": "",
+        "visible": false
+      },
+      {
+        "at": 1789524194093,
+        "tag": null,
+        "src": "",
+        "error": null,
+        "classes": "",
+        "visible": false
+      },
+      {
+        "at": 1789524194201,
+        "tag": null,
+        "src": "",
+        "error": null,
+        "classes": "",
+        "visible": false
+      },
+      {
+        "at": 1789524194294,
+        "tag": null,
+        "src": "",
+        "error": null,
+        "classes": "",
+        "visible": false
+      },
+      {
+        "at": 1789524194387,
+        "tag": null,
+        "src": "",
+        "error": null,
+        "classes": "",
+        "visible": false
+      },
+      {
+        "at": 1789524194497,
+        "tag": null,
+        "src": "",
+        "error": null,
+        "classes": "",
+        "visible": false
+      },
+      {
+        "at": 1789524194593,
+        "tag": null,
+        "src": "",
+        "error": null,
+        "classes": "",
+        "visible": false
+      },
+      {
+        "at": 1789524194699,
+        "tag": null,
+        "src": "",
+        "error": null,
+        "classes": "",
+        "visible": false
+      },
+      {
+        "at": 1789524194792,
+        "tag": null,
+        "src": "",
+        "error": null,
+        "classes": "",
+        "visible": false
+      },
+      {
+        "at": 1789524194901,
+        "tag": null,
+        "src": "",
+        "error": null,
+        "classes": "",
+        "visible": false
+      },
+      {
+        "at": 1789524194995,
+        "tag": null,
+        "src": "",
+        "error": null,
+        "classes": "",
+        "visible": false
+      },
+      {
+        "at": 1789524195089,
+        "tag": null,
+        "src": "",
+        "error": null,
+        "classes": "",
+        "visible": false
+      },
+      {
+        "at": 1789524195198,
+        "tag": null,
+        "src": "",
+        "error": null,
+        "classes": "",
+        "visible": false
+      },
+      {
+        "at": 1789524195291,
+        "tag": null,
+        "src": "",
+        "error": null,
+        "classes": "",
+        "visible": false
+      },
+      {
+        "at": 1789524195400,
+        "tag": null,
+        "src": "",
+        "error": null,
+        "classes": "",
+        "visible": false
+      },
+      {
+        "at": 1789524195494,
+        "tag": null,
+        "src": "",
+        "error": null,
+        "classes": "",
+        "visible": false
+      },
+      {
+        "at": 1789524195588,
+        "tag": null,
+        "src": "",
+        "error": null,
+        "classes": "",
+        "visible": false
+      },
+      {
+        "at": 1789524195698,
+        "tag": null,
+        "src": "",
+        "error": null,
+        "classes": "",
+        "visible": false
+      },
+      {
+        "at": 1789524195792,
+        "tag": null,
+        "src": "",
+        "error": null,
+        "classes": "",
+        "visible": false
+      },
+      {
+        "at": 1789524195899,
+        "tag": null,
+        "src": "",
+        "error": null,
+        "classes": "",
+        "visible": false
+      },
+      {
+        "at": 1789524195991,
+        "tag": null,
+        "src": "",
+        "error": null,
+        "classes": "",
+        "visible": false
+      },
+      {
+        "at": 1789524196101,
+        "tag": null,
+        "src": "",
+        "error": null,
+        "classes": "",
+        "visible": false
+      },
+      {
+        "at": 1789524196194,
+        "tag": null,
+        "src": "",
+        "error": null,
+        "classes": "",
+        "visible": false
+      },
+      {
+        "at": 1789524196302,
+        "tag": null,
+        "src": "",
+        "error": null,
+        "classes": "",
+        "visible": false
+      },
+      {
+        "at": 1789524196395,
+        "tag": null,
+        "src": "",
+        "error": null,
+        "classes": "",
+        "visible": false
+      },
+      {
+        "at": 1789524196488,
+        "tag": null,
+        "src": "",
+        "error": null,
+        "classes": "",
+        "visible": false
+      },
+      {
+        "at": 1789524196597,
+        "tag": null,
+        "src": "",
+        "error": null,
+        "classes": "",
+        "visible": false
+      },
+      {
+        "at": 1789524196691,
+        "tag": null,
+        "src": "",
+        "error": null,
+        "classes": "",
+        "visible": false
+      },
+      {
+        "at": 1789524196800,
+        "tag": null,
+        "src": "",
+        "error": null,
+        "classes": "",
+        "visible": false
+      },
+      {
+        "at": 1789524196894,
+        "tag": null,
+        "src": "",
+        "error": null,
+        "classes": "",
+        "visible": false
+      },
+      {
+        "at": 1789524196989,
+        "tag": null,
+        "src": "",
+        "error": null,
+        "classes": "",
+        "visible": false
+      },
+      {
+        "at": 1789524197098,
+        "tag": null,
+        "src": "",
+        "error": null,
+        "classes": "",
+        "visible": false
+      },
+      {
+        "at": 1789524197191,
+        "tag": null,
+        "src": "",
+        "error": null,
+        "classes": "",
+        "visible": false
+      },
+      {
+        "at": 1789524197301,
+        "tag": null,
+        "src": "",
+        "error": null,
+        "classes": "",
+        "visible": false
+      },
+      {
+        "at": 1789524197394,
+        "tag": null,
+        "src": "",
+        "error": null,
+        "classes": "",
+        "visible": false
+      },
+      {
+        "at": 1789524197489,
+        "tag": null,
+        "src": "",
+        "error": null,
+        "classes": "",
+        "visible": false
+      },
+      {
+        "at": 1789524197597,
+        "tag": null,
+        "src": "",
+        "error": null,
+        "classes": "",
+        "visible": false
+      },
+      {
+        "at": 1789524197691,
+        "tag": null,
+        "src": "",
+        "error": null,
+        "classes": "",
+        "visible": false
+      },
+      {
+        "at": 1789524197798,
+        "tag": null,
+        "src": "",
+        "error": null,
+        "classes": "",
+        "visible": false
+      },
+      {
+        "at": 1789524197890,
+        "tag": null,
+        "src": "",
+        "error": null,
+        "classes": "",
+        "visible": false
+      },
+      {
+        "at": 1789524198001,
+        "tag": null,
+        "src": "",
+        "error": null,
+        "classes": "",
+        "visible": false
+      },
+      {
+        "at": 1789524198093,
+        "tag": null,
+        "src": "",
+        "error": null,
+        "classes": "",
+        "visible": false
+      },
+      {
+        "at": 1789524198187,
+        "tag": null,
+        "src": "",
+        "error": null,
+        "classes": "",
+        "visible": false
+      },
+      {
+        "at": 1789524198296,
+        "tag": null,
+        "src": "",
+        "error": null,
+        "classes": "",
+        "visible": false
+      },
+      {
+        "at": 1789524198389,
+        "tag": null,
+        "src": "",
+        "error": null,
+        "classes": "",
+        "visible": false
+      },
+      {
+        "at": 1789524198496,
+        "tag": null,
+        "src": "",
+        "error": null,
+        "classes": "",
+        "visible": false
+      },
+      {
+        "at": 1789524198589,
+        "tag": null,
+        "src": "",
+        "error": null,
+        "classes": "",
+        "visible": false
+      },
+      {
+        "at": 1789524198699,
+        "tag": null,
+        "src": "",
+        "error": null,
+        "classes": "",
+        "visible": false
+      },
+      {
+        "at": 1789524198790,
+        "tag": null,
+        "src": "",
+        "error": null,
+        "classes": "",
+        "visible": false
+      },
+      {
+        "at": 1789524198899,
+        "tag": null,
+        "src": "",
+        "error": null,
+        "classes": "",
+        "visible": false
+      },
+      {
+        "at": 1789524198992,
+        "tag": null,
+        "src": "",
+        "error": null,
+        "classes": "",
+        "visible": false
+      },
+      {
+        "at": 1789524199101,
+        "tag": null,
+        "src": "",
+        "error": null,
+        "classes": "",
+        "visible": false
+      },
+      {
+        "at": 1789524199194,
+        "tag": null,
+        "src": "",
+        "error": null,
+        "classes": "",
+        "visible": false
+      },
+      {
+        "at": 1789524199288,
+        "tag": null,
+        "src": "",
+        "error": null,
+        "classes": "",
+        "visible": false
+      },
+      {
+        "at": 1789524199396,
+        "tag": null,
+        "src": "",
+        "error": null,
+        "classes": "",
+        "visible": false
+      },
+      {
+        "at": 1789524199489,
+        "tag": null,
+        "src": "",
+        "error": null,
+        "classes": "",
+        "visible": false
+      },
+      {
+        "at": 1789524199598,
+        "tag": null,
+        "src": "",
+        "error": null,
+        "classes": "",
+        "visible": false
+      },
+      {
+        "at": 1789524199691,
+        "tag": null,
+        "src": "",
+        "error": null,
+        "classes": "",
+        "visible": false
+      },
+      {
+        "at": 1789524199801,
+        "tag": null,
+        "src": "",
+        "error": null,
+        "classes": "",
+        "visible": false
+      },
+      {
+        "at": 1789524199895,
+        "tag": null,
+        "src": "",
+        "error": null,
+        "classes": "",
+        "visible": false
+      },
+      {
+        "at": 1789524199988,
+        "tag": null,
+        "src": "",
+        "error": null,
+        "classes": "",
+        "visible": false
+      },
+      {
+        "at": 1789524200097,
+        "tag": null,
+        "src": "",
+        "error": null,
+        "classes": "",
+        "visible": false
+      },
+      {
+        "at": 1789524200191,
+        "tag": null,
+        "src": "",
+        "error": null,
+        "classes": "",
+        "visible": false
+      },
+      {
+        "at": 1789524200299,
+        "tag": null,
+        "src": "",
+        "error": null,
+        "classes": "",
+        "visible": false
+      },
+      {
+        "at": 1789524200393,
+        "tag": null,
+        "src": "",
+        "error": null,
+        "classes": "",
+        "visible": false
+      },
+      {
+        "at": 1789524200487,
+        "tag": null,
+        "src": "",
+        "error": null,
+        "classes": "",
+        "visible": false
+      },
+      {
+        "at": 1789524200597,
+        "tag": null,
+        "src": "",
+        "error": null,
+        "classes": "",
+        "visible": false
+      },
+      {
+        "at": 1789524200690,
+        "tag": null,
+        "src": "",
+        "error": null,
+        "classes": "",
+        "visible": false
+      },
+      {
+        "at": 1789524200799,
+        "tag": null,
+        "src": "",
+        "error": null,
+        "classes": "",
+        "visible": false
+      },
+      {
+        "at": 1789524200891,
+        "tag": null,
+        "src": "",
+        "error": null,
+        "classes": "",
+        "visible": false
+      },
+      {
+        "at": 1789524201002,
+        "tag": null,
+        "src": "",
+        "error": null,
+        "classes": "",
+        "visible": false
+      },
+      {
+        "at": 1789524201095,
+        "tag": null,
+        "src": "",
+        "error": null,
+        "classes": "",
+        "visible": false
+      },
+      {
+        "at": 1789524201189,
+        "tag": null,
+        "src": "",
+        "error": null,
+        "classes": "",
+        "visible": false
+      },
+      {
+        "at": 1789524201298,
+        "tag": null,
+        "src": "",
+        "error": null,
+        "classes": "",
+        "visible": false
+      },
+      {
+        "at": 1789524201392,
+        "tag": null,
+        "src": "",
+        "error": null,
+        "classes": "",
+        "visible": false
+      },
+      {
+        "at": 1789524201502,
+        "tag": null,
+        "src": "",
+        "error": null,
+        "classes": "",
+        "visible": false
+      },
+      {
+        "at": 1789524201593,
+        "tag": null,
+        "src": "",
+        "error": null,
+        "classes": "",
+        "visible": false
+      },
+      {
+        "at": 1789524201701,
+        "tag": null,
+        "src": "",
+        "error": null,
+        "classes": "",
+        "visible": false
+      },
+      {
+        "at": 1789524201793,
+        "tag": null,
+        "src": "",
+        "error": null,
+        "classes": "",
+        "visible": false
+      },
+      {
+        "at": 1789524201902,
+        "tag": null,
+        "src": "",
+        "error": null,
+        "classes": "",
+        "visible": false
+      },
+      {
+        "at": 1789524201996,
+        "tag": null,
+        "src": "",
+        "error": null,
+        "classes": "",
+        "visible": false
+      },
+      {
+        "at": 1789524202089,
+        "tag": null,
+        "src": "",
+        "error": null,
+        "classes": "",
+        "visible": false
+      },
+      {
+        "at": 1789524202199,
+        "tag": null,
+        "src": "",
+        "error": null,
+        "classes": "",
+        "visible": false
+      },
+      {
+        "at": 1789524202293,
+        "tag": null,
+        "src": "",
+        "error": null,
+        "classes": "",
+        "visible": false
+      },
+      {
+        "at": 1789524202402,
+        "tag": null,
+        "src": "",
+        "error": null,
+        "classes": "",
+        "visible": false
+      },
+      {
+        "at": 1789524202494,
+        "tag": null,
+        "src": "",
+        "error": null,
+        "classes": "",
+        "visible": false
+      },
+      {
+        "at": 1789524202602,
+        "tag": null,
+        "src": "",
+        "error": null,
+        "classes": "",
+        "visible": false
+      },
+      {
+        "at": 1789524202695,
+        "tag": null,
+        "src": "",
+        "error": null,
+        "classes": "",
+        "visible": false
+      },
+      {
+        "at": 1789524202790,
+        "tag": null,
+        "src": "",
+        "error": null,
+        "classes": "",
+        "visible": false
+      },
+      {
+        "at": 1789524202898,
+        "tag": null,
+        "src": "",
+        "error": null,
+        "classes": "",
+        "visible": false
+      },
+      {
+        "at": 1789524202992,
+        "tag": null,
+        "src": "",
+        "error": null,
+        "classes": "",
+        "visible": false
+      },
+      {
+        "at": 1789524203099,
+        "tag": null,
+        "src": "",
+        "error": null,
+        "classes": "",
+        "visible": false
+      },
+      {
+        "at": 1789524203193,
+        "tag": null,
+        "src": "",
+        "error": null,
+        "classes": "",
+        "visible": false
+      },
+      {
+        "at": 1789524203301,
+        "tag": null,
+        "src": "",
+        "error": null,
+        "classes": "",
+        "visible": false
+      },
+      {
+        "at": 1789524203394,
+        "tag": null,
+        "src": "",
+        "error": null,
+        "classes": "",
+        "visible": false
+      },
+      {
+        "at": 1789524203487,
+        "tag": null,
+        "src": "",
+        "error": null,
+        "classes": "",
+        "visible": false
+      },
+      {
+        "at": 1789524203595,
+        "tag": null,
+        "src": "",
+        "error": null,
+        "classes": "",
+        "visible": false
+      },
+      {
+        "at": 1789524203688,
+        "tag": null,
+        "src": "",
+        "error": null,
+        "classes": "",
+        "visible": false
+      },
+      {
+        "at": 1789524203797,
+        "tag": null,
+        "src": "",
+        "error": null,
+        "classes": "",
+        "visible": false
+      },
+      {
+        "at": 1789524203891,
+        "tag": null,
+        "src": "",
+        "error": null,
+        "classes": "",
+        "visible": false
+      },
+      {
+        "at": 1789524204000,
+        "tag": null,
+        "src": "",
+        "error": null,
+        "classes": "",
+        "visible": false
+      },
+      {
+        "at": 1789524204094,
+        "tag": null,
+        "src": "",
+        "error": null,
+        "classes": "",
+        "visible": false
+      },
+      {
+        "at": 1789524204187,
+        "tag": null,
+        "src": "",
+        "error": null,
+        "classes": "",
+        "visible": false
+      },
+      {
+        "at": 1789524204295,
+        "tag": null,
+        "src": "",
+        "error": null,
+        "classes": "",
+        "visible": false
+      },
+      {
+        "at": 1789524204388,
+        "tag": null,
+        "src": "",
+        "error": null,
+        "classes": "",
+        "visible": false
+      },
+      {
+        "at": 1789524204496,
+        "tag": null,
+        "src": "",
+        "error": null,
+        "classes": "",
+        "visible": false
+      },
+      {
+        "at": 1789524204590,
+        "tag": null,
+        "src": "",
+        "error": null,
+        "classes": "",
+        "visible": false
+      },
+      {
+        "at": 1789524204700,
+        "tag": null,
+        "src": "",
+        "error": null,
+        "classes": "",
+        "visible": false
+      },
+      {
+        "at": 1789524204794,
+        "tag": null,
+        "src": "",
+        "error": null,
+        "classes": "",
+        "visible": false
+      },
+      {
+        "at": 1789524204902,
+        "tag": null,
+        "src": "",
+        "error": null,
+        "classes": "",
+        "visible": false
+      },
+      {
+        "at": 1789524204995,
+        "tag": null,
+        "src": "",
+        "error": null,
+        "classes": "",
+        "visible": false
+      },
+      {
+        "at": 1789524205089,
+        "tag": null,
+        "src": "",
+        "error": null,
+        "classes": "",
+        "visible": false
+      },
+      {
+        "at": 1789524205197,
+        "tag": null,
+        "src": "",
+        "error": null,
+        "classes": "",
+        "visible": false
+      },
+      {
+        "at": 1789524205289,
+        "tag": null,
+        "src": "",
+        "error": null,
+        "classes": "",
+        "visible": false
+      },
+      {
+        "at": 1789524205397,
+        "tag": null,
+        "src": "",
+        "error": null,
+        "classes": "",
+        "visible": false
+      },
+      {
+        "at": 1789524205491,
+        "tag": null,
+        "src": "",
+        "error": null,
+        "classes": "",
+        "visible": false
+      },
+      {
+        "at": 1789524205603,
+        "tag": null,
+        "src": "",
+        "error": null,
+        "classes": "",
+        "visible": false
+      },
+      {
+        "at": 1789524205696,
+        "tag": null,
+        "src": "",
+        "error": null,
+        "classes": "",
+        "visible": false
+      },
+      {
+        "at": 1789524205790,
+        "tag": null,
+        "src": "",
+        "error": null,
+        "classes": "",
+        "visible": false
+      },
+      {
+        "at": 1789524205897,
+        "tag": null,
+        "src": "",
+        "error": null,
+        "classes": "",
+        "visible": false
+      },
+      {
+        "at": 1789524205992,
+        "tag": null,
+        "src": "",
+        "error": null,
+        "classes": "",
+        "visible": false
+      },
+      {
+        "at": 1789524206100,
+        "tag": null,
+        "src": "",
+        "error": null,
+        "classes": "",
+        "visible": false
+      },
+      {
+        "at": 1789524206195,
+        "tag": null,
+        "src": "",
+        "error": null,
+        "classes": "",
+        "visible": false
+      },
+      {
+        "at": 1789524206302,
+        "tag": null,
+        "src": "",
+        "error": null,
+        "classes": "",
+        "visible": false
+      },
+      {
+        "at": 1789524206395,
+        "tag": null,
+        "src": "",
+        "error": null,
+        "classes": "",
+        "visible": false
+      },
+      {
+        "at": 1789524206489,
+        "tag": null,
+        "src": "",
+        "error": null,
+        "classes": "",
+        "visible": false
+      },
+      {
+        "at": 1789524206596,
+        "tag": null,
+        "src": "",
+        "error": null,
+        "classes": "",
+        "visible": false
+      },
+      {
+        "at": 1789524206690,
+        "tag": null,
+        "src": "",
+        "error": null,
+        "classes": "",
+        "visible": false
+      },
+      {
+        "at": 1789524206797,
+        "tag": null,
+        "src": "",
+        "error": null,
+        "classes": "",
+        "visible": false
+      },
+      {
+        "at": 1789524206891,
+        "tag": null,
+        "src": "",
+        "error": null,
+        "classes": "",
+        "visible": false
+      },
+      {
+        "at": 1789524207000,
+        "tag": null,
+        "src": "",
+        "error": null,
+        "classes": "",
+        "visible": false
+      },
+      {
+        "at": 1789524207091,
+        "tag": null,
+        "src": "",
+        "error": null,
+        "classes": "",
+        "visible": false
+      },
+      {
+        "at": 1789524207200,
+        "tag": null,
+        "src": "",
+        "error": null,
+        "classes": "",
+        "visible": false
+      },
+      {
+        "at": 1789524207294,
+        "tag": null,
+        "src": "",
+        "error": null,
+        "classes": "",
+        "visible": false
+      },
+      {
+        "at": 1789524207388,
+        "tag": null,
+        "src": "",
+        "error": null,
+        "classes": "",
+        "visible": false
+      },
+      {
+        "at": 1789524207497,
+        "tag": null,
+        "src": "",
+        "error": null,
+        "classes": "",
+        "visible": false
+      },
+      {
+        "at": 1789524207591,
+        "tag": null,
+        "src": "",
+        "error": null,
+        "classes": "",
+        "visible": false
+      },
+      {
+        "at": 1789524207699,
+        "tag": null,
+        "src": "",
+        "error": null,
+        "classes": "",
+        "visible": false
+      },
+      {
+        "at": 1789524207791,
+        "tag": null,
+        "src": "",
+        "error": null,
+        "classes": "",
+        "visible": false
+      },
+      {
+        "at": 1789524207900,
+        "tag": null,
+        "src": "",
+        "error": null,
+        "classes": "",
+        "visible": false
+      },
+      {
+        "at": 1789524207993,
+        "tag": null,
+        "src": "",
+        "error": null,
+        "classes": "",
+        "visible": false
+      },
+      {
+        "at": 1789524208102,
+        "tag": null,
+        "src": "",
+        "error": null,
+        "classes": "",
+        "visible": false
+      },
+      {
+        "at": 1789524208195,
+        "tag": null,
+        "src": "",
+        "error": null,
+        "classes": "",
+        "visible": false
+      },
+      {
+        "at": 1789524208288,
+        "tag": null,
+        "src": "",
+        "error": null,
+        "classes": "",
+        "visible": false
+      },
+      {
+        "at": 1789524208398,
+        "tag": null,
+        "src": "",
+        "error": null,
+        "classes": "",
+        "visible": false
+      },
+      {
+        "at": 1789524208491,
+        "tag": null,
+        "src": "",
+        "error": null,
+        "classes": "",
+        "visible": false
+      },
+      {
+        "at": 1789524208600,
+        "tag": null,
+        "src": "",
+        "error": null,
+        "classes": "",
+        "visible": false
+      },
+      {
+        "at": 1789524208693,
+        "tag": null,
+        "src": "",
+        "error": null,
+        "classes": "",
+        "visible": false
+      },
+      {
+        "at": 1789524208801,
+        "tag": null,
+        "src": "",
+        "error": null,
+        "classes": "",
+        "visible": false
+      },
+      {
+        "at": 1789524208893,
+        "tag": null,
+        "src": "",
+        "error": null,
+        "classes": "",
+        "visible": false
+      },
+      {
+        "at": 1789524209002,
+        "tag": null,
+        "src": "",
+        "error": null,
+        "classes": "",
+        "visible": false
+      },
+      {
+        "at": 1789524209095,
+        "tag": null,
+        "src": "",
+        "error": null,
+        "classes": "",
+        "visible": false
+      },
+      {
+        "at": 1789524209191,
+        "tag": null,
+        "src": "",
+        "error": null,
+        "classes": "",
+        "visible": false
+      },
+      {
+        "at": 1789524209301,
+        "tag": null,
+        "src": "",
+        "error": null,
+        "classes": "",
+        "visible": false
+      },
+      {
+        "at": 1789524209395,
+        "tag": null,
+        "src": "",
+        "error": null,
+        "classes": "",
+        "visible": false
+      },
+      {
+        "at": 1789524209490,
+        "tag": null,
+        "src": "",
+        "error": null,
+        "classes": "",
+        "visible": false
+      },
+      {
+        "at": 1789524209599,
+        "tag": null,
+        "src": "",
+        "error": null,
+        "classes": "",
+        "visible": false
+      },
+      {
+        "at": 1789524209693,
+        "tag": null,
+        "src": "",
+        "error": null,
+        "classes": "",
+        "visible": false
+      },
+      {
+        "at": 1789524209787,
+        "tag": null,
+        "src": "",
+        "error": null,
+        "classes": "",
+        "visible": false
+      },
+      {
+        "at": 1789524209897,
+        "tag": null,
+        "src": "",
+        "error": null,
+        "classes": "",
+        "visible": false
+      },
+      {
+        "at": 1789524209992,
+        "tag": null,
+        "src": "",
+        "error": null,
+        "classes": "",
+        "visible": false
+      },
+      {
+        "at": 1789524210102,
+        "tag": null,
+        "src": "",
+        "error": null,
+        "classes": "",
+        "visible": false
+      },
+      {
+        "at": 1789524210198,
+        "tag": null,
+        "src": "",
+        "error": null,
+        "classes": "",
+        "visible": false
+      },
+      {
+        "at": 1789524210289,
+        "tag": null,
+        "src": "",
+        "error": null,
+        "classes": "",
+        "visible": false
+      },
+      {
+        "at": 1789524210396,
+        "tag": null,
+        "src": "",
+        "error": null,
+        "classes": "",
+        "visible": false
+      },
+      {
+        "at": 1789524210491,
+        "tag": null,
+        "src": "",
+        "error": null,
+        "classes": "",
+        "visible": false
+      },
+      {
+        "at": 1789524210599,
+        "tag": null,
+        "src": "",
+        "error": null,
+        "classes": "",
+        "visible": false
+      },
+      {
+        "at": 1789524210691,
+        "tag": null,
+        "src": "",
+        "error": null,
+        "classes": "",
+        "visible": false
+      },
+      {
+        "at": 1789524210800,
+        "tag": null,
+        "src": "",
+        "error": null,
+        "classes": "",
+        "visible": false
+      },
+      {
+        "at": 1789524210894,
+        "tag": null,
+        "src": "",
+        "error": null,
+        "classes": "",
+        "visible": false
+      },
+      {
+        "at": 1789524210988,
+        "tag": null,
+        "src": "",
+        "error": null,
+        "classes": "",
+        "visible": false
+      },
+      {
+        "at": 1789524211100,
+        "tag": null,
+        "src": "",
+        "error": null,
+        "classes": "",
+        "visible": false
+      },
+      {
+        "at": 1789524211194,
+        "tag": null,
+        "src": "",
+        "error": null,
+        "classes": "",
+        "visible": false
+      },
+      {
+        "at": 1789524211289,
+        "tag": null,
+        "src": "",
+        "error": null,
+        "classes": "",
+        "visible": false
+      },
+      {
+        "at": 1789524211395,
+        "tag": null,
+        "src": "",
+        "error": null,
+        "classes": "",
+        "visible": false
+      },
+      {
+        "at": 1789524211488,
+        "tag": null,
+        "src": "",
+        "error": null,
+        "classes": "",
+        "visible": false
+      },
+      {
+        "at": 1789524211598,
+        "tag": null,
+        "src": "",
+        "error": null,
+        "classes": "",
+        "visible": false
+      },
+      {
+        "at": 1789524211689,
+        "tag": null,
+        "src": "",
+        "error": null,
+        "classes": "",
+        "visible": false
+      },
+      {
+        "at": 1789524211798,
+        "tag": null,
+        "src": "",
+        "error": null,
+        "classes": "",
+        "visible": false
+      },
+      {
+        "at": 1789524211891,
+        "tag": null,
+        "src": "",
+        "error": null,
+        "classes": "",
+        "visible": false
+      },
+      {
+        "at": 1789524212000,
+        "tag": null,
+        "src": "",
+        "error": null,
+        "classes": "",
+        "visible": false
+      },
+      {
+        "at": 1789524212093,
+        "tag": null,
+        "src": "",
+        "error": null,
+        "classes": "",
+        "visible": false
+      },
+      {
+        "at": 1789524212187,
+        "tag": null,
+        "src": "",
+        "error": null,
+        "classes": "",
+        "visible": false
+      },
+      {
+        "at": 1789524212295,
+        "tag": null,
+        "src": "",
+        "error": null,
+        "classes": "",
+        "visible": false
+      },
+      {
+        "at": 1789524212388,
+        "tag": null,
+        "src": "",
+        "error": null,
+        "classes": "",
+        "visible": false
+      }
+    ],
+    "events": [],
+    "online": false
+  },
+  "offlineCache": {
+    "names": [
+      "totem-park-pwa-v3",
+      "totempark-player-media-v1"
+    ],
+    "entries": [
+      {
+        "key": "https://totempark.local/cache/3056c0fe",
+        "bytes": 15649,
+        "sha256": "693d9b80d37e3cbb797ae1ae390d6bd9e5b7aff990231b8a58f67b64dccd72fd"
+      },
+      {
+        "key": "https://totempark.local/cache/aa0dc5a1",
+        "bytes": 27656,
+        "sha256": "5f5015fbb36a8379f70a8861a71efa490ab4a4945bef4460fd6a71be6a940013"
+      }
+    ],
+    "count": 2,
+    "bytes": 43305,
+    "worker": {
+      "registered": true,
+      "active": "activated",
+      "script": "http://127.0.0.1:5199/sw.js"
+    }
+  },
+  "offlineRuns": [
+    {
+      "tag": null,
+      "start": 1789524190497,
+      "end": 1789524212388
+    }
+  ],
+  "error": "AssertionError [ERR_ASSERTION]: At least two completed videos\n    at file:///C:/Users/centr/Desktop/totem-park/artifacts/homologacao-2a1/automated-gate.mjs:148:10",
+  "finished": "2026-09-16T02:03:32.664Z"
+}

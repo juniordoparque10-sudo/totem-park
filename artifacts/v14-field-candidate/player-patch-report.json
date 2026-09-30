@@ -1,0 +1,10 @@
+{
+  "inputSha256": "709BA00A7DC29932AB917EA4617829D9C2E6548BA9232490A5173CE373CF95C0",
+  "outputSha256": "0EF4A671B144589C5977F4985F9FE66579EE50E444F1F4E76B9C7D1F2B31F3BD",
+  "changes": [
+    {
+      "description": "Remove RC diagnostic overlay button",
+      "matches": 1
+    }
+  ]
+}

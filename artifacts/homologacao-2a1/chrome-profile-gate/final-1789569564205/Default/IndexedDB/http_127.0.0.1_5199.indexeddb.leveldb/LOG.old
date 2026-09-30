@@ -1,0 +1,38 @@
+2026/09/16-11:40:59.166 3078 Reusing MANIFEST C:\Users\centr\Desktop\totem-park\artifacts\homologacao-2a1\chrome-profile-gate\final-1789569564205\Default\IndexedDB\http_127.0.0.1_5199.indexeddb.leveldb/MANIFEST-000001
+2026/09/16-11:40:59.168 3078 Recovering log #6
+2026/09/16-11:40:59.192 3078 Reusing old log C:\Users\centr\Desktop\totem-park\artifacts\homologacao-2a1\chrome-profile-gate\final-1789569564205\Default\IndexedDB\http_127.0.0.1_5199.indexeddb.leveldb/000006.log 
+2026/09/16-11:40:59.239 30a8 Level-0 table #10: started
+2026/09/16-11:40:59.257 30a8 Level-0 table #10: 283889 bytes OK
+2026/09/16-11:40:59.258 30a8 Delete type=0 #6
+2026/09/16-11:40:59.260 30a8 Manual compaction at level-0 from '\x00\x06\x00\x00\x00' @ 72057594037927935 : 1 .. '\x00\x07\x00\x00\x00' @ 0 : 0; will stop at '\x00\x06\x00\x00\x05' @ 19462 : 1
+2026/09/16-11:40:59.261 30a8 Compacting 1@0 + 1@1 files
+2026/09/16-11:40:59.284 30a8 Generated table #11@0: 6973 keys, 73852 bytes
+2026/09/16-11:40:59.284 30a8 Compacted 1@0 + 1@1 files => 73852 bytes
+2026/09/16-11:40:59.285 30a8 compacted to: files[ 0 1 1 0 0 0 0 ]
+2026/09/16-11:40:59.286 30a8 Delete type=2 #10
+2026/09/16-11:40:59.287 30a8 Manual compaction at level-0 from '\x00\x06\x00\x00\x05' @ 19462 : 1 .. '\x00\x07\x00\x00\x00' @ 0 : 0; will stop at (end)
+2026/09/16-11:42:37.748 5d3c Compacting 1@1 + 1@2 files
+2026/09/16-11:42:37.758 5d3c Generated table #12@1: 528 keys, 18468 bytes
+2026/09/16-11:42:37.758 5d3c Compacted 1@1 + 1@2 files => 18468 bytes
+2026/09/16-11:42:37.759 5d3c compacted to: files[ 0 0 1 0 0 0 0 ]
+2026/09/16-11:42:37.760 5d3c Delete type=2 #5
+2026/09/16-11:42:37.760 5d3c Delete type=2 #7
+2026/09/16-11:42:37.760 5d3c Delete type=2 #11
+2026/09/16-11:42:49.506 30a8 Level-0 table #14: started
+2026/09/16-11:42:49.526 30a8 Level-0 table #14: 886563 bytes OK
+2026/09/16-11:42:49.526 30a8 Delete type=0 #9
+2026/09/16-11:42:49.528 5d3c Manual compaction at level-0 from '\x00\x07\x00\x00\x00' @ 72057594037927935 : 1 .. '\x00\x08\x00\x00\x00' @ 0 : 0; will stop at (end)
+2026/09/16-11:42:49.630 30a8 Compacting 1@1 + 1@2 files
+2026/09/16-11:42:49.643 30a8 Generated table #15@1: 707 keys, 24415 bytes
+2026/09/16-11:42:49.643 30a8 Compacted 1@1 + 1@2 files => 24415 bytes
+2026/09/16-11:42:49.643 30a8 compacted to: files[ 0 0 1 0 0 0 0 ]
+2026/09/16-11:42:49.644 30a8 Delete type=2 #12
+2026/09/16-11:42:49.644 30a8 Delete type=2 #14
+2026/09/16-11:42:53.215 5d3c Level-0 table #17: started
+2026/09/16-11:42:53.228 5d3c Level-0 table #17: 151073 bytes OK
+2026/09/16-11:42:53.230 5d3c Delete type=0 #13
+2026/09/16-11:42:53.231 5d3c Manual compaction at level-0 from '\x00\x08\x00\x00\x00' @ 72057594037927935 : 1 .. '\x00\x09\x00\x00\x00' @ 0 : 0; will stop at (end)
+2026/09/16-11:42:53.362 30a8 Compacting 1@1 + 1@2 files
+2026/09/16-11:42:53.374 30a8 Generated table #18@1: 773 keys, 27555 bytes
+2026/09/16-11:42:53.374 30a8 Compacted 1@1 + 1@2 files => 27555 bytes
+2026/09/16-11:42:53.375 30a8 compacted to: files[ 0 0 1 0 0 0 0 ]

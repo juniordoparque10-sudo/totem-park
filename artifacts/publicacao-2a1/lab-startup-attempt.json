@@ -1,0 +1,11 @@
+{
+  "profile": "C:\\Users\\centr\\Desktop\\totem-park\\artifacts\\homologacao-2a1\\chrome-profile-gate\\final-1789569564205",
+  "started": "2026-09-16T14:56:53.511Z",
+  "scope": "Downloaded published bundle, emulator-only configuration in memory, no physical TV or production client screen",
+  "phases": {},
+  "console": [],
+  "requests": [],
+  "result": "FALHOU",
+  "error": "Error: Server unavailable",
+  "finished": "2026-09-16T14:57:04.813Z"
+}

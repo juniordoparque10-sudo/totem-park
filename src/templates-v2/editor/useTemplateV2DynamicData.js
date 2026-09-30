@@ -1,5 +1,7 @@
 import { useEffect, useState } from "react";
 import { getTemplateV2DynamicDataKey, hasTemplateV2DynamicModules } from "../dynamic-data";
+import { normalizeSportsV2Config } from "../sports-v2/config";
+import { resolveSportsDataProvider } from "../sports-v2/data/SportsDataProvider";
 
 const CACHE_TTL_MS = 10 * 60 * 1000;
 const dynamicCache = new Map();
@@ -17,6 +19,13 @@ async function loadSharedDynamicData(config, loadWeather, loadNews) {
     const news = config.modules?.news || {};
     if (weather.enabled && loadWeather) data.weather = await loadWeather(weather.city);
     if (news.enabled && loadNews) data.news = await loadNews(news);
+    if (config.sports?.provider) {
+      const sports = normalizeSportsV2Config(config.sports);
+      const provider = resolveSportsDataProvider(sports);
+      const snapshots = await Promise.allSettled(sports.selectedSports.map(async (sport) => [sport,await provider.getSnapshot(sport)]));
+      data.sports = Object.fromEntries(snapshots.filter((result)=>result.status==="fulfilled").map((result)=>result.value));
+      data.sportsErrors = sports.selectedSports.filter((_,index)=>snapshots[index].status==="rejected");
+    }
     dynamicCache.set(key, { data, loadedAt: Date.now() });
     return data;
   })().finally(() => pendingLoads.delete(key));

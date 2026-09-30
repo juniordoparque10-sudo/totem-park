@@ -1,0 +1,235 @@
+{
+  "name": "projects/totem-park/databases/(default)/documents/clients/eCd1q9Dq1SMr9D5FlKN8/playlists/NYMMLih50iYxXho5bvRL",
+  "fields": {
+    "endTime": {
+      "stringValue": ""
+    },
+    "createdAt": {
+      "timestampValue": "2026-09-19T22:16:25.591Z"
+    },
+    "transition": {
+      "stringValue": "Fade suave"
+    },
+    "orientation": {
+      "stringValue": "Paisagem"
+    },
+    "targetScreenIds": {
+      "arrayValue": {}
+    },
+    "endDate": {
+      "stringValue": ""
+    },
+    "items": {
+      "arrayValue": {
+        "values": [
+          {
+            "mapValue": {
+              "fields": {
+                "id": {
+                  "stringValue": "enfiqiz94zS2wy4oAaKe"
+                },
+                "playerItemType": {
+                  "stringValue": "media"
+                },
+                "storagePath": {
+                  "stringValue": "clients/eCd1q9Dq1SMr9D5FlKN8/media/1785781309628_1001327080.mp4"
+                },
+                "name": {
+                  "stringValue": "Park Solutions vídeo"
+                },
+                "createdAt": {
+                  "timestampValue": "2026-08-03T18:21:52.505Z"
+                },
+                "templateType": {
+                  "stringValue": ""
+                },
+                "orientation": {
+                  "stringValue": "Paisagem"
+                },
+                "aspectRatio": {
+                  "stringValue": "16:9"
+                },
+                "width": {
+                  "integerValue": "1280"
+                },
+                "resolvedOrientation": {
+                  "stringValue": "Paisagem"
+                },
+                "sourceImageUrl": {
+                  "stringValue": ""
+                },
+                "title": {
+                  "stringValue": "Park Solutions vídeo"
+                },
+                "height": {
+                  "integerValue": "720"
+                },
+                "naturalDuration": {
+                  "integerValue": "10"
+                },
+                "preview": {
+                  "stringValue": "https://firebasestorage.googleapis.com/v0/b/totem-park.firebasestorage.app/o/clients%2FeCd1q9Dq1SMr9D5FlKN8%2Fmedia%2F1785781309628_1001327080.mp4?alt=media&token=126201f6-9262-4a65-84d4-17e52390c071"
+                },
+                "resolvedPreview": {
+                  "stringValue": "https://firebasestorage.googleapis.com/v0/b/totem-park.firebasestorage.app/o/clients%2FeCd1q9Dq1SMr9D5FlKN8%2Fmedia%2F1785781309628_1001327080.mp4?alt=media&token=126201f6-9262-4a65-84d4-17e52390c071"
+                },
+                "sourceRemotePreview": {
+                  "stringValue": ""
+                },
+                "fileName": {
+                  "stringValue": "1001327080.mp4"
+                },
+                "type": {
+                  "stringValue": "Vídeo"
+                },
+                "sound": {
+                  "booleanValue": false
+                },
+                "sourcePreview": {
+                  "stringValue": "https://firebasestorage.googleapis.com/v0/b/totem-park.firebasestorage.app/o/clients%2FeCd1q9Dq1SMr9D5FlKN8%2Fmedia%2F1785781309628_1001327080.mp4?alt=media&token=126201f6-9262-4a65-84d4-17e52390c071"
+                },
+                "sizeBytes": {
+                  "integerValue": "2564110"
+                },
+                "mediaId": {
+                  "stringValue": "enfiqiz94zS2wy4oAaKe"
+                },
+                "duration": {
+                  "integerValue": "10"
+                },
+                "sourceMediaId": {
+                  "stringValue": "enfiqiz94zS2wy4oAaKe"
+                }
+              }
+            }
+          },
+          {
+            "mapValue": {
+              "fields": {
+                "resolvedOrientation": {
+                  "stringValue": "Paisagem"
+                },
+                "clientId": {
+                  "stringValue": "eCd1q9Dq1SMr9D5FlKN8"
+                },
+                "width": {
+                  "integerValue": "848"
+                },
+                "createdAt": {
+                  "timestampValue": "2026-09-22T01:11:51.647Z"
+                },
+                "height": {
+                  "integerValue": "478"
+                },
+                "type": {
+                  "stringValue": "Vídeo"
+                },
+                "fileHash": {
+                  "stringValue": ""
+                },
+                "title": {
+                  "stringValue": "PSolutions V1"
+                },
+                "templateType": {
+                  "stringValue": ""
+                },
+                "storageProvider": {
+                  "stringValue": "firebase"
+                },
+                "uploadedByUid": {
+                  "stringValue": "fiuy77BXZ0daGa3nAk3h1DfVfBu2"
+                },
+                "uploadedByEmail": {
+                  "stringValue": "juniordoparque10@gmail.com"
+                },
+                "sourcePreview": {
+                  "stringValue": "https://firebasestorage.googleapis.com/v0/b/totem-park.firebasestorage.app/o/clients%2FeCd1q9Dq1SMr9D5FlKN8%2Fmedia%2F1790039504650_PSolutions%20V1.mp4?alt=media&token=3c5a8a62-e472-44ed-abd5-1cc32c2c1b52"
+                },
+                "fileName": {
+                  "stringValue": "PSolutions V1.mp4"
+                },
+                "mediaId": {
+                  "stringValue": "AVwGDQ73WNhEnKaMZj7I"
+                },
+                "storagePath": {
+                  "stringValue": "clients/eCd1q9Dq1SMr9D5FlKN8/media/1790039504650_PSolutions V1.mp4"
+                },
+                "playerItemType": {
+                  "stringValue": "media"
+                },
+                "etag": {
+                  "stringValue": ""
+                },
+                "name": {
+                  "stringValue": "PSolutions V1"
+                },
+                "storageKey": {
+                  "stringValue": "clients/eCd1q9Dq1SMr9D5FlKN8/media/1790039504650_PSolutions V1.mp4"
+                },
+                "orientation": {
+                  "stringValue": "Paisagem"
+                },
+                "sizeBytes": {
+                  "integerValue": "1825834"
+                },
+                "id": {
+                  "stringValue": "AVwGDQ73WNhEnKaMZj7I"
+                },
+                "naturalDuration": {
+                  "integerValue": "10"
+                },
+                "sourceRemotePreview": {
+                  "stringValue": ""
+                },
+                "duration": {
+                  "integerValue": "10"
+                },
+                "sourceImageUrl": {
+                  "stringValue": ""
+                },
+                "sourceMediaId": {
+                  "stringValue": "AVwGDQ73WNhEnKaMZj7I"
+                },
+                "resolvedPreview": {
+                  "stringValue": "https://firebasestorage.googleapis.com/v0/b/totem-park.firebasestorage.app/o/clients%2FeCd1q9Dq1SMr9D5FlKN8%2Fmedia%2F1790039504650_PSolutions%20V1.mp4?alt=media&token=3c5a8a62-e472-44ed-abd5-1cc32c2c1b52"
+                },
+                "sound": {
+                  "booleanValue": false
+                },
+                "preview": {
+                  "stringValue": "https://firebasestorage.googleapis.com/v0/b/totem-park.firebasestorage.app/o/clients%2FeCd1q9Dq1SMr9D5FlKN8%2Fmedia%2F1790039504650_PSolutions%20V1.mp4?alt=media&token=3c5a8a62-e472-44ed-abd5-1cc32c2c1b52"
+                },
+                "aspectRatio": {
+                  "stringValue": "16:9"
+                }
+              }
+            }
+          }
+        ]
+      }
+    },
+    "scheduleEnabled": {
+      "booleanValue": false
+    },
+    "updatedAt": {
+      "timestampValue": "2026-09-22T01:31:55.748Z"
+    },
+    "startTime": {
+      "stringValue": ""
+    },
+    "startDate": {
+      "stringValue": ""
+    },
+    "playlistRevision": {
+      "stringValue": "1790040716614-3neo94"
+    },
+    "transitionSpeed": {
+      "stringValue": "Normal"
+    },
+    "name": {
+      "stringValue": "Teste rapido"
+    }
+  },
+  "createTime": "2026-09-19T22:16:25.633900Z",
+  "updateTime": "2026-09-22T01:31:55.795585Z"
+}

@@ -68,8 +68,8 @@ android {
         }
         playerRc {
             dimension "appMode"
-            versionCode 10
-            versionName "1.0.0-2a2-rebaseline-rc5"
+            versionCode 19
+            versionName "1.0.0-v19-templates-v2-transition-rc"
             manifestPlaceholders = [
                 appLabel: "Totem Park Player",
                 tvLauncherEnabled: "true"

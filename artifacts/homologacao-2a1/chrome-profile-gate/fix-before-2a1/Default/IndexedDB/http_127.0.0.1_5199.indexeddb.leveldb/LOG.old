@@ -1,0 +1,13 @@
+2026/09/16-11:29:01.936 4438 Reusing MANIFEST C:\Users\centr\Desktop\totem-park\artifacts\homologacao-2a1\chrome-profile-gate\fix-before-2a1\Default\IndexedDB\http_127.0.0.1_5199.indexeddb.leveldb/MANIFEST-000001
+2026/09/16-11:29:01.937 4438 Recovering log #7
+2026/09/16-11:29:01.946 4438 Reusing old log C:\Users\centr\Desktop\totem-park\artifacts\homologacao-2a1\chrome-profile-gate\fix-before-2a1\Default\IndexedDB\http_127.0.0.1_5199.indexeddb.leveldb/000007.log 
+2026/09/16-11:29:01.986 2b90 Level-0 table #11: started
+2026/09/16-11:29:01.995 2b90 Level-0 table #11: 210122 bytes OK
+2026/09/16-11:29:01.996 2b90 Delete type=0 #7
+2026/09/16-11:29:01.997 2b90 Manual compaction at level-0 from '\x00\x07\x00\x00\x00' @ 72057594037927935 : 1 .. '\x00\x08\x00\x00\x00' @ 0 : 0; will stop at '\x00\x07\x00\x00\x05' @ 6346 : 1
+2026/09/16-11:29:01.997 2b90 Compacting 1@0 + 1@1 files
+2026/09/16-11:29:02.004 2b90 Generated table #12@0: 2493 keys, 39010 bytes
+2026/09/16-11:29:02.004 2b90 Compacted 1@0 + 1@1 files => 39010 bytes
+2026/09/16-11:29:02.004 2b90 compacted to: files[ 0 1 1 0 0 0 0 ]
+2026/09/16-11:29:02.005 2b90 Delete type=2 #11
+2026/09/16-11:29:02.005 2b90 Manual compaction at level-0 from '\x00\x07\x00\x00\x05' @ 6346 : 1 .. '\x00\x08\x00\x00\x00' @ 0 : 0; will stop at (end)

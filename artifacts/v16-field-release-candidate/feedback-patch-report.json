@@ -1,0 +1,9 @@
+{
+  "inputJsSha256": "1C7529A82FA5831B408AAAD70295167E914166704416EE02216B1E14CB75E55D",
+  "outputJsSha256": "634CE7D2AEA6B6F3875609DECE0AA4FD4DCC3F9A962FAF7243F2FDAB56C8CFF4",
+  "changes": [
+    "A completed download remains eligible for the visual success state when its effect is replaced",
+    "The last queued cache pass shows success only after zero failures and no pending items",
+    "Warm cache and failed cycles do not show success; existing three-second timer is retained"
+  ]
+}

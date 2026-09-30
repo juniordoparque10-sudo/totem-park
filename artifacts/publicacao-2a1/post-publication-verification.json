@@ -1,0 +1,94 @@
+{
+  "decision": "PUBLICAÇÃO ESTÁVEL",
+  "scope": "Production-origin SW/login smoke plus downloaded production bundle in emulator-isolated controlled browser; no physical TV available",
+  "checks": [
+    {
+      "name": "Published source/build scope",
+      "result": "PASSOU"
+    },
+    {
+      "name": "Production-origin normal SW update retains old cache",
+      "result": "PASSOU"
+    },
+    {
+      "name": "Published bundle online",
+      "result": "PASSOU"
+    },
+    {
+      "name": "Published bundle offline",
+      "result": "PASSOU"
+    },
+    {
+      "name": "Real offline and connection restored",
+      "result": "PASSOU"
+    },
+    {
+      "name": "Scheduled playlist and visible template",
+      "result": "PASSOU"
+    },
+    {
+      "name": "Heartbeat and realtime in emulator-only lab",
+      "result": "PASSOU"
+    },
+    {
+      "name": "Retained media entries/hashes",
+      "result": "PASSOU"
+    },
+    {
+      "name": "Player remote media payload zero after retained cache",
+      "result": "PASSOU"
+    },
+    {
+      "name": "All 519 workspace product files unchanged by publication preparation",
+      "result": "PASSOU"
+    }
+  ],
+  "rawHarnessResult": "FALHOU",
+  "rawHarnessError": "AssertionError [ERR_ASSERTION]: The expression evaluated to a falsy value:\n\n  assert.ok(result.fixtureRequests.every(x=>(x.bodyBytes||0)===0))\n",
+  "harnessAccountingExplanation": "Final harness assertion incorrectly counted local scenario.mjs fixture GET (16378 bytes), absent from all browser requests. No product correction or repeated production fix was made.",
+  "browserTransfers": [
+    {
+      "at": "2026-09-16T14:57:58.516Z",
+      "path": "/media/video01.webm",
+      "method": "GET",
+      "range": "bytes=0-27655",
+      "ifNoneMatch": "\"fixture-video01.webm-27656\"",
+      "status": 304,
+      "bodyBytes": 0
+    },
+    {
+      "at": "2026-09-16T14:59:31.012Z",
+      "path": "/media/video02.webm",
+      "method": "GET",
+      "range": "bytes=0-27891",
+      "ifNoneMatch": "\"fixture-video02.webm-27892\"",
+      "status": 304,
+      "bodyBytes": 0
+    },
+    {
+      "at": "2026-09-16T14:59:47.376Z",
+      "path": "/media/video01.webm",
+      "method": "GET",
+      "range": "bytes=0-27655",
+      "ifNoneMatch": "\"fixture-video01.webm-27656\"",
+      "status": 304,
+      "bodyBytes": 0
+    }
+  ],
+  "fixtureToolTransfers": [
+    {
+      "at": "2026-09-16T15:00:04.936Z",
+      "path": "/media/imagemNova.png",
+      "method": "GET",
+      "range": null,
+      "ifNoneMatch": null,
+      "status": 200,
+      "bodyBytes": 16378
+    }
+  ],
+  "additionalRemoteVideoBytes": 0,
+  "additionalRemoteImageBytes": 0,
+  "rollback": "NÃO NECESSÁRIO",
+  "newDeployment": "dpl_8fTZWFZXR7WZuswVbvUZeydrt1zW",
+  "previousDeployment": "dpl_AdMkvihNUgSQsWp6vBHohmY3f1Ty"
+}

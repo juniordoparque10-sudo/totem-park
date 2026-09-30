@@ -1,0 +1,3898 @@
+{
+  "variant": "current",
+  "started": "2026-09-16T14:23:13.529Z",
+  "phases": {
+    "online": {
+      "samples": [
+        {
+          "at": 1789568601775,
+          "id": null,
+          "visible": false,
+          "online": true
+        },
+        {
+          "at": 1789568601882,
+          "id": null,
+          "visible": false,
+          "online": true
+        },
+        {
+          "at": 1789568601978,
+          "id": null,
+          "visible": false,
+          "online": true
+        },
+        {
+          "at": 1789568602073,
+          "id": null,
+          "visible": false,
+          "online": true
+        },
+        {
+          "at": 1789568602182,
+          "id": null,
+          "visible": false,
+          "online": true
+        },
+        {
+          "at": 1789568602276,
+          "id": null,
+          "visible": false,
+          "online": true
+        },
+        {
+          "at": 1789568602372,
+          "id": null,
+          "visible": false,
+          "online": true
+        },
+        {
+          "at": 1789568602483,
+          "id": null,
+          "visible": false,
+          "online": true
+        },
+        {
+          "at": 1789568602578,
+          "id": null,
+          "visible": false,
+          "online": true
+        },
+        {
+          "at": 1789568602671,
+          "id": null,
+          "visible": false,
+          "online": true
+        },
+        {
+          "at": 1789568602781,
+          "id": null,
+          "visible": false,
+          "online": true
+        },
+        {
+          "at": 1789568602874,
+          "id": null,
+          "visible": false,
+          "online": true
+        },
+        {
+          "at": 1789568602984,
+          "id": null,
+          "visible": false,
+          "online": true
+        },
+        {
+          "at": 1789568603078,
+          "id": null,
+          "visible": false,
+          "online": true
+        },
+        {
+          "at": 1789568603171,
+          "id": null,
+          "visible": false,
+          "online": true
+        },
+        {
+          "at": 1789568603281,
+          "id": null,
+          "visible": false,
+          "online": true
+        },
+        {
+          "at": 1789568603374,
+          "id": null,
+          "visible": false,
+          "online": true
+        },
+        {
+          "at": 1789568603483,
+          "id": null,
+          "visible": false,
+          "online": true
+        },
+        {
+          "at": 1789568603577,
+          "id": null,
+          "visible": false,
+          "online": true
+        },
+        {
+          "at": 1789568603672,
+          "id": null,
+          "visible": false,
+          "online": true
+        },
+        {
+          "at": 1789568603780,
+          "id": null,
+          "visible": false,
+          "online": true
+        },
+        {
+          "at": 1789568603873,
+          "id": null,
+          "visible": false,
+          "online": true
+        },
+        {
+          "at": 1789568603980,
+          "id": null,
+          "visible": false,
+          "online": true
+        },
+        {
+          "at": 1789568604075,
+          "id": null,
+          "visible": false,
+          "online": true
+        },
+        {
+          "at": 1789568604169,
+          "id": null,
+          "visible": false,
+          "online": true
+        },
+        {
+          "at": 1789568604276,
+          "id": null,
+          "visible": false,
+          "online": true
+        },
+        {
+          "at": 1789568604371,
+          "id": null,
+          "visible": false,
+          "online": true
+        },
+        {
+          "at": 1789568604480,
+          "id": null,
+          "visible": false,
+          "online": true
+        },
+        {
+          "at": 1789568604573,
+          "id": null,
+          "visible": false,
+          "online": true
+        },
+        {
+          "at": 1789568604681,
+          "id": null,
+          "visible": false,
+          "online": true
+        },
+        {
+          "at": 1789568604774,
+          "id": null,
+          "visible": false,
+          "online": true
+        },
+        {
+          "at": 1789568604882,
+          "id": null,
+          "visible": false,
+          "online": true
+        },
+        {
+          "at": 1789568604976,
+          "id": null,
+          "visible": false,
+          "online": true
+        },
+        {
+          "at": 1789568605069,
+          "id": null,
+          "visible": false,
+          "online": true
+        },
+        {
+          "at": 1789568605179,
+          "id": null,
+          "visible": false,
+          "online": true
+        },
+        {
+          "at": 1789568605274,
+          "id": null,
+          "visible": false,
+          "online": true
+        },
+        {
+          "at": 1789568605383,
+          "id": null,
+          "visible": false,
+          "online": true
+        },
+        {
+          "at": 1789568605476,
+          "id": null,
+          "visible": false,
+          "online": true
+        },
+        {
+          "at": 1789568605571,
+          "id": null,
+          "visible": false,
+          "online": true
+        },
+        {
+          "at": 1789568605681,
+          "id": null,
+          "visible": false,
+          "online": true
+        },
+        {
+          "at": 1789568605775,
+          "id": null,
+          "visible": false,
+          "online": true
+        },
+        {
+          "at": 1789568605884,
+          "id": null,
+          "visible": false,
+          "online": true
+        },
+        {
+          "at": 1789568605977,
+          "id": null,
+          "visible": false,
+          "online": true
+        },
+        {
+          "at": 1789568606070,
+          "id": null,
+          "visible": false,
+          "online": true
+        },
+        {
+          "at": 1789568606179,
+          "id": null,
+          "visible": false,
+          "online": true
+        },
+        {
+          "at": 1789568606272,
+          "id": null,
+          "visible": false,
+          "online": true
+        },
+        {
+          "at": 1789568606381,
+          "id": null,
+          "visible": false,
+          "online": true
+        },
+        {
+          "at": 1789568606474,
+          "id": null,
+          "visible": false,
+          "online": true
+        },
+        {
+          "at": 1789568606569,
+          "id": null,
+          "visible": false,
+          "online": true
+        },
+        {
+          "at": 1789568606677,
+          "id": null,
+          "visible": false,
+          "online": true
+        },
+        {
+          "at": 1789568606770,
+          "id": null,
+          "visible": false,
+          "online": true
+        },
+        {
+          "at": 1789568606877,
+          "id": null,
+          "visible": false,
+          "online": true
+        },
+        {
+          "at": 1789568606970,
+          "id": null,
+          "visible": false,
+          "online": true
+        },
+        {
+          "at": 1789568607080,
+          "id": null,
+          "visible": false,
+          "online": true
+        },
+        {
+          "at": 1789568607174,
+          "id": null,
+          "visible": false,
+          "online": true
+        },
+        {
+          "at": 1789568607283,
+          "id": null,
+          "visible": false,
+          "online": true
+        },
+        {
+          "at": 1789568607378,
+          "id": null,
+          "visible": false,
+          "online": true
+        },
+        {
+          "at": 1789568607471,
+          "id": null,
+          "visible": false,
+          "online": true
+        },
+        {
+          "at": 1789568607580,
+          "id": null,
+          "visible": false,
+          "online": true
+        },
+        {
+          "at": 1789568607676,
+          "id": null,
+          "visible": false,
+          "online": true
+        },
+        {
+          "at": 1789568607769,
+          "id": null,
+          "visible": false,
+          "online": true
+        },
+        {
+          "at": 1789568607878,
+          "id": null,
+          "visible": false,
+          "online": true
+        },
+        {
+          "at": 1789568607972,
+          "id": null,
+          "visible": false,
+          "online": true
+        },
+        {
+          "at": 1789568608081,
+          "id": null,
+          "visible": false,
+          "online": true
+        },
+        {
+          "at": 1789568608175,
+          "id": null,
+          "visible": false,
+          "online": true
+        },
+        {
+          "at": 1789568608270,
+          "id": null,
+          "visible": false,
+          "online": true
+        },
+        {
+          "at": 1789568608378,
+          "id": null,
+          "visible": false,
+          "online": true
+        },
+        {
+          "at": 1789568608470,
+          "id": null,
+          "visible": false,
+          "online": true
+        },
+        {
+          "at": 1789568608580,
+          "id": null,
+          "visible": false,
+          "online": true
+        },
+        {
+          "at": 1789568608675,
+          "id": null,
+          "visible": false,
+          "online": true
+        },
+        {
+          "at": 1789568608783,
+          "id": null,
+          "visible": false,
+          "online": true
+        },
+        {
+          "at": 1789568608876,
+          "id": null,
+          "visible": false,
+          "online": true
+        },
+        {
+          "at": 1789568608969,
+          "id": null,
+          "visible": false,
+          "online": true
+        },
+        {
+          "at": 1789568609077,
+          "id": null,
+          "visible": false,
+          "online": true
+        },
+        {
+          "at": 1789568609170,
+          "id": null,
+          "visible": false,
+          "online": true
+        },
+        {
+          "at": 1789568609281,
+          "id": null,
+          "visible": false,
+          "online": true
+        },
+        {
+          "at": 1789568609375,
+          "id": null,
+          "visible": false,
+          "online": true
+        },
+        {
+          "at": 1789568609468,
+          "id": null,
+          "visible": false,
+          "online": true
+        },
+        {
+          "at": 1789568609578,
+          "id": null,
+          "visible": false,
+          "online": true
+        },
+        {
+          "at": 1789568609672,
+          "id": null,
+          "visible": false,
+          "online": true
+        },
+        {
+          "at": 1789568609781,
+          "id": null,
+          "visible": false,
+          "online": true
+        },
+        {
+          "at": 1789568609876,
+          "id": null,
+          "visible": false,
+          "online": true
+        },
+        {
+          "at": 1789568609970,
+          "id": null,
+          "visible": false,
+          "online": true
+        },
+        {
+          "at": 1789568610080,
+          "id": null,
+          "visible": false,
+          "online": true
+        },
+        {
+          "at": 1789568610173,
+          "id": null,
+          "visible": false,
+          "online": true
+        },
+        {
+          "at": 1789568610281,
+          "id": null,
+          "visible": false,
+          "online": true
+        },
+        {
+          "at": 1789568610376,
+          "id": null,
+          "visible": false,
+          "online": true
+        },
+        {
+          "at": 1789568610470,
+          "id": null,
+          "visible": false,
+          "online": true
+        },
+        {
+          "at": 1789568610581,
+          "id": null,
+          "visible": false,
+          "online": true
+        },
+        {
+          "at": 1789568610675,
+          "id": null,
+          "visible": false,
+          "online": true
+        },
+        {
+          "at": 1789568610782,
+          "id": null,
+          "visible": false,
+          "online": true
+        },
+        {
+          "at": 1789568610876,
+          "id": null,
+          "visible": false,
+          "online": true
+        },
+        {
+          "at": 1789568610985,
+          "id": null,
+          "visible": false,
+          "online": true
+        },
+        {
+          "at": 1789568611077,
+          "id": null,
+          "visible": false,
+          "online": true
+        },
+        {
+          "at": 1789568611171,
+          "id": null,
+          "visible": false,
+          "online": true
+        },
+        {
+          "at": 1789568611282,
+          "id": null,
+          "visible": false,
+          "online": true
+        },
+        {
+          "at": 1789568611376,
+          "id": null,
+          "visible": false,
+          "online": true
+        },
+        {
+          "at": 1789568611469,
+          "id": null,
+          "visible": false,
+          "online": true
+        },
+        {
+          "at": 1789568611577,
+          "id": null,
+          "visible": false,
+          "online": true
+        },
+        {
+          "at": 1789568611671,
+          "id": null,
+          "visible": false,
+          "online": true
+        },
+        {
+          "at": 1789568611781,
+          "id": null,
+          "visible": false,
+          "online": true
+        },
+        {
+          "at": 1789568611875,
+          "id": null,
+          "visible": false,
+          "online": true
+        },
+        {
+          "at": 1789568611969,
+          "id": null,
+          "visible": false,
+          "online": true
+        },
+        {
+          "at": 1789568612078,
+          "id": null,
+          "visible": false,
+          "online": true
+        },
+        {
+          "at": 1789568612171,
+          "id": null,
+          "visible": false,
+          "online": true
+        },
+        {
+          "at": 1789568612281,
+          "id": null,
+          "visible": false,
+          "online": true
+        },
+        {
+          "at": 1789568612375,
+          "id": null,
+          "visible": false,
+          "online": true
+        },
+        {
+          "at": 1789568612483,
+          "id": null,
+          "visible": false,
+          "online": true
+        },
+        {
+          "at": 1789568612578,
+          "id": null,
+          "visible": false,
+          "online": true
+        },
+        {
+          "at": 1789568612671,
+          "id": null,
+          "visible": false,
+          "online": true
+        },
+        {
+          "at": 1789568612782,
+          "id": null,
+          "visible": false,
+          "online": true
+        },
+        {
+          "at": 1789568612877,
+          "id": null,
+          "visible": false,
+          "online": true
+        },
+        {
+          "at": 1789568612968,
+          "id": null,
+          "visible": false,
+          "online": true
+        },
+        {
+          "at": 1789568613079,
+          "id": null,
+          "visible": false,
+          "online": true
+        },
+        {
+          "at": 1789568613172,
+          "id": null,
+          "visible": false,
+          "online": true
+        },
+        {
+          "at": 1789568613284,
+          "id": null,
+          "visible": false,
+          "online": true
+        },
+        {
+          "at": 1789568613376,
+          "id": null,
+          "visible": false,
+          "online": true
+        },
+        {
+          "at": 1789568613470,
+          "id": null,
+          "visible": false,
+          "online": true
+        },
+        {
+          "at": 1789568613579,
+          "id": null,
+          "visible": false,
+          "online": true
+        },
+        {
+          "at": 1789568613674,
+          "id": null,
+          "visible": false,
+          "online": true
+        },
+        {
+          "at": 1789568613782,
+          "id": null,
+          "visible": false,
+          "online": true
+        },
+        {
+          "at": 1789568613875,
+          "id": null,
+          "visible": false,
+          "online": true
+        },
+        {
+          "at": 1789568613984,
+          "id": null,
+          "visible": false,
+          "online": true
+        },
+        {
+          "at": 1789568614077,
+          "id": null,
+          "visible": false,
+          "online": true
+        },
+        {
+          "at": 1789568614170,
+          "id": null,
+          "visible": false,
+          "online": true
+        },
+        {
+          "at": 1789568614280,
+          "id": null,
+          "visible": false,
+          "online": true
+        },
+        {
+          "at": 1789568614374,
+          "id": null,
+          "visible": false,
+          "online": true
+        },
+        {
+          "at": 1789568614482,
+          "id": null,
+          "visible": false,
+          "online": true
+        },
+        {
+          "at": 1789568614577,
+          "id": null,
+          "visible": false,
+          "online": true
+        },
+        {
+          "at": 1789568614670,
+          "id": null,
+          "visible": false,
+          "online": true
+        },
+        {
+          "at": 1789568614780,
+          "id": null,
+          "visible": false,
+          "online": true
+        },
+        {
+          "at": 1789568614874,
+          "id": null,
+          "visible": false,
+          "online": true
+        },
+        {
+          "at": 1789568614982,
+          "id": null,
+          "visible": false,
+          "online": true
+        },
+        {
+          "at": 1789568615074,
+          "id": null,
+          "visible": false,
+          "online": true
+        },
+        {
+          "at": 1789568615170,
+          "id": null,
+          "visible": false,
+          "online": true
+        },
+        {
+          "at": 1789568615281,
+          "id": null,
+          "visible": false,
+          "online": true
+        },
+        {
+          "at": 1789568615375,
+          "id": null,
+          "visible": false,
+          "online": true
+        },
+        {
+          "at": 1789568615484,
+          "id": null,
+          "visible": false,
+          "online": true
+        },
+        {
+          "at": 1789568615579,
+          "id": null,
+          "visible": false,
+          "online": true
+        },
+        {
+          "at": 1789568615673,
+          "id": null,
+          "visible": false,
+          "online": true
+        },
+        {
+          "at": 1789568615784,
+          "id": null,
+          "visible": false,
+          "online": true
+        },
+        {
+          "at": 1789568615880,
+          "id": null,
+          "visible": false,
+          "online": true
+        },
+        {
+          "at": 1789568615976,
+          "id": null,
+          "visible": false,
+          "online": true
+        },
+        {
+          "at": 1789568616070,
+          "id": null,
+          "visible": false,
+          "online": true
+        },
+        {
+          "at": 1789568616179,
+          "id": null,
+          "visible": false,
+          "online": true
+        },
+        {
+          "at": 1789568616272,
+          "id": null,
+          "visible": false,
+          "online": true
+        },
+        {
+          "at": 1789568616382,
+          "id": null,
+          "visible": false,
+          "online": true
+        },
+        {
+          "at": 1789568616477,
+          "id": null,
+          "visible": false,
+          "online": true
+        },
+        {
+          "at": 1789568616570,
+          "id": null,
+          "visible": false,
+          "online": true
+        },
+        {
+          "at": 1789568616679,
+          "id": null,
+          "visible": false,
+          "online": true
+        },
+        {
+          "at": 1789568616773,
+          "id": null,
+          "visible": false,
+          "online": true
+        },
+        {
+          "at": 1789568616883,
+          "id": null,
+          "visible": false,
+          "online": true
+        },
+        {
+          "at": 1789568616978,
+          "id": null,
+          "visible": false,
+          "online": true
+        },
+        {
+          "at": 1789568617074,
+          "id": null,
+          "visible": false,
+          "online": true
+        },
+        {
+          "at": 1789568617183,
+          "id": null,
+          "visible": false,
+          "online": true
+        },
+        {
+          "at": 1789568617278,
+          "id": null,
+          "visible": false,
+          "online": true
+        },
+        {
+          "at": 1789568617374,
+          "id": null,
+          "visible": false,
+          "online": true
+        },
+        {
+          "at": 1789568617482,
+          "id": null,
+          "visible": false,
+          "online": true
+        },
+        {
+          "at": 1789568617576,
+          "id": null,
+          "visible": false,
+          "online": true
+        },
+        {
+          "at": 1789568617669,
+          "id": null,
+          "visible": false,
+          "online": true
+        },
+        {
+          "at": 1789568617780,
+          "id": null,
+          "visible": false,
+          "online": true
+        },
+        {
+          "at": 1789568617875,
+          "id": null,
+          "visible": false,
+          "online": true
+        },
+        {
+          "at": 1789568617971,
+          "id": null,
+          "visible": false,
+          "online": true
+        },
+        {
+          "at": 1789568618083,
+          "id": null,
+          "visible": false,
+          "online": true
+        },
+        {
+          "at": 1789568618179,
+          "id": null,
+          "visible": false,
+          "online": true
+        },
+        {
+          "at": 1789568618274,
+          "id": null,
+          "visible": false,
+          "online": true
+        },
+        {
+          "at": 1789568618384,
+          "id": null,
+          "visible": false,
+          "online": true
+        },
+        {
+          "at": 1789568618479,
+          "id": null,
+          "visible": false,
+          "online": true
+        },
+        {
+          "at": 1789568618573,
+          "id": null,
+          "visible": false,
+          "online": true
+        },
+        {
+          "at": 1789568618683,
+          "id": null,
+          "visible": false,
+          "online": true
+        },
+        {
+          "at": 1789568618778,
+          "id": null,
+          "visible": false,
+          "online": true
+        },
+        {
+          "at": 1789568618872,
+          "id": null,
+          "visible": false,
+          "online": true
+        },
+        {
+          "at": 1789568618981,
+          "id": null,
+          "visible": false,
+          "online": true
+        },
+        {
+          "at": 1789568619077,
+          "id": null,
+          "visible": false,
+          "online": true
+        },
+        {
+          "at": 1789568619171,
+          "id": null,
+          "visible": false,
+          "online": true
+        },
+        {
+          "at": 1789568619280,
+          "id": null,
+          "visible": false,
+          "online": true
+        },
+        {
+          "at": 1789568619373,
+          "id": null,
+          "visible": false,
+          "online": true
+        },
+        {
+          "at": 1789568619480,
+          "id": null,
+          "visible": false,
+          "online": true
+        },
+        {
+          "at": 1789568619572,
+          "id": null,
+          "visible": false,
+          "online": true
+        },
+        {
+          "at": 1789568619681,
+          "id": null,
+          "visible": false,
+          "online": true
+        },
+        {
+          "at": 1789568619775,
+          "id": null,
+          "visible": false,
+          "online": true
+        },
+        {
+          "at": 1789568619883,
+          "id": null,
+          "visible": false,
+          "online": true
+        },
+        {
+          "at": 1789568619976,
+          "id": null,
+          "visible": false,
+          "online": true
+        },
+        {
+          "at": 1789568620071,
+          "id": null,
+          "visible": false,
+          "online": true
+        },
+        {
+          "at": 1789568620181,
+          "id": null,
+          "visible": false,
+          "online": true
+        },
+        {
+          "at": 1789568620274,
+          "id": null,
+          "visible": false,
+          "online": true
+        },
+        {
+          "at": 1789568620383,
+          "id": null,
+          "visible": false,
+          "online": true
+        },
+        {
+          "at": 1789568620478,
+          "id": null,
+          "visible": false,
+          "online": true
+        },
+        {
+          "at": 1789568620572,
+          "id": null,
+          "visible": false,
+          "online": true
+        },
+        {
+          "at": 1789568620682,
+          "id": null,
+          "visible": false,
+          "online": true
+        },
+        {
+          "at": 1789568620777,
+          "id": null,
+          "visible": false,
+          "online": true
+        },
+        {
+          "at": 1789568620870,
+          "id": null,
+          "visible": false,
+          "online": true
+        },
+        {
+          "at": 1789568620979,
+          "id": null,
+          "visible": false,
+          "online": true
+        },
+        {
+          "at": 1789568621073,
+          "id": null,
+          "visible": false,
+          "online": true
+        },
+        {
+          "at": 1789568621183,
+          "id": null,
+          "visible": false,
+          "online": true
+        },
+        {
+          "at": 1789568621276,
+          "id": null,
+          "visible": false,
+          "online": true
+        },
+        {
+          "at": 1789568621372,
+          "id": null,
+          "visible": false,
+          "online": true
+        },
+        {
+          "at": 1789568621482,
+          "id": null,
+          "visible": false,
+          "online": true
+        },
+        {
+          "at": 1789568621575,
+          "id": null,
+          "visible": false,
+          "online": true
+        },
+        {
+          "at": 1789568621670,
+          "id": null,
+          "visible": false,
+          "online": true
+        },
+        {
+          "at": 1789568621781,
+          "id": null,
+          "visible": false,
+          "online": true
+        },
+        {
+          "at": 1789568621875,
+          "id": null,
+          "visible": false,
+          "online": true
+        },
+        {
+          "at": 1789568621970,
+          "id": null,
+          "visible": false,
+          "online": true
+        },
+        {
+          "at": 1789568622078,
+          "id": null,
+          "visible": false,
+          "online": true
+        },
+        {
+          "at": 1789568622174,
+          "id": null,
+          "visible": false,
+          "online": true
+        },
+        {
+          "at": 1789568622269,
+          "id": null,
+          "visible": false,
+          "online": true
+        },
+        {
+          "at": 1789568622379,
+          "id": null,
+          "visible": false,
+          "online": true
+        },
+        {
+          "at": 1789568622472,
+          "id": null,
+          "visible": false,
+          "online": true
+        },
+        {
+          "at": 1789568622582,
+          "id": null,
+          "visible": false,
+          "online": true
+        },
+        {
+          "at": 1789568622676,
+          "id": null,
+          "visible": false,
+          "online": true
+        },
+        {
+          "at": 1789568622771,
+          "id": null,
+          "visible": false,
+          "online": true
+        },
+        {
+          "at": 1789568622881,
+          "id": null,
+          "visible": false,
+          "online": true
+        },
+        {
+          "at": 1789568622976,
+          "id": null,
+          "visible": false,
+          "online": true
+        },
+        {
+          "at": 1789568623069,
+          "id": null,
+          "visible": false,
+          "online": true
+        },
+        {
+          "at": 1789568623179,
+          "id": null,
+          "visible": false,
+          "online": true
+        },
+        {
+          "at": 1789568623271,
+          "id": null,
+          "visible": false,
+          "online": true
+        },
+        {
+          "at": 1789568623381,
+          "id": null,
+          "visible": false,
+          "online": true
+        },
+        {
+          "at": 1789568623474,
+          "id": null,
+          "visible": false,
+          "online": true
+        },
+        {
+          "at": 1789568623583,
+          "id": null,
+          "visible": false,
+          "online": true
+        },
+        {
+          "at": 1789568623676,
+          "id": null,
+          "visible": false,
+          "online": true
+        },
+        {
+          "at": 1789568623771,
+          "id": null,
+          "visible": false,
+          "online": true
+        },
+        {
+          "at": 1789568623879,
+          "id": null,
+          "visible": false,
+          "online": true
+        },
+        {
+          "at": 1789568623972,
+          "id": null,
+          "visible": false,
+          "online": true
+        },
+        {
+          "at": 1789568624082,
+          "id": null,
+          "visible": false,
+          "online": true
+        },
+        {
+          "at": 1789568624177,
+          "id": null,
+          "visible": false,
+          "online": true
+        },
+        {
+          "at": 1789568624269,
+          "id": null,
+          "visible": false,
+          "online": true
+        },
+        {
+          "at": 1789568624378,
+          "id": null,
+          "visible": false,
+          "online": true
+        },
+        {
+          "at": 1789568624471,
+          "id": null,
+          "visible": false,
+          "online": true
+        },
+        {
+          "at": 1789568624578,
+          "id": null,
+          "visible": false,
+          "online": true
+        },
+        {
+          "at": 1789568624670,
+          "id": null,
+          "visible": false,
+          "online": true
+        },
+        {
+          "at": 1789568624779,
+          "id": null,
+          "visible": false,
+          "online": true
+        },
+        {
+          "at": 1789568624874,
+          "id": null,
+          "visible": false,
+          "online": true
+        },
+        {
+          "at": 1789568624982,
+          "id": null,
+          "visible": false,
+          "online": true
+        },
+        {
+          "at": 1789568625077,
+          "id": null,
+          "visible": false,
+          "online": true
+        },
+        {
+          "at": 1789568625170,
+          "id": null,
+          "visible": false,
+          "online": true
+        },
+        {
+          "at": 1789568625279,
+          "id": null,
+          "visible": false,
+          "online": true
+        },
+        {
+          "at": 1789568625373,
+          "id": null,
+          "visible": false,
+          "online": true
+        },
+        {
+          "at": 1789568625481,
+          "id": null,
+          "visible": false,
+          "online": true
+        },
+        {
+          "at": 1789568625574,
+          "id": null,
+          "visible": false,
+          "online": true
+        },
+        {
+          "at": 1789568625681,
+          "id": null,
+          "visible": false,
+          "online": true
+        },
+        {
+          "at": 1789568625774,
+          "id": null,
+          "visible": false,
+          "online": true
+        },
+        {
+          "at": 1789568625884,
+          "id": null,
+          "visible": false,
+          "online": true
+        },
+        {
+          "at": 1789568625976,
+          "id": null,
+          "visible": false,
+          "online": true
+        },
+        {
+          "at": 1789568626071,
+          "id": null,
+          "visible": false,
+          "online": true
+        },
+        {
+          "at": 1789568626180,
+          "id": null,
+          "visible": false,
+          "online": true
+        },
+        {
+          "at": 1789568626273,
+          "id": null,
+          "visible": false,
+          "online": true
+        },
+        {
+          "at": 1789568626383,
+          "id": null,
+          "visible": false,
+          "online": true
+        },
+        {
+          "at": 1789568626477,
+          "id": null,
+          "visible": false,
+          "online": true
+        },
+        {
+          "at": 1789568626570,
+          "id": null,
+          "visible": false,
+          "online": true
+        },
+        {
+          "at": 1789568626679,
+          "id": null,
+          "visible": false,
+          "online": true
+        },
+        {
+          "at": 1789568626773,
+          "id": null,
+          "visible": false,
+          "online": true
+        },
+        {
+          "at": 1789568626882,
+          "id": null,
+          "visible": false,
+          "online": true
+        },
+        {
+          "at": 1789568626973,
+          "id": null,
+          "visible": false,
+          "online": true
+        },
+        {
+          "at": 1789568627070,
+          "id": null,
+          "visible": false,
+          "online": true
+        },
+        {
+          "at": 1789568627180,
+          "id": null,
+          "visible": false,
+          "online": true
+        },
+        {
+          "at": 1789568627273,
+          "id": null,
+          "visible": false,
+          "online": true
+        },
+        {
+          "at": 1789568627381,
+          "id": null,
+          "visible": false,
+          "online": true
+        },
+        {
+          "at": 1789568627473,
+          "id": null,
+          "visible": false,
+          "online": true
+        },
+        {
+          "at": 1789568627583,
+          "id": null,
+          "visible": false,
+          "online": true
+        },
+        {
+          "at": 1789568627677,
+          "id": null,
+          "visible": false,
+          "online": true
+        },
+        {
+          "at": 1789568627771,
+          "id": null,
+          "visible": false,
+          "online": true
+        },
+        {
+          "at": 1789568627881,
+          "id": null,
+          "visible": false,
+          "online": true
+        },
+        {
+          "at": 1789568627976,
+          "id": null,
+          "visible": false,
+          "online": true
+        },
+        {
+          "at": 1789568628070,
+          "id": null,
+          "visible": false,
+          "online": true
+        },
+        {
+          "at": 1789568628181,
+          "id": null,
+          "visible": false,
+          "online": true
+        },
+        {
+          "at": 1789568628277,
+          "id": null,
+          "visible": false,
+          "online": true
+        },
+        {
+          "at": 1789568628372,
+          "id": null,
+          "visible": false,
+          "online": true
+        },
+        {
+          "at": 1789568628483,
+          "id": null,
+          "visible": false,
+          "online": true
+        },
+        {
+          "at": 1789568628577,
+          "id": null,
+          "visible": false,
+          "online": true
+        },
+        {
+          "at": 1789568628671,
+          "id": null,
+          "visible": false,
+          "online": true
+        },
+        {
+          "at": 1789568628778,
+          "id": null,
+          "visible": false,
+          "online": true
+        },
+        {
+          "at": 1789568628872,
+          "id": null,
+          "visible": false,
+          "online": true
+        },
+        {
+          "at": 1789568628982,
+          "id": null,
+          "visible": false,
+          "online": true
+        },
+        {
+          "at": 1789568629076,
+          "id": null,
+          "visible": false,
+          "online": true
+        },
+        {
+          "at": 1789568629170,
+          "id": null,
+          "visible": false,
+          "online": true
+        },
+        {
+          "at": 1789568629279,
+          "id": null,
+          "visible": false,
+          "online": true
+        },
+        {
+          "at": 1789568629372,
+          "id": null,
+          "visible": false,
+          "online": true
+        },
+        {
+          "at": 1789568629481,
+          "id": null,
+          "visible": false,
+          "online": true
+        },
+        {
+          "at": 1789568629574,
+          "id": null,
+          "visible": false,
+          "online": true
+        },
+        {
+          "at": 1789568629669,
+          "id": null,
+          "visible": false,
+          "online": true
+        },
+        {
+          "at": 1789568629777,
+          "id": null,
+          "visible": false,
+          "online": true
+        },
+        {
+          "at": 1789568629870,
+          "id": null,
+          "visible": false,
+          "online": true
+        },
+        {
+          "at": 1789568629981,
+          "id": null,
+          "visible": false,
+          "online": true
+        },
+        {
+          "at": 1789568630076,
+          "id": null,
+          "visible": false,
+          "online": true
+        },
+        {
+          "at": 1789568630171,
+          "id": null,
+          "visible": false,
+          "online": true
+        },
+        {
+          "at": 1789568630282,
+          "id": null,
+          "visible": false,
+          "online": true
+        },
+        {
+          "at": 1789568630378,
+          "id": null,
+          "visible": false,
+          "online": true
+        },
+        {
+          "at": 1789568630472,
+          "id": null,
+          "visible": false,
+          "online": true
+        },
+        {
+          "at": 1789568630583,
+          "id": null,
+          "visible": false,
+          "online": true
+        },
+        {
+          "at": 1789568630677,
+          "id": null,
+          "visible": false,
+          "online": true
+        },
+        {
+          "at": 1789568630774,
+          "id": null,
+          "visible": false,
+          "online": true
+        },
+        {
+          "at": 1789568630884,
+          "id": null,
+          "visible": false,
+          "online": true
+        },
+        {
+          "at": 1789568630978,
+          "id": null,
+          "visible": false,
+          "online": true
+        },
+        {
+          "at": 1789568631073,
+          "id": null,
+          "visible": false,
+          "online": true
+        },
+        {
+          "at": 1789568631183,
+          "id": null,
+          "visible": false,
+          "online": true
+        },
+        {
+          "at": 1789568631277,
+          "id": null,
+          "visible": false,
+          "online": true
+        },
+        {
+          "at": 1789568631371,
+          "id": null,
+          "visible": false,
+          "online": true
+        },
+        {
+          "at": 1789568631481,
+          "id": null,
+          "visible": false,
+          "online": true
+        },
+        {
+          "at": 1789568631575,
+          "id": null,
+          "visible": false,
+          "online": true
+        },
+        {
+          "at": 1789568631670,
+          "id": null,
+          "visible": false,
+          "online": true
+        },
+        {
+          "at": 1789568631781,
+          "id": null,
+          "visible": false,
+          "online": true
+        },
+        {
+          "at": 1789568631876,
+          "id": null,
+          "visible": false,
+          "online": true
+        },
+        {
+          "at": 1789568631971,
+          "id": null,
+          "visible": false,
+          "online": true
+        },
+        {
+          "at": 1789568632082,
+          "id": null,
+          "visible": false,
+          "online": true
+        },
+        {
+          "at": 1789568632176,
+          "id": null,
+          "visible": false,
+          "online": true
+        },
+        {
+          "at": 1789568632270,
+          "id": null,
+          "visible": false,
+          "online": true
+        },
+        {
+          "at": 1789568632380,
+          "id": null,
+          "visible": false,
+          "online": true
+        },
+        {
+          "at": 1789568632476,
+          "id": null,
+          "visible": false,
+          "online": true
+        },
+        {
+          "at": 1789568632571,
+          "id": null,
+          "visible": false,
+          "online": true
+        },
+        {
+          "at": 1789568632683,
+          "id": null,
+          "visible": false,
+          "online": true
+        },
+        {
+          "at": 1789568632778,
+          "id": null,
+          "visible": false,
+          "online": true
+        },
+        {
+          "at": 1789568632873,
+          "id": null,
+          "visible": false,
+          "online": true
+        },
+        {
+          "at": 1789568632968,
+          "id": null,
+          "visible": false,
+          "online": true
+        },
+        {
+          "at": 1789568633079,
+          "id": null,
+          "visible": false,
+          "online": true
+        },
+        {
+          "at": 1789568633174,
+          "id": null,
+          "visible": false,
+          "online": true
+        },
+        {
+          "at": 1789568633283,
+          "id": null,
+          "visible": false,
+          "online": true
+        },
+        {
+          "at": 1789568633379,
+          "id": null,
+          "visible": false,
+          "online": true
+        },
+        {
+          "at": 1789568633473,
+          "id": null,
+          "visible": false,
+          "online": true
+        },
+        {
+          "at": 1789568633581,
+          "id": null,
+          "visible": false,
+          "online": true
+        },
+        {
+          "at": 1789568633676,
+          "id": null,
+          "visible": false,
+          "online": true
+        }
+      ],
+      "events": [],
+      "runs": [
+        {
+          "start": 1789568601775,
+          "end": 1789568633676,
+          "visible": 0,
+          "pending": 0,
+          "samples": 320
+        }
+      ],
+      "fullImageIntervals": 0,
+      "visibleImageIntervals": 0,
+      "videoEnded": 0,
+      "blob": null
+    },
+    "offline": {
+      "samples": [
+        {
+          "at": 1789568643185,
+          "id": null,
+          "visible": false,
+          "online": false
+        },
+        {
+          "at": 1789568643280,
+          "id": null,
+          "visible": false,
+          "online": false
+        },
+        {
+          "at": 1789568643373,
+          "id": null,
+          "visible": false,
+          "online": false
+        },
+        {
+          "at": 1789568643484,
+          "id": null,
+          "visible": false,
+          "online": false
+        },
+        {
+          "at": 1789568643578,
+          "id": null,
+          "visible": false,
+          "online": false
+        },
+        {
+          "at": 1789568643673,
+          "id": null,
+          "visible": false,
+          "online": false
+        },
+        {
+          "at": 1789568643785,
+          "id": null,
+          "visible": false,
+          "online": false
+        },
+        {
+          "at": 1789568643881,
+          "id": null,
+          "visible": false,
+          "online": false
+        },
+        {
+          "at": 1789568643976,
+          "id": null,
+          "visible": false,
+          "online": false
+        },
+        {
+          "at": 1789568644072,
+          "id": null,
+          "visible": false,
+          "online": false
+        },
+        {
+          "at": 1789568644183,
+          "id": null,
+          "visible": false,
+          "online": false
+        },
+        {
+          "at": 1789568644276,
+          "id": null,
+          "visible": false,
+          "online": false
+        },
+        {
+          "at": 1789568644372,
+          "id": null,
+          "visible": false,
+          "online": false
+        },
+        {
+          "at": 1789568644482,
+          "id": null,
+          "visible": false,
+          "online": false
+        },
+        {
+          "at": 1789568644578,
+          "id": null,
+          "visible": false,
+          "online": false
+        },
+        {
+          "at": 1789568644674,
+          "id": null,
+          "visible": false,
+          "online": false
+        },
+        {
+          "at": 1789568644784,
+          "id": null,
+          "visible": false,
+          "online": false
+        },
+        {
+          "at": 1789568644879,
+          "id": null,
+          "visible": false,
+          "online": false
+        },
+        {
+          "at": 1789568644975,
+          "id": null,
+          "visible": false,
+          "online": false
+        },
+        {
+          "at": 1789568645071,
+          "id": null,
+          "visible": false,
+          "online": false
+        },
+        {
+          "at": 1789568645183,
+          "id": null,
+          "visible": false,
+          "online": false
+        },
+        {
+          "at": 1789568645278,
+          "id": null,
+          "visible": false,
+          "online": false
+        },
+        {
+          "at": 1789568645372,
+          "id": null,
+          "visible": false,
+          "online": false
+        },
+        {
+          "at": 1789568645482,
+          "id": null,
+          "visible": false,
+          "online": false
+        },
+        {
+          "at": 1789568645577,
+          "id": null,
+          "visible": false,
+          "online": false
+        },
+        {
+          "at": 1789568645673,
+          "id": null,
+          "visible": false,
+          "online": false
+        },
+        {
+          "at": 1789568645783,
+          "id": null,
+          "visible": false,
+          "online": false
+        },
+        {
+          "at": 1789568645878,
+          "id": null,
+          "visible": false,
+          "online": false
+        },
+        {
+          "at": 1789568645972,
+          "id": null,
+          "visible": false,
+          "online": false
+        },
+        {
+          "at": 1789568646082,
+          "id": null,
+          "visible": false,
+          "online": false
+        },
+        {
+          "at": 1789568646177,
+          "id": null,
+          "visible": false,
+          "online": false
+        },
+        {
+          "at": 1789568646272,
+          "id": null,
+          "visible": false,
+          "online": false
+        },
+        {
+          "at": 1789568646382,
+          "id": null,
+          "visible": false,
+          "online": false
+        },
+        {
+          "at": 1789568646478,
+          "id": null,
+          "visible": false,
+          "online": false
+        },
+        {
+          "at": 1789568646572,
+          "id": null,
+          "visible": false,
+          "online": false
+        },
+        {
+          "at": 1789568646684,
+          "id": null,
+          "visible": false,
+          "online": false
+        },
+        {
+          "at": 1789568646780,
+          "id": null,
+          "visible": false,
+          "online": false
+        },
+        {
+          "at": 1789568646876,
+          "id": null,
+          "visible": false,
+          "online": false
+        },
+        {
+          "at": 1789568646972,
+          "id": null,
+          "visible": false,
+          "online": false
+        },
+        {
+          "at": 1789568647082,
+          "id": null,
+          "visible": false,
+          "online": false
+        },
+        {
+          "at": 1789568647177,
+          "id": null,
+          "visible": false,
+          "online": false
+        },
+        {
+          "at": 1789568647273,
+          "id": null,
+          "visible": false,
+          "online": false
+        },
+        {
+          "at": 1789568647382,
+          "id": null,
+          "visible": false,
+          "online": false
+        },
+        {
+          "at": 1789568647478,
+          "id": null,
+          "visible": false,
+          "online": false
+        },
+        {
+          "at": 1789568647572,
+          "id": null,
+          "visible": false,
+          "online": false
+        },
+        {
+          "at": 1789568647684,
+          "id": null,
+          "visible": false,
+          "online": false
+        },
+        {
+          "at": 1789568647780,
+          "id": null,
+          "visible": false,
+          "online": false
+        },
+        {
+          "at": 1789568647875,
+          "id": null,
+          "visible": false,
+          "online": false
+        },
+        {
+          "at": 1789568647971,
+          "id": null,
+          "visible": false,
+          "online": false
+        },
+        {
+          "at": 1789568648082,
+          "id": null,
+          "visible": false,
+          "online": false
+        },
+        {
+          "at": 1789568648177,
+          "id": null,
+          "visible": false,
+          "online": false
+        },
+        {
+          "at": 1789568648273,
+          "id": null,
+          "visible": false,
+          "online": false
+        },
+        {
+          "at": 1789568648383,
+          "id": null,
+          "visible": false,
+          "online": false
+        },
+        {
+          "at": 1789568648479,
+          "id": null,
+          "visible": false,
+          "online": false
+        },
+        {
+          "at": 1789568648575,
+          "id": null,
+          "visible": false,
+          "online": false
+        },
+        {
+          "at": 1789568648670,
+          "id": null,
+          "visible": false,
+          "online": false
+        },
+        {
+          "at": 1789568648780,
+          "id": null,
+          "visible": false,
+          "online": false
+        },
+        {
+          "at": 1789568648876,
+          "id": null,
+          "visible": false,
+          "online": false
+        },
+        {
+          "at": 1789568648970,
+          "id": null,
+          "visible": false,
+          "online": false
+        },
+        {
+          "at": 1789568649079,
+          "id": null,
+          "visible": false,
+          "online": false
+        },
+        {
+          "at": 1789568649175,
+          "id": null,
+          "visible": false,
+          "online": false
+        },
+        {
+          "at": 1789568649270,
+          "id": null,
+          "visible": false,
+          "online": false
+        },
+        {
+          "at": 1789568649382,
+          "id": null,
+          "visible": false,
+          "online": false
+        },
+        {
+          "at": 1789568649476,
+          "id": null,
+          "visible": false,
+          "online": false
+        },
+        {
+          "at": 1789568649585,
+          "id": null,
+          "visible": false,
+          "online": false
+        },
+        {
+          "at": 1789568649679,
+          "id": null,
+          "visible": false,
+          "online": false
+        },
+        {
+          "at": 1789568649774,
+          "id": null,
+          "visible": false,
+          "online": false
+        },
+        {
+          "at": 1789568649884,
+          "id": null,
+          "visible": false,
+          "online": false
+        },
+        {
+          "at": 1789568649978,
+          "id": null,
+          "visible": false,
+          "online": false
+        },
+        {
+          "at": 1789568650085,
+          "id": null,
+          "visible": false,
+          "online": false
+        },
+        {
+          "at": 1789568650178,
+          "id": null,
+          "visible": false,
+          "online": false
+        },
+        {
+          "at": 1789568650271,
+          "id": null,
+          "visible": false,
+          "online": false
+        },
+        {
+          "at": 1789568650379,
+          "id": null,
+          "visible": false,
+          "online": false
+        },
+        {
+          "at": 1789568650471,
+          "id": null,
+          "visible": false,
+          "online": false
+        },
+        {
+          "at": 1789568650582,
+          "id": null,
+          "visible": false,
+          "online": false
+        },
+        {
+          "at": 1789568650676,
+          "id": null,
+          "visible": false,
+          "online": false
+        },
+        {
+          "at": 1789568650783,
+          "id": null,
+          "visible": false,
+          "online": false
+        },
+        {
+          "at": 1789568650876,
+          "id": null,
+          "visible": false,
+          "online": false
+        },
+        {
+          "at": 1789568650985,
+          "id": null,
+          "visible": false,
+          "online": false
+        },
+        {
+          "at": 1789568651078,
+          "id": null,
+          "visible": false,
+          "online": false
+        },
+        {
+          "at": 1789568651173,
+          "id": null,
+          "visible": false,
+          "online": false
+        },
+        {
+          "at": 1789568651277,
+          "id": null,
+          "visible": false,
+          "online": false
+        },
+        {
+          "at": 1789568651377,
+          "id": null,
+          "visible": false,
+          "online": false
+        },
+        {
+          "at": 1789568651471,
+          "id": null,
+          "visible": false,
+          "online": false
+        },
+        {
+          "at": 1789568651581,
+          "id": null,
+          "visible": false,
+          "online": false
+        },
+        {
+          "at": 1789568651675,
+          "id": null,
+          "visible": false,
+          "online": false
+        },
+        {
+          "at": 1789568651784,
+          "id": null,
+          "visible": false,
+          "online": false
+        },
+        {
+          "at": 1789568651876,
+          "id": null,
+          "visible": false,
+          "online": false
+        },
+        {
+          "at": 1789568651986,
+          "id": null,
+          "visible": false,
+          "online": false
+        },
+        {
+          "at": 1789568652081,
+          "id": null,
+          "visible": false,
+          "online": false
+        },
+        {
+          "at": 1789568652175,
+          "id": null,
+          "visible": false,
+          "online": false
+        },
+        {
+          "at": 1789568652284,
+          "id": null,
+          "visible": false,
+          "online": false
+        },
+        {
+          "at": 1789568652379,
+          "id": null,
+          "visible": false,
+          "online": false
+        },
+        {
+          "at": 1789568652473,
+          "id": null,
+          "visible": false,
+          "online": false
+        },
+        {
+          "at": 1789568652584,
+          "id": null,
+          "visible": false,
+          "online": false
+        },
+        {
+          "at": 1789568652678,
+          "id": null,
+          "visible": false,
+          "online": false
+        },
+        {
+          "at": 1789568652773,
+          "id": null,
+          "visible": false,
+          "online": false
+        },
+        {
+          "at": 1789568652877,
+          "id": null,
+          "visible": false,
+          "online": false
+        },
+        {
+          "at": 1789568652976,
+          "id": null,
+          "visible": false,
+          "online": false
+        },
+        {
+          "at": 1789568653085,
+          "id": null,
+          "visible": false,
+          "online": false
+        },
+        {
+          "at": 1789568653179,
+          "id": null,
+          "visible": false,
+          "online": false
+        },
+        {
+          "at": 1789568653272,
+          "id": null,
+          "visible": false,
+          "online": false
+        },
+        {
+          "at": 1789568653381,
+          "id": null,
+          "visible": false,
+          "online": false
+        },
+        {
+          "at": 1789568653474,
+          "id": null,
+          "visible": false,
+          "online": false
+        },
+        {
+          "at": 1789568653584,
+          "id": null,
+          "visible": false,
+          "online": false
+        },
+        {
+          "at": 1789568653676,
+          "id": null,
+          "visible": false,
+          "online": false
+        },
+        {
+          "at": 1789568653770,
+          "id": null,
+          "visible": false,
+          "online": false
+        },
+        {
+          "at": 1789568653879,
+          "id": null,
+          "visible": false,
+          "online": false
+        },
+        {
+          "at": 1789568653973,
+          "id": null,
+          "visible": false,
+          "online": false
+        },
+        {
+          "at": 1789568654083,
+          "id": null,
+          "visible": false,
+          "online": false
+        },
+        {
+          "at": 1789568654177,
+          "id": null,
+          "visible": false,
+          "online": false
+        },
+        {
+          "at": 1789568654273,
+          "id": null,
+          "visible": false,
+          "online": false
+        },
+        {
+          "at": 1789568654381,
+          "id": null,
+          "visible": false,
+          "online": false
+        },
+        {
+          "at": 1789568654474,
+          "id": null,
+          "visible": false,
+          "online": false
+        },
+        {
+          "at": 1789568654581,
+          "id": null,
+          "visible": false,
+          "online": false
+        },
+        {
+          "at": 1789568654675,
+          "id": null,
+          "visible": false,
+          "online": false
+        },
+        {
+          "at": 1789568654783,
+          "id": null,
+          "visible": false,
+          "online": false
+        },
+        {
+          "at": 1789568654878,
+          "id": null,
+          "visible": false,
+          "online": false
+        },
+        {
+          "at": 1789568654971,
+          "id": null,
+          "visible": false,
+          "online": false
+        },
+        {
+          "at": 1789568655080,
+          "id": null,
+          "visible": false,
+          "online": false
+        },
+        {
+          "at": 1789568655173,
+          "id": null,
+          "visible": false,
+          "online": false
+        },
+        {
+          "at": 1789568655282,
+          "id": null,
+          "visible": false,
+          "online": false
+        },
+        {
+          "at": 1789568655375,
+          "id": null,
+          "visible": false,
+          "online": false
+        },
+        {
+          "at": 1789568655485,
+          "id": null,
+          "visible": false,
+          "online": false
+        },
+        {
+          "at": 1789568655580,
+          "id": null,
+          "visible": false,
+          "online": false
+        },
+        {
+          "at": 1789568655673,
+          "id": null,
+          "visible": false,
+          "online": false
+        },
+        {
+          "at": 1789568655783,
+          "id": null,
+          "visible": false,
+          "online": false
+        },
+        {
+          "at": 1789568655876,
+          "id": null,
+          "visible": false,
+          "online": false
+        },
+        {
+          "at": 1789568655985,
+          "id": null,
+          "visible": false,
+          "online": false
+        },
+        {
+          "at": 1789568656079,
+          "id": null,
+          "visible": false,
+          "online": false
+        },
+        {
+          "at": 1789568656172,
+          "id": null,
+          "visible": false,
+          "online": false
+        },
+        {
+          "at": 1789568656282,
+          "id": null,
+          "visible": false,
+          "online": false
+        },
+        {
+          "at": 1789568656375,
+          "id": null,
+          "visible": false,
+          "online": false
+        },
+        {
+          "at": 1789568656470,
+          "id": null,
+          "visible": false,
+          "online": false
+        },
+        {
+          "at": 1789568656576,
+          "id": null,
+          "visible": false,
+          "online": false
+        },
+        {
+          "at": 1789568656676,
+          "id": null,
+          "visible": false,
+          "online": false
+        },
+        {
+          "at": 1789568656772,
+          "id": null,
+          "visible": false,
+          "online": false
+        },
+        {
+          "at": 1789568656882,
+          "id": null,
+          "visible": false,
+          "online": false
+        },
+        {
+          "at": 1789568656976,
+          "id": null,
+          "visible": false,
+          "online": false
+        },
+        {
+          "at": 1789568657072,
+          "id": null,
+          "visible": false,
+          "online": false
+        },
+        {
+          "at": 1789568657180,
+          "id": null,
+          "visible": false,
+          "online": false
+        },
+        {
+          "at": 1789568657275,
+          "id": null,
+          "visible": false,
+          "online": false
+        },
+        {
+          "at": 1789568657382,
+          "id": null,
+          "visible": false,
+          "online": false
+        },
+        {
+          "at": 1789568657476,
+          "id": null,
+          "visible": false,
+          "online": false
+        },
+        {
+          "at": 1789568657584,
+          "id": null,
+          "visible": false,
+          "online": false
+        },
+        {
+          "at": 1789568657679,
+          "id": null,
+          "visible": false,
+          "online": false
+        },
+        {
+          "at": 1789568657773,
+          "id": null,
+          "visible": false,
+          "online": false
+        },
+        {
+          "at": 1789568657881,
+          "id": null,
+          "visible": false,
+          "online": false
+        },
+        {
+          "at": 1789568657975,
+          "id": null,
+          "visible": false,
+          "online": false
+        },
+        {
+          "at": 1789568658085,
+          "id": null,
+          "visible": false,
+          "online": false
+        },
+        {
+          "at": 1789568658176,
+          "id": null,
+          "visible": false,
+          "online": false
+        },
+        {
+          "at": 1789568658272,
+          "id": null,
+          "visible": false,
+          "online": false
+        },
+        {
+          "at": 1789568658392,
+          "id": null,
+          "visible": false,
+          "online": false
+        },
+        {
+          "at": 1789568658477,
+          "id": null,
+          "visible": false,
+          "online": false
+        },
+        {
+          "at": 1789568658571,
+          "id": null,
+          "visible": false,
+          "online": false
+        },
+        {
+          "at": 1789568658679,
+          "id": null,
+          "visible": false,
+          "online": false
+        },
+        {
+          "at": 1789568658773,
+          "id": null,
+          "visible": false,
+          "online": false
+        },
+        {
+          "at": 1789568658882,
+          "id": null,
+          "visible": false,
+          "online": false
+        },
+        {
+          "at": 1789568658975,
+          "id": null,
+          "visible": false,
+          "online": false
+        },
+        {
+          "at": 1789568659083,
+          "id": null,
+          "visible": false,
+          "online": false
+        },
+        {
+          "at": 1789568659175,
+          "id": null,
+          "visible": false,
+          "online": false
+        },
+        {
+          "at": 1789568659270,
+          "id": null,
+          "visible": false,
+          "online": false
+        },
+        {
+          "at": 1789568659379,
+          "id": null,
+          "visible": false,
+          "online": false
+        },
+        {
+          "at": 1789568659473,
+          "id": null,
+          "visible": false,
+          "online": false
+        },
+        {
+          "at": 1789568659582,
+          "id": null,
+          "visible": false,
+          "online": false
+        },
+        {
+          "at": 1789568659674,
+          "id": null,
+          "visible": false,
+          "online": false
+        },
+        {
+          "at": 1789568659784,
+          "id": null,
+          "visible": false,
+          "online": false
+        },
+        {
+          "at": 1789568659877,
+          "id": null,
+          "visible": false,
+          "online": false
+        },
+        {
+          "at": 1789568659971,
+          "id": null,
+          "visible": false,
+          "online": false
+        },
+        {
+          "at": 1789568660079,
+          "id": null,
+          "visible": false,
+          "online": false
+        },
+        {
+          "at": 1789568660172,
+          "id": null,
+          "visible": false,
+          "online": false
+        },
+        {
+          "at": 1789568660280,
+          "id": null,
+          "visible": false,
+          "online": false
+        },
+        {
+          "at": 1789568660374,
+          "id": null,
+          "visible": false,
+          "online": false
+        },
+        {
+          "at": 1789568660482,
+          "id": null,
+          "visible": false,
+          "online": false
+        },
+        {
+          "at": 1789568660577,
+          "id": null,
+          "visible": false,
+          "online": false
+        },
+        {
+          "at": 1789568660672,
+          "id": null,
+          "visible": false,
+          "online": false
+        },
+        {
+          "at": 1789568660781,
+          "id": null,
+          "visible": false,
+          "online": false
+        },
+        {
+          "at": 1789568660875,
+          "id": null,
+          "visible": false,
+          "online": false
+        },
+        {
+          "at": 1789568660985,
+          "id": null,
+          "visible": false,
+          "online": false
+        },
+        {
+          "at": 1789568661079,
+          "id": null,
+          "visible": false,
+          "online": false
+        },
+        {
+          "at": 1789568661173,
+          "id": null,
+          "visible": false,
+          "online": false
+        },
+        {
+          "at": 1789568661282,
+          "id": null,
+          "visible": false,
+          "online": false
+        },
+        {
+          "at": 1789568661373,
+          "id": null,
+          "visible": false,
+          "online": false
+        },
+        {
+          "at": 1789568661484,
+          "id": null,
+          "visible": false,
+          "online": false
+        },
+        {
+          "at": 1789568661577,
+          "id": null,
+          "visible": false,
+          "online": false
+        },
+        {
+          "at": 1789568661670,
+          "id": null,
+          "visible": false,
+          "online": false
+        },
+        {
+          "at": 1789568661778,
+          "id": null,
+          "visible": false,
+          "online": false
+        },
+        {
+          "at": 1789568661871,
+          "id": null,
+          "visible": false,
+          "online": false
+        },
+        {
+          "at": 1789568661979,
+          "id": null,
+          "visible": false,
+          "online": false
+        },
+        {
+          "at": 1789568662071,
+          "id": null,
+          "visible": false,
+          "online": false
+        },
+        {
+          "at": 1789568662182,
+          "id": null,
+          "visible": false,
+          "online": false
+        },
+        {
+          "at": 1789568662276,
+          "id": null,
+          "visible": false,
+          "online": false
+        },
+        {
+          "at": 1789568662383,
+          "id": null,
+          "visible": false,
+          "online": false
+        },
+        {
+          "at": 1789568662476,
+          "id": null,
+          "visible": false,
+          "online": false
+        },
+        {
+          "at": 1789568662585,
+          "id": null,
+          "visible": false,
+          "online": false
+        },
+        {
+          "at": 1789568662677,
+          "id": null,
+          "visible": false,
+          "online": false
+        },
+        {
+          "at": 1789568662785,
+          "id": null,
+          "visible": false,
+          "online": false
+        },
+        {
+          "at": 1789568662877,
+          "id": null,
+          "visible": false,
+          "online": false
+        },
+        {
+          "at": 1789568662971,
+          "id": null,
+          "visible": false,
+          "online": false
+        },
+        {
+          "at": 1789568663080,
+          "id": null,
+          "visible": false,
+          "online": false
+        },
+        {
+          "at": 1789568663173,
+          "id": null,
+          "visible": false,
+          "online": false
+        },
+        {
+          "at": 1789568663283,
+          "id": null,
+          "visible": false,
+          "online": false
+        },
+        {
+          "at": 1789568663377,
+          "id": null,
+          "visible": false,
+          "online": false
+        },
+        {
+          "at": 1789568663470,
+          "id": null,
+          "visible": false,
+          "online": false
+        },
+        {
+          "at": 1789568663579,
+          "id": null,
+          "visible": false,
+          "online": false
+        },
+        {
+          "at": 1789568663673,
+          "id": null,
+          "visible": false,
+          "online": false
+        },
+        {
+          "at": 1789568663781,
+          "id": null,
+          "visible": false,
+          "online": false
+        },
+        {
+          "at": 1789568663875,
+          "id": null,
+          "visible": false,
+          "online": false
+        },
+        {
+          "at": 1789568663985,
+          "id": null,
+          "visible": false,
+          "online": false
+        },
+        {
+          "at": 1789568664078,
+          "id": null,
+          "visible": false,
+          "online": false
+        },
+        {
+          "at": 1789568664171,
+          "id": null,
+          "visible": false,
+          "online": false
+        },
+        {
+          "at": 1789568664280,
+          "id": null,
+          "visible": false,
+          "online": false
+        },
+        {
+          "at": 1789568664375,
+          "id": null,
+          "visible": false,
+          "online": false
+        },
+        {
+          "at": 1789568664484,
+          "id": null,
+          "visible": false,
+          "online": false
+        },
+        {
+          "at": 1789568664576,
+          "id": null,
+          "visible": false,
+          "online": false
+        },
+        {
+          "at": 1789568664670,
+          "id": null,
+          "visible": false,
+          "online": false
+        },
+        {
+          "at": 1789568664780,
+          "id": null,
+          "visible": false,
+          "online": false
+        },
+        {
+          "at": 1789568664872,
+          "id": null,
+          "visible": false,
+          "online": false
+        },
+        {
+          "at": 1789568664982,
+          "id": null,
+          "visible": false,
+          "online": false
+        },
+        {
+          "at": 1789568665075,
+          "id": null,
+          "visible": false,
+          "online": false
+        },
+        {
+          "at": 1789568665170,
+          "id": null,
+          "visible": false,
+          "online": false
+        },
+        {
+          "at": 1789568665278,
+          "id": null,
+          "visible": false,
+          "online": false
+        },
+        {
+          "at": 1789568665372,
+          "id": null,
+          "visible": false,
+          "online": false
+        },
+        {
+          "at": 1789568665482,
+          "id": null,
+          "visible": false,
+          "online": false
+        },
+        {
+          "at": 1789568665576,
+          "id": null,
+          "visible": false,
+          "online": false
+        },
+        {
+          "at": 1789568665684,
+          "id": null,
+          "visible": false,
+          "online": false
+        },
+        {
+          "at": 1789568665776,
+          "id": null,
+          "visible": false,
+          "online": false
+        },
+        {
+          "at": 1789568665871,
+          "id": null,
+          "visible": false,
+          "online": false
+        },
+        {
+          "at": 1789568665982,
+          "id": null,
+          "visible": false,
+          "online": false
+        },
+        {
+          "at": 1789568666075,
+          "id": null,
+          "visible": false,
+          "online": false
+        },
+        {
+          "at": 1789568666184,
+          "id": null,
+          "visible": false,
+          "online": false
+        },
+        {
+          "at": 1789568666277,
+          "id": null,
+          "visible": false,
+          "online": false
+        },
+        {
+          "at": 1789568666384,
+          "id": null,
+          "visible": false,
+          "online": false
+        },
+        {
+          "at": 1789568666478,
+          "id": null,
+          "visible": false,
+          "online": false
+        },
+        {
+          "at": 1789568666571,
+          "id": null,
+          "visible": false,
+          "online": false
+        },
+        {
+          "at": 1789568666683,
+          "id": null,
+          "visible": false,
+          "online": false
+        },
+        {
+          "at": 1789568666777,
+          "id": null,
+          "visible": false,
+          "online": false
+        },
+        {
+          "at": 1789568666885,
+          "id": null,
+          "visible": false,
+          "online": false
+        },
+        {
+          "at": 1789568666979,
+          "id": null,
+          "visible": false,
+          "online": false
+        },
+        {
+          "at": 1789568667074,
+          "id": null,
+          "visible": false,
+          "online": false
+        },
+        {
+          "at": 1789568667175,
+          "id": null,
+          "visible": false,
+          "online": false
+        },
+        {
+          "at": 1789568667274,
+          "id": null,
+          "visible": false,
+          "online": false
+        },
+        {
+          "at": 1789568667381,
+          "id": null,
+          "visible": false,
+          "online": false
+        },
+        {
+          "at": 1789568667475,
+          "id": null,
+          "visible": false,
+          "online": false
+        },
+        {
+          "at": 1789568667583,
+          "id": null,
+          "visible": false,
+          "online": false
+        },
+        {
+          "at": 1789568667676,
+          "id": null,
+          "visible": false,
+          "online": false
+        },
+        {
+          "at": 1789568667770,
+          "id": null,
+          "visible": false,
+          "online": false
+        },
+        {
+          "at": 1789568667879,
+          "id": null,
+          "visible": false,
+          "online": false
+        },
+        {
+          "at": 1789568667972,
+          "id": null,
+          "visible": false,
+          "online": false
+        },
+        {
+          "at": 1789568668079,
+          "id": null,
+          "visible": false,
+          "online": false
+        },
+        {
+          "at": 1789568668172,
+          "id": null,
+          "visible": false,
+          "online": false
+        },
+        {
+          "at": 1789568668282,
+          "id": null,
+          "visible": false,
+          "online": false
+        },
+        {
+          "at": 1789568668375,
+          "id": null,
+          "visible": false,
+          "online": false
+        },
+        {
+          "at": 1789568668484,
+          "id": null,
+          "visible": false,
+          "online": false
+        },
+        {
+          "at": 1789568668577,
+          "id": null,
+          "visible": false,
+          "online": false
+        },
+        {
+          "at": 1789568668670,
+          "id": null,
+          "visible": false,
+          "online": false
+        },
+        {
+          "at": 1789568668775,
+          "id": null,
+          "visible": false,
+          "online": false
+        },
+        {
+          "at": 1789568668874,
+          "id": null,
+          "visible": false,
+          "online": false
+        },
+        {
+          "at": 1789568668982,
+          "id": null,
+          "visible": false,
+          "online": false
+        },
+        {
+          "at": 1789568669076,
+          "id": null,
+          "visible": false,
+          "online": false
+        },
+        {
+          "at": 1789568669185,
+          "id": null,
+          "visible": false,
+          "online": false
+        },
+        {
+          "at": 1789568669278,
+          "id": null,
+          "visible": false,
+          "online": false
+        },
+        {
+          "at": 1789568669371,
+          "id": null,
+          "visible": false,
+          "online": false
+        },
+        {
+          "at": 1789568669479,
+          "id": null,
+          "visible": false,
+          "online": false
+        },
+        {
+          "at": 1789568669571,
+          "id": null,
+          "visible": false,
+          "online": false
+        },
+        {
+          "at": 1789568669678,
+          "id": null,
+          "visible": false,
+          "online": false
+        },
+        {
+          "at": 1789568669771,
+          "id": null,
+          "visible": false,
+          "online": false
+        },
+        {
+          "at": 1789568669879,
+          "id": null,
+          "visible": false,
+          "online": false
+        },
+        {
+          "at": 1789568669972,
+          "id": null,
+          "visible": false,
+          "online": false
+        },
+        {
+          "at": 1789568670083,
+          "id": null,
+          "visible": false,
+          "online": false
+        },
+        {
+          "at": 1789568670177,
+          "id": null,
+          "visible": false,
+          "online": false
+        },
+        {
+          "at": 1789568670270,
+          "id": null,
+          "visible": false,
+          "online": false
+        },
+        {
+          "at": 1789568670379,
+          "id": null,
+          "visible": false,
+          "online": false
+        },
+        {
+          "at": 1789568670472,
+          "id": null,
+          "visible": false,
+          "online": false
+        },
+        {
+          "at": 1789568670580,
+          "id": null,
+          "visible": false,
+          "online": false
+        },
+        {
+          "at": 1789568670674,
+          "id": null,
+          "visible": false,
+          "online": false
+        },
+        {
+          "at": 1789568670783,
+          "id": null,
+          "visible": false,
+          "online": false
+        },
+        {
+          "at": 1789568670877,
+          "id": null,
+          "visible": false,
+          "online": false
+        },
+        {
+          "at": 1789568670971,
+          "id": null,
+          "visible": false,
+          "online": false
+        },
+        {
+          "at": 1789568671081,
+          "id": null,
+          "visible": false,
+          "online": false
+        },
+        {
+          "at": 1789568671174,
+          "id": null,
+          "visible": false,
+          "online": false
+        },
+        {
+          "at": 1789568671283,
+          "id": null,
+          "visible": false,
+          "online": false
+        },
+        {
+          "at": 1789568671376,
+          "id": null,
+          "visible": false,
+          "online": false
+        },
+        {
+          "at": 1789568671483,
+          "id": null,
+          "visible": false,
+          "online": false
+        },
+        {
+          "at": 1789568671577,
+          "id": null,
+          "visible": false,
+          "online": false
+        },
+        {
+          "at": 1789568671670,
+          "id": null,
+          "visible": false,
+          "online": false
+        },
+        {
+          "at": 1789568671779,
+          "id": null,
+          "visible": false,
+          "online": false
+        },
+        {
+          "at": 1789568671874,
+          "id": null,
+          "visible": false,
+          "online": false
+        },
+        {
+          "at": 1789568671985,
+          "id": null,
+          "visible": false,
+          "online": false
+        },
+        {
+          "at": 1789568672080,
+          "id": null,
+          "visible": false,
+          "online": false
+        },
+        {
+          "at": 1789568672176,
+          "id": null,
+          "visible": false,
+          "online": false
+        },
+        {
+          "at": 1789568672286,
+          "id": null,
+          "visible": false,
+          "online": false
+        },
+        {
+          "at": 1789568672381,
+          "id": null,
+          "visible": false,
+          "online": false
+        },
+        {
+          "at": 1789568672476,
+          "id": null,
+          "visible": false,
+          "online": false
+        },
+        {
+          "at": 1789568672572,
+          "id": null,
+          "visible": false,
+          "online": false
+        },
+        {
+          "at": 1789568672684,
+          "id": null,
+          "visible": false,
+          "online": false
+        },
+        {
+          "at": 1789568672780,
+          "id": null,
+          "visible": false,
+          "online": false
+        },
+        {
+          "at": 1789568672876,
+          "id": null,
+          "visible": false,
+          "online": false
+        },
+        {
+          "at": 1789568672970,
+          "id": null,
+          "visible": false,
+          "online": false
+        },
+        {
+          "at": 1789568673080,
+          "id": null,
+          "visible": false,
+          "online": false
+        },
+        {
+          "at": 1789568673173,
+          "id": null,
+          "visible": false,
+          "online": false
+        },
+        {
+          "at": 1789568673284,
+          "id": null,
+          "visible": false,
+          "online": false
+        },
+        {
+          "at": 1789568673379,
+          "id": null,
+          "visible": false,
+          "online": false
+        },
+        {
+          "at": 1789568673475,
+          "id": null,
+          "visible": false,
+          "online": false
+        },
+        {
+          "at": 1789568673584,
+          "id": null,
+          "visible": false,
+          "online": false
+        },
+        {
+          "at": 1789568673677,
+          "id": null,
+          "visible": false,
+          "online": false
+        },
+        {
+          "at": 1789568673771,
+          "id": null,
+          "visible": false,
+          "online": false
+        },
+        {
+          "at": 1789568673881,
+          "id": null,
+          "visible": false,
+          "online": false
+        },
+        {
+          "at": 1789568673977,
+          "id": null,
+          "visible": false,
+          "online": false
+        },
+        {
+          "at": 1789568674072,
+          "id": null,
+          "visible": false,
+          "online": false
+        },
+        {
+          "at": 1789568674184,
+          "id": null,
+          "visible": false,
+          "online": false
+        },
+        {
+          "at": 1789568674280,
+          "id": null,
+          "visible": false,
+          "online": false
+        },
+        {
+          "at": 1789568674376,
+          "id": null,
+          "visible": false,
+          "online": false
+        },
+        {
+          "at": 1789568674471,
+          "id": null,
+          "visible": false,
+          "online": false
+        },
+        {
+          "at": 1789568674583,
+          "id": null,
+          "visible": false,
+          "online": false
+        },
+        {
+          "at": 1789568674679,
+          "id": null,
+          "visible": false,
+          "online": false
+        },
+        {
+          "at": 1789568674773,
+          "id": null,
+          "visible": false,
+          "online": false
+        },
+        {
+          "at": 1789568674885,
+          "id": null,
+          "visible": false,
+          "online": false
+        },
+        {
+          "at": 1789568674980,
+          "id": null,
+          "visible": false,
+          "online": false
+        },
+        {
+          "at": 1789568675075,
+          "id": null,
+          "visible": false,
+          "online": false
+        }
+      ],
+      "events": [],
+      "runs": [
+        {
+          "start": 1789568643185,
+          "end": 1789568675075,
+          "visible": 0,
+          "pending": 0,
+          "samples": 320
+        }
+      ],
+      "fullImageIntervals": 0,
+      "visibleImageIntervals": 0,
+      "videoEnded": 0,
+      "blob": null
+    }
+  },
+  "network": [],
+  "closures": [
+    {
+      "pid": 11040,
+      "terminated": true
+    },
+    {
+      "pid": 21036,
+      "terminated": true
+    }
+  ],
+  "chrome": "152.0.7977.84",
+  "before": [],
+  "after": [],
+  "offlineProbe": "Error: page.goto: net::ERR_INTERNET_DISCONNECTED at https://example.com/?fix=1789568643086\nCall log:\n\u001b[2m  - navigating to \"https://example.com/?fix=1789568643086\", waiting until \"load\"\u001b[22m\n",
+  "offlineCache": []
+}

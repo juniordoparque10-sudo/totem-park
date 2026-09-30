@@ -1,0 +1,6 @@
+﻿backup-before-corporate-custom-template.patch
+backup-before-sports-template.patch
+firebase.json
+firestore.rules
+storage.rules
+totem-park-backup-before-commercial-plans.patch

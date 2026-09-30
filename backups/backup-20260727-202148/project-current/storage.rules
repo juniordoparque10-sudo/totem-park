@@ -1,0 +1,31 @@
+rules_version = '2';
+
+service firebase.storage {
+  match /b/{bucket}/o {
+    function signedIn() {
+      return request.auth != null;
+    }
+
+    function isMaster() {
+      return signedIn()
+        && request.auth.token.email in [
+          "admin@parksolutions.com",
+          "juniordoparque10@gmail.com"
+        ];
+    }
+
+    function isClientOwner(clientId) {
+      return signedIn()
+        && firestore.get(/databases/(default)/documents/clients/$(clientId)).data.uid == request.auth.uid;
+    }
+
+    match /clients/{clientId}/{allPaths=**} {
+      allow read: if true;
+      allow write: if isMaster() || isClientOwner(clientId);
+    }
+
+    match /{allPaths=**} {
+      allow read, write: if isMaster();
+    }
+  }
+}

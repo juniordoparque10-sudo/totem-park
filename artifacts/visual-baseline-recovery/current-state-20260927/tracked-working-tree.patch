@@ -1,0 +1,360 @@
+diff --git a/functions/index.js b/functions/index.js
+index 6296413..949bac8 100644
+--- a/functions/index.js
++++ b/functions/index.js
+@@ -57,17 +57,26 @@ exports.claimPlayerBinding = onCall(async (request) => {
+     }
+ 
+     const now = FieldValue.serverTimestamp();
++    const sameCurrentLink = previous.status === "ACTIVE"
++      && previous.clientId === clientId
++      && previous.screenId === screenId
++      && previous.deviceId === deviceId;
++    // Legacy pairedAt/createdAt can predate a later relink. Do not turn either
++    // into a claimed current-link timestamp without independent evidence.
++    const linkedAt = sameCurrentLink ? (previous.linkedAt || null) : now;
+     transaction.set(bindingRef, {
+       uid, clientId, screenId, deviceId, appVersion,
+       status: "ACTIVE",
+       createdAt: previous.createdAt || now,
+-      pairedAt: previous.pairedAt || now,
++      pairedAt: sameCurrentLink ? (previous.pairedAt || null) : now,
++      linkedAt,
+       updatedAt: now,
+       revokedAt: null,
+     }, { merge: false });
+     transaction.update(screenRef, {
+       connectedAuthUid: uid,
+       connectedDeviceId: deviceId,
++      linkedAt,
+       status: "online",
+       lastSeenAt: now,
+     });
+diff --git a/src/App.css b/src/App.css
+index e3465cf..0279aed 100644
+--- a/src/App.css
++++ b/src/App.css
+@@ -4699,6 +4699,10 @@
+   grid-template-columns: 12px 42px minmax(0, 1fr) auto;
+ }
+ 
++.premium-screen-row[role="button"] { cursor: pointer; }
++.premium-screen-row[role="button"]:focus-visible { outline: 2px solid #22d3ee; outline-offset: 2px; }
++.premium-screen-row[role="button"]:hover { border-color: rgba(34, 211, 238, .38); }
++
+ .screen-live-card,
+ .media-card {
+   position: relative;
+@@ -13909,9 +13913,53 @@ video.player-media::-webkit-media-controls-start-playback-button {
+ /* 2A.2-C — telemetria operacional */
+ .telemetry-page{color:#e8eefb;min-height:100%;position:relative}.telemetry-hero{display:flex;justify-content:space-between;gap:24px;align-items:flex-end;padding:28px;border:1px solid #263a65;border-radius:24px;background:radial-gradient(circle at 80% 0,#203e7a 0,transparent 38%),linear-gradient(135deg,#101b39,#091329)}.telemetry-hero span{color:#63e6be;font-size:.76rem;font-weight:800;letter-spacing:.14em;text-transform:uppercase}.telemetry-hero h1{font-size:clamp(2rem,4vw,3.5rem);margin:8px 0}.telemetry-hero p{color:#9fb0d1;margin:0}.telemetry-live{display:flex;align-items:center;gap:8px;color:#b9c7e6}.telemetry-live i{width:9px;height:9px;border-radius:50%;background:#34d399;box-shadow:0 0 14px #34d399}.telemetry-filters{display:grid;grid-template-columns:repeat(6,minmax(125px,1fr));gap:10px;margin:18px 0}.telemetry-filters select{background:#0c1831;border:1px solid #2b3e65;color:#e8eefb;border-radius:12px;padding:12px}.telemetry-kpis{display:grid;grid-template-columns:repeat(3,1fr);gap:14px}.telemetry-kpis article{padding:20px;border-radius:18px;background:#0d1931;border:1px solid #24375d}.telemetry-kpis article.primary{background:linear-gradient(135deg,#173f78,#132349)}.telemetry-kpis article.saving{background:linear-gradient(135deg,#0e4a41,#122e3c)}.telemetry-kpis span,.telemetry-kpis small{display:block;color:#91a4ca}.telemetry-kpis strong{display:block;font-size:1.85rem;margin:8px 0;color:#fff}.telemetry-bars,.telemetry-table,.telemetry-state{margin-top:18px;background:#0b162d;border:1px solid #22375d;border-radius:18px;padding:20px}.telemetry-bars h2{margin-top:0}.telemetry-bars>div{position:relative;overflow:hidden;border-radius:10px;background:#16233d;margin:10px 0;padding:10px 14px}.telemetry-bars>div span{position:absolute;inset:0 auto 0 0;background:#136b55;opacity:.5}.telemetry-bars>div.remote span{background:#9d3545}.telemetry-table{overflow:hidden;padding:0}.telemetry-table .head,.telemetry-table>button{display:grid;grid-template-columns:1.6fr .8fr .9fr .8fr .9fr .7fr 1.2fr .5fr;gap:10px;align-items:center;width:100%;padding:15px 18px;border:0;border-bottom:1px solid #1d3152;background:transparent;color:#dce7fa;text-align:left}.telemetry-table .head{background:#101f3b;color:#7890b9;font-size:.75rem;text-transform:uppercase}.telemetry-table>button:hover{background:#10213f}.telemetry-table strong,.telemetry-table small{display:block}.telemetry-table small{color:#7f94ba}.status,.source{font-size:.72rem;font-weight:800}.status.online,.source.cache_local{color:#55e6b1}.status.offline,.source.internet_fallback{color:#ff7189}.status.unknown,.source.downloading_to_cache{color:#f8c963}.telemetry-state{display:flex;flex-direction:column;gap:8px;color:#9fb0d1}.telemetry-state.error{border-color:#71384a;color:#ff9daf}.telemetry-detail{position:fixed;z-index:50;right:24px;top:24px;bottom:24px;width:min(520px,calc(100vw - 48px));overflow:auto;border:1px solid #36517f;border-radius:24px;background:#081329;padding:26px;box-shadow:0 30px 80px #000a}.telemetry-detail .close{float:right;background:#132545;color:#fff;border:1px solid #36517f;border-radius:10px;padding:9px 14px}.detail-grid{display:grid;grid-template-columns:1fr 1fr;gap:10px}.detail-grid p{background:#0e1d38;border-radius:12px;padding:13px;margin:0}.detail-grid b{display:block;color:#7f96bd;font-size:.72rem;margin-bottom:5px}.telemetry-events div{display:grid;grid-template-columns:80px 1fr 1.5fr;gap:8px;padding:10px;border-bottom:1px solid #1c3051;font-size:.82rem}.telemetry-events time,.telemetry-events span{color:#849ac0}
+ .telemetry-config{margin:-4px 0 18px;padding:14px 18px;border:1px solid #263a60;border-radius:14px;background:#0b172d}.telemetry-config summary{cursor:pointer}.telemetry-config summary b{float:right;color:#67e8b6}.telemetry-config p{color:#8fa3c8}.telemetry-config label{display:grid;gap:7px;color:#aebddd}.telemetry-config textarea{min-height:84px;resize:vertical;background:#081226;border:1px solid #30466e;border-radius:10px;padding:10px;color:#fff}.telemetry-config div{display:flex;gap:10px;margin-top:10px}.telemetry-config button{border:1px solid #37517d;border-radius:10px;background:#14284a;color:#fff;padding:10px 14px}.telemetry-config button.enable{background:#116149}.telemetry-config button.danger{background:#70283a}
++.telemetry-v1-table{overflow-x:auto}.telemetry-v1-table .head,.telemetry-v1-table>button{grid-template-columns:1.5fr .8fr 1.35fr .7fr .7fr 1fr 1.15fr .5fr;min-width:1020px}.telemetry-v1-table .status.atenção{color:#f8c963}.telemetry-v1-table>button span{overflow-wrap:anywhere}
+ @media(max-width:1000px){.telemetry-filters{grid-template-columns:repeat(2,1fr)}.telemetry-kpis{grid-template-columns:repeat(2,1fr)}.telemetry-table .head{display:none}.telemetry-table>button{grid-template-columns:1.5fr 1fr 1fr}.telemetry-table>button span:nth-child(n+4){display:none}}
+ @media(max-width:600px){.telemetry-hero{align-items:flex-start;flex-direction:column}.telemetry-filters,.telemetry-kpis,.detail-grid{grid-template-columns:1fr}.telemetry-table>button{grid-template-columns:1.4fr .8fr}.telemetry-table>button span:nth-child(3){display:none}.telemetry-detail{inset:12px;width:auto}}
+ 
++/* Telemetria V1: composição compacta do dashboard aprovado. */
++.telemetry-page .telemetry-hero{align-items:center;padding:16px 20px;border-radius:18px;background:linear-gradient(125deg,#101b39,#0b1831)}
++.telemetry-page .telemetry-hero h1{font-size:clamp(1.4rem,2vw,1.9rem);line-height:1.15;margin:4px 0 0}
++.telemetry-page .telemetry-hero span{font-size:.68rem}
++.telemetry-page .telemetry-live{font-size:.78rem;white-space:nowrap}
++.telemetry-page .telemetry-filters{grid-template-columns:repeat(5,minmax(0,1fr));gap:9px;margin:12px 0}
++.telemetry-page .telemetry-filters select{min-width:0;padding:9px 11px}
++.telemetry-page .telemetry-config{margin:0 0 12px;padding:10px 14px}
++.telemetry-page .telemetry-kpis{grid-template-columns:repeat(3,minmax(0,1fr));gap:10px}
++.telemetry-page .telemetry-kpis article{min-height:86px;padding:13px 16px;border-radius:14px}
++.telemetry-page .telemetry-kpis strong{font-size:1.55rem;line-height:1.1;margin:7px 0 0}
++.telemetry-page .telemetry-kpis span,.telemetry-page .telemetry-kpis small{font-size:.75rem}
++.telemetry-visuals{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:10px;margin-top:12px}
++.telemetry-chart{min-width:0;min-height:116px;padding:15px 16px;border:1px solid #24375d;border-radius:15px;background:#0d1931}
++.telemetry-chart h2{margin:0 0 13px;font-size:.82rem;font-weight:750;color:#adbfdf}
++.telemetry-chart p{margin:10px 0 0;color:#b4c6e3;font-size:.78rem}
++.telemetry-chart p i{font-style:normal;color:#647ba2;padding:0 4px}
++.telemetry-status-bars{display:flex;width:100%;height:9px;overflow:hidden;border-radius:99px;background:#1a2945}
++.telemetry-status-bars .online{background:#34d399}.telemetry-status-bars .attention{background:#fbbf24}.telemetry-status-bars .offline{background:#fb7185}
++.telemetry-chart-empty{display:flex;align-items:center;min-height:34px;color:#7188ad!important}
++.telemetry-version{display:flex;align-items:center;justify-content:space-between;gap:12px}
++.telemetry-version span{min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
++.telemetry-version b{color:#e9f2ff}
++.telemetry-page .telemetry-v1-table{margin-top:12px;overflow-x:auto}
++.telemetry-page .telemetry-v1-table .head,.telemetry-page .telemetry-v1-table>button{display:grid;grid-template-columns:minmax(165px,1.6fr) minmax(75px,.75fr) minmax(122px,1.15fr) minmax(45px,.45fr) minmax(80px,.7fr) minmax(90px,.8fr) minmax(140px,1.15fr) minmax(42px,.4fr);min-width:870px;gap:10px;padding:11px 15px;align-items:center}
++.telemetry-page .telemetry-v1-table .head{font-size:.69rem}
++.telemetry-page .telemetry-v1-table>button span{min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;overflow-wrap:normal;font-size:.77rem}
++.telemetry-page .telemetry-v1-table>button span:first-child strong,.telemetry-page .telemetry-v1-table>button span:first-child small{overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
++.telemetry-page .telemetry-v1-table .status.online{color:#55e6b1}.telemetry-page .telemetry-v1-table .status.atenção{color:#f8c963}.telemetry-page .telemetry-v1-table .status.offline{color:#ff7189}
++.telemetry-page .telemetry-v1-table .telemetry-flag{color:#9db7dc}
++.telemetry-page .telemetry-v1-table>button span:nth-child(4),.telemetry-page .telemetry-v1-table>button span:nth-child(8){color:#6e84aa}
++@media(max-width:900px){.telemetry-page .telemetry-filters{grid-template-columns:repeat(2,minmax(0,1fr))}.telemetry-page .telemetry-kpis,.telemetry-visuals{grid-template-columns:repeat(2,minmax(0,1fr))}}
++@media(max-width:600px){.telemetry-page .telemetry-hero{flex-direction:row;align-items:center;gap:12px}.telemetry-page .telemetry-live{font-size:.7rem}.telemetry-page .telemetry-kpis,.telemetry-visuals{grid-template-columns:repeat(2,minmax(0,1fr))}.telemetry-page .telemetry-kpis article{min-height:76px;padding:12px}.telemetry-page .telemetry-kpis strong{font-size:1.35rem}.telemetry-page .telemetry-v1-table>button span:nth-child(3){display:block}}
++.premium-screen-summary{flex-wrap:wrap;justify-content:flex-end;flex-shrink:1}
++.premium-screen-summary button{white-space:nowrap}
++.manager-screen-status-col{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:5px 12px;min-width:300px;max-width:390px;align-items:center}
++.manager-screen-status-col .premium-live-badge{grid-column:1 / -1;justify-self:end;padding:6px 10px}
++.manager-screen-status-col span{font-size:11px;line-height:1.25;overflow-wrap:normal}
++.manager-screen-status-col .manager-screen-attention{color:#fbbf24;background:rgba(245,158,11,.13);border-radius:999px;padding:5px 9px;justify-self:end}
++.manager-screen-status-col .manager-telemetry-badge{color:#67e8f9;background:rgba(34,211,238,.12);border-radius:999px;padding:5px 9px;justify-self:end}
++@media(max-width:900px){.manager-screen-status-col{min-width:0;max-width:none;grid-template-columns:1fr 1fr}}
++@media(max-width:600px){.premium-screen-summary{justify-content:flex-start}.manager-screen-status-col{grid-template-columns:1fr 1fr;width:100%}.manager-screen-status-col span{text-align:left}.manager-screen-status-col .premium-live-badge{justify-self:start}}
++
+ .player-screen.android-tv-player .template-orientation-portrait .template-rss-magazine.news-focus .template-rss-mini-card span {
+   margin-top: 6px;
+   font-size: clamp(10px, 2.7vw, 13px);
+diff --git a/src/App.jsx b/src/App.jsx
+index 6d7affd..a39f6ed 100644
+--- a/src/App.jsx
++++ b/src/App.jsx
+@@ -1,6 +1,7 @@
+ import UploadLimitDialog from "./UploadLimitDialog";
+ import { uploadLimitBytes, uploadSizeNotice } from "./upload-plan-policy";
+-import TelemetryDashboard from "./TelemetryDashboard";
++import TelemetryDashboard from "./TelemetryDashboardV1";
++import { linkedAtForScreen, screenStatus, telemetryStatus, timestampMs } from "./telemetry-v1";
+ ﻿import { useEffect, useLayoutEffect, useRef, useState } from "react";
+ import { Routes, Route, Navigate, useParams, useNavigate } from "react-router-dom";
+ import { initializeApp, deleteApp } from "firebase/app";
+@@ -3999,6 +4000,7 @@ function AdminApp({ screenRotation, onScreenRotationChange }) {
+   const [loadingAuth, setLoadingAuth] = useState(true);
+   const [activePage, setActivePage] = useState("dashboard");
+   const [selectedClient, setSelectedClient] = useState(null);
++  const [telemetryFocus, setTelemetryFocus] = useState(null);
+   const [appMode, setAppMode] = useState(() => {
+     if (!isNativeApp()) return "web";
+ 
+@@ -4304,6 +4306,7 @@ function AdminApp({ screenRotation, onScreenRotationChange }) {
+               active={activePage === "telemetry" && !selectedClient}
+               onClick={() => {
+                 setSelectedClient(null);
++                setTelemetryFocus(null);
+                 setActivePage("telemetry");
+               }}
+             />
+@@ -4361,8 +4364,11 @@ function AdminApp({ screenRotation, onScreenRotationChange }) {
+         </aside>
+ 
+         <main className="content">
+-          {!selectedClient && activePage === "dashboard" && <Dashboard />}
+-          {!selectedClient && activePage === "telemetry" && <TelemetryDashboard />}
++          {!selectedClient && activePage === "dashboard" && <Dashboard onOpenTelemetry={(screen) => {
++            setTelemetryFocus({ clientId: screen.clientId, id: screen.id });
++            setActivePage("telemetry");
++          }} />}
++          {!selectedClient && activePage === "telemetry" && <TelemetryDashboard focusScreen={telemetryFocus} />}
+           {!selectedClient && activePage === "clients" && (
+             <ClientsPage onOpenClient={setSelectedClient} />
+           )}
+@@ -4956,10 +4962,12 @@ function PendingAccountPanel({ onBack }) {
+   );
+ }
+ 
+-function Dashboard() {
++function Dashboard({ onOpenTelemetry }) {
+   const [clients, setClients] = useState([]);
+   const [clientsError, setClientsError] = useState("");
+   const [screensData, setScreensData] = useState([]);
++  const [playerBindings, setPlayerBindings] = useState([]);
++  const [telemetryConfig, setTelemetryConfig] = useState({ enabled: false, screenIds: [], clientIds: [], deviceIds: [] });
+   const [playlistsData, setPlaylistsData] = useState([]);
+   const [now, setNow] = useState(Date.now());
+   const [screenStatusFilter, setScreenStatusFilter] = useState("all");
+@@ -4973,6 +4981,14 @@ function Dashboard() {
+     return () => clearInterval(interval);
+   }, []);
+ 
++  useEffect(() => onSnapshot(collection(db, "playerDeviceBindings"), (snapshot) => {
++    setPlayerBindings(snapshot.docs.map((item) => ({ id: item.id, ...item.data() })));
++  }, () => setPlayerBindings([])), []);
++
++  useEffect(() => onSnapshot(doc(db, "settings", "telemetry2a2c"), (snapshot) => {
++    setTelemetryConfig(snapshot.exists() ? snapshot.data() : { enabled: false, screenIds: [], clientIds: [], deviceIds: [] });
++  }), []);
++
+   useEffect(() => {
+     let unsubScreens = [];
+     let unsubPlaylists = [];
+@@ -4983,7 +4999,7 @@ function Dashboard() {
+       const clientsList = snapshot.docs.map((clientDoc) => ({
+         id: clientDoc.id,
+         ...clientDoc.data(),
+-      }));
++      })).sort((a, b) => String(a.name || "").localeCompare(String(b.name || ""), "pt-BR"));
+ 
+       setClientsError("");
+       setClients(clientsList);
+@@ -5134,11 +5150,13 @@ function Dashboard() {
+   const loggedOfflineScreens = screensData.filter(
+     (screen) => getScreenConnectionStatus(screen, now).key === "logged-offline"
+   );
++  const attentionScreens = screensData.filter((screen) => screenStatus(screen, now) === "ATENÇÃO");
+   const notLoggedScreens = screensData.filter(
+     (screen) => getScreenConnectionStatus(screen, now).key === "not-logged"
+   );
+   const filteredRealtimeScreens = screensData.filter((screen) => {
+     if (screenStatusFilter === "all") return true;
++    if (screenStatusFilter === "attention") return screenStatus(screen, now) === "ATENÇÃO";
+     return getScreenConnectionStatus(screen, now).key === screenStatusFilter;
+   });
+ 
+@@ -5436,6 +5454,13 @@ function Dashboard() {
+               >
+                 Online {onlineScreens.length}
+               </button>
++              <button
++                type="button"
++                className={screenStatusFilter === "attention" ? "warning active" : "warning"}
++                onClick={() => setScreenStatusFilter("attention")}
++              >
++                Atenção {attentionScreens.length}
++              </button>
+               <button
+                 type="button"
+                 className={screenStatusFilter === "logged-offline" ? "warning active" : "warning"}
+@@ -5463,7 +5488,7 @@ function Dashboard() {
+                 const online = connection.isOnline;
+ 
+                 return (
+-                  <div className="premium-screen-row" key={`${screen.clientId}-${screen.id}`}>
++                  <div className="premium-screen-row" key={`${screen.clientId}-${screen.id}`} role="button" tabIndex={0} onClick={() => onOpenTelemetry(screen)} onKeyDown={(event) => { if (event.key === "Enter" || event.key === " ") { event.preventDefault(); onOpenTelemetry(screen); } }}>
+                     <div className={online ? "premium-screen-dot online" : "premium-screen-dot offline"}></div>
+ 
+                     <div className="premium-screen-icon premium-screen-thumb">
+@@ -5498,6 +5523,7 @@ function Dashboard() {
+                       <div className={`premium-live-badge ${connection.className}`}>
+                         {connection.label}
+                       </div>
++                      {screenStatus(screen, now) === "ATENÇÃO" && <span className="manager-screen-attention">Atenção</span>}
+ 
+                       <span>
+                         {connection.deviceLabel}
+@@ -5507,6 +5533,30 @@ function Dashboard() {
+                         Login: {connection.lastConnection}
+                       </span>
+ 
++                      <span>
++                        Última comunicação: {timestampMs(screen.telemetry?.schemaVersion >= 3 ? screen.telemetryUpdatedAt : screen.lastSeenAt) === null ? "—" : new Date(timestampMs(screen.telemetry?.schemaVersion >= 3 ? screen.telemetryUpdatedAt : screen.lastSeenAt)).toLocaleString("pt-BR")}
++                      </span>
++
++                      <span>
++                        Vinculada desde: {timestampMs(linkedAtForScreen(screen, playerBindings)) === null ? "—" : new Date(timestampMs(linkedAtForScreen(screen, playerBindings))).toLocaleString("pt-BR")}
++                      </span>
++
++                      <span>
++                        App: {screen.telemetry?.session?.appVersion || "—"}
++                      </span>
++
++                      <span className="manager-telemetry-badge">
++                        Telemetria: {telemetryStatus(screen, telemetryConfig, now)}
++                      </span>
++
++                      <span>
++                        Tempo ativo: {screen.telemetry?.schemaVersion >= 3 && Number.isFinite(Number(screen.telemetry?.counters?.activeTimeMs)) ? `${Math.floor(Number(screen.telemetry.counters.activeTimeMs) / 60000)} min` : "—"}
++                      </span>
++
++                      {telemetryStatus(screen, telemetryConfig, now) === "ATIVA" && <span>
++                        Reprodução: Não instrumentado
++                      </span>}
++
+                       <span>
+                         Local: {deviceLocation.city}
+                       </span>
+@@ -6067,7 +6117,7 @@ function ClientsPage({ onOpenClient }) {
+       statusFilter === "Todos" || getClientPlanAccess(client).statusLabel === statusFilter;
+ 
+     return matchesSearch && matchesStatus;
+-  });
++  }).sort((a, b) => String(a.name || "").localeCompare(String(b.name || ""), "pt-BR"));
+ 
+   async function createClientAuthUser(email, password) {
+     const secondaryApp = initializeApp(
+diff --git a/src/TelemetryDashboard.jsx b/src/TelemetryDashboard.jsx
+index 47d58a7..2bf1bad 100644
+--- a/src/TelemetryDashboard.jsx
++++ b/src/TelemetryDashboard.jsx
+@@ -14,6 +14,9 @@ const fmtDuration = (value = 0) => {
+   const hours = Math.floor(minutes / 60);
+   return hours ? `${hours}h ${minutes % 60}m` : `${minutes} min`;
+ };
++const measured = (value) => value !== undefined && value !== null && Number.isFinite(Number(value));
++const fmtMeasured = (value) => measured(value) ? Number(value).toLocaleString("pt-BR") : "—";
++const fmtMeasuredBytes = (value) => measured(value) ? fmtBytes(value) : "—";
+ const timestampMs = (value) => value?.toMillis?.() || (value?.seconds ? value.seconds * 1000 : Date.parse(value || ""));
+ const statusOf = (screen) => Date.now() - timestampMs(screen.lastSeenAt) < 45_000 ? "ONLINE" : screen.telemetry ? "OFFLINE" : "UNKNOWN";
+ const sourceLabel = (source) => ({ CACHE_LOCAL: "LOCAL", INTERNET_FALLBACK: "REMOTO", DOWNLOADING_TO_CACHE: "PREPARANDO" }[source] || source || "UNKNOWN");
+@@ -88,6 +91,7 @@ export default function TelemetryDashboard() {
+     Object.keys(sum).forEach((key) => { sum[key] += Number(counters[key] || 0); });
+     return sum;
+   }, { localPlaybackCount: 0, remotePlaybackCount: 0, bytesDownloaded: 0, estimatedTrafficSaved: 0, displayTimeMs: 0, cacheHits: 0, cacheMisses: 0, downloadCompleted: 0, playbackErrors: 0, downloadTimeouts: 0 });
++  const hasMetric = (key) => filtered.some((item) => measured(item.telemetry?.counters?.[key]));
+   const online = filtered.filter((item) => statusOf(item) === "ONLINE").length;
+   const cacheRate = totals.cacheHits + totals.cacheMisses ? Math.round(totals.cacheHits * 100 / (totals.cacheHits + totals.cacheMisses)) : 0;
+ 
+@@ -108,15 +112,15 @@ export default function TelemetryDashboard() {
+     {!screens.some((item) => item.telemetry) ? <div className="telemetry-state"><strong>Telemetria desativada ou sem dados</strong><span>A ausência de dados é diferente de zero bytes. Ative somente dispositivos piloto pela allowlist.</span></div> : <>
+       <div className="telemetry-kpis">
+         <article className="primary"><span>Telas online</span><strong>{online}</strong><small>{filtered.length - online} offline/sem comunicação</small></article>
+-        <article><span>Tráfego</span><strong>{fmtBytes(totals.bytesDownloaded)}</strong><small>{period === "today" ? "acumulado disponível" : "snapshots disponíveis"}</small></article>
+-        <article className="saving"><span>Economia estimada</span><strong>{fmtBytes(totals.estimatedTrafficSaved)}</strong><small>baseada em reproduções locais</small></article>
+-        <article><span>Cache hit rate</span><strong>{cacheRate}%</strong><small>{totals.cacheHits} hits / {totals.cacheMisses} misses</small></article>
++        <article><span>Tráfego</span><strong>{hasMetric("bytesDownloaded") ? fmtBytes(totals.bytesDownloaded) : "—"}</strong><small>{hasMetric("bytesDownloaded") ? (period === "today" ? "acumulado disponível" : "snapshots disponíveis") : "Não instrumentado"}</small></article>
++        <article className="saving"><span>Economia estimada</span><strong>{hasMetric("estimatedTrafficSaved") ? fmtBytes(totals.estimatedTrafficSaved) : "—"}</strong><small>{hasMetric("estimatedTrafficSaved") ? "baseada em reproduções locais" : "Não instrumentado"}</small></article>
++        <article><span>Cache hit rate</span><strong>{hasMetric("cacheHits") && hasMetric("cacheMisses") ? `${cacheRate}%` : "—"}</strong><small>{hasMetric("cacheHits") && hasMetric("cacheMisses") ? `${totals.cacheHits} hits / ${totals.cacheMisses} misses` : "Não instrumentado"}</small></article>
+         <article><span>Tempo de exibição</span><strong>{fmtDuration(totals.displayTimeMs)}</strong><small>uptime do Player</small></article>
+-        <article><span>Erros / timeouts</span><strong>{totals.playbackErrors} / {totals.downloadTimeouts}</strong><small>{totals.downloadCompleted} downloads concluídos</small></article>
++        <article><span>Erros / timeouts</span><strong>{hasMetric("playbackErrors") ? totals.playbackErrors : "—"} / {hasMetric("downloadTimeouts") ? totals.downloadTimeouts : "—"}</strong><small>{hasMetric("downloadCompleted") ? `${totals.downloadCompleted} downloads concluídos` : "Downloads não instrumentados"}</small></article>
+       </div>
+       <div className="telemetry-bars"><h2>Local First</h2><div><span style={{ width: `${Math.max(4, totals.localPlaybackCount * 100 / Math.max(1, totals.localPlaybackCount + totals.remotePlaybackCount))}%` }} />Local: {totals.localPlaybackCount}</div><div className="remote"><span style={{ width: `${Math.max(4, totals.remotePlaybackCount * 100 / Math.max(1, totals.localPlaybackCount + totals.remotePlaybackCount))}%` }} />Remota: {totals.remotePlaybackCount}</div></div>
+-      <div className="telemetry-table"><div className="head"><span>Tela</span><span>Status</span><span>Origem</span><span>Sessão</span><span>Tráfego</span><span>Cache</span><span>Versão</span><span>Erros</span></div>{filtered.map((item) => { const t=item.telemetry; const c=t?.counters||{}; const state=statusOf(item); return <button key={`${item.clientId}-${item.id}`} onClick={() => setSelected(item)}><span><strong>{item.name || item.code || item.id}</strong><small>{item.clientName}</small></span><span className={`status ${state.toLowerCase()}`}>{state}</span><span className={`source ${(t?.current?.mediaSource||"unknown").toLowerCase()}`}>{sourceLabel(t?.current?.mediaSource)}</span><span>{fmtDuration(c.displayTimeMs)}</span><span>{fmtBytes(c.bytesDownloaded)}</span><span>{c.cacheHits || 0}/{c.cacheMisses || 0}</span><span>{t?.session?.appVersion || "Sem dados"}</span><span>{c.playbackErrors || 0}</span></button>; })}</div>
++      <div className="telemetry-table"><div className="head"><span>Tela</span><span>Status</span><span>Origem</span><span>Sessão</span><span>Tráfego</span><span>Cache</span><span>Versão</span><span>Erros</span></div>{filtered.map((item) => { const t=item.telemetry; const c=t?.counters||{}; const state=statusOf(item); return <button key={`${item.clientId}-${item.id}`} onClick={() => setSelected(item)}><span><strong>{item.name || item.code || item.id}</strong><small>{item.clientName}</small></span><span className={`status ${state.toLowerCase()}`}>{state}</span><span className={`source ${(t?.current?.mediaSource||"unknown").toLowerCase()}`}>{sourceLabel(t?.current?.mediaSource)}</span><span>{fmtDuration(c.displayTimeMs)}</span><span>{fmtMeasuredBytes(c.bytesDownloaded)}</span><span>{fmtMeasured(c.cacheHits)}/{fmtMeasured(c.cacheMisses)}</span><span>{t?.session?.appVersion || "Sem dados"}</span><span>{fmtMeasured(c.playbackErrors)}</span></button>; })}</div>
+     </>}
+-    {selected && <div className="telemetry-detail"><button className="close" onClick={() => setSelected(null)}>Fechar</button><span>{selected.clientName}</span><h2>{selected.name || selected.code || selected.id}</h2><div className="detail-grid"><p><b>Status</b>{statusOf(selected)}</p><p><b>Origem atual</b>{sourceLabel(selected.telemetry?.current?.mediaSource)}</p><p><b>Modo</b>{selected.telemetry?.current?.operatingMode || "UNKNOWN"}</p><p><b>Última comunicação</b>{selected.lastSeenAt?.toDate?.().toLocaleString("pt-BR") || "Sem dados"}</p><p><b>Mídia atual</b>{selected.telemetry?.current?.mediaName || selected.telemetry?.current?.mediaId || "Sem dados"}</p><p><b>Playlist</b>{selected.telemetry?.current?.playlistId || "Sem dados"}</p><p><b>Waiting / stalled</b>{selected.telemetry?.counters?.waitingCount || 0} / {selected.telemetry?.counters?.stalledCount || 0}</p><p><b>Último erro</b>{selected.telemetry?.current?.lastError || "Nenhum"}</p></div><h3>Eventos recentes</h3><div className="telemetry-events">{(selected.telemetry?.lastPlayerEvents || []).slice(-20).reverse().map((event, index) => <div key={`${event.timestamp}-${index}`}><time>{new Date(event.timestamp).toLocaleTimeString("pt-BR")}</time><strong>{event.event}</strong><span>{event.mediaId || "—"} · {sourceLabel(event.mediaSource)}</span></div>)}</div></div>}
++    {selected && <div className="telemetry-detail"><button className="close" onClick={() => setSelected(null)}>Fechar</button><span>{selected.clientName}</span><h2>{selected.name || selected.code || selected.id}</h2><div className="detail-grid"><p><b>Status</b>{statusOf(selected)}</p><p><b>Origem atual</b>{sourceLabel(selected.telemetry?.current?.mediaSource)}</p><p><b>Modo</b>{selected.telemetry?.current?.operatingMode || "UNKNOWN"}</p><p><b>Última comunicação</b>{selected.lastSeenAt?.toDate?.().toLocaleString("pt-BR") || "Sem dados"}</p><p><b>Mídia atual</b>{selected.telemetry?.current?.mediaName || selected.telemetry?.current?.mediaId || "Sem dados"}</p><p><b>Playlist</b>{selected.telemetry?.current?.playlistId || "Sem dados"}</p><p><b>Waiting / stalled</b>{fmtMeasured(selected.telemetry?.counters?.waitingCount)} / {fmtMeasured(selected.telemetry?.counters?.stalledCount)}</p><p><b>Último erro</b>{selected.telemetry?.current?.lastError || "Nenhum"}</p></div><h3>Eventos recentes</h3><div className="telemetry-events">{(selected.telemetry?.lastPlayerEvents || []).slice(-20).reverse().map((event, index) => <div key={`${event.timestamp}-${index}`}><time>{new Date(event.timestamp).toLocaleTimeString("pt-BR")}</time><strong>{event.event}</strong><span>{event.mediaId || "—"} · {sourceLabel(event.mediaSource)}</span></div>)}</div></div>}
+   </section>;
+ }
+diff --git a/tests/firestore-player-identity.rules.test.mjs b/tests/firestore-player-identity.rules.test.mjs
+index d171c79..c60f259 100644
+--- a/tests/firestore-player-identity.rules.test.mjs
++++ b/tests/firestore-player-identity.rules.test.mjs
+@@ -86,6 +86,7 @@ test("player cannot create or edit a binding", async () => {
+   const player = env.authenticatedContext("player-a").firestore();
+   await assertFails(setDoc(doc(player, bindingPath("new-player")), { uid: "new-player", status: "ACTIVE" }));
+   await assertFails(updateDoc(doc(player, bindingPath("player-a")), { screenId: "screen-b" }));
++  await assertFails(updateDoc(doc(player, screenPath()), { linkedAt: new Date() }));
+ });
+ 
+ test("master can manage bindings and owner cannot", async () => {
+diff --git a/tests/player-binding-functions.test.mjs b/tests/player-binding-functions.test.mjs
+index 7a60799..981e983 100644
+--- a/tests/player-binding-functions.test.mjs
++++ b/tests/player-binding-functions.test.mjs
+@@ -39,5 +39,32 @@ test("authenticated backend claim creates an authoritative binding", async () =>
+     assert.equal(snapshot.data().uid, credential.user.uid);
+     assert.equal(snapshot.data().clientId, "client-a");
+     assert.equal(snapshot.data().deviceId, "device-a");
++    assert.ok(snapshot.data().linkedAt?.toMillis());
++    const screen = await getDoc(doc(context.firestore(), "clients/client-a/screens/screen-a"));
++    assert.equal(screen.data().linkedAt.toMillis(), snapshot.data().linkedAt.toMillis());
++  });
++
++  let original;
++  await env.withSecurityRulesDisabled(async (context) => {
++    original = (await getDoc(doc(context.firestore(), `playerDeviceBindings/${credential.user.uid}`))).data().linkedAt.toMillis();
++  });
++  await claim({ code: "SECURE1", deviceId: "device-a", appVersion: "test-reopen" });
++  let unchanged;
++  await env.withSecurityRulesDisabled(async (context) => {
++    unchanged = (await getDoc(doc(context.firestore(), `playerDeviceBindings/${credential.user.uid}`))).data().linkedAt.toMillis();
++  });
++  assert.equal(unchanged, original, "revalidation must preserve the original link time");
++
++  const revoke = httpsCallable(getFunctions(app), "revokePlayerBinding");
++  await revoke({ reason: "TEST_REPAIR" });
++  await new Promise((resolve) => setTimeout(resolve, 1200));
++  await claim({ code: "SECURE1", deviceId: "device-b", appVersion: "test-relink" });
++  await env.withSecurityRulesDisabled(async (context) => {
++    const binding = (await getDoc(doc(context.firestore(), `playerDeviceBindings/${credential.user.uid}`))).data();
++    const screen = (await getDoc(doc(context.firestore(), "clients/client-a/screens/screen-a"))).data();
++    assert.equal(binding.deviceId, "device-b");
++    assert.ok(binding.linkedAt.toMillis() > original,
++      `new binding must get a new server timestamp: original=${original}, next=${binding.linkedAt.toMillis()}, previousStatus=${binding.status}`);
++    assert.equal(screen.linkedAt.toMillis(), binding.linkedAt.toMillis());
+   });
+ });

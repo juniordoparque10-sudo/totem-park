@@ -1,0 +1,83 @@
+{
+  "TESTA1": {
+    "client": "A",
+    "screen": "tela01",
+    "playlistId": "playlist-tela01",
+    "items": [
+      {
+        "id": "video01.webm",
+        "mediaId": "video01.webm",
+        "title": "video01.webm",
+        "type": "Vídeo",
+        "preview": "http://127.0.0.1:5199/media/video01.webm",
+        "sizeBytes": 27656,
+        "duration": 3,
+        "soundEnabled": false
+      },
+      {
+        "id": "imagem01.png",
+        "mediaId": "imagem01.png",
+        "title": "imagem01.png",
+        "type": "Imagem",
+        "preview": "http://127.0.0.1:5199/media/imagem01.png",
+        "sizeBytes": 15649,
+        "duration": 3,
+        "soundEnabled": false
+      }
+    ]
+  },
+  "TESTA2": {
+    "client": "A",
+    "screen": "tela02",
+    "playlistId": "playlist-tela02",
+    "items": [
+      {
+        "id": "video02.webm",
+        "mediaId": "video02.webm",
+        "title": "video02.webm",
+        "type": "Vídeo",
+        "preview": "http://127.0.0.1:5199/media/video02.webm",
+        "sizeBytes": 27892,
+        "duration": 3,
+        "soundEnabled": false
+      },
+      {
+        "id": "imagem02.png",
+        "mediaId": "imagem02.png",
+        "title": "imagem02.png",
+        "type": "Imagem",
+        "preview": "http://127.0.0.1:5199/media/imagem02.png",
+        "sizeBytes": 16044,
+        "duration": 3,
+        "soundEnabled": false
+      }
+    ]
+  },
+  "TESTB1": {
+    "client": "B",
+    "screen": "tela01",
+    "playlistId": "playlist-tela01",
+    "items": [
+      {
+        "id": "videoB.webm",
+        "mediaId": "videoB.webm",
+        "title": "videoB.webm",
+        "type": "Vídeo",
+        "preview": "http://127.0.0.1:5199/media/videoB.webm",
+        "sizeBytes": 25618,
+        "duration": 3,
+        "soundEnabled": false
+      },
+      {
+        "id": "imagemB.png",
+        "mediaId": "imagemB.png",
+        "title": "imagemB.png",
+        "type": "Imagem",
+        "preview": "http://127.0.0.1:5199/media/imagemB.png",
+        "sizeBytes": 15292,
+        "duration": 3,
+        "soundEnabled": false
+      }
+    ]
+  }
+}

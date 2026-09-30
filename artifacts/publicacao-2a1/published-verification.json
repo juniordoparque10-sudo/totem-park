@@ -1,0 +1,38 @@
+[
+  {
+    "path": "index.html",
+    "bytes": 3404,
+    "sha256": "6bf1b883b21e0c83e9a0c9134aa9b9a5959e13318aaeed5edcc0d9f12c4f41d1",
+    "matchesLocalBuild": true
+  },
+  {
+    "path": "sw.js",
+    "bytes": 1491,
+    "sha256": "5b7f0abac7a25de3c969820d78cfbb62a9c3f5eac3ef3da9a26e56e7ef6d8797",
+    "matchesLocalBuild": true
+  },
+  {
+    "path": "assets/index-BNJWtZvH.js",
+    "bytes": 1073019,
+    "sha256": "280fdb8b81cedc81602fdcf98335d7afce5738f7b6691437aea77b50cfcae0b7",
+    "matchesLocalBuild": true
+  },
+  {
+    "path": "assets/index-CdQgOp4A.css",
+    "bytes": 241383,
+    "sha256": "801db860bba0948c9f3a6c13c44cb59344b260c008febdde951158f97d615a16",
+    "matchesLocalBuild": true
+  },
+  {
+    "path": "assets/web-BDd98SvS.js",
+    "bytes": 8455,
+    "sha256": "8de4ee66d266a53b951583bbfdf2cf6313b872c381f3f088041b37e36430e8b2",
+    "matchesLocalBuild": true
+  },
+  {
+    "path": "assets/web-BjKL51lK-CL-ZYWJR.js",
+    "bytes": 5495,
+    "sha256": "5ad815c7dbea065b1d88ba703d8f1a3c77f94019274d15b9ed1dfff6c49d2e26",
+    "matchesLocalBuild": true
+  }
+]

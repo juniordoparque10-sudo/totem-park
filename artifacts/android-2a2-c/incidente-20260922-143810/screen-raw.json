@@ -1,0 +1,571 @@
+{
+  "name": "projects/totem-park/databases/(default)/documents/clients/eCd1q9Dq1SMr9D5FlKN8/screens/emp3VDKfLzmz1sWJrnbx",
+  "fields": {
+    "nowPlayingDuration": {
+      "integerValue": "10"
+    },
+    "deviceLocation": {
+      "mapValue": {
+        "fields": {
+          "region": {
+            "stringValue": "Rio Grande do Norte"
+          },
+          "latitude": {
+            "doubleValue": -5.794862
+          },
+          "longitude": {
+            "doubleValue": -35.20958
+          },
+          "regionCode": {
+            "stringValue": "RN"
+          },
+          "cityLabel": {
+            "stringValue": "Natal/RN"
+          },
+          "source": {
+            "stringValue": "ip"
+          },
+          "country": {
+            "stringValue": "Brazil"
+          },
+          "capturedAt": {
+            "stringValue": "2026-09-22T17:11:45.424Z"
+          },
+          "city": {
+            "stringValue": "Natal"
+          }
+        }
+      }
+    },
+    "nowPlayingTitle": {
+      "stringValue": "Park Solutions vídeo"
+    },
+    "templateRevision": {
+      "stringValue": "1786494897908-51o0uf"
+    },
+    "cacheManifestItems": {
+      "integerValue": "0"
+    },
+    "lastCommandExecuted": {
+      "stringValue": "refresh"
+    },
+    "createdAt": {
+      "timestampValue": "2026-08-01T17:47:12.233Z"
+    },
+    "currentPlaylistName": {
+      "stringValue": "Teste rapido"
+    },
+    "nowPlayingIndex": {
+      "integerValue": "1"
+    },
+    "location": {
+      "stringValue": "Não informado"
+    },
+    "deviceLocationCity": {
+      "stringValue": "Natal/RN"
+    },
+    "remoteCommand": {
+      "mapValue": {
+        "fields": {
+          "id": {
+            "stringValue": "1790083026997-owfi6txv658"
+          },
+          "sentAt": {
+            "stringValue": "2026-09-22T13:17:06.997Z"
+          },
+          "type": {
+            "stringValue": "refresh"
+          }
+        }
+      }
+    },
+    "lastMediaDownloadBytes": {
+      "integerValue": "84023317"
+    },
+    "nowPlayingType": {
+      "stringValue": "Vídeo"
+    },
+    "currentPlaylistId": {
+      "stringValue": "NYMMLih50iYxXho5bvRL"
+    },
+    "lastCommandSentAt": {
+      "timestampValue": "2026-09-22T13:17:07.007Z"
+    },
+    "estimatedMonthlyTrafficBytes": {
+      "integerValue": "131698320"
+    },
+    "nowPlayingTemplateType": {
+      "stringValue": ""
+    },
+    "lastCommandExecutedAt": {
+      "timestampValue": "2026-09-22T13:17:07.167Z"
+    },
+    "playlistName": {
+      "stringValue": "Teste rapido"
+    },
+    "connectedDeviceId": {
+      "stringValue": "b148d1ab-5dd6-42b1-98d7-f2ca68024b59"
+    },
+    "cachedItems": {
+      "integerValue": "2"
+    },
+    "nowPlayingSound": {
+      "booleanValue": false
+    },
+    "lastCommandSent": {
+      "stringValue": "refresh"
+    },
+    "lastConnection": {
+      "stringValue": "22/09/2026, 14:38:14"
+    },
+    "commandStatus": {
+      "stringValue": "executed"
+    },
+    "telemetryUpdatedAt": {
+      "timestampValue": "2026-09-22T17:37:10.013Z"
+    },
+    "nowPlayingTotal": {
+      "integerValue": "2"
+    },
+    "cacheStatus": {
+      "stringValue": "pronto"
+    },
+    "failedCacheItems": {
+      "integerValue": "0"
+    },
+    "currentMediaSource": {
+      "stringValue": "local"
+    },
+    "nowPlayingWidth": {
+      "integerValue": "1280"
+    },
+    "currentPlaylistMode": {
+      "stringValue": "default"
+    },
+    "code": {
+      "stringValue": "KEYFRK"
+    },
+    "cacheSizeBytes": {
+      "integerValue": "0"
+    },
+    "playlistTransition": {
+      "stringValue": "Fade suave"
+    },
+    "nowPlayingAspectRatio": {
+      "stringValue": "16:9"
+    },
+    "playlistRevision": {
+      "stringValue": "1790040716614-3neo94"
+    },
+    "lastSeenAt": {
+      "timestampValue": "2026-09-22T17:38:09.757Z"
+    },
+    "nowPlayingHeight": {
+      "integerValue": "720"
+    },
+    "orientation": {
+      "stringValue": "Paisagem"
+    },
+    "telemetry": {
+      "mapValue": {
+        "fields": {
+          "current": {
+            "mapValue": {
+              "fields": {
+                "lastError": {
+                  "stringValue": "Erro ao carregar vídeo"
+                },
+                "mediaName": {
+                  "stringValue": "Park Solutions vídeo"
+                },
+                "operatingMode": {
+                  "stringValue": "LOCAL"
+                },
+                "mediaType": {
+                  "stringValue": "VIDEO"
+                },
+                "lastPlayerEvent": {
+                  "stringValue": "waiting"
+                },
+                "playlistId": {
+                  "stringValue": "NYMMLih50iYxXho5bvRL"
+                },
+                "dynamicDataSource": {
+                  "stringValue": "INTERNET"
+                },
+                "mediaId": {
+                  "stringValue": "enfiqiz94zS2wy4oAaKe"
+                },
+                "connectionStatus": {
+                  "stringValue": "ONLINE"
+                },
+                "lastErrorAt": {
+                  "stringValue": "2026-09-22T17:27:24.036Z"
+                },
+                "playbackActive": {
+                  "booleanValue": false
+                },
+                "mediaSource": {
+                  "stringValue": "CACHE_LOCAL"
+                }
+              }
+            }
+          },
+          "counters": {
+            "mapValue": {
+              "fields": {
+                "downloadTimeouts": {
+                  "integerValue": "0"
+                },
+                "stallDurationMs": {
+                  "integerValue": "0"
+                },
+                "downloadStalls": {
+                  "integerValue": "0"
+                },
+                "remotePlaybackCount": {
+                  "integerValue": "0"
+                },
+                "cacheMisses": {
+                  "integerValue": "0"
+                },
+                "displayTimeMs": {
+                  "integerValue": "5131026"
+                },
+                "bytesDownloaded": {
+                  "integerValue": "0"
+                },
+                "cacheHits": {
+                  "integerValue": "0"
+                },
+                "partialBytesObserved": {
+                  "integerValue": "0"
+                },
+                "waitingCount": {
+                  "integerValue": "418"
+                },
+                "downloadRetries": {
+                  "integerValue": "0"
+                },
+                "localPlaybackCount": {
+                  "integerValue": "416"
+                },
+                "downloadFailed": {
+                  "integerValue": "0"
+                },
+                "downloadCompleted": {
+                  "integerValue": "0"
+                },
+                "playbackErrors": {
+                  "integerValue": "4"
+                },
+                "estimatedTrafficSaved": {
+                  "integerValue": "913108352"
+                },
+                "stalledCount": {
+                  "integerValue": "0"
+                },
+                "waitingDurationMs": {
+                  "integerValue": "85493"
+                },
+                "downloadStarts": {
+                  "integerValue": "0"
+                }
+              }
+            }
+          },
+          "transitions": {
+            "arrayValue": {
+              "values": [
+                {
+                  "mapValue": {
+                    "fields": {
+                      "transitionStartedAt": {
+                        "stringValue": "2026-09-22T17:27:23.087Z"
+                      },
+                      "fromMediaId": {
+                        "stringValue": "enfiqiz94zS2wy4oAaKe"
+                      },
+                      "transitionCompletedAt": {
+                        "stringValue": "2026-09-22T17:27:23.308Z"
+                      },
+                      "transitionId": {
+                        "stringValue": "11bc417d-3ed8-4b07-b301-d01bf82a0225"
+                      },
+                      "transitionDurationMs": {
+                        "integerValue": "221"
+                      },
+                      "toMediaId": {
+                        "stringValue": "AVwGDQ73WNhEnKaMZj7I"
+                      },
+                      "result": {
+                        "stringValue": "SUCCESS"
+                      },
+                      "reason": {
+                        "stringValue": "VIDEO_ENDED"
+                      }
+                    }
+                  }
+                },
+                {
+                  "mapValue": {
+                    "fields": {
+                      "transitionStartedAt": {
+                        "stringValue": "2026-09-22T17:27:24.081Z"
+                      },
+                      "transitionCompletedAt": {
+                        "nullValue": null
+                      },
+                      "result": {
+                        "stringValue": "UNKNOWN"
+                      },
+                      "reason": {
+                        "stringValue": "ERROR"
+                      },
+                      "toMediaId": {
+                        "stringValue": "enfiqiz94zS2wy4oAaKe"
+                      },
+                      "fromMediaId": {
+                        "stringValue": "AVwGDQ73WNhEnKaMZj7I"
+                      },
+                      "transitionDurationMs": {
+                        "integerValue": "0"
+                      },
+                      "transitionId": {
+                        "stringValue": "d42d9877-5c9f-441a-8c7d-e8237999c73a"
+                      }
+                    }
+                  }
+                }
+              ]
+            }
+          },
+          "lastPlayerEvents": {
+            "arrayValue": {
+              "values": [
+                {
+                  "mapValue": {
+                    "fields": {
+                      "duration": {
+                        "integerValue": "0"
+                      },
+                      "event": {
+                        "stringValue": "MEDIA_CHANGE"
+                      },
+                      "readyState": {
+                        "integerValue": "0"
+                      },
+                      "currentTime": {
+                        "integerValue": "0"
+                      },
+                      "networkState": {
+                        "integerValue": "0"
+                      },
+                      "mediaId": {
+                        "stringValue": ""
+                      },
+                      "timestamp": {
+                        "stringValue": "2026-09-22T17:27:24.081Z"
+                      },
+                      "errorCode": {
+                        "nullValue": null
+                      },
+                      "ended": {
+                        "booleanValue": false
+                      },
+                      "paused": {
+                        "booleanValue": false
+                      },
+                      "mediaSource": {
+                        "stringValue": "UNKNOWN"
+                      }
+                    }
+                  }
+                },
+                {
+                  "mapValue": {
+                    "fields": {
+                      "ended": {
+                        "booleanValue": false
+                      },
+                      "duration": {
+                        "doubleValue": 10.005333
+                      },
+                      "mediaSource": {
+                        "stringValue": "CACHE_LOCAL"
+                      },
+                      "timestamp": {
+                        "stringValue": "2026-09-22T17:27:24.097Z"
+                      },
+                      "networkState": {
+                        "integerValue": "1"
+                      },
+                      "mediaId": {
+                        "stringValue": "AVwGDQ73WNhEnKaMZj7I"
+                      },
+                      "errorCode": {
+                        "integerValue": "3"
+                      },
+                      "paused": {
+                        "booleanValue": true
+                      },
+                      "event": {
+                        "stringValue": "pause"
+                      },
+                      "currentTime": {
+                        "doubleValue": 0.641028
+                      },
+                      "readyState": {
+                        "integerValue": "4"
+                      }
+                    }
+                  }
+                },
+                {
+                  "mapValue": {
+                    "fields": {
+                      "duration": {
+                        "doubleValue": 10.005
+                      },
+                      "ended": {
+                        "booleanValue": false
+                      },
+                      "timestamp": {
+                        "stringValue": "2026-09-22T17:27:24.109Z"
+                      },
+                      "errorCode": {
+                        "nullValue": null
+                      },
+                      "readyState": {
+                        "integerValue": "1"
+                      },
+                      "currentTime": {
+                        "integerValue": "0"
+                      },
+                      "paused": {
+                        "booleanValue": false
+                      },
+                      "mediaSource": {
+                        "stringValue": "CACHE_LOCAL"
+                      },
+                      "event": {
+                        "stringValue": "waiting"
+                      },
+                      "networkState": {
+                        "integerValue": "1"
+                      },
+                      "mediaId": {
+                        "stringValue": "enfiqiz94zS2wy4oAaKe"
+                      }
+                    }
+                  }
+                }
+              ]
+            }
+          },
+          "schemaVersion": {
+            "integerValue": "1"
+          },
+          "session": {
+            "mapValue": {
+              "fields": {
+                "endedAt": {
+                  "nullValue": null
+                },
+                "lastHeartbeatAt": {
+                  "stringValue": "2026-09-22T17:37:14.631Z"
+                },
+                "screenId": {
+                  "stringValue": "emp3VDKfLzmz1sWJrnbx"
+                },
+                "clientId": {
+                  "stringValue": "eCd1q9Dq1SMr9D5FlKN8"
+                },
+                "deviceId": {
+                  "stringValue": "b148d1ab-5dd6-42b1-98d7-f2ca68024b59"
+                },
+                "appVersion": {
+                  "stringValue": "1.0-player-2a2-c-telemetry-pilot"
+                },
+                "sessionId": {
+                  "stringValue": "efa5d675-8ead-47db-b14e-d43b1b289c7a"
+                },
+                "platform": {
+                  "stringValue": "ANDROID"
+                },
+                "lastActivityAt": {
+                  "stringValue": "2026-09-22T17:27:24.109Z"
+                },
+                "startedAt": {
+                  "stringValue": "2026-09-22T16:11:43.605Z"
+                },
+                "sequence": {
+                  "integerValue": "17"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "cacheManifestKey": {
+      "stringValue": ""
+    },
+    "lastMediaDownloadAt": {
+      "timestampValue": "2026-09-22T00:49:21.108Z"
+    },
+    "cacheRemovedItems": {
+      "integerValue": "0"
+    },
+    "nowPlayingPreview": {
+      "stringValue": "https://firebasestorage.googleapis.com/v0/b/totem-park.firebasestorage.app/o/clients%2FeCd1q9Dq1SMr9D5FlKN8%2Fmedia%2F1785781309628_1001327080.mp4?alt=media&token=126201f6-9262-4a65-84d4-17e52390c071"
+    },
+    "status": {
+      "stringValue": "online"
+    },
+    "totalCacheableItems": {
+      "integerValue": "2"
+    },
+    "playlistId": {
+      "stringValue": "NYMMLih50iYxXho5bvRL"
+    },
+    "updatedAt": {
+      "timestampValue": "2026-09-22T01:31:55.854Z"
+    },
+    "activePlaylistWeightBytes": {
+      "integerValue": "4389944"
+    },
+    "nowPlayingOrientation": {
+      "stringValue": "Paisagem"
+    },
+    "playlistTransitionSpeed": {
+      "stringValue": "Normal"
+    },
+    "nowPlayingItemType": {
+      "stringValue": "media"
+    },
+    "lastMediaUpdateAt": {
+      "timestampValue": "2026-09-22T17:27:19.262Z"
+    },
+    "deviceLocationUpdatedAt": {
+      "timestampValue": "2026-09-22T17:11:40.662Z"
+    },
+    "name": {
+      "stringValue": "TV Teste"
+    },
+    "connectedAuthUid": {
+      "stringValue": "zs8bACp67ibGv3v66vf570MDpLQ2"
+    },
+    "cacheDownloadedItems": {
+      "integerValue": "0"
+    },
+    "cacheManifestSizeBytes": {
+      "integerValue": "0"
+    },
+    "cacheUpdatedAt": {
+      "timestampValue": "2026-09-22T16:11:46.414Z"
+    }
+  },
+  "createTime": "2026-08-01T17:47:12.247929Z",
+  "updateTime": "2026-09-22T17:38:09.786074Z"
+}

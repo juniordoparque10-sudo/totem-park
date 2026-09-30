@@ -1,0 +1,11 @@
+{
+  "inputJsSha256": "0EF4A671B144589C5977F4985F9FE66579EE50E444F1F4E76B9C7D1F2B31F3BD",
+  "outputJsSha256": "1C7529A82FA5831B408AAAD70295167E914166704416EE02216B1E14CB75E55D",
+  "inputCssSha256": "77391472D6D3A2A464B24488322B6CBC09511D2E8FAE63229853234DB9594BD5",
+  "outputCssSha256": "452F67B2379D4244D295A964C6E81175EC7CDF674AB11D984A381970B1B1BE15",
+  "changes": [
+    "A successful cycle shows ready only when downloaded > 0; no green toast for warm cache or failed cycle",
+    "Ready label becomes Conteúdo atualizado ✓ in both Player views",
+    "Ready toast is green and fades within three seconds"
+  ]
+}

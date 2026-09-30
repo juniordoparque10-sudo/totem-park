@@ -1,0 +1,965 @@
+{
+  "error": "Error: page.evaluate: Error: {\"manifest\":{\"version\":1,\"clientId\":\"audit\",\"manifestKey\":\"d61e8270\",\"totalItems\":1,\"totalSizeBytes\":0,\"entries\":[{\"key\":\"5dec958a\",\"index\":0,\"id\":\"big.webm\",\"mediaId\":\"big.webm\",\"remoteUrl\":\"http://127.0.0.1:5204/media/big.webm\",\"storagePath\":\"\",\"fileName\":\"\",\"sizeBytes\":0,\"fileVersion\":\"\",\"type\":\"Vídeo\"}]},\"total\":1,\"cached\":0,\"failed\":1,\"downloaded\":0,\"downloadedBytes\":0,\"results\":{},\"failures\":[{\"key\":\"5dec958a\",\"url\":\"http://127.0.0.1:5204/media/big.webm\",\"message\":\"Failed to execute 'put' on 'Cache': Cache.put() encountered a network error\"}]}\n    at eval (eval at evaluate (:311:30), <anonymous>:4:170)\n    at async <anonymous>:337:30",
+  "runs": [
+    {
+      "phase": "no-sw-small.webm-empty",
+      "events": [
+        {
+          "kind": "T0-playlist",
+          "t": 127.90000000596046
+        },
+        {
+          "kind": "T1-selected",
+          "t": 127.90000000596046
+        },
+        {
+          "kind": "T2-src",
+          "t": 129,
+          "src": "http://127.0.0.1:5204/media/small.webm"
+        },
+        {
+          "kind": "T4-prepare",
+          "t": 129
+        },
+        {
+          "kind": "T5-cache-fetch",
+          "t": 150.60000002384186,
+          "remoteUrl": "http://127.0.0.1:5204/media/small.webm"
+        },
+        {
+          "kind": "T6-cache-response",
+          "t": 154.60000002384186,
+          "remoteUrl": "http://127.0.0.1:5204/media/small.webm",
+          "status": 200
+        },
+        {
+          "kind": "T7-cache-stored",
+          "t": 159.80000001192093,
+          "remoteUrl": "http://127.0.0.1:5204/media/small.webm"
+        },
+        {
+          "kind": "T8-blob",
+          "t": 161.2000000178814,
+          "url": "blob:http://127.0.0.1:5204/413ea412-dd93-4271-9aaf-63966403b40d",
+          "bytes": 27656
+        },
+        {
+          "kind": "T9-map-updated",
+          "t": 162.40000000596046
+        },
+        {
+          "kind": "T10-first-frame",
+          "t": 175.10000002384186,
+          "src": "blob:http://127.0.0.1:5204/413ea412-dd93-4271-9aaf-63966403b40d"
+        }
+      ],
+      "summary": {
+        "downloaded": 1,
+        "downloadedBytes": 27656,
+        "cached": 1,
+        "failed": 0
+      },
+      "resources": [
+        {
+          "url": "http://127.0.0.1:5204/media/small.webm",
+          "initiatorType": "video",
+          "startTime": 149,
+          "duration": 4.4000000059604645,
+          "transferSize": 27956,
+          "encodedBodySize": 27656,
+          "decodedBodySize": 27656
+        },
+        {
+          "url": "http://127.0.0.1:5204/media/small.webm",
+          "initiatorType": "fetch",
+          "startTime": 150.80000001192093,
+          "duration": 3.0999999940395355,
+          "transferSize": 27956,
+          "encodedBodySize": 27656,
+          "decodedBodySize": 27656
+        }
+      ],
+      "src": "blob:http://127.0.0.1:5204/413ea412-dd93-4271-9aaf-63966403b40d",
+      "readyState": 4,
+      "wire": [
+        {
+          "phase": "no-sw-small.webm-empty",
+          "at": 1789760041521,
+          "url": "http://127.0.0.1:5204/media/small.webm",
+          "method": "GET",
+          "range": "bytes=0-27655",
+          "ifNoneMatch": "\"5f5015fbb36a8379f70a8861a71efa490ab4a4945bef4460fd6a71be6a940013\"",
+          "status": 304,
+          "contentLength": 0,
+          "bodyBytes": 0
+        },
+        {
+          "phase": "no-sw-small.webm-empty",
+          "at": 1789760041523,
+          "url": "http://127.0.0.1:5204/media/small.webm",
+          "method": "GET",
+          "range": null,
+          "ifNoneMatch": null,
+          "status": 200,
+          "contentLength": 27656,
+          "bodyBytes": 27656
+        }
+      ]
+    },
+    {
+      "phase": "no-sw-small.webm-ready",
+      "events": [
+        {
+          "kind": "T0-playlist",
+          "t": 3669.2000000178814
+        },
+        {
+          "kind": "T1-selected",
+          "t": 3669.300000011921
+        },
+        {
+          "kind": "T8-blob",
+          "t": 3672.100000023842,
+          "url": "blob:http://127.0.0.1:5204/de357d18-24cc-43d9-9e53-eb2eed9ead38",
+          "bytes": 27656
+        },
+        {
+          "kind": "T2-src",
+          "t": 3672.100000023842,
+          "src": "blob:http://127.0.0.1:5204/de357d18-24cc-43d9-9e53-eb2eed9ead38"
+        },
+        {
+          "kind": "T4-prepare",
+          "t": 3672.2000000178814
+        },
+        {
+          "kind": "T8-blob",
+          "t": 3674.5,
+          "url": "blob:http://127.0.0.1:5204/62447778-9534-42a6-bc23-a901138603b5",
+          "bytes": 27656
+        },
+        {
+          "kind": "T9-map-updated",
+          "t": 3674.600000023842
+        },
+        {
+          "kind": "T10-first-frame",
+          "t": 3691.300000011921,
+          "src": "blob:http://127.0.0.1:5204/62447778-9534-42a6-bc23-a901138603b5"
+        }
+      ],
+      "summary": {
+        "downloaded": 0,
+        "downloadedBytes": 0,
+        "cached": 1,
+        "failed": 0
+      },
+      "resources": [],
+      "src": "blob:http://127.0.0.1:5204/62447778-9534-42a6-bc23-a901138603b5",
+      "readyState": 4,
+      "wire": []
+    },
+    {
+      "phase": "no-sw-small.webm-reload",
+      "events": [
+        {
+          "kind": "T0-playlist",
+          "t": 34.599999994039536
+        },
+        {
+          "kind": "T1-selected",
+          "t": 34.599999994039536
+        },
+        {
+          "kind": "T8-blob",
+          "t": 36.69999998807907,
+          "url": "blob:http://127.0.0.1:5204/dae6cd6f-6d1f-4af7-a506-4e4cd47c100f",
+          "bytes": 27656
+        },
+        {
+          "kind": "T2-src",
+          "t": 36.69999998807907,
+          "src": "blob:http://127.0.0.1:5204/dae6cd6f-6d1f-4af7-a506-4e4cd47c100f"
+        },
+        {
+          "kind": "T4-prepare",
+          "t": 36.69999998807907
+        },
+        {
+          "kind": "T8-blob",
+          "t": 38.69999998807907,
+          "url": "blob:http://127.0.0.1:5204/983617d3-5f3a-4cf1-89cb-11fdd5e516a0",
+          "bytes": 27656
+        },
+        {
+          "kind": "T9-map-updated",
+          "t": 39
+        },
+        {
+          "kind": "T10-first-frame",
+          "t": 55.69999998807907,
+          "src": "blob:http://127.0.0.1:5204/983617d3-5f3a-4cf1-89cb-11fdd5e516a0"
+        }
+      ],
+      "summary": {
+        "downloaded": 0,
+        "downloadedBytes": 0,
+        "cached": 1,
+        "failed": 0
+      },
+      "resources": [],
+      "src": "blob:http://127.0.0.1:5204/983617d3-5f3a-4cf1-89cb-11fdd5e516a0",
+      "readyState": 4,
+      "wire": []
+    },
+    {
+      "phase": "no-sw-image.png-empty",
+      "events": [
+        {
+          "kind": "T0-playlist",
+          "t": 3547.0999999940395
+        },
+        {
+          "kind": "T1-selected",
+          "t": 3547.0999999940395
+        },
+        {
+          "kind": "T2-src",
+          "t": 3547.199999988079,
+          "src": "http://127.0.0.1:5204/media/image.png"
+        },
+        {
+          "kind": "T4-prepare",
+          "t": 3547.2999999821186
+        },
+        {
+          "kind": "T5-cache-fetch",
+          "t": 3547.699999988079,
+          "remoteUrl": "http://127.0.0.1:5204/media/image.png"
+        },
+        {
+          "kind": "T6-cache-response",
+          "t": 3550.0999999940395,
+          "remoteUrl": "http://127.0.0.1:5204/media/image.png",
+          "status": 200
+        },
+        {
+          "kind": "T10-image-loaded",
+          "t": 3551.5999999940395,
+          "src": "http://127.0.0.1:5204/media/image.png",
+          "width": 640
+        },
+        {
+          "kind": "T7-cache-stored",
+          "t": 3553.0999999940395,
+          "remoteUrl": "http://127.0.0.1:5204/media/image.png"
+        },
+        {
+          "kind": "T8-blob",
+          "t": 3553.7999999821186,
+          "url": "blob:http://127.0.0.1:5204/6572977a-28c0-481b-805f-c53a58483c79",
+          "bytes": 15649
+        },
+        {
+          "kind": "T9-map-updated",
+          "t": 3554
+        },
+        {
+          "kind": "T10-image-loaded",
+          "t": 3555,
+          "src": "blob:http://127.0.0.1:5204/6572977a-28c0-481b-805f-c53a58483c79",
+          "width": 640
+        }
+      ],
+      "summary": {
+        "downloaded": 1,
+        "downloadedBytes": 15649,
+        "cached": 1,
+        "failed": 0
+      },
+      "resources": [
+        {
+          "url": "http://127.0.0.1:5204/media/image.png",
+          "initiatorType": "img",
+          "startTime": 3547.399999976158,
+          "duration": 3.300000011920929,
+          "transferSize": 300,
+          "encodedBodySize": 15649,
+          "decodedBodySize": 15649
+        },
+        {
+          "url": "http://127.0.0.1:5204/media/image.png",
+          "initiatorType": "fetch",
+          "startTime": 3547.899999976158,
+          "duration": 1.7000000178813934,
+          "transferSize": 15949,
+          "encodedBodySize": 15649,
+          "decodedBodySize": 15649
+        }
+      ],
+      "src": "blob:http://127.0.0.1:5204/6572977a-28c0-481b-805f-c53a58483c79",
+      "width": 640,
+      "wire": [
+        {
+          "phase": "no-sw-image.png-empty",
+          "at": 1789760052104,
+          "url": "http://127.0.0.1:5204/media/image.png",
+          "method": "GET",
+          "range": null,
+          "ifNoneMatch": null,
+          "status": 200,
+          "contentLength": 15649,
+          "bodyBytes": 15649
+        },
+        {
+          "phase": "no-sw-image.png-empty",
+          "at": 1789760052105,
+          "url": "http://127.0.0.1:5204/media/image.png",
+          "method": "GET",
+          "range": null,
+          "ifNoneMatch": "\"693d9b80d37e3cbb797ae1ae390d6bd9e5b7aff990231b8a58f67b64dccd72fd\"",
+          "status": 304,
+          "contentLength": 0,
+          "bodyBytes": 0
+        }
+      ]
+    },
+    {
+      "phase": "no-sw-image.png-ready",
+      "events": [
+        {
+          "kind": "T0-playlist",
+          "t": 7059.199999988079
+        },
+        {
+          "kind": "T1-selected",
+          "t": 7059.199999988079
+        },
+        {
+          "kind": "T8-blob",
+          "t": 7061.0999999940395,
+          "url": "blob:http://127.0.0.1:5204/5b128b92-60fc-4b3d-812f-f11823f9879a",
+          "bytes": 15649
+        },
+        {
+          "kind": "T2-src",
+          "t": 7061.0999999940395,
+          "src": "blob:http://127.0.0.1:5204/5b128b92-60fc-4b3d-812f-f11823f9879a"
+        },
+        {
+          "kind": "T4-prepare",
+          "t": 7061.0999999940395
+        },
+        {
+          "kind": "T10-image-loaded",
+          "t": 7062.299999982119,
+          "src": "blob:http://127.0.0.1:5204/5b128b92-60fc-4b3d-812f-f11823f9879a",
+          "width": 640
+        },
+        {
+          "kind": "T8-blob",
+          "t": 7062.5,
+          "url": "blob:http://127.0.0.1:5204/3d9b5a06-8771-441c-9e03-d4abde233996",
+          "bytes": 15649
+        },
+        {
+          "kind": "T9-map-updated",
+          "t": 7062.5999999940395
+        },
+        {
+          "kind": "T10-image-loaded",
+          "t": 7063.5,
+          "src": "blob:http://127.0.0.1:5204/3d9b5a06-8771-441c-9e03-d4abde233996",
+          "width": 640
+        }
+      ],
+      "summary": {
+        "downloaded": 0,
+        "downloadedBytes": 0,
+        "cached": 1,
+        "failed": 0
+      },
+      "resources": [],
+      "src": "blob:http://127.0.0.1:5204/3d9b5a06-8771-441c-9e03-d4abde233996",
+      "width": 640,
+      "wire": []
+    },
+    {
+      "phase": "no-sw-image.png-reload",
+      "events": [
+        {
+          "kind": "T0-playlist",
+          "t": 34.900000005960464
+        },
+        {
+          "kind": "T1-selected",
+          "t": 35
+        },
+        {
+          "kind": "T8-blob",
+          "t": 36.400000005960464,
+          "url": "blob:http://127.0.0.1:5204/caa3dfd6-5930-4490-b4a1-9ef0d61ba0d9",
+          "bytes": 15649
+        },
+        {
+          "kind": "T2-src",
+          "t": 36.400000005960464,
+          "src": "blob:http://127.0.0.1:5204/caa3dfd6-5930-4490-b4a1-9ef0d61ba0d9"
+        },
+        {
+          "kind": "T4-prepare",
+          "t": 36.400000005960464
+        },
+        {
+          "kind": "T10-image-loaded",
+          "t": 37.80000001192093,
+          "src": "blob:http://127.0.0.1:5204/caa3dfd6-5930-4490-b4a1-9ef0d61ba0d9",
+          "width": 640
+        },
+        {
+          "kind": "T8-blob",
+          "t": 38.30000001192093,
+          "url": "blob:http://127.0.0.1:5204/9fe31bee-9442-44a4-9743-9d1bdf37edb8",
+          "bytes": 15649
+        },
+        {
+          "kind": "T9-map-updated",
+          "t": 38.400000005960464
+        },
+        {
+          "kind": "T10-image-loaded",
+          "t": 39.20000001788139,
+          "src": "blob:http://127.0.0.1:5204/9fe31bee-9442-44a4-9743-9d1bdf37edb8",
+          "width": 640
+        }
+      ],
+      "summary": {
+        "downloaded": 0,
+        "downloadedBytes": 0,
+        "cached": 1,
+        "failed": 0
+      },
+      "resources": [],
+      "src": "blob:http://127.0.0.1:5204/9fe31bee-9442-44a4-9743-9d1bdf37edb8",
+      "width": 640,
+      "wire": []
+    }
+  ],
+  "wire": [
+    {
+      "phase": "no-sw-small.webm-empty",
+      "at": 1789760041521,
+      "url": "http://127.0.0.1:5204/media/small.webm",
+      "method": "GET",
+      "range": "bytes=0-27655",
+      "ifNoneMatch": "\"5f5015fbb36a8379f70a8861a71efa490ab4a4945bef4460fd6a71be6a940013\"",
+      "status": 304,
+      "contentLength": 0,
+      "bodyBytes": 0
+    },
+    {
+      "phase": "no-sw-small.webm-empty",
+      "at": 1789760041523,
+      "url": "http://127.0.0.1:5204/media/small.webm",
+      "method": "GET",
+      "range": null,
+      "ifNoneMatch": null,
+      "status": 200,
+      "contentLength": 27656,
+      "bodyBytes": 27656
+    },
+    {
+      "phase": "no-sw-image.png-empty",
+      "at": 1789760052104,
+      "url": "http://127.0.0.1:5204/media/image.png",
+      "method": "GET",
+      "range": null,
+      "ifNoneMatch": null,
+      "status": 200,
+      "contentLength": 15649,
+      "bodyBytes": 15649
+    },
+    {
+      "phase": "no-sw-image.png-empty",
+      "at": 1789760052105,
+      "url": "http://127.0.0.1:5204/media/image.png",
+      "method": "GET",
+      "range": null,
+      "ifNoneMatch": "\"693d9b80d37e3cbb797ae1ae390d6bd9e5b7aff990231b8a58f67b64dccd72fd\"",
+      "status": 304,
+      "contentLength": 0,
+      "bodyBytes": 0
+    },
+    {
+      "phase": "no-sw-big.webm-empty",
+      "at": 1789760062700,
+      "url": "http://127.0.0.1:5204/media/big.webm",
+      "method": "GET",
+      "range": null,
+      "ifNoneMatch": null,
+      "status": 200,
+      "contentLength": 28947112,
+      "bodyBytes": 28947112
+    },
+    {
+      "phase": "no-sw-big.webm-empty",
+      "at": 1789760062718,
+      "url": "http://127.0.0.1:5204/media/big.webm",
+      "method": "GET",
+      "range": "bytes=0-1048575",
+      "ifNoneMatch": "\"bd16d2bd5576458031a1684db7ce08a18bbe9f249a0b136b63782f8f2d831d06\"",
+      "status": 304,
+      "contentLength": 0,
+      "bodyBytes": 0
+    },
+    {
+      "phase": "no-sw-big.webm-empty",
+      "at": 1789760062793,
+      "url": "http://127.0.0.1:5204/media/big.webm",
+      "method": "GET",
+      "range": "bytes=25886720-28947111",
+      "ifNoneMatch": null,
+      "status": 206,
+      "contentLength": 3060392,
+      "bodyBytes": 3060392
+    }
+  ],
+  "network": [
+    {
+      "phase": "setup",
+      "type": "finished",
+      "id": "F750B220496520A8B0C8053540D8E1AC",
+      "encodedDataLength": 431,
+      "timestamp": 235262.340596
+    },
+    {
+      "phase": "setup",
+      "type": "finished",
+      "id": "28928.2",
+      "encodedDataLength": 14818,
+      "timestamp": 235262.357861
+    },
+    {
+      "phase": "setup",
+      "type": "finished",
+      "id": "28928.3",
+      "encodedDataLength": 431,
+      "timestamp": 235262.367416
+    },
+    {
+      "phase": "no-sw-small.webm-empty",
+      "type": "request",
+      "id": "28928.4",
+      "url": "http://127.0.0.1:5204/media/small.webm",
+      "initiator": {
+        "type": "other"
+      },
+      "method": "GET",
+      "headers": {
+        "sec-ch-ua-platform": "\"Windows\"",
+        "Referer": "http://127.0.0.1:5204/",
+        "Accept-Encoding": "identity;q=1, *;q=0",
+        "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) HeadlessChrome/152.0.0.0 Safari/537.36",
+        "sec-ch-ua": "\"Chromium\";v=\"152\", \"Not?A_Brand\";v=\"24\", \"Google Chrome\";v=\"152\"",
+        "Range": "bytes=0-",
+        "sec-ch-ua-mobile": "?0"
+      },
+      "timestamp": 235262.482572
+    },
+    {
+      "phase": "no-sw-small.webm-empty",
+      "type": "request",
+      "id": "28928.5",
+      "url": "http://127.0.0.1:5204/media/small.webm",
+      "initiator": {
+        "type": "script",
+        "stack": {
+          "callFrames": [
+            {
+              "functionName": "cacheSingleMedia",
+              "scriptId": "6",
+              "url": "http://127.0.0.1:5204/module.js",
+              "lineNumber": 249,
+              "columnNumber": 66
+            }
+          ]
+        }
+      },
+      "method": "GET",
+      "headers": {
+        "sec-ch-ua-platform": "\"Windows\"",
+        "Referer": "http://127.0.0.1:5204/",
+        "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) HeadlessChrome/152.0.0.0 Safari/537.36",
+        "sec-ch-ua": "\"Chromium\";v=\"152\", \"Not?A_Brand\";v=\"24\", \"Google Chrome\";v=\"152\"",
+        "sec-ch-ua-mobile": "?0"
+      },
+      "timestamp": 235262.484487
+    },
+    {
+      "phase": "no-sw-small.webm-empty",
+      "type": "response",
+      "id": "28928.4",
+      "url": "http://127.0.0.1:5204/media/small.webm",
+      "status": 206,
+      "headers": {
+        "Accept-Ranges": "bytes",
+        "Cache-Control": "private, max-age=0",
+        "Content-Length": "27656",
+        "Date": "Fri, 18 Sep 2026 19:34:01 GMT",
+        "ETag": "\"5f5015fbb36a8379f70a8861a71efa490ab4a4945bef4460fd6a71be6a940013\"",
+        "Content-Type": "video/webm",
+        "Content-Range": "bytes 0-27655/27656"
+      },
+      "fromDiskCache": false,
+      "fromServiceWorker": false,
+      "timestamp": 235262.48669
+    },
+    {
+      "phase": "no-sw-small.webm-empty",
+      "type": "finished",
+      "id": "28928.4",
+      "encodedDataLength": 289,
+      "timestamp": 235262.487124
+    },
+    {
+      "phase": "no-sw-small.webm-empty",
+      "type": "response",
+      "id": "28928.5",
+      "url": "http://127.0.0.1:5204/media/small.webm",
+      "status": 200,
+      "headers": {
+        "Cache-Control": "private, max-age=0",
+        "ETag": "\"5f5015fbb36a8379f70a8861a71efa490ab4a4945bef4460fd6a71be6a940013\"",
+        "Connection": "keep-alive",
+        "Accept-Ranges": "bytes",
+        "Content-Length": "27656",
+        "Keep-Alive": "timeout=5",
+        "Date": "Fri, 18 Sep 2026 19:34:01 GMT",
+        "Content-Type": "video/webm"
+      },
+      "fromDiskCache": false,
+      "fromServiceWorker": false,
+      "timestamp": 235262.488171
+    },
+    {
+      "phase": "no-sw-small.webm-empty",
+      "type": "finished",
+      "id": "28928.5",
+      "encodedDataLength": 27939,
+      "timestamp": 235262.487616
+    },
+    {
+      "phase": "no-sw-small.webm-empty",
+      "type": "finished",
+      "id": "28928.6",
+      "encodedDataLength": 0,
+      "timestamp": 235262.497582
+    },
+    {
+      "phase": "no-sw-small.webm-ready",
+      "type": "finished",
+      "id": "28928.7",
+      "encodedDataLength": 0,
+      "timestamp": 235266.007253
+    },
+    {
+      "phase": "no-sw-small.webm-ready",
+      "type": "finished",
+      "id": "28928.8",
+      "encodedDataLength": 0,
+      "timestamp": 235266.010934
+    },
+    {
+      "phase": "no-sw-small.webm-ready",
+      "type": "finished",
+      "id": "1421C9683BEF299B4381AA909FADF0E8",
+      "encodedDataLength": 431,
+      "timestamp": 235269.521829
+    },
+    {
+      "phase": "no-sw-small.webm-ready",
+      "type": "finished",
+      "id": "28928.10",
+      "encodedDataLength": 14818,
+      "timestamp": 235269.532536
+    },
+    {
+      "phase": "no-sw-small.webm-ready",
+      "type": "finished",
+      "id": "28928.11",
+      "encodedDataLength": 431,
+      "timestamp": 235269.537624
+    },
+    {
+      "phase": "no-sw-small.webm-reload",
+      "type": "finished",
+      "id": "28928.12",
+      "encodedDataLength": 0,
+      "timestamp": 235269.556596
+    },
+    {
+      "phase": "no-sw-small.webm-reload",
+      "type": "finished",
+      "id": "28928.13",
+      "encodedDataLength": 0,
+      "timestamp": 235269.560541
+    },
+    {
+      "phase": "no-sw-image.png-empty",
+      "type": "request",
+      "id": "28928.14",
+      "url": "http://127.0.0.1:5204/media/image.png",
+      "initiator": {
+        "type": "other"
+      },
+      "method": "GET",
+      "headers": {
+        "sec-ch-ua-platform": "\"Windows\"",
+        "Referer": "http://127.0.0.1:5204/",
+        "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) HeadlessChrome/152.0.0.0 Safari/537.36",
+        "sec-ch-ua": "\"Chromium\";v=\"152\", \"Not?A_Brand\";v=\"24\", \"Google Chrome\";v=\"152\"",
+        "sec-ch-ua-mobile": "?0"
+      },
+      "timestamp": 235273.066226
+    },
+    {
+      "phase": "no-sw-image.png-empty",
+      "type": "request",
+      "id": "28928.15",
+      "url": "http://127.0.0.1:5204/media/image.png",
+      "initiator": {
+        "type": "script",
+        "stack": {
+          "callFrames": [
+            {
+              "functionName": "cacheSingleMedia",
+              "scriptId": "6",
+              "url": "http://127.0.0.1:5204/module.js",
+              "lineNumber": 249,
+              "columnNumber": 66
+            }
+          ]
+        }
+      },
+      "method": "GET",
+      "headers": {
+        "sec-ch-ua-platform": "\"Windows\"",
+        "Referer": "http://127.0.0.1:5204/",
+        "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) HeadlessChrome/152.0.0.0 Safari/537.36",
+        "sec-ch-ua": "\"Chromium\";v=\"152\", \"Not?A_Brand\";v=\"24\", \"Google Chrome\";v=\"152\"",
+        "sec-ch-ua-mobile": "?0"
+      },
+      "timestamp": 235273.066616
+    },
+    {
+      "phase": "no-sw-image.png-empty",
+      "type": "response",
+      "id": "28928.15",
+      "url": "http://127.0.0.1:5204/media/image.png",
+      "status": 200,
+      "headers": {
+        "Cache-Control": "private, max-age=0",
+        "ETag": "\"693d9b80d37e3cbb797ae1ae390d6bd9e5b7aff990231b8a58f67b64dccd72fd\"",
+        "Connection": "keep-alive",
+        "Accept-Ranges": "bytes",
+        "Content-Length": "15649",
+        "Keep-Alive": "timeout=5",
+        "Date": "Fri, 18 Sep 2026 19:34:12 GMT",
+        "Content-Type": "image/png"
+      },
+      "fromDiskCache": false,
+      "fromServiceWorker": false,
+      "timestamp": 235273.068758
+    },
+    {
+      "phase": "no-sw-image.png-empty",
+      "type": "finished",
+      "id": "28928.15",
+      "encodedDataLength": 15931,
+      "timestamp": 235273.068335
+    },
+    {
+      "phase": "no-sw-image.png-empty",
+      "type": "response",
+      "id": "28928.14",
+      "url": "http://127.0.0.1:5204/media/image.png",
+      "status": 200,
+      "headers": {
+        "Accept-Ranges": "bytes",
+        "Cache-Control": "private, max-age=0",
+        "Content-Length": "15649",
+        "Date": "Fri, 18 Sep 2026 19:34:12 GMT",
+        "ETag": "\"693d9b80d37e3cbb797ae1ae390d6bd9e5b7aff990231b8a58f67b64dccd72fd\"",
+        "Content-Type": "image/png"
+      },
+      "fromDiskCache": false,
+      "fromServiceWorker": false,
+      "timestamp": 235273.069818
+    },
+    {
+      "phase": "no-sw-image.png-empty",
+      "type": "finished",
+      "id": "28928.14",
+      "encodedDataLength": 288,
+      "timestamp": 235273.069484
+    },
+    {
+      "phase": "no-sw-image.png-empty",
+      "type": "finished",
+      "id": "28928.16",
+      "encodedDataLength": 0,
+      "timestamp": 235273.073341
+    },
+    {
+      "phase": "no-sw-image.png-ready",
+      "type": "finished",
+      "id": "28928.17",
+      "encodedDataLength": 0,
+      "timestamp": 235276.580683
+    },
+    {
+      "phase": "no-sw-image.png-ready",
+      "type": "finished",
+      "id": "28928.18",
+      "encodedDataLength": 0,
+      "timestamp": 235276.582065
+    },
+    {
+      "phase": "no-sw-image.png-ready",
+      "type": "finished",
+      "id": "834736719A29241830D43A2FE0E51EFE",
+      "encodedDataLength": 431,
+      "timestamp": 235280.097256
+    },
+    {
+      "phase": "no-sw-image.png-ready",
+      "type": "finished",
+      "id": "28928.20",
+      "encodedDataLength": 14818,
+      "timestamp": 235280.108772
+    },
+    {
+      "phase": "no-sw-image.png-ready",
+      "type": "finished",
+      "id": "28928.21",
+      "encodedDataLength": 431,
+      "timestamp": 235280.115901
+    },
+    {
+      "phase": "no-sw-image.png-reload",
+      "type": "finished",
+      "id": "28928.22",
+      "encodedDataLength": 0,
+      "timestamp": 235280.13243
+    },
+    {
+      "phase": "no-sw-image.png-reload",
+      "type": "finished",
+      "id": "28928.23",
+      "encodedDataLength": 0,
+      "timestamp": 235280.13421
+    },
+    {
+      "phase": "no-sw-big.webm-empty",
+      "type": "request",
+      "id": "28928.24",
+      "url": "http://127.0.0.1:5204/media/big.webm",
+      "initiator": {
+        "type": "other"
+      },
+      "method": "GET",
+      "headers": {
+        "sec-ch-ua-platform": "\"Windows\"",
+        "Referer": "http://127.0.0.1:5204/",
+        "Accept-Encoding": "identity;q=1, *;q=0",
+        "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) HeadlessChrome/152.0.0.0 Safari/537.36",
+        "sec-ch-ua": "\"Chromium\";v=\"152\", \"Not?A_Brand\";v=\"24\", \"Google Chrome\";v=\"152\"",
+        "Range": "bytes=0-",
+        "sec-ch-ua-mobile": "?0"
+      },
+      "timestamp": 235283.648104
+    },
+    {
+      "phase": "no-sw-big.webm-empty",
+      "type": "request",
+      "id": "28928.25",
+      "url": "http://127.0.0.1:5204/media/big.webm",
+      "initiator": {
+        "type": "script",
+        "stack": {
+          "callFrames": [
+            {
+              "functionName": "cacheSingleMedia",
+              "scriptId": "6",
+              "url": "http://127.0.0.1:5204/module.js",
+              "lineNumber": 249,
+              "columnNumber": 66
+            }
+          ]
+        }
+      },
+      "method": "GET",
+      "headers": {
+        "sec-ch-ua-platform": "\"Windows\"",
+        "Referer": "http://127.0.0.1:5204/",
+        "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) HeadlessChrome/152.0.0.0 Safari/537.36",
+        "sec-ch-ua": "\"Chromium\";v=\"152\", \"Not?A_Brand\";v=\"24\", \"Google Chrome\";v=\"152\"",
+        "sec-ch-ua-mobile": "?0"
+      },
+      "timestamp": 235283.648576
+    },
+    {
+      "phase": "no-sw-big.webm-empty",
+      "type": "response",
+      "id": "28928.25",
+      "url": "http://127.0.0.1:5204/media/big.webm",
+      "status": 200,
+      "headers": {
+        "Cache-Control": "private, max-age=0",
+        "ETag": "\"bd16d2bd5576458031a1684db7ce08a18bbe9f249a0b136b63782f8f2d831d06\"",
+        "Connection": "keep-alive",
+        "Accept-Ranges": "bytes",
+        "Content-Length": "28947112",
+        "Keep-Alive": "timeout=5",
+        "Date": "Fri, 18 Sep 2026 19:34:22 GMT",
+        "Content-Type": "video/webm"
+      },
+      "fromDiskCache": false,
+      "fromServiceWorker": false,
+      "timestamp": 235283.667973
+    },
+    {
+      "phase": "no-sw-big.webm-empty",
+      "type": "response",
+      "id": "28928.24",
+      "url": "http://127.0.0.1:5204/media/big.webm",
+      "status": 206,
+      "headers": {
+        "Accept-Ranges": "bytes",
+        "Cache-Control": "private, max-age=0",
+        "Content-Length": "28947112",
+        "Date": "Fri, 18 Sep 2026 19:34:22 GMT",
+        "ETag": "\"bd16d2bd5576458031a1684db7ce08a18bbe9f249a0b136b63782f8f2d831d06\"",
+        "Content-Type": "video/webm",
+        "Content-Range": "bytes 0-28947111/28947112"
+      },
+      "fromDiskCache": false,
+      "fromServiceWorker": false,
+      "timestamp": 235283.683158
+    },
+    {
+      "phase": "no-sw-big.webm-empty",
+      "type": "finished",
+      "id": "28928.25",
+      "encodedDataLength": 28947398,
+      "timestamp": 235283.754343
+    },
+    {
+      "phase": "no-sw-big.webm-empty",
+      "type": "finished",
+      "id": "28928.24",
+      "encodedDataLength": 3061028,
+      "timestamp": 235283.768229
+    }
+  ]
+}

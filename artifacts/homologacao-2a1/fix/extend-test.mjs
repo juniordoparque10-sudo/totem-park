@@ -1,0 +1,7 @@
+import fs from 'node:fs';
+const file='artifacts/homologacao-2a1/fix-diagnostic.mjs';let s=fs.readFileSync(file,'utf8');
+s=s.replace("const page=context.pages()[0];",`const page=context.pages()[0];const cdp=await context.newCDPSession(page);await cdp.send('Network.enable');const requests=new Map();cdp.on('Network.requestWillBeSent',e=>{if(!e.request.url.includes('/media/'))return;const row={at:Date.now(),url:e.request.url,encodedBodyBytes:0,decodedBodyBytes:0};requests.set(e.requestId,row);result.network.push(row);});cdp.on('Network.responseReceived',e=>{const r=requests.get(e.requestId);if(r)Object.assign(r,{status:e.response.status,sw:e.response.fromServiceWorker,disk:e.response.fromDiskCache});});cdp.on('Network.dataReceived',e=>{const r=requests.get(e.requestId);if(r){r.encodedBodyBytes+=e.encodedDataLength;r.decodedBodyBytes+=e.dataLength;}});cdp.on('Network.loadingFinished',e=>{const r=requests.get(e.requestId);if(r)r.transferBytes=e.encodedDataLength;});`);
+s=s.replace('result.before=await inv(p);','result.before=await inv(p);result.cachedAt=Date.now();');
+s=s.replace('result.offlineCache=await inv(p);','result.offlineCache=await inv(p);result.fullTimeline=await p.evaluate(()=>window.fix);');
+s=s.replace("fs.writeFileSync(path.join(out,`${variant}.json`)","try{result.fixtureRequests=JSON.parse(fs.readFileSync(path.join(root,'evidence.json'))).requests;}catch{}fs.writeFileSync(path.join(out,`${variant}.json`)");
+fs.writeFileSync(file,s);

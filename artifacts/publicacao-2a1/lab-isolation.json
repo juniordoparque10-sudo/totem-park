@@ -1,0 +1,10 @@
+{
+  "originalPublishedSHA256": "280fdb8b81cedc81602fdcf98335d7afce5738f7b6691437aea77b50cfcae0b7",
+  "temporaryChanges": [
+    "Firestore project → demo-totem-homolog",
+    "Firestore host → 127.0.0.1:8288, ssl=false",
+    "Auth apiKey → demo-local-key"
+  ],
+  "delivery": "In-memory response only, never written to published dist or deployed",
+  "productionBlockedByCSP": true
+}

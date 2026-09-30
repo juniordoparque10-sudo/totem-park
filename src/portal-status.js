@@ -1,6 +1,6 @@
 export const SCREEN_HEARTBEAT_INTERVAL_MS = 15_000;
 export const SCREEN_ONLINE_THRESHOLD_MS = 45_000;
-export const SCREEN_ATTENTION_THRESHOLD_MS = 120_000;
+export const SCREEN_ATTENTION_THRESHOLD_MS = 90_000;
 const PT_BR_COLLATOR = new Intl.Collator("pt-BR", { sensitivity: "base", numeric: true });
 
 export function sortClientsAlphabetically(clients = []) {
@@ -21,16 +21,29 @@ export function timestampMs(value) {
   return Number.isFinite(parsed) ? parsed : 0;
 }
 
-export function getPortalScreenStatus(screen, now = Date.now()) {
-  const lastSeenAt = Math.max(
+export function getPortalLastSignalMs(screen = {}) {
+  const playerSignal = Math.max(
     timestampMs(screen?.lastSeenAt),
     timestampMs(screen?.lastCommandExecutedAt),
     timestampMs(screen?.lastMediaUpdateAt)
   );
+  const telemetry = screen?.telemetry;
+  const session = telemetry?.session;
+  const trustedV5 = Number(telemetry?.schemaVersion) >= 3
+    && telemetry?.current?.connectionStatus === "ONLINE"
+    && Boolean(screen?.connectedDeviceId)
+    && session?.screenId === screen?.id
+    && session?.clientId === screen?.clientId
+    && session?.deviceId === screen?.connectedDeviceId;
+  return Math.max(playerSignal, trustedV5 ? timestampMs(screen?.telemetryUpdatedAt) : 0);
+}
+
+export function getPortalScreenStatus(screen, now = Date.now()) {
+  const lastSeenAt = getPortalLastSignalMs(screen);
   if (!lastSeenAt) return "OFFLINE";
   const age = Math.max(0, now - lastSeenAt);
-  if (age <= SCREEN_ONLINE_THRESHOLD_MS) return "ONLINE";
-  if (age <= SCREEN_ATTENTION_THRESHOLD_MS) return "ATTENTION";
+  if (age < SCREEN_ONLINE_THRESHOLD_MS) return "ONLINE";
+  if (age < SCREEN_ATTENTION_THRESHOLD_MS) return "ATTENTION";
   return "OFFLINE";
 }
 
@@ -76,7 +89,7 @@ export function comparePortalScreens(left = {}, right = {}, now = Date.now()) {
   const rightOnline = isScreenOnlineForOrder(right, now);
   if (leftOnline !== rightOnline) return leftOnline ? -1 : 1;
   if (!leftOnline) {
-    const lastSeenDifference = timestampMs(right.lastSeenAt) - timestampMs(left.lastSeenAt);
+    const lastSeenDifference = getPortalLastSignalMs(right) - getPortalLastSignalMs(left);
     if (lastSeenDifference !== 0) return lastSeenDifference;
   }
   return compareScreenNames(left, right);

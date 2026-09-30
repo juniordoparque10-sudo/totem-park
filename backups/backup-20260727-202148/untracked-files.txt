@@ -1,0 +1,9 @@
+﻿backup-before-corporate-custom-template.patch
+backup-before-sports-template.patch
+backups/backup-20260727-202148/git-status.txt
+backups/backup-20260727-202148/untracked-files.txt
+backups/backup-20260727-202148/working-tree.patch
+firebase.json
+firestore.rules
+storage.rules
+totem-park-backup-before-commercial-plans.patch
