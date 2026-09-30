@@ -14556,6 +14556,58 @@ button.premium-stat-card{width:100%;font:inherit;text-align:left;color:inherit;c
   max-width: none !important;
 }
 
+.qr-code-configurator {
+  display: grid;
+  gap: 12px;
+  min-width: 0;
+  max-width: 100%;
+}
+
+.qr-code-configurator label {
+  display: grid;
+  gap: 7px;
+  min-width: 0;
+  color: #cbd5e1;
+  font-size: 12px;
+  font-weight: 800;
+}
+
+.qr-code-configurator :is(input, select, textarea) {
+  width: 100%;
+  min-width: 0;
+  max-width: 100%;
+  box-sizing: border-box;
+  border: 1px solid rgba(148, 163, 184, 0.2);
+  border-radius: 12px;
+  padding: 11px 12px;
+  color: #fff;
+  background: #0a1525;
+}
+
+.qr-code-configurator input[type="range"] {
+  padding: 0;
+}
+
+.qr-code-inline-fields {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 12px;
+}
+
+.qr-code-configurator-warning {
+  padding: 9px 11px;
+  border: 1px solid rgba(245, 158, 11, 0.28);
+  border-radius: 9px;
+  color: #fcd34d;
+  background: rgba(245, 158, 11, 0.08);
+}
+
+@media (max-width: 600px) {
+  .qr-code-inline-fields {
+    grid-template-columns: minmax(0, 1fr);
+  }
+}
+
 @media (max-width: 760px) {
   .template-preview-actions {
     width: 100%;

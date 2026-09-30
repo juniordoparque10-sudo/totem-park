@@ -82,7 +82,7 @@ test("content position changes structure without mutating content", () => {
 
 test("QR configuration persists safe positioning controls", () => {
   const draft = createHeroBusinessDraft({ modules: { qrCode: { enabled:true, value:"https://example.com", position:"top-left", size:"large", margin:48 } } });
-  assert.deepEqual(draft.modules.qrCode, { enabled:true, value:"https://example.com", position:"top-left", size:"large", margin:48 });
+  assert.deepEqual(draft.modules.qrCode, { enabled:true, type:"link", countryCode:"55", phone:"", message:"", link:"", text:"", value:"https://example.com", position:"top-left", size:"large", margin:48 });
 });
 
 test("news ticker configuration remains inside the draft contract", () => {

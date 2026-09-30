@@ -56,7 +56,7 @@ const HERO_DEFAULTS = {
     clock: { enabled: true, format: "24h", showDate: true, showLocal: true },
     weather: { enabled: false, city: "Sua cidade", showCity: true, showCurrent: true, showFeelsLike: true, showForecast: true, forecastDays: 5 },
     news: { enabled: false, newsSource: "", newsFeedUrl: "", selectedNewsSources: [], tickerSpeed: "normal", tickerSize: "normal", tickerBackground: "#07111f", tickerTextColor: "#ffffff", tickerTransparency: 8, tickerLabel: "Últimas notícias" },
-    qrCode: { enabled: false, value: "", position: "bottom-right", size: "medium", margin: 32 },
+    qrCode: { enabled: false, type: "link", countryCode: "55", phone: "", message: "", link: "", text: "", value: "", position: "bottom-right", size: "medium", margin: 32 },
   },
   orientationLayouts: {
     landscape: { contentOrder: "content-media" },

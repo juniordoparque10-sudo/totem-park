@@ -1,7 +1,8 @@
 import UploadLimitDialog from "./UploadLimitDialog";
 import { uploadLimitBytes, uploadSizeNotice } from "./upload-plan-policy";
 import TelemetryDashboard from "./TelemetryDashboard";
-import { buildQrUrl } from "./qr-code";
+import { buildQRCodeValue, buildQrUrl, normalizeQRCodeConfig } from "./qr-code";
+import QRCodeConfigurator from "./QRCodeConfigurator";
 import { normalizeTemplatesV2Override, resolveTemplatesV2Entitlement } from "./templates-v2/entitlement";
 import { linkedAtForScreen, telemetryStatus } from "./telemetry-v1";
 ﻿import { useEffect, useLayoutEffect, useRef, useState } from "react";
@@ -10452,6 +10453,7 @@ function getMarketingDefaultForm() {
     whatsapp: "",
     location: "",
     qrText: "",
+    qrCode: { type: "link", countryCode: "55", phone: "", message: "", link: "", text: "", value: "", position: "bottom-right", size: "medium", margin: 32 },
     primaryColor: "#06b6d4",
     secondaryColor: "#9333ea",
     accentColor: "#22d3ee",
@@ -10503,7 +10505,7 @@ function collectOfflineAssetUrls(values) {
       if (fieldValue && typeof fieldValue === "object") visit(fieldValue);
     });
 
-    const qrUrl = buildQrUrl(value.qrText || value.whatsapp || "");
+    const qrUrl = buildQrUrl(buildQRCodeValue(value.qrCode || value.qrText || value.whatsapp || ""));
     if (qrUrl) urls.add(qrUrl);
   }
 
@@ -10523,7 +10525,7 @@ function applyOfflineAssetUrls(item, urlMap) {
     }
   });
 
-  const qrUrl = buildQrUrl(localized.qrText || localized.whatsapp || "");
+  const qrUrl = buildQrUrl(buildQRCodeValue(localized.qrCode || localized.qrText || localized.whatsapp || ""));
   if (qrUrl && urlMap[qrUrl]) localized.qrImageUrl = urlMap[qrUrl];
 
   return localized;
@@ -10603,7 +10605,7 @@ function MarketingArtPreview({ art, compact = false, tv = false }) {
   const isFeed = marketingType === "feed";
   const imageSrc = art.imagePreview || art.imageUrl || "";
   const logoSrc = art.logoPreview || art.logoUrl || "";
-  const qrValue = art.qrText || art.whatsapp || "";
+  const qrValue = buildQRCodeValue(art.qrCode || art.qrText || art.whatsapp || "");
   const qrUrl = art.qrImageUrl || buildQrUrl(qrValue);
   const isVisible = (field) => art[field] !== false;
   const showTopRow = isVisible("showFormatLabel") || isVisible("showLogo");
@@ -10822,9 +10824,10 @@ function ClientMarketingPage({ client, access = getClientPlanAccess(client) }) {
         title: String(form.title || "").trim(),
         subtitle: String(form.subtitle || "").trim(),
         cta: String(form.cta || "").trim(),
-        whatsapp: String(form.whatsapp || "").trim(),
+        whatsapp: String(form.qrCode?.type === "whatsapp" ? form.qrCode.phone : form.whatsapp || "").trim(),
         location: String(form.location || "").trim(),
-        qrText: String(form.qrText || "").trim(),
+        qrCode: { ...normalizeQRCodeConfig(form.qrCode), value: buildQRCodeValue(form.qrCode) },
+        qrText: buildQRCodeValue(form.qrCode),
         imageUrl,
         logoUrl,
         primaryColor: form.primaryColor,
@@ -10914,7 +10917,8 @@ function ClientMarketingPage({ client, access = getClientPlanAccess(client) }) {
         cta: String(art.cta || "").trim(),
         imageUrl: art.imageUrl || "",
         logoUrl: art.logoUrl || "",
-        qrText: String(art.qrText || "").trim(),
+        qrCode: { ...normalizeQRCodeConfig(art.qrCode || art.qrText), value: buildQRCodeValue(art.qrCode || art.qrText) },
+        qrText: buildQRCodeValue(art.qrCode || art.qrText),
         whatsapp: String(art.whatsapp || "").trim(),
         location: String(art.location || "").trim(),
         primaryColor,
@@ -10949,6 +10953,7 @@ function ClientMarketingPage({ client, access = getClientPlanAccess(client) }) {
     setForm({
       ...getMarketingDefaultForm(),
       ...art,
+      qrCode: normalizeQRCodeConfig(art.qrCode || art.qrText || art.whatsapp || ""),
       imageFile: null,
       imagePreview: art.imageUrl || "",
       logoFile: null,
@@ -11066,15 +11071,6 @@ function ClientMarketingPage({ client, access = getClientPlanAccess(client) }) {
             </div>
 
             <div className="form-group">
-              <label>WhatsApp</label>
-              <input
-                value={form.whatsapp}
-                placeholder="Ex: 84 99999-9999"
-                onChange={(e) => setForm({ ...form, whatsapp: e.target.value })}
-              />
-            </div>
-
-            <div className="form-group">
               <label>Localização</label>
               <input
                 value={form.location}
@@ -11083,14 +11079,11 @@ function ClientMarketingPage({ client, access = getClientPlanAccess(client) }) {
               />
             </div>
 
-            <div className="form-group">
-              <label>QR Code / Link</label>
-              <input
-                value={form.qrText}
-                placeholder="Link, WhatsApp ou texto para QR Code"
-                onChange={(e) => setForm({ ...form, qrText: e.target.value })}
-              />
-            </div>
+          </div>
+
+          <div className="template-color-panel marketing-qr-panel">
+            <div className="playlist-section-title compact"><div><h3>QR Code</h3><p>Configure link, WhatsApp direto ou texto livre.</p></div></div>
+            <QRCodeConfigurator value={form.qrCode || form.qrText || form.whatsapp} showDisplayControls onChange={(qrCode) => setForm((current) => ({ ...current, qrCode, qrText: qrCode.value, whatsapp: qrCode.type === "whatsapp" ? qrCode.phone : "" }))} />
           </div>
 
           <VisibilityControls
