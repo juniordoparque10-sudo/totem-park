@@ -14105,6 +14105,11 @@ button.premium-stat-card{width:100%;font:inherit;text-align:left;color:inherit;c
 }
 
 /* Hotfix de homologacao: editor com preview sempre visivel e sem overflow. */
+.content:has(.templates-library-tabs) {
+  overflow-x: clip;
+  overflow-y: visible;
+}
+
 .templates-library-tabs ~ .templates-builder-grid {
   grid-template-areas: "editor preview";
 }
@@ -14269,6 +14274,32 @@ button.premium-stat-card{width:100%;font:inherit;text-align:left;color:inherit;c
     width: 100%;
     justify-content: center;
   }
+
+  .templates-library-tabs ~ .templates-builder-grid:has(.template-scaled-preview-stage.portrait) > .templates-preview-panel,
+  .tpv2-preview-panel:has(.tpv2-preview-viewport.portrait) {
+    max-height: min(52vh, 520px);
+  }
+
+  .templates-library-tabs ~ .templates-builder-grid .template-scaled-preview-stage.portrait,
+  .tpv2-preview-viewport.portrait {
+    height: clamp(330px, 42vh, 460px);
+  }
+
+  .templates-library-tabs ~ .templates-builder-grid .template-scaled-preview-stage.portrait .legacy-template-thumbnail {
+    width: auto;
+    height: 100%;
+    max-width: 100%;
+  }
+
+  .tpv2-preview-panel:has(.tpv2-preview-viewport.portrait) .tpv2-preview-head,
+  .tpv2-preview-panel:has(.tpv2-preview-viewport.portrait) .tpv2-preview-controls {
+    margin-bottom: 5px;
+  }
+
+  .templates-library-tabs ~ .templates-builder-grid .templates-editor-panel :is(input, select, textarea, button),
+  .tpv2-editor-form :is(input, select, textarea, button) {
+    scroll-margin-top: min(58vh, 590px);
+  }
 }
 
 @media (max-width: 430px) {
@@ -14282,11 +14313,19 @@ button.premium-stat-card{width:100%;font:inherit;text-align:left;color:inherit;c
     max-height: 250px;
   }
 
+  .templates-library-tabs ~ .templates-builder-grid:has(.template-scaled-preview-stage.portrait) > .templates-preview-panel,
+  .tpv2-preview-panel:has(.tpv2-preview-viewport.portrait) {
+    max-height: min(52vh, 480px);
+  }
+
   .templates-library-tabs ~ .templates-builder-grid .template-scaled-preview-stage,
-  .templates-library-tabs ~ .templates-builder-grid .template-scaled-preview-stage.portrait,
-  .tpv2-preview-viewport,
-  .tpv2-preview-viewport.portrait {
+  .tpv2-preview-viewport {
     height: clamp(145px, 21vh, 175px);
+  }
+
+  .templates-library-tabs ~ .templates-builder-grid .template-scaled-preview-stage.portrait,
+  .tpv2-preview-viewport.portrait {
+    height: clamp(320px, 41vh, 430px);
   }
 
   .templates-library-tabs ~ .templates-builder-grid .template-preview-heading .kicker,
