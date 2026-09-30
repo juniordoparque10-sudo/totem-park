@@ -36,6 +36,7 @@ export function normalizeQRCodeConfig(config = {}) {
       : QR_CODE_TYPES.TEXT;
   const type = Object.values(QR_CODE_TYPES).includes(config.type) ? config.type : inferredType;
   return {
+    enabled: Boolean(config.enabled),
     type,
     countryCode: String(config.countryCode || "55").replace(/\D/g, "") || "55",
     phone: String(config.phone || config.whatsapp || ""),

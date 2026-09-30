@@ -1,6 +1,6 @@
 import test from "node:test";
 import assert from "node:assert/strict";
-import { buildQRCodeValue, buildQrUrl, getQRCodeValidationError, normalizePhoneDigits } from "../src/qr-code.js";
+import { buildQRCodeValue, buildQrUrl, getQRCodeValidationError, normalizePhoneDigits, normalizeQRCodeConfig } from "../src/qr-code.js";
 
 test("QR encodes URLs, WhatsApp and social links", () => {
   for (const value of ["https://totempark.com.br", "https://wa.me/5584999999999", "https://instagram.com/totempark"]) {
@@ -41,4 +41,10 @@ test("invalid WhatsApp does not create a broken QR payload", () => {
   const config = { type: "whatsapp", countryCode: "55", phone: "123" };
   assert.equal(buildQRCodeValue(config), "");
   assert.equal(getQRCodeValidationError(config), "Informe um número de WhatsApp válido.");
+});
+
+test("QR normalization preserves the V2 enabled gate while editing", () => {
+  const normalized = normalizeQRCodeConfig({ enabled: true, type: "link", link: "https://totempark.com.br" });
+  assert.equal(normalized.enabled, true);
+  assert.equal(normalizeQRCodeConfig({ enabled: false, type: "text", text: "Aviso" }).enabled, false);
 });
