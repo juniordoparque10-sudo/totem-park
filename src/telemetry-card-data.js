@@ -1,7 +1,13 @@
 import { timestampMs } from "./portal-status.js";
 
-export const reportedAppVersion = (screen) => screen?.telemetry?.session?.appVersion
-  || screen?.appVersion || screen?.playerAppVersion || null;
+export const reportedAppVersion = (screen = {}) => {
+  if (!screen) return null;
+  const nativeName = screen.playerVersionName || screen.versionName || screen.nativeAppVersion;
+  const nativeCode = screen.playerVersionCode || screen.versionCode;
+  if (nativeName) return nativeCode ? `${nativeName} (${nativeCode})` : String(nativeName);
+  if (nativeCode) return `VersionCode ${nativeCode}`;
+  return screen.appVersion || screen.playerAppVersion || screen?.telemetry?.session?.appVersion || null;
+};
 
 export function getTelemetryCardData(screens = []) {
   let activeTimeMs = 0;

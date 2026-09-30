@@ -39,8 +39,9 @@ test("version uses newest checkpoint and ignores heartbeat for ranking", () => {
   assert.equal(getTelemetryCardData([old, fresh, same]).latestVersionScreen?.id, "fresh");
   assert.equal(getTelemetryCardData([old, fresh, same]).versionCount, 2);
   assert.equal(getTelemetryCardData([old]).latestVersionScreen?.id, "old");
-  assert.equal(reportedAppVersion({ telemetry: { session: { appVersion: "v5" } }, appVersion: "fallback" }), "v5");
+  assert.equal(reportedAppVersion({ telemetry: { session: { appVersion: "stale-v16" } }, appVersion: "v17" }), "v17");
   assert.equal(reportedAppVersion({ appVersion: "fallback", playerAppVersion: "older" }), "fallback");
+  assert.equal(reportedAppVersion({ telemetry: { session: { appVersion: "stale-v16" } }, playerVersionName: "1.0.0-v17", playerVersionCode: 17 }), "1.0.0-v17 (17)");
   assert.equal(reportedAppVersion({ playerAppVersion: "older" }), "older");
   assert.equal(getTelemetryCardData([{}]).latestVersionScreen, null);
 });

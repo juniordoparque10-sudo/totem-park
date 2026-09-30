@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useRef, useState } from "react";
-import { addDoc, collection, doc, onSnapshot, serverTimestamp, updateDoc } from "firebase/firestore";
+import { addDoc, collection, deleteDoc, doc, onSnapshot, serverTimestamp, updateDoc } from "firebase/firestore";
 import { ChevronDown, CloudSun, Image, Palette, Plus, RotateCcw, Save, Send, Type } from "lucide-react";
 import { auth, db } from "../../firebase";
 import { uploadStorageAsset } from "../../storage-service";
@@ -22,6 +22,8 @@ import TemplateV2MediaField from "./TemplateV2MediaField";
 import { mediaDocumentToTemplateAsset } from "./media-utils";
 import TemplateV2PreviewPanel from "./TemplateV2PreviewPanel";
 import TemplateV2ScaledStage from "./TemplateV2ScaledStage";
+import PortalModal from "../../PortalModal";
+import { getTemplatePlaylistUsage } from "../../template-usage";
 import "./template-v2-editor.css";
 
 function safeFileName(name = "asset") { return name.normalize("NFD").replace(/[\u0300-\u036f]/g, "").replace(/[^a-zA-Z0-9._-]+/g, "-"); }
@@ -51,6 +53,7 @@ function TypographyControl({ label, value, onChange, sizeLimits, lineLimits = [0
 export default function TemplateV2Editor({ client, access, entitlement = { allowed: true }, weatherCities = [], newsSources = [], loadWeather, loadNews, onUseInPlaylist }) {
   const workspaceRef = useRef(null);
   const [templates, setTemplates] = useState([]);
+  const [playlists, setPlaylists] = useState([]);
   const [mediaList, setMediaList] = useState([]);
   const [selectedId, setSelectedId] = useState("");
   const [newType, setNewType] = useState(HERO_BUSINESS_TYPE);
@@ -64,6 +67,8 @@ export default function TemplateV2Editor({ client, access, entitlement = { allow
   const [message, setMessage] = useState("");
   const [previewOpen, setPreviewOpen] = useState(false);
   const [previewDynamicData, setPreviewDynamicData] = useState(null);
+  const [deleteTarget, setDeleteTarget] = useState(null);
+  const [deleteBlockedBy, setDeleteBlockedBy] = useState([]);
   const selected = useMemo(() => templates.find((item) => item.id === selectedId) || null, [templates, selectedId]);
   const activeType = selected?.identity?.templateType || selected?.templateType || newType;
   const definition = getTemplateV2Definition(activeType);
@@ -78,7 +83,8 @@ export default function TemplateV2Editor({ client, access, entitlement = { allow
       setTemplates(list);
     });
     const stopMedia = onSnapshot(collection(db, "clients", client.id, "media"), (snapshot) => setMediaList(snapshot.docs.map((item) => ({ id: item.id, ...item.data() }))));
-    return () => { stopTemplates(); stopMedia(); };
+    const stopPlaylists = onSnapshot(collection(db, "clients", client.id, "playlists"), (snapshot) => setPlaylists(snapshot.docs.map((item) => ({ id: item.id, ...item.data() }))));
+    return () => { stopTemplates(); stopMedia(); stopPlaylists(); };
   }, [client.id]);
 
   /* The selected Firestore document is an external editor session boundary. */
@@ -181,6 +187,23 @@ export default function TemplateV2Editor({ client, access, entitlement = { allow
     } catch (error) { console.error(error); setMessage("Não foi possível publicar o template."); } finally { setSaving(false); }
   }
 
+  function requestDelete(item) {
+    const usage = getTemplatePlaylistUsage(playlists, item.id);
+    setDeleteBlockedBy(usage);
+    setDeleteTarget(item);
+  }
+
+  async function deleteTemplateInstance() {
+    if (!deleteTarget || deleteBlockedBy.length) return;
+    try {
+      setSaving(true);
+      await deleteDoc(doc(db, "clients", client.id, "templates", deleteTarget.id));
+      if (selectedId === deleteTarget.id) setSelectedId("");
+      setDeleteTarget(null);
+      setMessage("Template excluído. As mídias da biblioteca foram preservadas.");
+    } catch (error) { console.error(error); setMessage("Não foi possível excluir o template."); } finally { setSaving(false); }
+  }
+
   async function uploadMedia(file, event, targetPath = "media.primary") {
     if (event) event.target.value = "";
     if (!file) return;
@@ -227,6 +250,15 @@ export default function TemplateV2Editor({ client, access, entitlement = { allow
 
   return (
     <div className="tpv2-workspace" ref={workspaceRef}>
+      {deleteTarget && <PortalModal
+        title={deleteBlockedBy.length ? "Este template está sendo usado em uma playlist." : "Excluir template?"}
+        message={deleteBlockedBy.length ? "Remova o template das playlists relacionadas antes de excluí-lo." : "Esta ação removerá o template criado. As mídias da sua biblioteca não serão apagadas."}
+        details={deleteBlockedBy.map((playlist) => playlist.name || playlist.title || playlist.id)}
+        confirmLabel={deleteBlockedBy.length ? "Entendi" : "Excluir template"}
+        danger={!deleteBlockedBy.length}
+        onConfirm={deleteBlockedBy.length ? undefined : deleteTemplateInstance}
+        onClose={() => { setDeleteTarget(null); setDeleteBlockedBy([]); }}
+      />}
       <div className="tpv2-workspace-title"><div><span>Templates V2 · Professional / Enterprise</span><h2>{definition?.label || "Biblioteca V2"}</h2><p>Edite o rascunho com preview ao vivo e publique somente quando estiver pronto.</p></div><button type="button" onClick={() => { if (!entitlement.allowed) { setMessage("Templates V2 não estão disponíveis no seu plano."); return; } setSelectedId(""); setMessage(""); }}><Plus /> Novo Template</button></div>
       {!selected && <><div className="tpv2-catalog-filters"><select value={catalogCategory} onChange={(event) => setCatalogCategory(event.target.value)}>{TEMPLATE_V2_CATEGORIES.map((category) => <option key={category}>{category}</option>)}</select><select value={catalogOrientation} onChange={(event) => setCatalogOrientation(event.target.value)}><option>Todos</option><option>Paisagem</option><option>Retrato</option></select></div><div className="tpv2-catalog">{catalogItems.map((item) => <button type="button" key={item.type} className={activeType === item.type ? "active" : ""} onClick={() => setNewType(item.type)}><div className={`tpv2-catalog-thumbnail ${item.thumbnail}`}><i/><i/><i/></div><span>{item.category}</span><strong>{item.label}</strong><small>{item.description}</small><em>Paisagem · Retrato · Professional</em></button>)}</div></>}
       <div className="tpv2-template-tabs">{templates.map((item) => <button type="button" key={item.id} className={selectedId === item.id ? "active" : ""} onClick={() => setSelectedId(item.id)}><strong>{getTemplateV2Name(item)}</strong><span>{item.published ? "Publicado" : "Somente rascunho"}</span></button>)}</div>
@@ -279,7 +311,7 @@ export default function TemplateV2Editor({ client, access, entitlement = { allow
         <TemplateV2PreviewPanel template={previewTemplate} config={draftState.editorDraft} orientation={orientation} onOrientationChange={setOrientation} scale={scale} onScaleChange={setScale} onOpen={() => setPreviewOpen(true)} dynamicData={previewDynamicData} />
       </div>
       {previewOpen && <PopupPreview template={previewTemplate} config={draftState.editorDraft} orientation={orientation} onClose={() => setPreviewOpen(false)} dynamicData={previewDynamicData} />}
-      {templates.length > 0 && <div className="tpv2-published-strip"><h3>Meus Templates V2</h3>{templates.map((item) => { const view = getPublishedTemplateV2View(item); const draft = getTemplateV2DraftConfig(item); const hasChanges = Boolean(view && isTemplateV2Dirty(draft,view.published)); const preview = hasChanges ? draft : view?.published || draft; const previewOrientation = preview.display?.defaultOrientation || "Paisagem"; return <article role="button" tabIndex="0" className={previewOrientation === "Retrato" ? "portrait" : "landscape"} key={item.id} onClick={() => openTemplate(item)} onKeyDown={(event) => { if (event.key === "Enter" || event.key === " ") openTemplate(item); }}><TemplateV2ScaledStage className="tpv2-created-thumbnail" template={item} config={preview} orientation={previewOrientation} mode="thumbnail"/><div className="tpv2-created-meta"><strong>{getTemplateV2Name(item)}</strong><span>{item.identity?.templateType || item.templateType} · {previewOrientation}</span><em className={view ? "published" : "draft"}>{hasChanges ? "Alterações não publicadas" : view ? "Publicado" : "Rascunho"}</em></div><div className="tpv2-created-actions"><button type="button" onClick={(event) => { event.stopPropagation(); openTemplate(item); }}>Editar</button>{view && !hasChanges ? <button type="button" className="primary" onClick={(event) => { event.stopPropagation(); onUseInPlaylist?.(); }}>Usar em playlist</button> : <button type="button" className="primary" disabled={saving} onClick={(event) => { event.stopPropagation(); publishFromCard(item); }}>{view ? "Atualizar publicação" : "Publicar"}</button>}</div></article>; })}</div>}
+      {templates.length > 0 && <div className="tpv2-published-strip"><h3>Meus Templates V2</h3>{templates.map((item) => { const view = getPublishedTemplateV2View(item); const draft = getTemplateV2DraftConfig(item); const hasChanges = Boolean(view && isTemplateV2Dirty(draft,view.published)); const preview = hasChanges ? draft : view?.published || draft; const previewOrientation = preview.display?.defaultOrientation || "Paisagem"; return <article role="button" tabIndex="0" className={previewOrientation === "Retrato" ? "portrait" : "landscape"} key={item.id} onClick={() => openTemplate(item)} onKeyDown={(event) => { if (event.key === "Enter" || event.key === " ") openTemplate(item); }}><TemplateV2ScaledStage className="tpv2-created-thumbnail" template={item} config={preview} orientation={previewOrientation} mode="thumbnail"/><div className="tpv2-created-meta"><strong>{getTemplateV2Name(item)}</strong><span>{item.identity?.templateType || item.templateType} · {previewOrientation}</span><em className={view ? "published" : "draft"}>{hasChanges ? "Alterações não publicadas" : view ? "Publicado" : "Rascunho"}</em></div><div className="tpv2-created-actions"><button type="button" onClick={(event) => { event.stopPropagation(); openTemplate(item); }}>Editar</button>{view && !hasChanges ? <button type="button" className="primary" onClick={(event) => { event.stopPropagation(); onUseInPlaylist?.(); }}>Usar em playlist</button> : <button type="button" className="primary" disabled={saving} onClick={(event) => { event.stopPropagation(); publishFromCard(item); }}>{view ? "Atualizar publicação" : "Publicar"}</button>}<button type="button" className="danger" onClick={(event) => { event.stopPropagation(); requestDelete(item); }}>Excluir</button></div></article>; })}</div>}
     </div>
   );
 }
