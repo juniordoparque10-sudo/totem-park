@@ -2,6 +2,7 @@ import {
   AGENDA_INFO_TYPE, CLOCK_PRO_TYPE, DIGITAL_MENU_TYPE, HERO_BUSINESS_TYPE,
   KPI_INDICATORS_TYPE, NEWS_EDITORIAL_TYPE, PROMOTION_CAMPAIGN_TYPE,
   QR_INTERACTION_TYPE, SMART_LOBBY_TYPE, WEATHER_PREMIUM_TYPE, createTemplateV2Draft,
+  SPORTS_PREMIUM_TYPE,
 } from "./schema.js";
 
 const entries = [
@@ -15,6 +16,7 @@ const entries = [
   [DIGITAL_MENU_TYPE,"Menu Digital","Restaurantes","Produtos, preços e destaque comercial.","cafe",[]],
   [KPI_INDICATORS_TYPE,"KPI / Indicadores","Indicadores","Cards, metas e variações com dados informados.","data",[]],
   [QR_INTERACTION_TYPE,"QR Code / Interação","Interação","Campanhas, redes sociais e serviços.","social",["qrCode"]],
+  [SPORTS_PREMIUM_TYPE,"Resultados Esportivos Premium V2","Esportes","Cards modulares, rotação multiesportes e tela dividida.","sports",["news"]],
 ];
 
 export const TEMPLATE_V2_REGISTRY = Object.fromEntries(entries.map(([type,label,category,description,preset,modules]) => [type, {
@@ -22,7 +24,7 @@ export const TEMPLATE_V2_REGISTRY = Object.fromEntries(entries.map(([type,label,
   createDraft:(overrides) => createTemplateV2Draft(type, overrides),
 }]));
 
-export const TEMPLATE_V2_CATEGORIES = ["Todos","Institucional","Promoções","Informações","Notícias","Corporativo","Restaurantes","Interação","Indicadores"];
+export const TEMPLATE_V2_CATEGORIES = ["Todos","Institucional","Promoções","Informações","Notícias","Corporativo","Restaurantes","Interação","Indicadores","Esportes"];
 
 export function getTemplateV2Definition(type) {
   return TEMPLATE_V2_REGISTRY[type] || null;

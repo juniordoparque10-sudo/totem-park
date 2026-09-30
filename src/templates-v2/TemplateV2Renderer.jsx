@@ -1,5 +1,6 @@
 import { TemplateClock, TemplateCTA, TemplateDate, TemplateLogo, TemplateMedia, TemplateNewsTicker, TemplateQRCode, TemplateWeather } from "./TemplateV2Modules";
-import { CLOCK_PRO_TYPE, HERO_BUSINESS_TYPE, KPI_INDICATORS_TYPE, WEATHER_PREMIUM_TYPE, getTemplateV2Name } from "./schema";
+import { CLOCK_PRO_TYPE, HERO_BUSINESS_TYPE, KPI_INDICATORS_TYPE, SPORTS_PREMIUM_TYPE, WEATHER_PREMIUM_TYPE, getTemplateV2Name } from "./schema";
+import SportsPremiumRenderer from "./sports-v2/SportsPremiumRenderer";
 import "./template-v2.css";
 
 function HeroBusiness({ config, orientation, name, compact, tv, type, dynamicData, mode }) {
@@ -107,5 +108,6 @@ export default function TemplateV2Renderer({ template, config, orientation, comp
 
   if (type === CLOCK_PRO_TYPE) return <ClockPro config={resolvedConfig} orientation={resolvedOrientation} name={getTemplateV2Name(template)} dynamicData={dynamicData} mode={mode}/>;
   if (type === WEATHER_PREMIUM_TYPE) return <WeatherPremium config={resolvedConfig} orientation={resolvedOrientation} name={getTemplateV2Name(template)} dynamicData={dynamicData} mode={mode}/>;
+  if (type === SPORTS_PREMIUM_TYPE) return <SportsPremiumRenderer config={resolvedConfig} orientation={resolvedOrientation} name={getTemplateV2Name(template)} dynamicData={dynamicData} mode={mode}/>;
   return <HeroBusiness config={resolvedConfig} orientation={resolvedOrientation} name={getTemplateV2Name(template)} compact={compact} tv={tv} type={type} dynamicData={dynamicData} mode={mode} isKpi={type === KPI_INDICATORS_TYPE} />;
 }

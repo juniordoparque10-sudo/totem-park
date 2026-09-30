@@ -8,6 +8,7 @@ import {
   HERO_BUSINESS_TYPE,
   CLOCK_PRO_TYPE,
   WEATHER_PREMIUM_TYPE,
+  SPORTS_PREMIUM_TYPE,
   cloneTemplateV2Config,
   createTemplateV2Document,
   getPublishedTemplateV2View,
@@ -29,6 +30,8 @@ import PreviewModal from "../../PreviewModal";
 import QRCodeConfigurator from "../../QRCodeConfigurator";
 import { getTemplatePlaylistUsage } from "../../template-usage";
 import "./template-v2-editor.css";
+import SportsV2EditorFields from "../sports-v2/SportsV2EditorFields";
+import { getSportsV2Timing, normalizeSportsV2Config, SPORTS_V2_MODES } from "../sports-v2/config";
 
 function safeFileName(name = "asset") { return name.normalize("NFD").replace(/[\u0300-\u036f]/g, "").replace(/[^a-zA-Z0-9._-]+/g, "-"); }
 function revision(prefix) { return `${prefix}-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`; }
@@ -77,6 +80,7 @@ export default function TemplateV2Editor({ client, access, entitlement = { allow
   const definition = getTemplateV2Definition(activeType);
   const catalogItems = listTemplateV2Definitions().filter((item) => (catalogCategory === "Todos" || item.category === catalogCategory) && (catalogOrientation === "Todos" || item.orientations.includes(catalogOrientation)));
   const draftState = useTemplateV2Draft(selected, activeType);
+  const sportsDraft = activeType === SPORTS_PREMIUM_TYPE ? normalizeSportsV2Config(draftState.editorDraft.sports) : null;
   const previewTemplate = selected || createTemplateV2Document({ name, type: activeType });
   const previewDynamicData = useTemplateV2DynamicData(draftState.editorDraft, { loadWeather, loadNews });
 
@@ -97,6 +101,7 @@ export default function TemplateV2Editor({ client, access, entitlement = { allow
   async function saveDraft() {
     if (!entitlement.allowed) { setMessage("Templates V2 não estão disponíveis no seu plano."); return; }
     if (selected ? access?.canEditTemplates === false : access?.canCreateTemplates === false) { setMessage("Seu plano não permite esta operação."); return; }
+    if (activeType === SPORTS_PREMIUM_TYPE) { const sports = normalizeSportsV2Config(draftState.editorDraft.sports); if (sports.mode === SPORTS_V2_MODES.ROTATION && !getSportsV2Timing(sports,draftState.editorDraft.display.duration).valid) { setMessage("A soma dos tempos por esporte deve ser igual à duração total do template."); return; } }
     setSaving(true); setMessage("");
     try {
       const draftRevision = revision("draft");
@@ -143,6 +148,7 @@ export default function TemplateV2Editor({ client, access, entitlement = { allow
     if (!entitlement.allowed) { setMessage("Templates V2 não estão disponíveis no seu plano."); return; }
     if (!selected) { setMessage("Salve o rascunho antes de publicar."); return; }
     if (draftState.isDirty) { setMessage("Salve as alterações do rascunho antes de publicar."); return; }
+    if (activeType === SPORTS_PREMIUM_TYPE) { const sports = normalizeSportsV2Config(draftState.persistedDraft.sports); if (sports.mode === SPORTS_V2_MODES.ROTATION && !getSportsV2Timing(sports,draftState.persistedDraft.display.duration).valid) { setMessage("A soma dos tempos por esporte deve ser igual à duração total do template."); return; } }
     if (access?.canEditTemplates === false) { setMessage("Seu plano não permite publicar templates."); return; }
     if (draftState.persistedDraft.media?.primary?.type === "video") { setMessage("Substitua o vídeo interno por uma imagem antes de publicar. Vídeo em Template V2 ainda está em homologação."); return; }
     setSaving(true); setMessage("");
@@ -250,7 +256,7 @@ export default function TemplateV2Editor({ client, access, entitlement = { allow
       <div className="tpv2-editor-grid">
         <main className="tpv2-editor-form">
           <div className={`tpv2-save-state ${draftState.isDirty ? "dirty" : "saved"}`}><span>{draftState.isDirty ? "Alterações não salvas" : "Rascunho sincronizado"}</span><small>{draftState.publishedSnapshot ? "Existe uma publicação ativa" : "Ainda não publicado"}</small></div>
-          {[CLOCK_PRO_TYPE, WEATHER_PREMIUM_TYPE].includes(activeType) ? <Section sectionId="content" icon={<Type />} title={activeType === CLOCK_PRO_TYPE ? "Configuração da hora" : "Dados do clima"} open={openSections.content} onToggle={toggleSection}>
+          {activeType === SPORTS_PREMIUM_TYPE ? <Section sectionId="content" icon={<Type />} title="Conteúdo esportivo" open={openSections.content} onToggle={toggleSection}><label>Nome do template<input value={name} onChange={(event) => setName(event.target.value)} /></label><SportsV2EditorFields value={draftState.editorDraft.sports} totalDuration={draftState.editorDraft.display.duration} onChange={(value) => draftState.update("sports", value)} /></Section> : [CLOCK_PRO_TYPE, WEATHER_PREMIUM_TYPE].includes(activeType) ? <Section sectionId="content" icon={<Type />} title={activeType === CLOCK_PRO_TYPE ? "Configuração da hora" : "Dados do clima"} open={openSections.content} onToggle={toggleSection}>
             <label>Nome do template<input value={name} onChange={(event) => setName(event.target.value)} /></label>
             {activeType === CLOCK_PRO_TYPE && <><label className="tpv2-check"><input type="checkbox" checked={draftState.editorDraft.modules.clock.showDate} onChange={(event) => draftState.update("modules.clock.showDate", event.target.checked)} /> Exibir data</label><label className="tpv2-check"><input type="checkbox" checked={draftState.editorDraft.modules.clock.showLocal} onChange={(event) => draftState.update("modules.clock.showLocal", event.target.checked)} /> Exibir local</label></>}
             {activeType === WEATHER_PREMIUM_TYPE && <><label className="tpv2-check"><input type="checkbox" checked={draftState.editorDraft.modules.weather.showCity} onChange={(event) => draftState.update("modules.weather.showCity", event.target.checked)} /> Exibir nome da cidade</label><label className="tpv2-check"><input type="checkbox" checked={draftState.editorDraft.modules.weather.showCurrent} onChange={(event) => draftState.update("modules.weather.showCurrent", event.target.checked)} /> Exibir condição atual</label><label className="tpv2-check"><input type="checkbox" checked={draftState.editorDraft.modules.weather.showFeelsLike} onChange={(event) => draftState.update("modules.weather.showFeelsLike", event.target.checked)} /> Exibir sensação térmica</label><label className="tpv2-check"><input type="checkbox" checked={draftState.editorDraft.modules.weather.showForecast} onChange={(event) => draftState.update("modules.weather.showForecast", event.target.checked)} /> Exibir próximos dias</label>{draftState.editorDraft.modules.weather.showForecast && <label>Quantidade<select value={draftState.editorDraft.modules.weather.forecastDays} onChange={(event) => draftState.update("modules.weather.forecastDays", Number(event.target.value))}><option value="3">3 dias</option><option value="4">4 dias</option><option value="5">5 dias</option></select></label>}</>}
@@ -271,6 +277,8 @@ export default function TemplateV2Editor({ client, access, entitlement = { allow
           <Section sectionId="media" icon={<Image />} title="Mídia" open={openSections.media} onToggle={toggleSection}>
             <TemplateV2MediaField label="Logo" value={draftState.editorDraft.content.logo} mediaList={mediaList.filter((item) => !String(item.type || item.contentType).toLowerCase().includes("video"))} onChange={(value) => draftState.update("content.logo", value)} onUpload={(file, event) => uploadMedia(file, event, "content.logo")} uploading={uploading} accept="image/*" />
             <TemplateV2MediaField label="Mídia principal" value={draftState.editorDraft.media.primary} mediaList={mediaList} onChange={(value) => draftState.update("media.primary", value)} onUpload={(file, event) => uploadMedia(file, event, "media.primary")} uploading={uploading} imagesOnly accept="image/*" />
+            {sportsDraft && !["motorsport","combat"].includes(sportsDraft.selectedSport) && <><TemplateV2MediaField label="Escudo / logo mandante" value={sportsDraft.items[sportsDraft.selectedSport].homeLogo} mediaList={mediaList} onChange={(value) => draftState.update(`sports.items.${sportsDraft.selectedSport}.homeLogo`, value)} onUpload={(file,event)=>uploadMedia(file,event,`sports.items.${sportsDraft.selectedSport}.homeLogo`)} uploading={uploading} imagesOnly accept="image/*"/><TemplateV2MediaField label="Escudo / logo visitante" value={sportsDraft.items[sportsDraft.selectedSport].awayLogo} mediaList={mediaList} onChange={(value) => draftState.update(`sports.items.${sportsDraft.selectedSport}.awayLogo`, value)} onUpload={(file,event)=>uploadMedia(file,event,`sports.items.${sportsDraft.selectedSport}.awayLogo`)} uploading={uploading} imagesOnly accept="image/*"/></>}
+            {sportsDraft?.selectedSport === "combat" && <><TemplateV2MediaField label="Imagem do atleta A" value={sportsDraft.items.combat.fighterAImage} mediaList={mediaList} onChange={(value)=>draftState.update("sports.items.combat.fighterAImage",value)} onUpload={(file,event)=>uploadMedia(file,event,"sports.items.combat.fighterAImage")} uploading={uploading} imagesOnly accept="image/*"/><TemplateV2MediaField label="Imagem do atleta B" value={sportsDraft.items.combat.fighterBImage} mediaList={mediaList} onChange={(value)=>draftState.update("sports.items.combat.fighterBImage",value)} onUpload={(file,event)=>uploadMedia(file,event,"sports.items.combat.fighterBImage")} uploading={uploading} imagesOnly accept="image/*"/></>}
             <div className="tpv2-inline-fields"><label>Ajuste<select value={draftState.editorDraft.style.mediaFit} onChange={(event) => draftState.update("style.mediaFit", event.target.value)}><option value="cover">Preencher</option><option value="contain">Ajustar</option></select></label><label>Posição<select value={draftState.editorDraft.style.mediaPosition} onChange={(event) => draftState.update("style.mediaPosition", event.target.value)}><option value="center">Centro</option><option value="top">Topo</option><option value="bottom">Base</option><option value="left">Esquerda</option><option value="right">Direita</option></select></label></div>
           </Section>
           <Section sectionId="appearance" icon={<Palette />} title="Aparência" open={openSections.appearance} onToggle={toggleSection}>
