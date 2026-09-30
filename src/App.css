@@ -14594,6 +14594,88 @@ button.premium-stat-card{width:100%;font:inherit;text-align:left;color:inherit;c
   gap: 12px;
 }
 
+/* Preview toolbars must shrink and wrap inside every preview card. */
+.template-preview-heading,
+.template-preview-actions,
+.marketing-preview-heading,
+.tpv2-preview-head,
+.tpv2-preview-controls {
+  width: 100%;
+  max-width: 100%;
+  min-width: 0;
+  box-sizing: border-box;
+}
+
+.template-preview-heading,
+.template-preview-actions,
+.marketing-preview-heading,
+.tpv2-preview-head,
+.tpv2-preview-controls,
+.tpv2-preview-controls > div {
+  flex-wrap: wrap;
+}
+
+.template-preview-heading > div:first-child,
+.marketing-preview-heading > div:first-child,
+.tpv2-preview-head > div:first-child {
+  flex: 1 1 150px;
+  min-width: 0;
+}
+
+.template-preview-actions {
+  flex: 1 1 260px;
+  justify-content: flex-end;
+}
+
+.preview-open-button,
+.template-orientation-switch button,
+.tpv2-preview-head > button,
+.tpv2-preview-controls button,
+.tpv2-preview-controls select {
+  min-width: 0;
+  max-width: 100%;
+  white-space: nowrap;
+}
+
+.template-orientation-switch {
+  width: auto;
+  max-width: 100%;
+  min-width: 0;
+  flex: 0 1 auto;
+  display: flex;
+  flex-wrap: wrap;
+}
+
+.tpv2-preview-controls > div {
+  width: auto;
+  max-width: 100%;
+  min-width: 0;
+  flex: 0 1 auto;
+}
+
+.template-orientation-switch button,
+.tpv2-preview-controls > div > button {
+  flex: 1 1 auto;
+}
+
+@media (max-width: 600px) {
+  .template-preview-actions,
+  .marketing-preview-heading,
+  .tpv2-preview-head,
+  .tpv2-preview-controls {
+    justify-content: flex-start;
+  }
+
+  .template-preview-actions {
+    flex-basis: 100%;
+  }
+
+  .template-orientation-switch,
+  .tpv2-preview-controls > div {
+    width: 100%;
+  }
+}
+
 .qr-code-configurator-warning {
   padding: 9px 11px;
   border: 1px solid rgba(245, 158, 11, 0.28);
