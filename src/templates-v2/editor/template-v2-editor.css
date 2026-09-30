@@ -138,3 +138,4 @@
 .tpv2-created-meta strong,.tpv2-created-meta span{display:block}.tpv2-created-meta span{color:#94a3b8;font-size:11px}.tpv2-created-meta em{width:max-content;padding:4px 7px;border-radius:999px;font-size:9px;font-style:normal;font-weight:950;text-transform:uppercase}.tpv2-created-meta em.published{color:#6ee7b7;background:rgba(16,185,129,.12)}.tpv2-created-meta em.draft{color:#fcd34d;background:rgba(245,158,11,.12)}
 .tpv2-created-actions{padding:0 12px 12px;display:flex;flex-wrap:wrap;gap:8px}.tpv2-created-actions button{min-height:34px;padding:0 11px;border:1px solid rgba(103,232,249,.22);border-radius:9px;color:#bae6fd;background:rgba(14,165,233,.08);font-weight:850;cursor:pointer}.tpv2-created-actions button.primary{color:#07111f;background:#67e8f9}
 .tpv2-created-actions button.danger{color:#fecdd3;border-color:rgba(244,63,94,.28);background:rgba(244,63,94,.1)}
+.tpv2-editor-section>div[hidden]{display:none}

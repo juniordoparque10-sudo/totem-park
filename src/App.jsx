@@ -3,6 +3,7 @@ import { uploadLimitBytes, uploadSizeNotice } from "./upload-plan-policy";
 import TelemetryDashboard from "./TelemetryDashboard";
 import { buildQRCodeValue, buildQrUrl, normalizeQRCodeConfig } from "./qr-code";
 import QRCodeConfigurator from "./QRCodeConfigurator";
+import QRCodeLayer from "./QRCodeLayer";
 import { normalizeTemplatesV2Override, resolveTemplatesV2Entitlement } from "./templates-v2/entitlement";
 import { linkedAtForScreen, telemetryStatus } from "./telemetry-v1";
 ﻿import { useEffect, useLayoutEffect, useRef, useState } from "react";
@@ -10605,11 +10606,9 @@ function MarketingArtPreview({ art, compact = false, tv = false }) {
   const isFeed = marketingType === "feed";
   const imageSrc = art.imagePreview || art.imageUrl || "";
   const logoSrc = art.logoPreview || art.logoUrl || "";
-  const qrValue = buildQRCodeValue(art.qrCode || art.qrText || art.whatsapp || "");
-  const qrUrl = art.qrImageUrl || buildQrUrl(qrValue);
   const isVisible = (field) => art[field] !== false;
   const showTopRow = isVisible("showFormatLabel") || isVisible("showLogo");
-  const showActions = isVisible("showCta") || (isVisible("showQr") && qrUrl);
+  const showActions = isVisible("showCta");
   const showContacts = !compact && (
     (isVisible("showWhatsapp") && art.whatsapp) ||
     (isVisible("showLocation") && art.location)
@@ -10700,11 +10699,6 @@ function MarketingArtPreview({ art, compact = false, tv = false }) {
                 </div>
               )}
 
-              {isVisible("showQr") && qrUrl && (
-                <div style={{ width: compact ? 42 : isFeed ? 82 : 78, height: compact ? 42 : isFeed ? 82 : 78, minWidth: compact ? 42 : isFeed ? 82 : 78, borderRadius: compact ? 9 : 16, background: "#ffffff", padding: compact ? 4 : 8, display: "grid", placeItems: "center" }}>
-                  <img src={qrUrl} alt="QR Code" style={{ width: "100%", height: "100%" }} />
-                </div>
-              )}
             </div>
           )}
 
@@ -10716,6 +10710,7 @@ function MarketingArtPreview({ art, compact = false, tv = false }) {
           )}
         </div>
       </div>
+      {isVisible("showQr") && <QRCodeLayer config={art.qrCode || art.qrText || art.whatsapp || ""} logicalWidth={1080} showLabel={false} className="marketing-qr-layer" />}
     </div>
   );
 }

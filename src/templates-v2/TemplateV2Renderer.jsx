@@ -73,7 +73,7 @@ function HeroBusiness({ config, orientation, name, compact, tv, type, dynamicDat
         </div>
         {modules.news?.enabled && <TemplateNewsTicker items={dynamicData?.news} config={modules.news} orientation={orientation} />}
       </div>
-      {modules.qrCode?.enabled && <TemplateQRCode config={modules.qrCode} />}
+      {modules.qrCode?.enabled && <TemplateQRCode config={modules.qrCode} logicalWidth={logicalWidth} />}
     </section>
   );
 }

@@ -1,6 +1,6 @@
 import { useSyncExternalStore } from "react";
-import { Clock3, CloudSun, QrCode, Sparkles } from "lucide-react";
-import { buildQrUrl } from "../qr-code";
+import { Clock3, CloudSun, Sparkles } from "lucide-react";
+import QRCodeLayer from "../QRCodeLayer";
 import { shouldRenderTemplateV2InternalVideo, shouldShowTemplateMediaPlaceholder } from "./render-mode";
 
 let clockSnapshot = Date.now();
@@ -42,11 +42,7 @@ export function TemplateLogo({ asset, name }) {
 }
 
 export function TemplateCTA({ config = {} }) { return config.enabled ? <span className="tpv2-cta">{config.label || "Saiba mais"}</span> : null; }
-export function TemplateQRCode({ config = {} }) {
-  const source = buildQrUrl(config.value, config.size === "large" ? 720 : config.size === "small" ? 360 : 520);
-  if (!source) return null;
-  return <div className={`tpv2-qr-code is-${config.position || "bottom-right"} size-${config.size || "medium"}`} style={{"--tpv2-qr-margin":`${Math.max(16,Math.min(96,Number(config.margin)||32))}px`}}><img src={source} alt="QR Code"/><span><QrCode/>Aponte a câmera</span></div>;
-}
+export function TemplateQRCode({ config = {}, logicalWidth = 1920 }) { return <QRCodeLayer config={config} logicalWidth={logicalWidth} />; }
 export function TemplateNewsTicker({ items = [], config = {}, orientation = "Paisagem" }) {
   const headlines = items.map((item) => item?.title || item?.headline).filter(Boolean);
   const content = headlines.length ? headlines : [`Aguardando notícias de ${(config.selectedNewsSources || []).join(", ") || "fonte selecionada"}`];

@@ -41,7 +41,7 @@ function uploadPlanName(plan = "") {
 }
 
 function Section({ sectionId, icon, title, children, open, onToggle }) {
-  return <section data-section={sectionId} className={`tpv2-editor-section ${open ? "open" : ""}`}><button type="button" aria-expanded={open} onClick={() => onToggle(sectionId)}>{icon}<strong>{title}</strong><ChevronDown /></button>{open && <div>{children}</div>}</section>;
+  return <section data-section={sectionId} className={`tpv2-editor-section ${open ? "open" : ""}`}><button type="button" aria-expanded={open} onClick={() => onToggle(sectionId)}>{icon}<strong>{title}</strong><ChevronDown /></button><div hidden={!open}>{children}</div></section>;
 }
 
 function PopupPreview({ template, config, orientation, onClose, dynamicData }) {

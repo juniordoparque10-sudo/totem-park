@@ -14,7 +14,7 @@ export default function QRCodeConfigurator({ value, onChange, showDisplayControl
   const config = normalizeQRCodeConfig(value);
   const update = (patch) => {
     const next = { ...config, ...patch };
-    onChange({ ...next, value: buildQRCodeValue(next) });
+    onChange({ ...next, value: buildQRCodeValue(next) }, Object.keys(patch)[0]);
   };
   const error = getQRCodeValidationError(config);
 

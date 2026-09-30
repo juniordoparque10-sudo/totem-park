@@ -14,4 +14,5 @@ test("dynamic data section has a stable identity and controlled open state", () 
   assert.match(source, /sectionId="dynamicData"/);
   assert.match(source, /title="Dados dinâmicos" open=\{openSections\.dynamicData\} onToggle=\{toggleSection\}/);
   assert.match(source, /<QRCodeConfigurator[^>]*onChange=\{\(value\) => draftState\.update\("modules\.qrCode", value\)\}/);
+  assert.match(source, /<div hidden=\{!open\}>\{children\}<\/div>/);
 });
