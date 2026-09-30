@@ -137,7 +137,7 @@ import {
 import { deleteStoredAsset, uploadStorageAsset } from "./storage-service";
 import TemplateV2Editor from "./templates-v2/editor/TemplateV2Editor";
 import TemplateV2Renderer from "./templates-v2/TemplateV2Renderer";
-import TemplateV2ScaledStage from "./templates-v2/editor/TemplateV2ScaledStage";
+import TemplateV2DynamicStage from "./templates-v2/editor/TemplateV2DynamicStage";
 import TemplateScaledStage from "./TemplateScaledStage";
 import PortalModal from "./PortalModal";
 import { getPublishedTemplateV2View, isTemplateV2 } from "./templates-v2/schema";
@@ -9048,7 +9048,7 @@ function ClientPlaylistsPage({ client, access = getClientPlanAccess(client), isA
           toggleTemplate(template.id);
         }}
       >
-        {templateV2 ? <TemplateV2ScaledStage className={`playlist-preview-frame tpv2-picker-thumbnail ${template.orientation === "Retrato" ? "portrait" : "landscape"}`} template={template} config={template.published} orientation={template.orientation || "Paisagem"} mode="thumbnail" /> : <TemplateScaledStage className={`playlist-preview-frame legacy-template-thumbnail ${template.orientation === "Retrato" ? "portrait" : "landscape"}`} orientation={template.orientation || "Paisagem"}><LegacyTemplateVisualPreview template={template} compact={false} /></TemplateScaledStage>}
+        {templateV2 ? <TemplateV2DynamicStage className={`playlist-preview-frame tpv2-picker-thumbnail ${template.orientation === "Retrato" ? "portrait" : "landscape"}`} template={template} config={template.published} orientation={template.orientation || "Paisagem"} mode="thumbnail" loadWeather={loadTemplateV2Weather} loadNews={loadTemplateV2News} /> : <TemplateScaledStage className={`playlist-preview-frame legacy-template-thumbnail ${template.orientation === "Retrato" ? "portrait" : "landscape"}`} orientation={template.orientation || "Paisagem"}><LegacyTemplateVisualPreview template={template} compact={false} /></TemplateScaledStage>}
 
         <strong>{template.name}</strong>
 
@@ -13538,7 +13538,7 @@ function TemplateVisualPreview({ template, compact = false, tv = false }) {
 function ScaledTemplatePortalPreview({ template }) {
   const orientation = template?.orientation || template?.published?.display?.defaultOrientation || "Paisagem";
   if (isTemplateV2(template)) {
-    return <TemplateV2ScaledStage className="universal-template-scaled-stage" template={template} config={template.published} orientation={orientation} mode="thumbnail" />;
+    return <TemplateV2DynamicStage className="universal-template-scaled-stage" template={template} config={template.published} orientation={orientation} mode="thumbnail" loadWeather={loadTemplateV2Weather} loadNews={loadTemplateV2News} />;
   }
   return <TemplateScaledStage className="universal-template-scaled-stage" orientation={orientation}><LegacyTemplateVisualPreview template={template} compact={false} /></TemplateScaledStage>;
 }

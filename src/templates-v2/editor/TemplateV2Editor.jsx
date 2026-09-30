@@ -22,6 +22,8 @@ import TemplateV2MediaField from "./TemplateV2MediaField";
 import { mediaDocumentToTemplateAsset } from "./media-utils";
 import TemplateV2PreviewPanel from "./TemplateV2PreviewPanel";
 import TemplateV2ScaledStage from "./TemplateV2ScaledStage";
+import TemplateV2DynamicStage from "./TemplateV2DynamicStage";
+import useTemplateV2DynamicData from "./useTemplateV2DynamicData";
 import PortalModal from "../../PortalModal";
 import { getTemplatePlaylistUsage } from "../../template-usage";
 import "./template-v2-editor.css";
@@ -66,7 +68,6 @@ export default function TemplateV2Editor({ client, access, entitlement = { allow
   const [uploading, setUploading] = useState(false);
   const [message, setMessage] = useState("");
   const [previewOpen, setPreviewOpen] = useState(false);
-  const [previewDynamicData, setPreviewDynamicData] = useState(null);
   const [deleteTarget, setDeleteTarget] = useState(null);
   const [deleteBlockedBy, setDeleteBlockedBy] = useState([]);
   const selected = useMemo(() => templates.find((item) => item.id === selectedId) || null, [templates, selectedId]);
@@ -75,7 +76,7 @@ export default function TemplateV2Editor({ client, access, entitlement = { allow
   const catalogItems = listTemplateV2Definitions().filter((item) => (catalogCategory === "Todos" || item.category === catalogCategory) && (catalogOrientation === "Todos" || item.orientations.includes(catalogOrientation)));
   const draftState = useTemplateV2Draft(selected, activeType);
   const previewTemplate = selected || createTemplateV2Document({ name, type: activeType });
-  const previewNewsKey = JSON.stringify(draftState.editorDraft.modules.news || {});
+  const previewDynamicData = useTemplateV2DynamicData(draftState.editorDraft, { loadWeather, loadNews });
 
   useEffect(() => {
     const stopTemplates = onSnapshot(collection(db, "clients", client.id, "templates"), (snapshot) => {
@@ -90,25 +91,6 @@ export default function TemplateV2Editor({ client, access, entitlement = { allow
   /* The selected Firestore document is an external editor session boundary. */
   /* eslint-disable-next-line react-hooks/set-state-in-effect, react-hooks/exhaustive-deps */
   useEffect(() => { setName(selected ? getTemplateV2Name(selected) : (definition?.label || "Hero Business")); }, [selected?.id, selected?.status?.draftRevision, definition?.label]);
-
-  /* Live weather is an external resource; loading state intentionally begins at the request boundary. */
-  /* eslint-disable react-hooks/set-state-in-effect */
-  useEffect(() => {
-    if (![CLOCK_PRO_TYPE, WEATHER_PREMIUM_TYPE].includes(activeType) || !draftState.editorDraft.modules.weather?.enabled || !loadWeather) { setPreviewDynamicData(null); return undefined; }
-    let cancelled = false;
-    setPreviewDynamicData({ loading:true });
-    loadWeather(draftState.editorDraft.modules.weather.city).then((weather) => { if (!cancelled) setPreviewDynamicData({ weather }); }).catch(() => { if (!cancelled) setPreviewDynamicData({ weather:null, error:true }); });
-    return () => { cancelled = true; };
-  }, [activeType, draftState.editorDraft.modules.weather?.city, draftState.editorDraft.modules.weather?.enabled, loadWeather]);
-  /* eslint-enable react-hooks/set-state-in-effect */
-
-  useEffect(() => {
-    const newsConfig = JSON.parse(previewNewsKey);
-    if (!newsConfig.enabled || !loadNews) return undefined;
-    let cancelled = false;
-    loadNews(newsConfig).then((news) => { if (!cancelled) setPreviewDynamicData((current) => ({ ...(current || {}), news })); }).catch(() => {});
-    return () => { cancelled = true; };
-  }, [previewNewsKey, loadNews]);
 
   async function saveDraft() {
     if (!entitlement.allowed) { setMessage("Templates V2 não estão disponíveis no seu plano."); return; }
@@ -311,7 +293,7 @@ export default function TemplateV2Editor({ client, access, entitlement = { allow
         <TemplateV2PreviewPanel template={previewTemplate} config={draftState.editorDraft} orientation={orientation} onOrientationChange={setOrientation} scale={scale} onScaleChange={setScale} onOpen={() => setPreviewOpen(true)} dynamicData={previewDynamicData} />
       </div>
       {previewOpen && <PopupPreview template={previewTemplate} config={draftState.editorDraft} orientation={orientation} onClose={() => setPreviewOpen(false)} dynamicData={previewDynamicData} />}
-      {templates.length > 0 && <div className="tpv2-published-strip"><h3>Meus Templates V2</h3>{templates.map((item) => { const view = getPublishedTemplateV2View(item); const draft = getTemplateV2DraftConfig(item); const hasChanges = Boolean(view && isTemplateV2Dirty(draft,view.published)); const preview = hasChanges ? draft : view?.published || draft; const previewOrientation = preview.display?.defaultOrientation || "Paisagem"; return <article role="button" tabIndex="0" className={previewOrientation === "Retrato" ? "portrait" : "landscape"} key={item.id} onClick={() => openTemplate(item)} onKeyDown={(event) => { if (event.key === "Enter" || event.key === " ") openTemplate(item); }}><TemplateV2ScaledStage className="tpv2-created-thumbnail" template={item} config={preview} orientation={previewOrientation} mode="thumbnail"/><div className="tpv2-created-meta"><strong>{getTemplateV2Name(item)}</strong><span>{item.identity?.templateType || item.templateType} · {previewOrientation}</span><em className={view ? "published" : "draft"}>{hasChanges ? "Alterações não publicadas" : view ? "Publicado" : "Rascunho"}</em></div><div className="tpv2-created-actions"><button type="button" onClick={(event) => { event.stopPropagation(); openTemplate(item); }}>Editar</button>{view && !hasChanges ? <button type="button" className="primary" onClick={(event) => { event.stopPropagation(); onUseInPlaylist?.(); }}>Usar em playlist</button> : <button type="button" className="primary" disabled={saving} onClick={(event) => { event.stopPropagation(); publishFromCard(item); }}>{view ? "Atualizar publicação" : "Publicar"}</button>}<button type="button" className="danger" onClick={(event) => { event.stopPropagation(); requestDelete(item); }}>Excluir</button></div></article>; })}</div>}
+      {templates.length > 0 && <div className="tpv2-published-strip"><h3>Meus Templates V2</h3>{templates.map((item) => { const view = getPublishedTemplateV2View(item); const draft = getTemplateV2DraftConfig(item); const hasChanges = Boolean(view && isTemplateV2Dirty(draft,view.published)); const preview = hasChanges ? draft : view?.published || draft; const previewOrientation = preview.display?.defaultOrientation || "Paisagem"; return <article role="button" tabIndex="0" className={previewOrientation === "Retrato" ? "portrait" : "landscape"} key={item.id} onClick={() => openTemplate(item)} onKeyDown={(event) => { if (event.key === "Enter" || event.key === " ") openTemplate(item); }}><TemplateV2DynamicStage className="tpv2-created-thumbnail" template={item} config={preview} orientation={previewOrientation} mode="thumbnail" loadWeather={loadWeather} loadNews={loadNews}/><div className="tpv2-created-meta"><strong>{getTemplateV2Name(item)}</strong><span>{item.identity?.templateType || item.templateType} · {previewOrientation}</span><em className={view ? "published" : "draft"}>{hasChanges ? "Alterações não publicadas" : view ? "Publicado" : "Rascunho"}</em></div><div className="tpv2-created-actions"><button type="button" onClick={(event) => { event.stopPropagation(); openTemplate(item); }}>Editar</button>{view && !hasChanges ? <button type="button" className="primary" onClick={(event) => { event.stopPropagation(); onUseInPlaylist?.(); }}>Usar em playlist</button> : <button type="button" className="primary" disabled={saving} onClick={(event) => { event.stopPropagation(); publishFromCard(item); }}>{view ? "Atualizar publicação" : "Publicar"}</button>}<button type="button" className="danger" onClick={(event) => { event.stopPropagation(); requestDelete(item); }}>Excluir</button></div></article>; })}</div>}
     </div>
   );
 }
