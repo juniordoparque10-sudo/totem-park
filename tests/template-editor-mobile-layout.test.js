@@ -36,3 +36,33 @@ test("portrait preview receives a taller orientation-specific mobile frame", () 
     /@media \(max-width:\s*430px\)[\s\S]*?\.template-scaled-preview-stage\.portrait,[\s\S]*?\.tpv2-preview-viewport\.portrait\s*\{[^}]*height:\s*clamp\(320px,\s*41vh,\s*430px\);/,
   );
 });
+
+test("marketing reorders one live preview above the form and preserves sticky scrolling", () => {
+  assert.match(
+    css,
+    /\.content:has\(\.marketing-page\)\s*\{[^}]*overflow-x:\s*clip;[^}]*overflow-y:\s*visible;/s,
+  );
+  assert.match(
+    css,
+    /\.marketing-page > \.templates-builder-grid\s*\{[^}]*grid-template-areas:\s*"marketing-editor marketing-preview";/s,
+  );
+  assert.match(
+    css,
+    /@media \(max-width:\s*1200px\)[\s\S]*?grid-template-areas:\s*"marketing-preview"\s*"marketing-editor";/,
+  );
+  assert.match(
+    css,
+    /\.marketing-page > \.templates-builder-grid > \.templates-preview-panel\s*\{[^}]*position:\s*sticky;/s,
+  );
+});
+
+test("marketing mobile stages use distinct square and vertical geometries", () => {
+  assert.match(
+    css,
+    /@media \(max-width:\s*760px\)[\s\S]*?\.marketing-page \.marketing-preview-stage\s*\{[^}]*height:\s*clamp\(310px,\s*40vh,\s*420px\);/,
+  );
+  assert.match(
+    css,
+    /\.marketing-page \.marketing-preview-stage\.format-feed\s*\{[^}]*height:\s*clamp\(245px,\s*34vh,\s*330px\);/,
+  );
+});

@@ -11233,7 +11233,14 @@ function ClientMarketingPage({ client, access = getClientPlanAccess(client) }) {
           </div>
 
           <div className={`marketing-preview-stage format-${form.type}`}>
-            <MarketingArtPreview art={form} />
+            <TemplateScaledStage
+              className={`marketing-scaled-preview format-${form.type}`}
+              orientation={form.type === "feed" ? "Paisagem" : "Retrato"}
+              logicalWidth={getMarketingFormatRatio(form.type).width}
+              logicalHeight={getMarketingFormatRatio(form.type).height}
+            >
+              <MarketingArtPreview art={form} />
+            </TemplateScaledStage>
           </div>
         </div>
       </section>

@@ -14350,6 +14350,182 @@ button.premium-stat-card{width:100%;font:inherit;text-align:left;color:inherit;c
   }
 }
 
+/* Marketing: o mesmo palco logico e contexto sticky usados pelos Templates. */
+.content:has(.marketing-page) {
+  overflow-x: clip;
+  overflow-y: visible;
+}
+
+.marketing-page,
+.marketing-page > .templates-builder-grid {
+  min-width: 0;
+  max-width: 100%;
+  overflow: visible;
+}
+
+.marketing-page > .templates-builder-grid {
+  grid-template-areas: "marketing-editor marketing-preview";
+}
+
+.marketing-page > .templates-builder-grid > .templates-editor-panel {
+  grid-area: marketing-editor;
+  min-width: 0;
+}
+
+.marketing-page > .templates-builder-grid > .templates-preview-panel {
+  grid-area: marketing-preview;
+  position: sticky;
+  top: 18px;
+  align-self: start;
+  min-width: 0;
+  max-width: 100%;
+  max-height: calc(100vh - 36px);
+  box-sizing: border-box;
+  overflow: hidden;
+}
+
+.marketing-page .templates-editor-panel :is(input, textarea, select, button, label),
+.marketing-page .form-grid,
+.marketing-page .form-group,
+.marketing-page .template-color-panel,
+.marketing-page .marketing-assets-grid,
+.marketing-page .marketing-file-picker,
+.marketing-page .panel-actions {
+  min-width: 0;
+  max-width: 100%;
+  box-sizing: border-box;
+}
+
+.marketing-page .templates-editor-panel :is(input:not([type="file"]), textarea, select, input[type="range"]) {
+  width: 100%;
+  max-width: 100%;
+  box-sizing: border-box;
+}
+
+.marketing-page .marketing-preview-stage {
+  width: 100%;
+  height: min(62vh, 660px);
+  min-height: 0;
+  padding: 12px;
+  box-sizing: border-box;
+  overflow: hidden;
+}
+
+.marketing-page .marketing-preview-stage.format-feed {
+  height: min(56vh, 560px);
+}
+
+.marketing-page .marketing-scaled-preview {
+  width: 100%;
+  height: 100%;
+}
+
+.marketing-page .marketing-scaled-preview .template-logical-stage > .marketing-art-preview {
+  width: 100% !important;
+  height: 100% !important;
+  max-width: none !important;
+  border-radius: 34px;
+}
+
+@media (max-width: 1200px) {
+  .marketing-page > .templates-builder-grid {
+    grid-template-areas:
+      "marketing-preview"
+      "marketing-editor";
+    grid-template-columns: minmax(0, 1fr);
+  }
+
+  .marketing-page > .templates-builder-grid > .templates-preview-panel {
+    position: sticky;
+    top: 12px;
+    z-index: 18;
+    max-height: min(50vh, 500px);
+    padding: 12px;
+    border-color: rgba(103, 232, 249, 0.3);
+    box-shadow: 0 16px 38px rgba(0, 0, 0, 0.38);
+    backdrop-filter: blur(18px);
+  }
+
+  .marketing-page .marketing-preview-stage {
+    height: min(40vh, 390px);
+    padding: 8px;
+  }
+
+  .marketing-page .marketing-preview-stage.format-feed {
+    height: min(38vh, 370px);
+  }
+}
+
+@media (max-width: 760px) {
+  .marketing-page > .templates-builder-grid > .templates-preview-panel {
+    top: 62px;
+    max-height: min(50vh, 460px);
+    padding: 9px;
+    border-radius: 17px;
+  }
+
+  .marketing-page > .templates-builder-grid > .templates-preview-panel > div:first-child {
+    margin-bottom: 7px !important;
+  }
+
+  .marketing-page > .templates-builder-grid > .templates-preview-panel .kicker {
+    display: none;
+  }
+
+  .marketing-page > .templates-builder-grid > .templates-preview-panel h2 {
+    margin: 0 !important;
+    font-size: 14px;
+    line-height: 1.2;
+  }
+
+  .marketing-page .marketing-preview-stage {
+    height: clamp(310px, 40vh, 420px);
+    padding: 6px;
+  }
+
+  .marketing-page .marketing-preview-stage.format-feed {
+    height: clamp(245px, 34vh, 330px);
+  }
+
+  .marketing-page .templates-editor-panel,
+  .marketing-page .templates-preview-panel {
+    padding: 16px;
+    border-radius: 22px;
+  }
+
+  .marketing-page .panel-actions {
+    display: grid;
+    grid-template-columns: minmax(0, 1fr);
+  }
+
+  .marketing-page .panel-actions > * {
+    width: 100%;
+    justify-content: center;
+  }
+
+  .marketing-page .templates-editor-panel :is(input, textarea, select, button) {
+    scroll-margin-top: min(58vh, 540px);
+  }
+}
+
+@media (max-width: 430px) {
+  .marketing-page > .templates-builder-grid {
+    gap: 14px;
+  }
+
+  .marketing-page > .templates-builder-grid > .templates-preview-panel {
+    max-height: min(49vh, 430px);
+  }
+
+  .marketing-page .marketing-preview-stage {
+    height: clamp(300px, 39vh, 390px);
+  }
+
+  .marketing-page .marketing-preview-stage.format-feed {
+    height: clamp(230px, 32vh, 300px);
+  }
+}
+
 /* Telas em tempo real: três áreas legíveis sem mudar os dados exibidos. */
 .premium-screen-row.realtime-screen-card {
   display: grid;

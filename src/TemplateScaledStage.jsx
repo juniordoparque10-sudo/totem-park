@@ -1,10 +1,14 @@
 import { useEffect, useMemo, useRef, useState } from "react";
 import { getTemplateStageGeometry } from "./template-stage-geometry";
 
-export default function TemplateScaledStage({ orientation = "Paisagem", zoom = 1, className = "", children }) {
+export default function TemplateScaledStage({ orientation = "Paisagem", logicalWidth, logicalHeight, zoom = 1, className = "", children }) {
   const areaRef = useRef(null);
   const [frame, setFrame] = useState({ width: 0, height: 0 });
-  const logical = orientation === "Retrato" ? { width: 1080, height: 1920 } : { width: 1920, height: 1080 };
+  const logical = logicalWidth > 0 && logicalHeight > 0
+    ? { width: logicalWidth, height: logicalHeight }
+    : orientation === "Retrato"
+      ? { width: 1080, height: 1920 }
+      : { width: 1920, height: 1080 };
 
   useEffect(() => {
     const node = areaRef.current;
