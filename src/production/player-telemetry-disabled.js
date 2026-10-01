@@ -4,6 +4,7 @@ export const createPlayerTelemetry = () => ({
   configure: () => false,
   isEnabled: () => false,
   updateIdentity: () => {},
+  updateOperational: () => {},
   record: () => {},
   increment: () => {},
   setConnection: () => {},

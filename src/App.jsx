@@ -139,8 +139,11 @@ import {
   restartSingleVideo,
 } from "./single-item-loop";
 import { createPlayerTelemetry, readPlayerTelemetryReport, TELEMETRY_DEFAULT_CONFIG } from "./player-telemetry";
+import { buildOperationalSnapshot, normalizeNativeAppInfo, normalizeOperationalMediaSource, OPERATIONAL_HEARTBEAT_INTERVAL_MS } from "./operational-telemetry";
 import { comparePortalScreens, getPortalLastSignalMs, getPortalScreenPage, sortClientsAlphabetically } from "./portal-status";
+import { reportedAppVersion } from "./telemetry-card-data";
 import {
+  authorizePlayerRebind,
   claimPlayerBinding,
   classifyPlayerIdentityFailure,
   PLAYER_IDENTITY_STATES,
@@ -2536,9 +2539,11 @@ function getCacheStatusLabel(screen = {}) {
 }
 
 function getMediaSourceLabel(source) {
-  if (source === "cache" || source === "local") return "Reproduzindo do cache local";
-  if (source === "mixed") return "Reprodução alternada: cache local e internet";
-  if (source === "remote" || source === "internet") return "Reproduzindo pela internet";
+  if (["cache", "local", "LOCAL"].includes(source)) return "Reproduzindo do cache local";
+  if (["mixed", "MIXED"].includes(source)) return "Reprodução alternada: cache local e internet";
+  if (["remote", "internet", "REMOTE"].includes(source)) return "Reproduzindo pela internet";
+  if (source === "FALLBACK") return "Fallback pela internet";
+  if (source === "TEMPLATE") return "Template renderizado localmente";
   return "Origem da reprodução não informada";
 }
 
@@ -3745,7 +3750,7 @@ const IS_PLAYER_BUILD = ["player", "playerLab", "playerCanary", "playerRc", "pla
 const IS_PLAYER_LAB_BUILD = APP_BUILD_MODE === "playerLab";
 const IS_PLAYER_CANARY_BUILD = APP_BUILD_MODE === "playerCanary";
 const IS_PLAYER_RC_BUILD = APP_BUILD_MODE === "playerRc";
-const IS_TEMPLATES_V2_DIAGNOSTIC_BUILD = IS_PLAYER_RC_BUILD;
+const IS_TEMPLATES_V2_DIAGNOSTIC_BUILD = false;
 const TEMPLATE_DIAGNOSTIC_EVENT_NAMES = Object.freeze({
   T0:"PLAYER_T0", T1:"PLAYER_T1", T2:"PLAYER_T2", T3:"PLAYER_T3", T4:"PLAYER_T4",
   T5:"PLAYER_T5", T6:"PLAYER_T6", T7:"PLAYER_T7", T8:"PLAYER_T8",
@@ -3757,6 +3762,7 @@ function logTemplatesV2Diagnostic(event, payload = {}) {
   globalThis.dispatchEvent?.(new CustomEvent("totempark-v2-diagnostic", { detail:{ event, payload:detail } }));
 }
 const IS_PLAYER_TELEMETRY_BUILD = APP_BUILD_MODE === "playerTelemetry";
+const IS_OPERATIONAL_TELEMETRY_BUILD = IS_PLAYER_RC_BUILD || IS_PLAYER_TELEMETRY_BUILD;
 const IS_PLAYER_JUMP_DIAG_BUILD = APP_BUILD_MODE === "playerJumpDiag";
 const IS_PLAYER_DECODER_EXPERIMENT_BUILD = APP_BUILD_MODE === "playerDecoderExperiment";
 const IS_PLAYER_DECODER_LIFECYCLE_BUILD = IS_PLAYER_RC_BUILD || IS_PLAYER_DECODER_EXPERIMENT_BUILD;
@@ -3916,7 +3922,6 @@ function PlayerOnlyApp() {
       <Route path="/player/:clientId/:codigo" element={<PlayerPage />} />
       {IS_PLAYER_LAB_BUILD && <Route path="/diagnostico-lab" element={<PlayerLabDiagnostics />} />}
       {IS_PLAYER_CANARY_BUILD && <Route path="/diagnostico-canary" element={<PlayerLabDiagnostics />} />}
-      {IS_PLAYER_RC_BUILD && <Route path="/diagnostico-rc" element={<PlayerLabDiagnostics />} />}
       {IS_PLAYER_PHASE_B_BUILD && <Route path="/diagnostico-2a2-b" element={<PlayerLabDiagnostics />} />}
       {IS_PLAYER_LINK_FIX_BUILD && <Route path="/diagnostico-link-fix" element={<PlayerLabDiagnostics />} />}
       {IS_PLAYER_TELEMETRY_BUILD && <Route path="/diagnostico-telemetria" element={<PlayerLabDiagnostics />} />}
@@ -5593,8 +5598,8 @@ function Dashboard({ onNavigate, onOpenTelemetry }) {
                       <div className="realtime-screen-facts">
                         <span>Cache: {getCacheStatusLabel(screen)} • {getMediaSourceLabel(screen.currentMediaSource)}</span>
                         {getCacheSyncLabel(screen) && <span>{getCacheSyncLabel(screen)}</span>}
-                        <span title={screen.telemetry?.session?.appVersion || "—"}>App: {screen.telemetry?.session?.appVersion || "—"}</span>
-                        <span>Tempo ativo: {screen.telemetry?.schemaVersion >= 3 && Number.isFinite(Number(screen.telemetry?.counters?.activeTimeMs)) ? `${Math.floor(Number(screen.telemetry.counters.activeTimeMs) / 60000)} min` : "—"}</span>
+                        <span title={reportedAppVersion(screen) || "—"}>App: {reportedAppVersion(screen) || "—"}</span>
+                        <span>Tempo ativo: {screen.telemetry?.schemaVersion >= 3 && Number.isFinite(Number(screen.telemetry?.session?.uptimeSeconds)) ? `${Math.floor(Number(screen.telemetry.session.uptimeSeconds) / 60)} min` : "—"}</span>
                         <span>Local: {deviceLocation.city}</span>
                         <span>Item: {screen.nowPlayingIndex && screen.nowPlayingTotal
                           ? `${screen.nowPlayingIndex}/${screen.nowPlayingTotal}`
@@ -9678,6 +9683,7 @@ function ClientScreensPage({ client, access = getClientPlanAccess(client), isAdm
   const [playlists, setPlaylists] = useState([]);
   const [now, setNow] = useState(Date.now());
   const [editingScreen, setEditingScreen] = useState(null);
+  const [rebindDialog, setRebindDialog] = useState(null);
   const screenEditorRef = useRef(null);
 
   const [form, setForm] = useState({
@@ -10033,6 +10039,31 @@ function ClientScreensPage({ client, access = getClientPlanAccess(client), isAdm
     }
   }
 
+  async function confirmPlayerRebindAuthorization() {
+    if (!isAdmin || !rebindDialog?.screen || rebindDialog.phase === "saving") return;
+    setRebindDialog((current) => ({ ...current, phase: "saving", error: "" }));
+    try {
+      const result = await authorizePlayerRebind({
+        app: firebaseApp,
+        clientId: client.id,
+        screenId: rebindDialog.screen.id,
+      });
+      setRebindDialog((current) => ({
+        ...current,
+        phase: "success",
+        expiresAt: result.expiresAt,
+        authorizationId: result.authorizationId,
+      }));
+    } catch (error) {
+      console.log("Não foi possível reautorizar o Player:", error);
+      setRebindDialog((current) => ({
+        ...current,
+        phase: "error",
+        error: error?.message || "A autorização não pôde ser criada.",
+      }));
+    }
+  }
+
   function sendOverlayCommand(screenId) {
     const message = window.prompt("Digite a mensagem do overlay:");
 
@@ -10270,6 +10301,11 @@ function ClientScreensPage({ client, access = getClientPlanAccess(client), isAdm
                     <button type="button" className={screen.templatesV2TestMode ? "active" : ""} onClick={() => setTemplatesV2TestMode(screen, !screen.templatesV2TestMode)}>{screen.templatesV2TestMode ? "Ativado" : "Desativado"}</button>
                   </div>}
 
+                  {isAdmin && <div className="screen-v2-test-control screen-rebind-control">
+                    <div><small>Controle restrito Master</small><strong>Reautorizar Player</strong><span>Libera uma única troca de identidade autenticada por 10 minutos.</span></div>
+                    <button type="button" onClick={() => setRebindDialog({ screen, phase: "confirm", error: "" })}>Reautorizar</button>
+                  </div>}
+
                   <div className="remote-control-panel-inline">
                     <div className="remote-control-heading">
                       <div className="remote-control-title">
@@ -10411,6 +10447,23 @@ function ClientScreensPage({ client, access = getClientPlanAccess(client), isAdm
           })
         )}
       </section>
+
+      {rebindDialog && <PortalModal
+        title={rebindDialog.phase === "success" ? "Player reautorizado" : "Reautorizar Player"}
+        message={rebindDialog.phase === "success"
+          ? `A autorização temporária foi criada para ${rebindDialog.screen.name}. O próximo claim legítimo poderá registrar a nova identidade.`
+          : rebindDialog.phase === "error"
+            ? rebindDialog.error
+            : "Esta ação autoriza temporariamente este Player a registrar uma nova identidade autenticada. A tela, playlist e vínculo operacional serão preservados."}
+        details={rebindDialog.phase === "success"
+          ? ["Uso único: será consumida no primeiro rebind válido.", `Expira em: ${new Date(rebindDialog.expiresAt).toLocaleString("pt-BR")}.`]
+          : ["Não apaga a tela, playlist, mídias ou configurações.", "A autorização expira em 10 minutos.", "Após um rebind válido, ela é consumida e não pode ser reutilizada."]}
+        confirmLabel={rebindDialog.phase === "success" ? "Concluir" : rebindDialog.phase === "saving" ? "Autorizando..." : rebindDialog.phase === "error" ? "Tentar novamente" : "Autorizar por 10 minutos"}
+        confirmDisabled={rebindDialog.phase === "saving"}
+        danger={rebindDialog.phase !== "success"}
+        onConfirm={rebindDialog.phase === "success" ? () => setRebindDialog(null) : confirmPlayerRebindAuthorization}
+        onClose={() => setRebindDialog(null)}
+      />}
     </>
   );
 }
@@ -15123,6 +15176,7 @@ function PlayerPage() {
   const mediaCacheRunRef = useRef(0);
   const mediaCacheProgressReportAtRef = useRef(0);
   const mediaCacheObjectUrlsRef = useRef(new Set());
+  const fallbackMediaKeysRef = useRef(new Set());
   const lastCacheStatusPayloadRef = useRef("");
   const playbackTimerRef = useRef(null);
   const playbackTimingKeyRef = useRef("");
@@ -15147,12 +15201,17 @@ function PlayerPage() {
   const transitionDiagnosticRescueRef = useRef(null);
   const playerBindingRef = useRef(null);
   const playerIdentityStateRef = useRef(PLAYER_IDENTITY_STATES.UNAVAILABLE);
+  const operationalSnapshotRef = useRef(null);
+  const operationalPlayerErrorRef = useRef(false);
+  const [operationalAppInfo, setOperationalAppInfo] = useState(() => normalizeNativeAppInfo({}, {
+    packageName: isNativeApp() ? "" : window.location.hostname,
+    versionName: isNativeApp() ? "" : (import.meta.env.VITE_APP_VERSION || import.meta.env.VITE_APP_MODE || "web"),
+  }));
   if (!telemetryRef.current) {
     telemetryRef.current = createPlayerTelemetry({
       identity: {
         clientId,
         deviceId: getTotemDeviceId(),
-        appVersion: import.meta.env.VITE_APP_VERSION || import.meta.env.VITE_APP_MODE || "unknown",
         platform: isNativeApp() ? "ANDROID" : "WEB",
       },
     });
@@ -15171,7 +15230,7 @@ function PlayerPage() {
   const isAndroidSmartTv = isNativeApp() && isAndroidTv === true;
 
   useEffect(() => {
-    if (!(IS_PLAYER_TELEMETRY_BUILD || IS_TEMPLATES_V2_DIAGNOSTIC_BUILD) || !clientId || !codigo) return undefined;
+    if (!(IS_OPERATIONAL_TELEMETRY_BUILD || IS_TEMPLATES_V2_DIAGNOSTIC_BUILD) || !clientId || !codigo) return undefined;
     let cancelled = false;
     const establishIdentity = async () => {
       try {
@@ -15180,7 +15239,7 @@ function PlayerPage() {
           auth,
           code: codigo,
           deviceId: getTotemDeviceId(),
-          appVersion: import.meta.env.VITE_APP_VERSION || "2a2-c.1",
+          appVersion: operationalAppInfo.versionName,
         });
         if (cancelled) return;
         playerBindingRef.current = binding;
@@ -15198,7 +15257,7 @@ function PlayerPage() {
       cancelled = true;
       window.removeEventListener("online", establishIdentity);
     };
-  }, [clientId, codigo]);
+  }, [clientId, codigo, operationalAppInfo.versionName]);
 
   useEffect(() => {
     const diagnostic = transitionDiagnosticsRef.current;
@@ -15208,7 +15267,7 @@ function PlayerPage() {
   }, [clientId, screen?.id, screen?.templatesV2TestMode]);
 
   useEffect(() => {
-    if (!IS_PLAYER_TELEMETRY_BUILD || !screen?.id || !clientId) return undefined;
+    if (!IS_OPERATIONAL_TELEMETRY_BUILD || !screen?.id || !clientId) return undefined;
     const telemetry = telemetryRef.current;
     telemetry.updateIdentity({ clientId, screenId: screen.id, deviceId: getTotemDeviceId() });
     const unsubscribe = onSnapshot(
@@ -15254,6 +15313,13 @@ function PlayerPage() {
 
     return sentAtMs >= playerSessionStartedAtRef.current - 5000;
   }
+
+  useEffect(() => {
+    if (!isNativeApp()) return;
+    TotemDevice.getAppInfo()
+      .then((value) => setOperationalAppInfo(normalizeNativeAppInfo(value)))
+      .catch((error) => console.log("Não foi possível obter a versão nativa do Player:", error));
+  }, []);
 
   useEffect(() => {
     if (!isNativeApp()) return;
@@ -15410,6 +15476,7 @@ function PlayerPage() {
     const cached = mediaCacheMap[mediaCacheKey];
 
     if (isNativeApp() && isAndroidLocalMediaSource(item.preview)) {
+      fallbackMediaKeysRef.current.delete(mediaCacheKey);
       return {
         ...item,
         remotePreview,
@@ -15419,6 +15486,7 @@ function PlayerPage() {
     }
 
     if (cached?.url) {
+      fallbackMediaKeysRef.current.delete(mediaCacheKey);
       return {
         ...item,
         remotePreview,
@@ -15432,7 +15500,7 @@ function PlayerPage() {
       ...item,
       remotePreview,
       mediaCacheKey,
-      currentMediaSource: "remote",
+      currentMediaSource: fallbackMediaKeysRef.current.has(mediaCacheKey) ? "fallback" : "remote",
     };
   }
 
@@ -15442,6 +15510,7 @@ function PlayerPage() {
       item?.currentMediaSource === "local" &&
       item.remotePreview
     ) {
+      if (item.mediaCacheKey) fallbackMediaKeysRef.current.add(item.mediaCacheKey);
       setOfflineAssetMap((previous) => {
         const next = { ...previous };
         delete next[item.remotePreview];
@@ -15458,6 +15527,7 @@ function PlayerPage() {
       return false;
     }
 
+    fallbackMediaKeysRef.current.add(item.mediaCacheKey);
     setMediaCacheMap((previous) => {
       const cached = previous[item.mediaCacheKey];
 
@@ -15527,7 +15597,6 @@ function PlayerPage() {
       totalCacheableItems: Number(payload.totalCacheableItems || 0),
       failedCacheItems: Number(payload.failedCacheItems || 0),
       cacheSizeBytes: Number(payload.cacheSizeBytes || 0),
-      currentMediaSource: payload.currentMediaSource || playerCacheStatus.currentMediaSource || "remote",
       activePlaylistWeightBytes: Number(payload.activePlaylistWeightBytes || 0),
       estimatedMonthlyTrafficBytes: Number(payload.estimatedMonthlyTrafficBytes || 0),
       cacheManifestKey: payload.cacheManifestKey || "",
@@ -16098,6 +16167,7 @@ function PlayerPage() {
   }
 
   function goToNextMedia(reason = "UNKNOWN") {
+    operationalPlayerErrorRef.current = false;
     if (advancingRef.current) return;
 
     recordTransitionDiagnostic("GO_TO_NEXT_MEDIA", { reason });
@@ -16178,6 +16248,7 @@ function PlayerPage() {
     if (isTemplateV2(item) && readyPlaybackExecutionsRef.current.has(executionId)) return;
     if (isTemplateV2(item)) readyPlaybackExecutionsRef.current.add(executionId);
 
+    operationalPlayerErrorRef.current = false;
     setReadyMediaKey(itemKey);
     logTemplatesV2Diagnostic("T6_TEMPLATE_READY", { templateId:item.templateId||item.id||"", itemKey, playbackExecutionId:executionId, CURRENT_VISIBLE:previousMediaIndexRef.current !== null, NEXT_PENDING:false });
     telemetryRef.current.completeTransition(telemetryTransitionRef.current, "SUCCESS");
@@ -16555,8 +16626,15 @@ function PlayerPage() {
           return;
         }
 
+        telemetryRef.current.updateOperational(operationalSnapshotRef.current || {});
         const telemetryHeartbeat = telemetryRef.current.heartbeat();
         const telemetrySnapshot = telemetryHeartbeat?.snapshot;
+        const binding = playerBindingRef.current;
+        const canSyncTelemetry = telemetrySnapshot
+          && binding?.status === "ACTIVE"
+          && binding.clientId === clientId
+          && binding.screenId === screen.id
+          && binding.deviceId === localDeviceId;
         const heartbeatPayload = {
           connectedDeviceId: localDeviceId,
           activeDeviceId: deleteField(),
@@ -16565,9 +16643,13 @@ function PlayerPage() {
           lastSeenAt: serverTimestamp(),
         };
 
+        if (canSyncTelemetry) {
+          heartbeatPayload.telemetry = telemetrySnapshot;
+          heartbeatPayload.telemetryUpdatedAt = serverTimestamp();
+        }
+
         await updateDoc(screenDocRef, heartbeatPayload);
 
-        const binding = playerBindingRef.current;
         const pendingTransitionDiagnostic = transitionDiagnosticsRef.current.pending();
         const canSyncTransitionDiagnostic = pendingTransitionDiagnostic
           && binding?.status === "ACTIVE"
@@ -16577,28 +16659,7 @@ function PlayerPage() {
         const canRescueTransitionDiagnostic = pendingTransitionDiagnostic
           && IS_TEMPLATES_V2_DIAGNOSTIC_BUILD
           && screen.templatesV2TestMode === true;
-        const canSyncTelemetry = telemetrySnapshot
-          && telemetryHeartbeat?.due
-          && binding?.status === "ACTIVE"
-          && binding.clientId === clientId
-          && binding.screenId === screen.id
-          && binding.deviceId === localDeviceId;
-
-        if (canSyncTelemetry) {
-          await updateDoc(screenDocRef, {
-            telemetry: {
-            schemaVersion: telemetrySnapshot.schemaVersion,
-            session: telemetrySnapshot.session,
-            current: telemetrySnapshot.current,
-            counters: telemetrySnapshot.counters,
-            lastPlayerEvents: telemetrySnapshot.lastPlayerEvents.slice(-3),
-            transitions: telemetrySnapshot.transitions.slice(-2),
-            },
-            telemetryUpdatedAt: serverTimestamp(),
-          });
-        }
-
-        if (canSyncTelemetry && telemetryHeartbeat.outbox.length > 0 && Date.now() - lastTelemetryHistorySyncRef.current >= 15 * 60 * 1000) {
+        if (canSyncTelemetry && telemetryHeartbeat?.due && telemetryHeartbeat.outbox.length > 0 && Date.now() - lastTelemetryHistorySyncRef.current >= 15 * 60 * 1000) {
           const pending = telemetryHeartbeat.outbox.at(-1);
           await setDoc(
             doc(db, "clients", clientId, "screens", screen.id, "telemetrySessions", telemetrySnapshot.session.sessionId),
@@ -16644,7 +16705,7 @@ function PlayerPage() {
 
     const interval = setInterval(() => {
       sendHeartbeat();
-    }, 15000);
+    }, OPERATIONAL_HEARTBEAT_INTERVAL_MS);
 
     const onVisible = () => {
       if (document.visibilityState === "visible") sendHeartbeat();
@@ -16924,7 +16985,9 @@ function PlayerPage() {
           nowPlayingTemplateType: currentItem.templateType || "",
           nowPlayingItemType: currentItem.playerItemType || "",
           nowPlayingSound: currentItem.sound || false,
-          currentMediaSource: currentItem.currentMediaSource || "remote",
+          currentMediaSource: normalizeOperationalMediaSource(currentItem.currentMediaSource, {
+            template:currentItem.playerItemType === "template" || Boolean(currentItem.templateType),
+          }),
           nowPlayingIndex: safeIndex + 1,
           nowPlayingTotal: items.length,
           currentPlaylistId: activePlaylist.id || "",
@@ -17323,6 +17386,20 @@ function PlayerPage() {
   const currentMediaKey = getPlaybackReadyKey(currentMedia, safeMediaIndex, currentPlaybackExecutionId);
   const currentMediaReady = readyMediaKey === currentMediaKey;
   const currentTransitionReady = currentMediaReady;
+  const operationalPlayerState = operationalPlayerErrorRef.current
+    ? "error"
+    : pauseMode || maintenanceMode || blackoutMode || takeoverMessage || !currentMedia
+      ? "idle"
+      : currentMediaReady ? "playing" : "loading";
+  operationalSnapshotRef.current = buildOperationalSnapshot({
+    screenId:screen?.id || "",
+    deviceId:getTotemDeviceId(),
+    app:operationalAppInfo,
+    playerState:operationalPlayerState,
+    currentItem:currentMedia,
+    cache:playerCacheStatus,
+    networkStatus:navigator.onLine === false ? "OFFLINE" : "ONLINE",
+  });
   const transitionClass = getTransitionClass(activePlaylist?.transition || "Fade suave");
   const transitionSpeedClass = getTransitionSpeedClass(activePlaylist?.transitionSpeed || "Normal");
   const playerOrientationClass = hasManualScreenRotation
@@ -17487,6 +17564,7 @@ function PlayerPage() {
           onError={(event) => {
             if (IS_PLAYER_DECODER_LIFECYCLE_BUILD && releasingVideoNodesRef.current.has(event.currentTarget)) return;
             if (!isCurrent) return;
+            operationalPlayerErrorRef.current = true;
             captureVideoEvent("error", event, { message: "Erro ao carregar vídeo" });
             telemetryRef.current.record("PLAYBACK_ERROR", { ...telemetryMedia, message: "Erro ao carregar vídeo" });
             recordPlayback("PLAYBACK_ERROR", source, { ...diagnosticMedia, message: "Erro ao carregar vídeo" });
@@ -17523,6 +17601,7 @@ function PlayerPage() {
         }}
         onError={() => {
           if (!isCurrent) return;
+          operationalPlayerErrorRef.current = true;
           telemetryRef.current.record("PLAYBACK_ERROR", { ...telemetryMedia, message: "Erro ao carregar imagem" });
           recordPlayback("PLAYBACK_ERROR", source, { ...diagnosticMedia, message: "Erro ao carregar imagem" });
           if (fallbackToRemoteMedia(item)) return;
@@ -17537,7 +17616,6 @@ function PlayerPage() {
     <div className={`player-screen ${playerOrientationClass} ${isAndroidSmartTv ? "android-tv-player" : ""}`}>
       {IS_PLAYER_LAB_BUILD && <button className="player-lab-badge" onClick={() => navigate("/diagnostico-lab")}>LAB · Diagnóstico</button>}
       {IS_PLAYER_CANARY_BUILD && <button className="player-lab-badge" onClick={() => navigate("/diagnostico-canary")}>CANARY · Diagnóstico</button>}
-      {IS_PLAYER_RC_BUILD && <button className="player-lab-badge" onClick={() => navigate("/diagnostico-rc")}>RC · Diagnóstico</button>}
       {IS_PLAYER_PHASE_B_BUILD && <button className="player-lab-badge" onClick={() => navigate("/diagnostico-2a2-b")}>2A.2-B · Diagnóstico</button>}
       {IS_PLAYER_LINK_FIX_BUILD && <button className="player-lab-badge" onClick={() => navigate("/diagnostico-link-fix")}>LINK-FIX · Diagnóstico</button>}
       {IS_PLAYER_TELEMETRY_BUILD && <button className="player-lab-badge" onClick={() => navigate("/diagnostico-telemetria")}>2A.2-C · Diagnóstico</button>}

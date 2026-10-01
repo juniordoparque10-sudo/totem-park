@@ -1,7 +1,8 @@
 const { onCall, HttpsError } = require("firebase-functions/v2/https");
 const { initializeApp } = require("firebase-admin/app");
-const { getFirestore, FieldValue } = require("firebase-admin/firestore");
+const { getFirestore, FieldValue, Timestamp } = require("firebase-admin/firestore");
 const { validateRescueRequest } = require("./transition-diagnostic-rescue");
+const { REBIND_AUTHORIZATION_TTL_MS, evaluateRebindAuthorization, canRebindKnownDevice } = require("./player-rebind");
 
 initializeApp();
 const db = getFirestore();
@@ -115,6 +116,70 @@ async function isMaster(request) {
   return emails.map((item) => clean(item).toLowerCase()).includes(email);
 }
 
+function playerRebindAuthorizationRef(clientId, screenId) {
+  return db.doc(`clients/${clientId}/screens/${screenId}/system/rebindAuthorization`);
+}
+
+exports.authorizePlayerRebind = onCall(async (request) => {
+  const uid = requireUid(request);
+  if (!(await isMaster(request))) {
+    throw new HttpsError("permission-denied", "Only an authorized master can reauthorize a Player.");
+  }
+  const clientId = clean(request.data?.clientId, 120);
+  const screenId = clean(request.data?.screenId, 120);
+  if (!clientId || !screenId) throw new HttpsError("invalid-argument", "clientId and screenId are required.");
+
+  const screenRef = db.doc(`clients/${clientId}/screens/${screenId}`);
+  const authorizationRef = playerRebindAuthorizationRef(clientId, screenId);
+  const nowMs = Date.now();
+  const authorizationId = `${nowMs}-${Math.random().toString(36).slice(2, 12)}`;
+  const authorizationAuditRef = db.doc(`playerRebindAuthorizations/${authorizationId}`);
+  await db.runTransaction(async (transaction) => {
+    const [screenSnapshot, previousAuthorizationSnapshot] = await Promise.all([
+      transaction.get(screenRef),
+      transaction.get(authorizationRef),
+    ]);
+    if (!screenSnapshot.exists) throw new HttpsError("not-found", "Screen was not found.");
+    const authorization = {
+      schemaVersion: 1,
+      authorizationId,
+      status: "ACTIVE",
+      clientId,
+      screenId,
+      createdBy: uid,
+      createdByEmail: clean(request.auth?.token?.email).toLowerCase(),
+      createdAt: FieldValue.serverTimestamp(),
+      expiresAt: Timestamp.fromMillis(nowMs + REBIND_AUTHORIZATION_TTL_MS),
+      expiresAtMs: nowMs + REBIND_AUTHORIZATION_TTL_MS,
+      consumedAt: null,
+      consumedBy: null,
+      consumedDeviceId: null,
+    };
+    const previousAuthorizationId = previousAuthorizationSnapshot.exists
+      ? clean(previousAuthorizationSnapshot.get("authorizationId"), 160)
+      : "";
+    if (previousAuthorizationSnapshot.exists && previousAuthorizationId) {
+      transaction.set(db.doc(`playerRebindAuthorizations/${previousAuthorizationId}`), {
+        authorizationId: previousAuthorizationId,
+        clientId,
+        screenId,
+        status: "SUPERSEDED",
+        supersededAt: FieldValue.serverTimestamp(),
+        supersededBy: uid,
+      }, { merge: true });
+    }
+    transaction.set(authorizationRef, authorization, { merge: false });
+    transaction.set(authorizationAuditRef, authorization, { merge: false });
+  });
+  return {
+    status: "ACTIVE",
+    authorizationId,
+    clientId,
+    screenId,
+    expiresAt: new Date(nowMs + REBIND_AUTHORIZATION_TTL_MS).toISOString(),
+  };
+});
+
 exports.claimPlayerBinding = onCall(async (request) => {
   const uid = requireUid(request);
   const code = clean(request.data?.code, 16).toUpperCase();
@@ -133,9 +198,11 @@ exports.claimPlayerBinding = onCall(async (request) => {
 
     const screenRef = db.doc(`clients/${clientId}/screens/${screenId}`);
     const bindingRef = db.doc(`playerDeviceBindings/${uid}`);
-    const [screenSnapshot, bindingSnapshot] = await Promise.all([
+    const authorizationRef = playerRebindAuthorizationRef(clientId, screenId);
+    const [screenSnapshot, bindingSnapshot, authorizationSnapshot] = await Promise.all([
       transaction.get(screenRef),
       transaction.get(bindingRef),
+      transaction.get(authorizationRef),
     ]);
     if (!screenSnapshot.exists) throw new HttpsError("not-found", "Screen was not found.");
 
@@ -144,8 +211,45 @@ exports.claimPlayerBinding = onCall(async (request) => {
       throw new HttpsError("failed-precondition", "This identity is already bound to another screen.");
     }
     const screen = screenSnapshot.data() || {};
-    if (screen.connectedAuthUid && screen.connectedAuthUid !== uid) {
-      throw new HttpsError("already-exists", "Screen is bound to another authenticated player.");
+    const previousConnectedUid = clean(screen.connectedAuthUid);
+    const isUidConflict = Boolean(previousConnectedUid && previousConnectedUid !== uid);
+    if (isUidConflict) {
+      const authorization = evaluateRebindAuthorization({
+        authorization: authorizationSnapshot.data(),
+        clientId,
+        screenId,
+        nowMs: Date.now(),
+      });
+      if (!authorization.allowed || !canRebindKnownDevice({
+        connectedDeviceId: clean(screen.connectedDeviceId),
+        requestedDeviceId: deviceId,
+      })) {
+        throw new HttpsError("already-exists", "Screen is bound to another authenticated player.");
+      }
+
+      const previousBindingRef = db.doc(`playerDeviceBindings/${previousConnectedUid}`);
+      const previousBindingSnapshot = await transaction.get(previousBindingRef);
+      if (previousBindingSnapshot.exists) {
+        transaction.update(previousBindingRef, {
+          status: "REVOKED",
+          revokedAt: FieldValue.serverTimestamp(),
+          updatedAt: FieldValue.serverTimestamp(),
+          revokeReason: "ADMIN_REBIND",
+          replacedByUid: uid,
+        });
+      }
+      transaction.update(authorizationRef, {
+        status: "CONSUMED",
+        consumedAt: FieldValue.serverTimestamp(),
+        consumedBy: uid,
+        consumedDeviceId: deviceId,
+      });
+      transaction.update(db.doc(`playerRebindAuthorizations/${authorizationSnapshot.get("authorizationId")}`), {
+        status: "CONSUMED",
+        consumedAt: FieldValue.serverTimestamp(),
+        consumedBy: uid,
+        consumedDeviceId: deviceId,
+      });
     }
 
     const now = FieldValue.serverTimestamp();

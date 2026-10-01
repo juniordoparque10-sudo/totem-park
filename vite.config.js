@@ -8,8 +8,6 @@ export default defineConfig(({ mode }) => ({
   resolve: mode === 'playerRc' ? {
     alias: [
       { find: './jump-diagnostics', replacement: fileURLToPath(new URL('./src/production/jump-diagnostics-disabled.js', import.meta.url)) },
-      { find: './player-telemetry', replacement: fileURLToPath(new URL('./src/production/player-telemetry-disabled.js', import.meta.url)) },
-      { find: './player-identity', replacement: fileURLToPath(new URL('./src/production/player-identity-disabled.js', import.meta.url)) },
     ],
   } : {},
 }))

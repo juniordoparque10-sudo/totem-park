@@ -1,7 +1,7 @@
 import test, { after, before } from "node:test";
 import assert from "node:assert/strict";
 import { initializeApp, deleteApp } from "firebase/app";
-import { connectAuthEmulator, getAuth, signInAnonymously } from "firebase/auth";
+import { connectAuthEmulator, createUserWithEmailAndPassword, getAuth, signInAnonymously } from "firebase/auth";
 import { connectFunctionsEmulator, getFunctions, httpsCallable } from "firebase/functions";
 import { doc, getDoc, setDoc } from "firebase/firestore";
 import { initializeTestEnvironment } from "@firebase/rules-unit-testing";
@@ -9,6 +9,22 @@ import { initializeTestEnvironment } from "@firebase/rules-unit-testing";
 const projectId = "demo-totem-identity";
 let env;
 let app;
+const extraApps = [];
+
+function emulatorApp(name) {
+  const instance = initializeApp({ projectId, apiKey: "demo-key", authDomain: "demo.local" }, name);
+  connectAuthEmulator(getAuth(instance), "http://127.0.0.1:9198", { disableWarnings: true });
+  connectFunctionsEmulator(getFunctions(instance), "127.0.0.1", 5002);
+  extraApps.push(instance);
+  return instance;
+}
+
+async function assertCallableCode(action, expectedCode) {
+  await assert.rejects(action, (error) => {
+    assert.match(String(error?.code || ""), new RegExp(`${expectedCode}$`));
+    return true;
+  });
+}
 
 before(async () => {
   env = await initializeTestEnvironment({ projectId });
@@ -23,8 +39,62 @@ before(async () => {
 });
 
 after(async () => {
+  await Promise.all(extraApps.map((instance) => deleteApp(instance)));
   await deleteApp(app);
   await env.cleanup();
+});
+
+test("master authorization permits one secure rebind and revokes the old UID", async () => {
+  const oldPlayer = emulatorApp("binding-old-player");
+  const nextPlayer = emulatorApp("binding-next-player");
+  const thirdPlayer = emulatorApp("binding-third-player");
+  const master = emulatorApp("binding-master");
+  const oldCredential = await signInAnonymously(getAuth(oldPlayer));
+  const nextCredential = await signInAnonymously(getAuth(nextPlayer));
+  await signInAnonymously(getAuth(thirdPlayer));
+  await createUserWithEmailAndPassword(getAuth(master), "master@example.com", "secure-test-password");
+
+  await env.withSecurityRulesDisabled(async (context) => {
+    const db = context.firestore();
+    await setDoc(doc(db, "settings/masterAccess"), { emails: ["master@example.com"] });
+    await setDoc(doc(db, "tv_codes/REBIND1"), { clientId: "client-a", screenId: "screen-rebind" });
+    await setDoc(doc(db, "clients/client-a/screens/screen-rebind"), {
+      name: "Rebind", connectedAuthUid: oldCredential.user.uid, connectedDeviceId: "device-rebind",
+    });
+    await setDoc(doc(db, `playerDeviceBindings/${oldCredential.user.uid}`), {
+      uid: oldCredential.user.uid, clientId: "client-a", screenId: "screen-rebind", deviceId: "device-rebind", status: "ACTIVE",
+    });
+  });
+
+  const nextClaim = httpsCallable(getFunctions(nextPlayer), "claimPlayerBinding");
+  await assertCallableCode(() => nextClaim({ code: "REBIND1", deviceId: "device-rebind", appVersion: "test" }), "already-exists");
+  const unauthorized = httpsCallable(getFunctions(nextPlayer), "authorizePlayerRebind");
+  await assertCallableCode(() => unauthorized({ clientId: "client-a", screenId: "screen-rebind" }), "permission-denied");
+
+  const authorize = httpsCallable(getFunctions(master), "authorizePlayerRebind");
+  const authorization = await authorize({ clientId: "client-a", screenId: "screen-rebind" });
+  assert.equal(authorization.data.status, "ACTIVE");
+  const rebound = await nextClaim({ code: "REBIND1", deviceId: "device-rebind", appVersion: "test" });
+  assert.equal(rebound.data.status, "ACTIVE");
+
+  await env.withSecurityRulesDisabled(async (context) => {
+    const db = context.firestore();
+    const screen = (await getDoc(doc(db, "clients/client-a/screens/screen-rebind"))).data();
+    const oldBinding = (await getDoc(doc(db, `playerDeviceBindings/${oldCredential.user.uid}`))).data();
+    const currentBinding = (await getDoc(doc(db, `playerDeviceBindings/${nextCredential.user.uid}`))).data();
+    const consumed = (await getDoc(doc(db, "clients/client-a/screens/screen-rebind/system/rebindAuthorization"))).data();
+    const audit = (await getDoc(doc(db, `playerRebindAuthorizations/${consumed.authorizationId}`))).data();
+    assert.equal(screen.connectedAuthUid, nextCredential.user.uid);
+    assert.equal(oldBinding.status, "REVOKED");
+    assert.equal(currentBinding.status, "ACTIVE");
+    assert.equal(consumed.status, "CONSUMED");
+    assert.equal(consumed.consumedBy, nextCredential.user.uid);
+    assert.equal(audit.status, "CONSUMED");
+    assert.equal(audit.screenId, "screen-rebind");
+  });
+
+  const thirdClaim = httpsCallable(getFunctions(thirdPlayer), "claimPlayerBinding");
+  await assertCallableCode(() => thirdClaim({ code: "REBIND1", deviceId: "device-rebind", appVersion: "test" }), "already-exists");
 });
 
 test("authenticated backend claim creates an authoritative binding", async () => {

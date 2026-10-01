@@ -135,9 +135,15 @@ service cloud.firestore {
     function isAllowedPlayerTelemetryUpdate(clientId, screenId) {
       return hasActivePlayerBinding(clientId, screenId)
         && request.resource.data.diff(resource.data).affectedKeys().hasOnly([
+          "activeDeviceId",
+          "connectedDeviceId",
+          "lastConnection",
+          "lastSeenAt",
+          "status",
           "telemetry",
           "telemetryUpdatedAt"
         ])
+        && request.resource.data.connectedDeviceId == playerBinding().data.deviceId
         && telemetryIdentityMatches(clientId, screenId, request.resource.data.telemetry);
     }
 
@@ -171,6 +177,10 @@ service cloud.firestore {
             && request.resource.data.sequence is int
             && request.resource.data.sequence >= resource.data.sequence;
           allow delete: if isMaster();
+        }
+
+        match /system/{systemDocument} {
+          allow read, write: if false;
         }
       }
 
@@ -208,6 +218,10 @@ service cloud.firestore {
       allow get: if signedIn() && request.auth.uid == uid;
       allow list: if isMaster();
       allow create, update, delete: if isMaster();
+    }
+
+    match /playerRebindAuthorizations/{authorizationId} {
+      allow read, write: if false;
     }
 
     match /account_requests/{requestId} {

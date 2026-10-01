@@ -29,13 +29,15 @@ export function getPortalLastSignalMs(screen = {}) {
   );
   const telemetry = screen?.telemetry;
   const session = telemetry?.session;
+  const operationalHeartbeat = timestampMs(session?.lastHeartbeatAt);
   const trustedV5 = Number(telemetry?.schemaVersion) >= 3
-    && telemetry?.current?.connectionStatus === "ONLINE"
+    && (telemetry?.current?.networkStatus || telemetry?.current?.connectionStatus) === "ONLINE"
+    && Boolean(operationalHeartbeat)
     && Boolean(screen?.connectedDeviceId)
     && session?.screenId === screen?.id
     && session?.clientId === screen?.clientId
     && session?.deviceId === screen?.connectedDeviceId;
-  return Math.max(playerSignal, trustedV5 ? timestampMs(screen?.telemetryUpdatedAt) : 0);
+  return Math.max(playerSignal, trustedV5 ? operationalHeartbeat : 0);
 }
 
 export function getPortalScreenStatus(screen, now = Date.now()) {
@@ -119,6 +121,10 @@ export function getTelemetryVisualState({ config, screen, now = Date.now(), read
   if (readError) return "READ_ERROR";
   if (!isTelemetryEnabledForScreen(config, screen)) return "DISABLED";
   if (!screen?.telemetry || !timestampMs(screen.telemetryUpdatedAt)) return "WAITING_FIRST_SIGNAL";
+  if (Number(screen.telemetry.schemaVersion) >= 3) {
+    const heartbeatAt = timestampMs(screen.telemetry?.session?.lastHeartbeatAt);
+    if (!heartbeatAt || now - heartbeatAt >= SCREEN_ONLINE_THRESHOLD_MS) return "STALE";
+  }
   const staleAfter = Math.max(60_000, Number(config?.syncIntervalMs || 300_000)) * 2;
   if (now - timestampMs(screen.telemetryUpdatedAt) > staleAfter) return "STALE";
   if (!periodHasData) return "NO_DATA_PERIOD";

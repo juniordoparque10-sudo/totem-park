@@ -5,7 +5,7 @@ import { comparePortalScreens, compareTelemetryScreens, getPortalLastSignalMs, g
 const v5Screen = (now, overrides = {}) => ({
   id: "screen", clientId: "client", connectedDeviceId: "device", lastSeenAt: now - 200_000,
   telemetryUpdatedAt: now - 10_000,
-  telemetry: { schemaVersion: 3, current: { connectionStatus: "ONLINE" }, session: { screenId: "screen", clientId: "client", deviceId: "device" } },
+  telemetry: { schemaVersion: 3, current: { networkStatus: "ONLINE" }, session: { screenId: "screen", clientId: "client", deviceId: "device", lastHeartbeatAt:new Date(now - 10_000).toISOString() } },
   ...overrides,
 });
 
@@ -32,13 +32,13 @@ test("V5 checkpoint uses 45-second attention and 90-second offline boundaries", 
   assert.equal(getPortalScreenStatus(screen, now + 35_000), "ATTENTION");
   assert.equal(getPortalScreenStatus(screen, now + 79_000), "ATTENTION");
   assert.equal(getPortalScreenStatus(screen, now + 80_000), "OFFLINE");
-  screen.telemetryUpdatedAt = now + 80_000;
+  screen.telemetry.session.lastHeartbeatAt = new Date(now + 80_000).toISOString();
   assert.equal(getPortalScreenStatus(screen, now + 80_000), "ONLINE");
 });
 
 test("old, unmatched or legacy telemetry cannot replace Player presence", () => {
   const now = 1_000_000;
-  assert.equal(getPortalScreenStatus(v5Screen(now, { telemetryUpdatedAt: now - 200_000 }), now), "OFFLINE");
+  assert.equal(getPortalScreenStatus(v5Screen(now, { telemetryUpdatedAt: now - 200_000, telemetry: { schemaVersion:3, current:{ networkStatus:"ONLINE" }, session:{ screenId:"screen", clientId:"client", deviceId:"device", lastHeartbeatAt:new Date(now - 200_000).toISOString() } } }), now), "OFFLINE");
   assert.equal(getPortalScreenStatus(v5Screen(now, { telemetry: { schemaVersion: 3, current: { connectionStatus: "ONLINE" }, session: { screenId: "other", clientId: "client", deviceId: "device" } } }), now), "OFFLINE");
   assert.equal(getPortalScreenStatus(v5Screen(now, { telemetry: { schemaVersion: 2 }, lastSeenAt: now - 10_000 }), now), "ONLINE");
   assert.equal(getPortalScreenStatus(v5Screen(now, { telemetry: { schemaVersion: 2 } }), now), "OFFLINE");

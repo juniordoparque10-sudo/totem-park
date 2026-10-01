@@ -46,6 +46,12 @@ export async function revokeOwnPlayerBinding({ app, auth, reason = "PLAYER_RELEA
   return result.data;
 }
 
+export async function authorizePlayerRebind({ app, clientId, screenId }) {
+  const authorize = httpsCallable(getFunctions(app), "authorizePlayerRebind");
+  const result = await authorize({ clientId, screenId });
+  return result.data;
+}
+
 export async function uploadTransitionDiagnosticRescue({ app, auth, payload }) {
   await ensurePlayerAuth(auth);
   const upload = httpsCallable(getFunctions(app), "uploadTransitionDiagnosticRescue");

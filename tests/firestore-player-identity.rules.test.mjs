@@ -32,7 +32,7 @@ before(async () => {
     const db = context.firestore();
     await setDoc(doc(db, "settings/masterAccess"), { emails: ["master@example.com"] });
     await setDoc(doc(db, "clients/client-a"), { uid: "client-owner", accountStatus: "active" });
-    await setDoc(doc(db, screenPath("screen-a")), { name: "A", status: "online" });
+    await setDoc(doc(db, screenPath("screen-a")), { name: "A", status: "online", connectedDeviceId: "device-a" });
     await setDoc(doc(db, screenPath("screen-b")), { name: "B", status: "online" });
     await setDoc(doc(db, bindingPath("player-a")), {
       uid: "player-a", clientId: "client-a", screenId: "screen-a", deviceId: "device-a", status: "ACTIVE",
@@ -87,6 +87,9 @@ test("player cannot create or edit a binding", async () => {
   await assertFails(setDoc(doc(player, bindingPath("new-player")), { uid: "new-player", status: "ACTIVE" }));
   await assertFails(updateDoc(doc(player, bindingPath("player-a")), { screenId: "screen-b" }));
   await assertFails(updateDoc(doc(player, screenPath()), { linkedAt: new Date() }));
+  await assertFails(setDoc(doc(player, `${screenPath()}/system/rebindAuthorization`), {
+    status: "ACTIVE", expiresAtMs: Date.now() + 600000,
+  }));
 });
 
 test("master can manage bindings and owner cannot", async () => {

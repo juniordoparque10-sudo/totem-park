@@ -6,6 +6,10 @@ export const reportedAppVersion = (screen = {}) => {
   const nativeCode = screen.playerVersionCode || screen.versionCode;
   if (nativeName) return nativeCode ? `${nativeName} (${nativeCode})` : String(nativeName);
   if (nativeCode) return `VersionCode ${nativeCode}`;
+  const operationalName = screen?.telemetry?.app?.versionName;
+  const operationalCode = screen?.telemetry?.app?.versionCode;
+  if (operationalName) return operationalCode ? `${operationalName} (${operationalCode})` : String(operationalName);
+  if (operationalCode) return `VersionCode ${operationalCode}`;
   return screen.appVersion || screen.playerAppVersion || screen?.telemetry?.session?.appVersion || null;
 };
 
@@ -19,8 +23,8 @@ export function getTelemetryCardData(screens = []) {
 
   for (const screen of screens) {
     const active = screen?.telemetry?.schemaVersion >= 3
-      ? Number(screen?.telemetry?.counters?.activeTimeMs) : NaN;
-    if (screen?.telemetry?.counters?.activeTimeMs != null && Number.isFinite(active)) {
+      ? Number(screen?.telemetry?.session?.uptimeSeconds) * 1000 : NaN;
+    if (screen?.telemetry?.session?.uptimeSeconds != null && Number.isFinite(active)) {
       activeTimeMs += Math.max(0, active);
       activeScreens += 1;
     }

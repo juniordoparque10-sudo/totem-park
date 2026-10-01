@@ -3,10 +3,10 @@ import assert from "node:assert/strict";
 import { getTelemetryCardData, reportedAppVersion } from "./telemetry-card-data.js";
 
 test("V5 active time follows checkpoints without treating legacy display time as active time", () => {
-  const v5 = { telemetry: { schemaVersion: 3, counters: { activeTimeMs: 60_000 } } };
+  const v5 = { telemetry: { schemaVersion: 3, session: { uptimeSeconds: 60 } } };
   const legacy = { telemetry: { schemaVersion: 2, counters: { displayTimeMs: 900_000 } } };
   assert.equal(getTelemetryCardData([v5, legacy]).activeTimeMs, 60_000);
-  v5.telemetry.counters.activeTimeMs = 120_000;
+  v5.telemetry.session.uptimeSeconds = 120;
   assert.equal(getTelemetryCardData([v5, legacy]).activeTimeMs, 120_000);
   assert.equal(getTelemetryCardData([legacy]).activeScreens, 0);
 });
