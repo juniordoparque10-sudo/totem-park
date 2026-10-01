@@ -7,7 +7,7 @@ import QRCodeLayer from "./QRCodeLayer";
 import { normalizeTemplatesV2Override, resolveTemplatesV2Entitlement } from "./templates-v2/entitlement";
 import { normalizeSportsV2Config } from "./templates-v2/sports-v2/config";
 import { resolveSportsDataProvider } from "./templates-v2/sports-v2/data/SportsDataProvider";
-import { getTemplateV2CriticalImageUrl, localizeTemplateV2Assets, preloadImageForPaint } from "./templates-v2/player-preload";
+import { getTemplateV2CriticalImageState, getTemplateV2CriticalImageUrl, localizeTemplateV2Assets, prepareTemplateV2CriticalImage, preloadImageForPaint, suppressTemplateV2CriticalImage } from "./templates-v2/player-preload";
 import { linkedAtForScreen, telemetryStatus } from "./telemetry-v1";
 import { createTransitionDiagnostics } from "./transition-diagnostics";
 import {
@@ -15082,6 +15082,7 @@ function PlayerPage() {
   const previousMediaIndexRef = useRef(null);
   const [decoderReleasePending, setDecoderReleasePending] = useState(false);
   const [readyMediaKey, setReadyMediaKey] = useState("");
+  const [suppressedTemplateBackgroundKeys, setSuppressedTemplateBackgroundKeys] = useState(() => new Set());
   const [isAndroidTv, setIsAndroidTv] = useState(null);
   const [offlineAssetMap, setOfflineAssetMap] = useState(() =>
     isNativeApp() ? restoreOfflineAssetMap(offlineStorageKey) : {}
@@ -15691,24 +15692,32 @@ function PlayerPage() {
     if (!playerItems.length) return undefined;
     const safeIndex = mediaIndex >= playerItems.length ? 0 : mediaIndex;
     const currentItem = playerItems[safeIndex];
+    const currentItemKey = currentItem ? getPlayerItemKey(currentItem,safeIndex) : "";
     if (currentItem?.playerItemType !== "template") return undefined;
 
     let active = true;
-    const criticalUrl = getTemplateV2CriticalImageUrl(currentItem);
-    const diagnosticPayload = { templateId:currentItem.templateId||currentItem.id||"", itemKey:getPlayerItemKey(currentItem,safeIndex) };
+    const criticalImage = getTemplateV2CriticalImageState(currentItem);
+    const criticalUrl = criticalImage.url;
+    const diagnosticPayload = { templateId:currentItem.templateId||currentItem.id||"", itemKey:currentItemKey };
     logTemplatesV2Diagnostic("T2_ASSET_RESOLVED", { ...diagnosticPayload, hasCriticalAsset:Boolean(criticalUrl), CURRENT_VISIBLE:previousMediaIndexRef.current !== null, NEXT_PENDING:true });
     logTemplatesV2Diagnostic("T3_ASSET_SOURCE_DEFINED", { ...diagnosticPayload, source:/^(blob:|file:|data:|capacitor:)/i.test(criticalUrl)?"LOCAL":"REMOTE", CURRENT_VISIBLE:previousMediaIndexRef.current !== null, NEXT_PENDING:true });
     const reveal = () => {
       if (active) markCurrentMediaReady(currentItem, safeIndex);
     };
 
-    if (criticalUrl) {
-      preloadImageForPaint(criticalUrl, globalThis.Image, { onEvent:(event,details)=>logTemplatesV2Diagnostic(`${event}_${event === "T4" ? "IMAGE_LOADED" : "IMAGE_DECODED"}`,{...diagnosticPayload,...details,CURRENT_VISIBLE:previousMediaIndexRef.current !== null,NEXT_PENDING:true}) }).then(reveal).catch((error) => {
-        console.log("Falha no preload do fundo V2; exibindo fallback:", error);
-        reveal();
-      });
-    } else {
+    if (suppressedTemplateBackgroundKeys.has(currentItemKey)) {
+      logTemplatesV2Diagnostic("CRITICAL_BACKGROUND_FALLBACK_ACTIVE", { ...diagnosticPayload, CURRENT_VISIBLE:previousMediaIndexRef.current !== null, NEXT_PENDING:true });
       reveal();
+    } else {
+      prepareTemplateV2CriticalImage(currentItem, globalThis.Image, {
+        maxAttempts:2,
+        onEvent:(event,details)=>logTemplatesV2Diagnostic(`${event}_${event === "T4" ? "IMAGE_LOADED" : "IMAGE_DECODED"}`,{...diagnosticPayload,...details,CURRENT_VISIBLE:previousMediaIndexRef.current !== null,NEXT_PENDING:true}),
+        onFailure:(error,details)=>logTemplatesV2Diagnostic("CRITICAL_BACKGROUND_PRELOAD_FAILED",{...diagnosticPayload,...details,message:String(error?.message||error||"").slice(0,300),CURRENT_VISIBLE:previousMediaIndexRef.current !== null,NEXT_PENDING:true}),
+      }).then((result) => {
+        if (!active) return;
+        if (result.status === "ready" || result.status === "no-background") reveal();
+        else logTemplatesV2Diagnostic("CRITICAL_BACKGROUND_NOT_READY", { ...diagnosticPayload, status:result.status, attempts:result.attempts, CURRENT_VISIBLE:previousMediaIndexRef.current !== null, NEXT_PENDING:true });
+      });
     }
 
     const nextItem = playerItems[(safeIndex + 1) % playerItems.length];
@@ -15716,7 +15725,7 @@ function PlayerPage() {
     if (nextUrl) preloadImageForPaint(nextUrl).catch(() => {});
 
     return () => { active = false; };
-  }, [activeItemsKey, mediaIndex]);
+  }, [activeItemsKey, mediaIndex, suppressedTemplateBackgroundKeys]);
 
   useEffect(() => {
     const safeIndex = mediaIndex >= playerItems.length ? 0 : mediaIndex;
@@ -15734,6 +15743,9 @@ function PlayerPage() {
     if (!item || item.playerItemType !== "template" || readyMediaKey === itemKey || previousMediaIndexRef.current === null) return undefined;
     const timeout = setTimeout(() => {
       logTemplatesV2Diagnostic("READINESS_TIMEOUT_CURRENT_PRESERVED", { templateId:item.templateId||item.id||"", itemKey, CURRENT_VISIBLE:true, NEXT_PENDING:true, NEXT_VISIBLE:false });
+      if (getTemplateV2CriticalImageState(item).configured) {
+        setSuppressedTemplateBackgroundKeys((previous) => new Set(previous).add(itemKey));
+      }
     }, 15000);
     return () => clearTimeout(timeout);
   }, [activeItemsKey, mediaIndex, readyMediaKey]);
@@ -17310,7 +17322,9 @@ function PlayerPage() {
 
   function renderPlayerItem(item, index, isCurrent) {
     if (item.playerItemType === "template") {
-      return <TemplateVisualPreview template={item} tv />;
+      const itemKey = getPlayerItemKey(item,index);
+      const renderItem = suppressedTemplateBackgroundKeys.has(itemKey) ? suppressTemplateV2CriticalImage(item) : item;
+      return <TemplateVisualPreview template={renderItem} tv />;
     }
 
     if (item.type === "Vídeo") {

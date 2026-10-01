@@ -6,6 +6,12 @@ export function getTemplateV2CriticalImageUrl(item) {
   return String(asset.url || asset.preview || asset.publicUrl || "").trim();
 }
 
+export function getTemplateV2CriticalImageState(item) {
+  const asset = item?.published?.media?.primary;
+  const configured = Boolean(asset && asset.type !== "video");
+  return { configured, url: configured ? getTemplateV2CriticalImageUrl(item) : "" };
+}
+
 export function localizeTemplateV2Assets(item, urlMap = {}) {
   if (!item?.published?.media?.primary) return item;
   const primary = item.published.media.primary;
@@ -55,4 +61,35 @@ export function preloadImageForPaint(url, ImageClass = globalThis.Image, options
   decodedImagePromises.set(url, entry);
   promise.catch(() => decodedImagePromises.delete(url));
   return promise;
+}
+
+export async function prepareTemplateV2CriticalImage(item, ImageClass = globalThis.Image, options = {}) {
+  const state = getTemplateV2CriticalImageState(item);
+  if (!state.configured) return { status: "no-background", attempts: 0, url: "" };
+  if (!state.url) return { status: "asset-unresolved", attempts: 0, url: "" };
+
+  const maxAttempts = Math.max(1, Number(options.maxAttempts) || 2);
+  let lastError = null;
+  for (let attempt = 1; attempt <= maxAttempts; attempt += 1) {
+    try {
+      await preloadImageForPaint(state.url, ImageClass, options);
+      return { status: "ready", attempts: attempt, url: state.url };
+    } catch (error) {
+      lastError = error;
+      options.onFailure?.(error, { attempt, maxAttempts, url: state.url });
+    }
+  }
+
+  return { status: "failed", attempts: maxAttempts, url: state.url, error: lastError };
+}
+
+export function suppressTemplateV2CriticalImage(item) {
+  if (!item?.published?.media) return item;
+  return {
+    ...item,
+    published: {
+      ...item.published,
+      media: { ...item.published.media, primary: null },
+    },
+  };
 }
