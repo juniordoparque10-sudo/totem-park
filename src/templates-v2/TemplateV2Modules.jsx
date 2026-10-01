@@ -1,8 +1,9 @@
-import { useSyncExternalStore } from "react";
+import { createContext, useContext, useEffect, useRef, useSyncExternalStore } from "react";
 import { Clock3, CloudSun, Sparkles } from "lucide-react";
 import QRCodeLayer from "../QRCodeLayer";
 import { shouldRenderTemplateV2InternalVideo, shouldShowTemplateMediaPlaceholder } from "./render-mode";
 import { getTemplateV2ImageAssetUrl } from "./player-preload";
+import { confirmTemplateImageForPaint } from "./player-execution";
 
 let clockSnapshot = Date.now();
 let clockTimer = null;
@@ -13,6 +14,11 @@ function subscribeClock(listener) {
   return () => { clockListeners.delete(listener); if (!clockListeners.size && clockTimer) { clearInterval(clockTimer); clockTimer = null; } };
 }
 const getClockSnapshot = () => clockSnapshot;
+const TemplateVisualReadyContext = createContext(null);
+
+export function TemplateV2VisualReadyProvider({ value, children }) {
+  return <TemplateVisualReadyContext.Provider value={value}>{children}</TemplateVisualReadyContext.Provider>;
+}
 
 export function TemplateClock({ format = "24h", large = false }) {
   const snapshot = useSyncExternalStore(subscribeClock, getClockSnapshot, getClockSnapshot);
@@ -32,11 +38,40 @@ export function TemplateWeather({ config = {}, data }) {
 export function TemplateMedia({ asset, fit = "cover", position = "center", mode = "player" }) {
   const visiblePlaceholder = shouldShowTemplateMediaPlaceholder(mode);
   const assetUrl = getTemplateV2ImageAssetUrl(asset);
+  const visualReady = useContext(TemplateVisualReadyContext);
+  const imageRef = useRef(null);
+  const readinessRef = useRef("");
+  const readinessKey = `${visualReady?.playbackExecutionId ?? "preview"}|${assetUrl}`;
+
+  async function confirmVisualReady(image) {
+    if (!visualReady?.onVisualEvent || !image || !assetUrl || asset?.type === "video") return;
+    if (readinessRef.current === readinessKey) return;
+    readinessRef.current = readinessKey;
+    try {
+      await confirmTemplateImageForPaint(image, (event) => {
+        if (readinessRef.current === readinessKey) visualReady.onVisualEvent(event, { url:assetUrl });
+      });
+    } catch {
+      if (readinessRef.current === readinessKey) readinessRef.current = "";
+      return;
+    }
+    if (readinessRef.current !== readinessKey) return;
+  }
+
+  useEffect(() => {
+    readinessRef.current = "";
+    const image = imageRef.current;
+    if (image?.complete && image.naturalWidth > 0) confirmVisualReady(image);
+    return () => { readinessRef.current = ""; };
+  // The execution and authoritative URL are the visual readiness boundary.
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [readinessKey]);
+
   if (!assetUrl) return <div className={`tpv2-media-fallback ${visiblePlaceholder ? "is-editor-placeholder" : "is-empty"}`}>{visiblePlaceholder && <><Sparkles /><span>Selecione uma imagem da biblioteca</span></>}</div>;
   if (asset.type === "video") return shouldRenderTemplateV2InternalVideo(mode)
     ? <video src={assetUrl} muted autoPlay loop playsInline style={{ objectFit:fit, objectPosition:position }} />
     : <div className="tpv2-media-fallback is-empty" />;
-  return <img src={assetUrl} alt="" style={{ objectFit:fit, objectPosition:position }} />;
+  return <img ref={imageRef} src={assetUrl} alt="" style={{ objectFit:fit, objectPosition:position }} onLoad={(event) => confirmVisualReady(event.currentTarget)} />;
 }
 
 export function TemplateLogo({ asset, name }) {

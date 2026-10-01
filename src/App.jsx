@@ -8,6 +8,7 @@ import { normalizeTemplatesV2Override, resolveTemplatesV2Entitlement } from "./t
 import { normalizeSportsV2Config } from "./templates-v2/sports-v2/config";
 import { resolveSportsDataProvider } from "./templates-v2/sports-v2/data/SportsDataProvider";
 import { getTemplateV2CriticalImageState, getTemplateV2CriticalImageUrl, getTemplateV2ReadinessFingerprint, localizeTemplateV2Assets, prepareTemplateV2CriticalImage, preloadImageForPaint, suppressTemplateV2CriticalImage } from "./templates-v2/player-preload";
+import { getTemplatePlaybackLayerKey, getTemplatePlaybackReadyKey, isCurrentPlaybackExecution, nextPlaybackExecutionId } from "./templates-v2/player-execution";
 import { linkedAtForScreen, telemetryStatus } from "./telemetry-v1";
 import { createTransitionDiagnostics } from "./transition-diagnostics";
 import {
@@ -13581,9 +13582,9 @@ function SparklineIcon() {
   );
 }
 
-function TemplateVisualPreview({ template, compact = false, tv = false }) {
+function TemplateVisualPreview({ template, compact = false, tv = false, playbackExecutionId = null, onVisualEvent = null }) {
   if (isTemplateV2(template)) {
-    return <TemplateV2LivePreview template={template} compact={compact} tv={tv} />;
+    return <TemplateV2LivePreview template={template} compact={compact} tv={tv} playbackExecutionId={playbackExecutionId} onVisualEvent={onVisualEvent} />;
   }
 
   return <LegacyTemplateVisualPreview template={template} compact={compact} tv={tv} />;
@@ -13615,16 +13616,16 @@ async function loadTemplateV2News(config = {}) {
   return lists.flat().filter((item) => item?.title).slice(0,8);
 }
 
-function TemplateV2LivePreview({ template, compact = false, tv = false }) {
+function TemplateV2LivePreview({ template, compact = false, tv = false, playbackExecutionId = null, onVisualEvent = null }) {
   const config = template.published;
   const weatherConfig = config?.modules?.weather || {};
   const newsConfig = config?.modules?.news || {};
   const [dynamicData, setDynamicData] = useState(null);
   const dynamicKey = JSON.stringify({ city:weatherConfig.city || "", enabledWeather:weatherConfig.enabled, enabledNews:newsConfig.enabled, feed:newsConfig.newsFeedUrl || "", sources:newsConfig.selectedNewsSources || [], sports:config?.sports || null });
 
-  useEffect(() => {
-    logTemplatesV2Diagnostic("T1_RENDERER_MOUNTED", { templateId: template.id || template.templateId || "", templateType: template.identity?.templateType || template.templateType || template.type || "" });
-  }, [template.id, template.templateId, template.identity?.templateType, template.templateType, template.type]);
+  useLayoutEffect(() => {
+    logTemplatesV2Diagnostic("T1_RENDERER_MOUNTED", { templateId: template.id || template.templateId || "", templateType: template.identity?.templateType || template.templateType || template.type || "", playbackExecutionId });
+  }, [template.id, template.templateId, template.identity?.templateType, template.templateType, template.type, playbackExecutionId]);
 
   useEffect(() => {
     let cancelled = false;
@@ -13652,7 +13653,7 @@ function TemplateV2LivePreview({ template, compact = false, tv = false }) {
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [dynamicKey]);
 
-  return <TemplateV2Renderer template={template} config={config} orientation={config?.display?.defaultOrientation || template.orientation || "Paisagem"} compact={compact} tv={tv} dynamicData={dynamicData} />;
+  return <TemplateV2Renderer template={template} config={config} orientation={config?.display?.defaultOrientation || template.orientation || "Paisagem"} compact={compact} tv={tv} dynamicData={dynamicData} playbackExecutionId={playbackExecutionId} onVisualEvent={onVisualEvent} />;
 }
 
 function LegacyTemplateVisualPreview({ template, compact = false, tv = false }) {
@@ -15081,6 +15082,12 @@ function PlayerPage() {
   const [mediaIndex, setMediaIndex] = useState(0);
   const [previousMediaIndex, setPreviousMediaIndex] = useState(null);
   const previousMediaIndexRef = useRef(null);
+  const playbackExecutionCounterRef = useRef(1);
+  const [currentPlaybackExecutionId, setCurrentPlaybackExecutionId] = useState(1);
+  const currentPlaybackExecutionIdRef = useRef(1);
+  const [previousPlaybackExecutionId, setPreviousPlaybackExecutionId] = useState(null);
+  const previousPlaybackExecutionIdRef = useRef(null);
+  const readyPlaybackExecutionsRef = useRef(new Set());
   const [decoderReleasePending, setDecoderReleasePending] = useState(false);
   const [readyMediaKey, setReadyMediaKey] = useState("");
   const [suppressedTemplateBackgroundKeys, setSuppressedTemplateBackgroundKeys] = useState(() => new Set());
@@ -15656,7 +15663,7 @@ function PlayerPage() {
   useEffect(() => {
     const safeIndex = mediaIndex >= playerItems.length ? 0 : mediaIndex;
     const item = playerItems[safeIndex];
-    const currentMediaKey = item ? getPlayerItemKey(item,safeIndex) : "";
+    const currentMediaKey = item ? getPlaybackReadyKey(item,safeIndex,currentPlaybackExecutionId) : "";
     const next = {
       mediaIndex,
       previousMediaIndex,
@@ -15680,7 +15687,7 @@ function PlayerPage() {
       }
     });
     transitionDiagnosticPreviousRef.current = next;
-  }, [activeItemsKey, activePlaylistRevision, mediaIndex, previousMediaIndex, readyMediaKey]);
+  }, [activeItemsKey, activePlaylistRevision, mediaIndex, previousMediaIndex, readyMediaKey, currentPlaybackExecutionId]);
 
   useEffect(() => {
     if (!playerItems.length) return;
@@ -15705,13 +15712,14 @@ function PlayerPage() {
     if (currentItem?.playerItemType !== "template") return undefined;
 
     let active = true;
+    const executionId = currentPlaybackExecutionId;
     const criticalImage = getTemplateV2CriticalImageState(currentItem);
     const criticalUrl = criticalImage.url;
-    const diagnosticPayload = { templateId:currentItem.templateId||currentItem.id||"", itemKey:currentItemKey };
+    const diagnosticPayload = { templateId:currentItem.templateId||currentItem.id||"", itemKey:currentItemKey, playbackExecutionId:executionId };
     logTemplatesV2Diagnostic("T2_ASSET_RESOLVED", { ...diagnosticPayload, hasCriticalAsset:Boolean(criticalUrl), CURRENT_VISIBLE:previousMediaIndexRef.current !== null, NEXT_PENDING:true });
     logTemplatesV2Diagnostic("T3_ASSET_SOURCE_DEFINED", { ...diagnosticPayload, source:/^(blob:|file:|data:|capacitor:)/i.test(criticalUrl)?"LOCAL":"REMOTE", CURRENT_VISIBLE:previousMediaIndexRef.current !== null, NEXT_PENDING:true });
     const reveal = () => {
-      if (active) markCurrentMediaReady(currentItem, safeIndex);
+      if (active && isCurrentPlaybackExecution(executionId,currentPlaybackExecutionIdRef.current)) markCurrentMediaReady(currentItem, safeIndex, executionId);
     };
 
     if (suppressedTemplateBackgroundKeys.has(currentItemKey)) {
@@ -15720,11 +15728,12 @@ function PlayerPage() {
     } else {
       prepareTemplateV2CriticalImage(currentItem, globalThis.Image, {
         maxAttempts:2,
-        onEvent:(event,details)=>logTemplatesV2Diagnostic(`${event}_${event === "T4" ? "IMAGE_LOADED" : "IMAGE_DECODED"}`,{...diagnosticPayload,...details,CURRENT_VISIBLE:previousMediaIndexRef.current !== null,NEXT_PENDING:true}),
         onFailure:(error,details)=>logTemplatesV2Diagnostic("CRITICAL_BACKGROUND_PRELOAD_FAILED",{...diagnosticPayload,...details,message:String(error?.message||error||"").slice(0,300),CURRENT_VISIBLE:previousMediaIndexRef.current !== null,NEXT_PENDING:true}),
       }).then((result) => {
-        if (!active) return;
-        if (result.status === "ready" || result.status === "no-background") reveal();
+        if (!active || !isCurrentPlaybackExecution(executionId,currentPlaybackExecutionIdRef.current)) return;
+        if (result.status === "no-background") reveal();
+        else if (result.status === "ready" && !isTemplateV2(currentItem)) reveal();
+        else if (result.status === "ready") return;
         else logTemplatesV2Diagnostic("CRITICAL_BACKGROUND_NOT_READY", { ...diagnosticPayload, status:result.status, attempts:result.attempts, CURRENT_VISIBLE:previousMediaIndexRef.current !== null, NEXT_PENDING:true });
       });
     }
@@ -15734,22 +15743,22 @@ function PlayerPage() {
     if (nextUrl) preloadImageForPaint(nextUrl).catch(() => {});
 
     return () => { active = false; };
-  }, [activeItemsKey, mediaIndex, suppressedTemplateBackgroundKeys]);
+  }, [activeItemsKey, mediaIndex, suppressedTemplateBackgroundKeys, currentPlaybackExecutionId]);
 
   useEffect(() => {
     const safeIndex = mediaIndex >= playerItems.length ? 0 : mediaIndex;
     const item = playerItems[safeIndex];
-    if (!item || item.playerItemType !== "template" || readyMediaKey !== getPlayerItemKey(item,safeIndex)) return undefined;
-    logTemplatesV2Diagnostic("T7_TEMPLATE_VISIBLE", { templateId:item.templateId||item.id||"", itemKey:getPlayerItemKey(item,safeIndex), CURRENT_VISIBLE:previousMediaIndexRef.current !== null, NEXT_PENDING:false, NEXT_VISIBLE:true });
+    if (!item || item.playerItemType !== "template" || readyMediaKey !== getPlaybackReadyKey(item,safeIndex,currentPlaybackExecutionId)) return undefined;
+    logTemplatesV2Diagnostic("T7_TEMPLATE_VISIBLE", { templateId:item.templateId||item.id||"", itemKey:getPlayerItemKey(item,safeIndex), playbackExecutionId:currentPlaybackExecutionId, CURRENT_VISIBLE:previousMediaIndexRef.current !== null, NEXT_PENDING:false, NEXT_VISIBLE:true });
     if ((activePlaylist?.transition || "Fade suave") === "Corte seco") requestAnimationFrame(() => finishCurrentTransition(item,safeIndex));
     return undefined;
-  }, [activeItemsKey, mediaIndex, readyMediaKey]);
+  }, [activeItemsKey, mediaIndex, readyMediaKey, currentPlaybackExecutionId]);
 
   useEffect(() => {
     const safeIndex = mediaIndex >= playerItems.length ? 0 : mediaIndex;
     const item = playerItems[safeIndex];
     const itemKey = item ? getPlayerItemKey(item,safeIndex) : "";
-    if (!item || item.playerItemType !== "template" || readyMediaKey === itemKey || previousMediaIndexRef.current === null) return undefined;
+    if (!item || item.playerItemType !== "template" || readyMediaKey === getPlaybackReadyKey(item,safeIndex,currentPlaybackExecutionId) || previousMediaIndexRef.current === null) return undefined;
     const timeout = setTimeout(() => {
       logTemplatesV2Diagnostic("READINESS_TIMEOUT_CURRENT_PRESERVED", { templateId:item.templateId||item.id||"", itemKey, CURRENT_VISIBLE:true, NEXT_PENDING:true, NEXT_VISIBLE:false });
       if (getTemplateV2CriticalImageState(item).configured) {
@@ -15757,7 +15766,7 @@ function PlayerPage() {
       }
     }, 15000);
     return () => clearTimeout(timeout);
-  }, [activeItemsKey, mediaIndex, readyMediaKey]);
+  }, [activeItemsKey, mediaIndex, readyMediaKey, currentPlaybackExecutionId]);
 
   const playlistsForOffline = allPlaylists.filter((playlist) => {
     if (playlist.id === screen?.playlistId) return true;
@@ -16068,6 +16077,15 @@ function PlayerPage() {
     return `${activePlaylist?.id || "templates"}-${activePlaylistRevision}-${item?.id || item?.preview || item?.title || "item"}-${index}`;
   }
 
+  function getPlaybackLayerKey(item, index, executionId) {
+    const baseKey = `${getPlayerItemKey(item,index)}-${activePlaylistRevision}`;
+    return getTemplatePlaybackLayerKey(baseKey, executionId, isTemplateV2(item));
+  }
+
+  function getPlaybackReadyKey(item, index, executionId) {
+    return getTemplatePlaybackReadyKey(getPlayerItemKey(item,index), executionId, isTemplateV2(item));
+  }
+
   function getStablePlayerItemIdentity(item = {}) {
     return [
       item.playerItemType || "",
@@ -16119,6 +16137,8 @@ function PlayerPage() {
       setDecoderReleasePending(true);
       previousMediaIndexRef.current = null;
       setPreviousMediaIndex(null);
+      previousPlaybackExecutionIdRef.current = null;
+      setPreviousPlaybackExecutionId(null);
     }
 
     const safePrev = mediaIndex >= items.length ? 0 : mediaIndex;
@@ -16132,7 +16152,13 @@ function PlayerPage() {
     if (!singleDecoderTransition) {
       previousMediaIndexRef.current = safePrev;
       setPreviousMediaIndex(safePrev);
+      previousPlaybackExecutionIdRef.current = currentPlaybackExecutionIdRef.current;
+      setPreviousPlaybackExecutionId(currentPlaybackExecutionIdRef.current);
     }
+    const nextExecutionId = nextPlaybackExecutionId(playbackExecutionCounterRef.current);
+    playbackExecutionCounterRef.current = nextExecutionId;
+    currentPlaybackExecutionIdRef.current = nextExecutionId;
+    setCurrentPlaybackExecutionId(nextExecutionId);
     setReadyMediaKey("");
     setMediaIndex(nextIndex);
   }
@@ -16144,13 +16170,16 @@ function PlayerPage() {
     if (remainingVideoCount === 0) setDecoderReleasePending(false);
   }, [decoderReleasePending, mediaIndex]);
 
-  function markCurrentMediaReady(item, index) {
-    const itemKey = getPlayerItemKey(item, index);
+  function markCurrentMediaReady(item, index, executionId = currentPlaybackExecutionIdRef.current) {
+    if (isTemplateV2(item) && !isCurrentPlaybackExecution(executionId, currentPlaybackExecutionIdRef.current)) return;
+    const itemKey = getPlaybackReadyKey(item, index, executionId);
 
-    if (itemKey !== getPlayerItemKey(playerItems[mediaIndex], mediaIndex)) return;
+    if (itemKey !== getPlaybackReadyKey(playerItems[mediaIndex], mediaIndex, currentPlaybackExecutionIdRef.current)) return;
+    if (isTemplateV2(item) && readyPlaybackExecutionsRef.current.has(executionId)) return;
+    if (isTemplateV2(item)) readyPlaybackExecutionsRef.current.add(executionId);
 
     setReadyMediaKey(itemKey);
-    logTemplatesV2Diagnostic("T6_TEMPLATE_READY", { templateId:item.templateId||item.id||"", itemKey, CURRENT_VISIBLE:previousMediaIndexRef.current !== null, NEXT_PENDING:false });
+    logTemplatesV2Diagnostic("T6_TEMPLATE_READY", { templateId:item.templateId||item.id||"", itemKey, playbackExecutionId:executionId, CURRENT_VISIBLE:previousMediaIndexRef.current !== null, NEXT_PENDING:false });
     telemetryRef.current.completeTransition(telemetryTransitionRef.current, "SUCCESS");
     telemetryTransitionRef.current = "";
   }
@@ -16160,13 +16189,13 @@ function PlayerPage() {
     if (!diagnostic?.isEnabled()) return;
     const safeIndex = mediaIndex >= playerItems.length ? 0 : mediaIndex;
     const current = playerItems[safeIndex];
-    const currentMediaKey = current ? getPlayerItemKey(current,safeIndex) : "";
+    const currentMediaKey = current ? getPlaybackReadyKey(current,safeIndex,currentPlaybackExecutionId) : "";
     const currentMediaReady = Boolean(currentMediaKey && currentMediaKey === readyMediaKey);
     const retainedPreviousIndex = previousMediaIndex ?? (!currentMediaReady ? previousMediaIndexRef.current : null);
     const layerModels = [];
     if (!decoderReleasePending && retainedPreviousIndex !== null && retainedPreviousIndex !== safeIndex && playerItems[retainedPreviousIndex]) {
       const item = playerItems[retainedPreviousIndex];
-      layerModels.push({ index:retainedPreviousIndex, key:getPlayerItemKey(item,retainedPreviousIndex), playerItemType:item.playerItemType || item.type || "", isCurrent:false, isPrevious:true, isPending:false, isVisible:true });
+      layerModels.push({ index:retainedPreviousIndex, key:getPlaybackLayerKey(item,retainedPreviousIndex,previousPlaybackExecutionId ?? previousPlaybackExecutionIdRef.current), playerItemType:item.playerItemType || item.type || "", isCurrent:false, isPrevious:true, isPending:false, isVisible:true });
     }
     if (!decoderReleasePending && current) layerModels.push({ index:safeIndex, key:currentMediaKey, playerItemType:current.playerItemType || current.type || "", isCurrent:true, isPrevious:false, isPending:!currentMediaReady, isVisible:currentMediaReady });
     const stage = globalThis.document?.querySelector?.(".player-transition-layer.is-current");
@@ -16194,10 +16223,12 @@ function PlayerPage() {
   }
 
   function finishCurrentTransition(item, index) {
-    if (readyMediaKey !== getPlayerItemKey(item,index)) return;
-    recordTransitionDiagnostic("FINISH_CURRENT_TRANSITION", { itemKey:getPlayerItemKey(item,index), index });
+    if (readyMediaKey !== getPlaybackReadyKey(item,index,currentPlaybackExecutionIdRef.current)) return;
+    recordTransitionDiagnostic("FINISH_CURRENT_TRANSITION", { itemKey:getPlayerItemKey(item,index), index, playbackExecutionId:currentPlaybackExecutionIdRef.current });
     previousMediaIndexRef.current = null;
     setPreviousMediaIndex(null);
+    previousPlaybackExecutionIdRef.current = null;
+    setPreviousPlaybackExecutionId(null);
     transitionInProgressRef.current = false;
   }
 
@@ -17054,7 +17085,7 @@ function PlayerPage() {
 
     const safeIndex = mediaIndex >= items.length ? 0 : mediaIndex;
     const currentItem = items[safeIndex];
-    const currentKey = getPlayerItemKey(currentItem, safeIndex);
+    const currentKey = getPlaybackReadyKey(currentItem, safeIndex, currentPlaybackExecutionId);
     const durationInSeconds = Number(currentItem?.duration);
     const fallbackDuration = currentItem?.playerItemType === "template" ? 15 : 10;
     const durationInMs =
@@ -17114,7 +17145,7 @@ function PlayerPage() {
         playbackRemainingRef.current - (Date.now() - playbackStartedAtRef.current)
       );
     };
-  }, [activePlaylist?.id, activeItemsKey, mediaIndex, previousMediaIndex, readyMediaKey, pauseMode, takeoverMessage, blackoutMode, maintenanceMode, isAndroidSmartTv, singleImageLoopCycle]);
+  }, [activePlaylist?.id, activeItemsKey, mediaIndex, previousMediaIndex, readyMediaKey, pauseMode, takeoverMessage, blackoutMode, maintenanceMode, isAndroidSmartTv, singleImageLoopCycle, currentPlaybackExecutionId]);
 
   useEffect(() => {
     const mediaElement = document.querySelector(
@@ -17289,7 +17320,7 @@ function PlayerPage() {
   const safeMediaIndex =
     mediaIndex >= playerItems.length ? 0 : mediaIndex;
   const currentMedia = playerItems[safeMediaIndex] || playerItems[0];
-  const currentMediaKey = getPlayerItemKey(currentMedia, safeMediaIndex);
+  const currentMediaKey = getPlaybackReadyKey(currentMedia, safeMediaIndex, currentPlaybackExecutionId);
   const currentMediaReady = readyMediaKey === currentMediaKey;
   const currentTransitionReady = currentMediaReady;
   const transitionClass = getTransitionClass(activePlaylist?.transition || "Fade suave");
@@ -17316,6 +17347,7 @@ function PlayerPage() {
     visibleLayers.push({
       item: playerItems[retainedPreviousIndex],
       index: retainedPreviousIndex,
+      executionId: previousPlaybackExecutionId ?? previousPlaybackExecutionIdRef.current,
       state: "is-previous",
     });
   }
@@ -17324,17 +17356,25 @@ function PlayerPage() {
     visibleLayers.push({
       item: currentMedia,
       index: safeMediaIndex,
+      executionId: currentPlaybackExecutionId,
       state: currentMediaReady
         ? `is-current is-ready ${currentTransitionReady ? "transition-active" : ""}`
         : "is-current is-pending",
     });
   }
 
-  function renderPlayerItem(item, index, isCurrent) {
+  function renderPlayerItem(item, index, isCurrent, executionId) {
     if (item.playerItemType === "template") {
       const itemKey = getPlayerItemKey(item,index);
       const renderItem = suppressedTemplateBackgroundKeys.has(itemKey) ? suppressTemplateV2CriticalImage(item) : item;
-      return <TemplateVisualPreview template={renderItem} tv />;
+      const onVisualEvent = isTemplateV2(renderItem) ? async (event, details = {}) => {
+        if (!isCurrentPlaybackExecution(executionId,currentPlaybackExecutionIdRef.current)) return;
+        const diagnosticPayload = { templateId:item.templateId||item.id||"", itemKey, playbackExecutionId:executionId, ...details, CURRENT_VISIBLE:previousMediaIndexRef.current !== null, NEXT_PENDING:event !== "ready" };
+        if (event === "load") logTemplatesV2Diagnostic("T4_IMAGE_LOADED", diagnosticPayload);
+        if (event === "decoded") logTemplatesV2Diagnostic("T5_IMAGE_DECODED", diagnosticPayload);
+        if (event === "ready") markCurrentMediaReady(item,index,executionId);
+      } : null;
+      return <TemplateVisualPreview template={renderItem} tv playbackExecutionId={executionId} onVisualEvent={onVisualEvent} />;
     }
 
     if (item.type === "Vídeo") {
@@ -17470,7 +17510,7 @@ function PlayerPage() {
           if (
             isCurrent && image?.complete && image.naturalWidth > 0 &&
             image.naturalHeight > 0 &&
-            readyMediaKey !== getPlayerItemKey(item, index)
+            readyMediaKey !== getPlaybackReadyKey(item, index, currentPlaybackExecutionIdRef.current)
           ) {
             markCurrentMediaReady(item, index);
           }
@@ -17539,9 +17579,9 @@ function PlayerPage() {
 
       {demoPlayerOverlay}
 
-      {visibleLayers.map(({ item, index, state }) => (
+      {visibleLayers.map(({ item, index, state, executionId }) => (
         <div
-          key={`${getPlayerItemKey(item, index)}-${activePlaylistRevision}`}
+          key={getPlaybackLayerKey(item,index,executionId)}
           className={`player-transition-layer player-buffer-layer ${state} ${transitionClass} ${transitionSpeedClass} ${item.playerItemType === "template" ? "template-layer" : ""}`}
           onAnimationEnd={(event) => {
             const animationPayload = {
@@ -17559,7 +17599,7 @@ function PlayerPage() {
             }
           }}
         >
-          {renderPlayerItem(item, index, index === safeMediaIndex)}
+          {renderPlayerItem(item, index, index === safeMediaIndex, executionId)}
         </div>
       ))}
     </div>
