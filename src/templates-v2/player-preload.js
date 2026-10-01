@@ -1,15 +1,35 @@
 const decodedImagePromises = new Map();
 
-export function getTemplateV2CriticalImageUrl(item) {
-  const asset = item?.published?.media?.primary;
-  if (!asset || asset.type === "video") return "";
+export function getTemplateV2ImageAssetUrl(asset) {
+  if (!asset) return "";
   return String(asset.url || asset.preview || asset.publicUrl || "").trim();
 }
 
+export function getTemplateV2CriticalImageUrl(item) {
+  const asset = item?.published?.media?.primary;
+  return asset?.type === "video" ? "" : getTemplateV2ImageAssetUrl(asset);
+}
+
 export function getTemplateV2CriticalImageState(item) {
+  if (item?.templatePublishedResolved === false) {
+    return { status: "pending-hydration", configured: false, url: "" };
+  }
   const asset = item?.published?.media?.primary;
   const configured = Boolean(asset && asset.type !== "video");
-  return { configured, url: configured ? getTemplateV2CriticalImageUrl(item) : "" };
+  return { status: configured ? "configured" : "no-background", configured, url: configured ? getTemplateV2CriticalImageUrl(item) : "" };
+}
+
+export function getTemplateV2ReadinessFingerprint(item) {
+  const state = getTemplateV2CriticalImageState(item);
+  const asset = item?.published?.media?.primary;
+  return [
+    item?.templateId || item?.sourceTemplateId || item?.id || "",
+    item?.templateRevision || item?.published?.revision || "",
+    state.status,
+    asset?.type || "none",
+    asset?.mediaId || asset?.id || asset?.fileHash || "",
+    state.url,
+  ].join("|");
 }
 
 export function localizeTemplateV2Assets(item, urlMap = {}) {
@@ -65,6 +85,7 @@ export function preloadImageForPaint(url, ImageClass = globalThis.Image, options
 
 export async function prepareTemplateV2CriticalImage(item, ImageClass = globalThis.Image, options = {}) {
   const state = getTemplateV2CriticalImageState(item);
+  if (state.status === "pending-hydration") return { status: "pending-hydration", attempts: 0, url: "" };
   if (!state.configured) return { status: "no-background", attempts: 0, url: "" };
   if (!state.url) return { status: "asset-unresolved", attempts: 0, url: "" };
 

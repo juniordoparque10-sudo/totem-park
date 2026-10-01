@@ -7,7 +7,7 @@ import QRCodeLayer from "./QRCodeLayer";
 import { normalizeTemplatesV2Override, resolveTemplatesV2Entitlement } from "./templates-v2/entitlement";
 import { normalizeSportsV2Config } from "./templates-v2/sports-v2/config";
 import { resolveSportsDataProvider } from "./templates-v2/sports-v2/data/SportsDataProvider";
-import { getTemplateV2CriticalImageState, getTemplateV2CriticalImageUrl, localizeTemplateV2Assets, prepareTemplateV2CriticalImage, preloadImageForPaint, suppressTemplateV2CriticalImage } from "./templates-v2/player-preload";
+import { getTemplateV2CriticalImageState, getTemplateV2CriticalImageUrl, getTemplateV2ReadinessFingerprint, localizeTemplateV2Assets, prepareTemplateV2CriticalImage, preloadImageForPaint, suppressTemplateV2CriticalImage } from "./templates-v2/player-preload";
 import { linkedAtForScreen, telemetryStatus } from "./telemetry-v1";
 import { createTransitionDiagnostics } from "./transition-diagnostics";
 import {
@@ -15073,6 +15073,7 @@ function PlayerPage() {
   const [defaultPlaylist, setDefaultPlaylist] = useState(null);
   const [allPlaylists, setAllPlaylists] = useState([]);
   const [clientTemplates, setClientTemplates] = useState([]);
+  const [clientTemplatesResolvedScope, setClientTemplatesResolvedScope] = useState("");
   const [screenTemplates, setScreenTemplates] = useState([]);
   const [activePlaylist, setActivePlaylist] = useState(null);
   const [activeTemplate, setActiveTemplate] = useState(null);
@@ -15487,7 +15488,12 @@ function PlayerPage() {
       identifiers.includes(String(template.id || "").trim())
     );
 
-    if (!latestTemplate) return item;
+    if (!latestTemplate) {
+      return {
+        ...item,
+        templatePublishedResolved: clientTemplatesResolvedScope === `${clientId}|${screen?.id || ""}` && Boolean(item.published),
+      };
+    }
 
     return {
       ...item,
@@ -15501,6 +15507,7 @@ function PlayerPage() {
       type: latestTemplate.templateType || latestTemplate.type || item.templateType || item.type,
       duration: Number(latestTemplate.duration || item.duration || 15),
       playerItemType: "template",
+      templatePublishedResolved: true,
     };
   }
 
@@ -15579,6 +15586,7 @@ function PlayerPage() {
         type: cachedTemplate.type,
         duration: Number(cachedTemplate.duration || 15),
         playerItemType: "template",
+        templatePublishedResolved: true,
       };
     }),
   ]
@@ -15605,6 +15613,7 @@ function PlayerPage() {
       item.newsSource || "",
       item.tickerSpeed || "",
       item.showBadge === false ? "hideBadge" : "showBadge",
+      item.playerItemType === "template" ? getTemplateV2ReadinessFingerprint(item) : "",
     ].join("-"))
     .join("|")}`;
   useEffect(() => {
@@ -16945,6 +16954,7 @@ function PlayerPage() {
           });
 
         setClientTemplates(list);
+        setClientTemplatesResolvedScope(`${clientId}|${screen.id}`);
         setScreenTemplates(screenScopedTemplates);
       }
     );

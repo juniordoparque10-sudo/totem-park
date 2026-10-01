@@ -2,6 +2,7 @@ import { useSyncExternalStore } from "react";
 import { Clock3, CloudSun, Sparkles } from "lucide-react";
 import QRCodeLayer from "../QRCodeLayer";
 import { shouldRenderTemplateV2InternalVideo, shouldShowTemplateMediaPlaceholder } from "./render-mode";
+import { getTemplateV2ImageAssetUrl } from "./player-preload";
 
 let clockSnapshot = Date.now();
 let clockTimer = null;
@@ -30,11 +31,12 @@ export function TemplateWeather({ config = {}, data }) {
 
 export function TemplateMedia({ asset, fit = "cover", position = "center", mode = "player" }) {
   const visiblePlaceholder = shouldShowTemplateMediaPlaceholder(mode);
-  if (!asset?.url) return <div className={`tpv2-media-fallback ${visiblePlaceholder ? "is-editor-placeholder" : "is-empty"}`}>{visiblePlaceholder && <><Sparkles /><span>Selecione uma imagem da biblioteca</span></>}</div>;
+  const assetUrl = getTemplateV2ImageAssetUrl(asset);
+  if (!assetUrl) return <div className={`tpv2-media-fallback ${visiblePlaceholder ? "is-editor-placeholder" : "is-empty"}`}>{visiblePlaceholder && <><Sparkles /><span>Selecione uma imagem da biblioteca</span></>}</div>;
   if (asset.type === "video") return shouldRenderTemplateV2InternalVideo(mode)
-    ? <video src={asset.url} muted autoPlay loop playsInline style={{ objectFit:fit, objectPosition:position }} />
+    ? <video src={assetUrl} muted autoPlay loop playsInline style={{ objectFit:fit, objectPosition:position }} />
     : <div className="tpv2-media-fallback is-empty" />;
-  return <img src={asset.url} alt="" style={{ objectFit:fit, objectPosition:position }} />;
+  return <img src={assetUrl} alt="" style={{ objectFit:fit, objectPosition:position }} />;
 }
 
 export function TemplateLogo({ asset, name }) {
