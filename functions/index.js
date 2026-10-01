@@ -1,6 +1,7 @@
 const { onCall, HttpsError } = require("firebase-functions/v2/https");
 const { initializeApp } = require("firebase-admin/app");
 const { getFirestore, FieldValue } = require("firebase-admin/firestore");
+const { validateRescueRequest } = require("./transition-diagnostic-rescue");
 
 initializeApp();
 const db = getFirestore();
@@ -214,6 +215,39 @@ exports.revokePlayerBinding = onCall(async (request) => {
     }
     return { status: "REVOKED" };
   });
+});
+
+exports.uploadTransitionDiagnosticRescue = onCall(async (request) => {
+  const uid = requireUid(request);
+  const clientId = clean(request.data?.clientId, 120);
+  const screenId = clean(request.data?.screenId, 120);
+  if (!clientId || !screenId) throw new HttpsError("invalid-argument", "clientId and screenId are required.");
+
+  const screenSnapshot = await db.doc(`clients/${clientId}/screens/${screenId}`).get();
+  const validation = validateRescueRequest({
+    authUid: uid,
+    data: request.data,
+    screen: screenSnapshot.exists ? screenSnapshot.data() : null,
+  });
+  if (validation.error) throw new HttpsError(validation.error[0], validation.error[1]);
+
+  const value = validation.value;
+  const sessionId = value.diagnosticSessionId.replace(/[^a-zA-Z0-9_-]/g, "_").slice(0, 180);
+  await db.doc(`clients/${clientId}/screens/${screenId}/transitionDiagnosticSessions/${sessionId}`).set({
+    schemaVersion: 1,
+    sourceAppVersion: value.sourceAppVersion,
+    rescuedByVersion: clean(request.data?.rescuedByVersion, 80),
+    diagnosticSessionId: value.diagnosticSessionId,
+    sequence: value.sequence,
+    deviceId: value.deviceId,
+    eventCount: value.events.length,
+    payloadBytes: value.payloadBytes,
+    events: value.events,
+    rescuedAt: FieldValue.serverTimestamp(),
+    uploadedByUid: uid,
+    status: "RESCUED",
+  }, { merge: true });
+  return { status: "STORED", diagnosticSessionId: value.diagnosticSessionId, eventCount: value.events.length };
 });
 
 exports.getSportsV2Snapshot = onCall({ timeoutSeconds: 30, memory: "256MiB" }, async (request) => {

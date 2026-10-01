@@ -9,6 +9,12 @@ import { normalizeSportsV2Config } from "./templates-v2/sports-v2/config";
 import { resolveSportsDataProvider } from "./templates-v2/sports-v2/data/SportsDataProvider";
 import { getTemplateV2CriticalImageUrl, localizeTemplateV2Assets, preloadImageForPaint } from "./templates-v2/player-preload";
 import { linkedAtForScreen, telemetryStatus } from "./telemetry-v1";
+import { createTransitionDiagnostics } from "./transition-diagnostics";
+import {
+  captureV20TransitionDiagnosticBuffer,
+  markV20TransitionDiagnosticRescueUploaded,
+  readV20TransitionDiagnosticRescue,
+} from "./transition-diagnostic-rescue";
 ﻿import { useEffect, useLayoutEffect, useRef, useState } from "react";
 import { Routes, Route, Navigate, useParams, useNavigate } from "react-router-dom";
 import { initializeApp, deleteApp } from "firebase/app";
@@ -138,6 +144,7 @@ import {
   classifyPlayerIdentityFailure,
   PLAYER_IDENTITY_STATES,
   revokeOwnPlayerBinding,
+  uploadTransitionDiagnosticRescue,
 } from "./player-identity";
 import { deleteStoredAsset, uploadStorageAsset } from "./storage-service";
 import TemplateV2Editor from "./templates-v2/editor/TemplateV2Editor";
@@ -3738,9 +3745,15 @@ const IS_PLAYER_LAB_BUILD = APP_BUILD_MODE === "playerLab";
 const IS_PLAYER_CANARY_BUILD = APP_BUILD_MODE === "playerCanary";
 const IS_PLAYER_RC_BUILD = APP_BUILD_MODE === "playerRc";
 const IS_TEMPLATES_V2_DIAGNOSTIC_BUILD = IS_PLAYER_RC_BUILD;
+const TEMPLATE_DIAGNOSTIC_EVENT_NAMES = Object.freeze({
+  T0:"PLAYER_T0", T1:"PLAYER_T1", T2:"PLAYER_T2", T3:"PLAYER_T3", T4:"PLAYER_T4",
+  T5:"PLAYER_T5", T6:"PLAYER_T6", T7:"PLAYER_T7", T8:"PLAYER_T8",
+});
 function logTemplatesV2Diagnostic(event, payload = {}) {
   if (!IS_TEMPLATES_V2_DIAGNOSTIC_BUILD) return;
-  console.log(`[TP-V2-DIAG] ${event}`, { timestamp: Date.now(), performanceMs: Math.round(performance.now()), ...payload });
+  const detail = { timestamp: Date.now(), performanceMs: Math.round(performance.now()), ...payload };
+  console.log(`[TP-V2-DIAG] ${event}`, detail);
+  globalThis.dispatchEvent?.(new CustomEvent("totempark-v2-diagnostic", { detail:{ event, payload:detail } }));
 }
 const IS_PLAYER_TELEMETRY_BUILD = APP_BUILD_MODE === "playerTelemetry";
 const IS_PLAYER_JUMP_DIAG_BUILD = APP_BUILD_MODE === "playerJumpDiag";
@@ -15118,6 +15131,11 @@ function PlayerPage() {
   const telemetryRef = useRef(null);
   const telemetryTransitionRef = useRef("");
   const lastTelemetryHistorySyncRef = useRef(0);
+  const transitionDiagnosticsRef = useRef(null);
+  const transitionDiagnosticRecorderRef = useRef(null);
+  const transitionDiagnosticTimersRef = useRef([]);
+  const transitionDiagnosticPreviousRef = useRef({});
+  const transitionDiagnosticRescueRef = useRef(null);
   const playerBindingRef = useRef(null);
   const playerIdentityStateRef = useRef(PLAYER_IDENTITY_STATES.UNAVAILABLE);
   if (!telemetryRef.current) {
@@ -15130,10 +15148,21 @@ function PlayerPage() {
       },
     });
   }
+  if (!transitionDiagnosticsRef.current) {
+    transitionDiagnosticRescueRef.current = captureV20TransitionDiagnosticBuffer();
+    transitionDiagnosticsRef.current = createTransitionDiagnostics({
+      identity: {
+        clientId,
+        deviceId: getTotemDeviceId(),
+        appVersion: import.meta.env.VITE_APP_VERSION || "1.0.0-v21-transition-diagnostic-rescue",
+        platform: isNativeApp() ? "ANDROID" : "WEB",
+      },
+    });
+  }
   const isAndroidSmartTv = isNativeApp() && isAndroidTv === true;
 
   useEffect(() => {
-    if (!IS_PLAYER_TELEMETRY_BUILD || !clientId || !codigo) return undefined;
+    if (!(IS_PLAYER_TELEMETRY_BUILD || IS_TEMPLATES_V2_DIAGNOSTIC_BUILD) || !clientId || !codigo) return undefined;
     let cancelled = false;
     const establishIdentity = async () => {
       try {
@@ -15161,6 +15190,13 @@ function PlayerPage() {
       window.removeEventListener("online", establishIdentity);
     };
   }, [clientId, codigo]);
+
+  useEffect(() => {
+    const diagnostic = transitionDiagnosticsRef.current;
+    const enabled = Boolean(IS_TEMPLATES_V2_DIAGNOSTIC_BUILD && screen?.id && screen?.templatesV2TestMode === true);
+    diagnostic.updateIdentity({ clientId, screenId:screen?.id || "", deviceId:getTotemDeviceId() });
+    diagnostic.configure(enabled);
+  }, [clientId, screen?.id, screen?.templatesV2TestMode]);
 
   useEffect(() => {
     if (!IS_PLAYER_TELEMETRY_BUILD || !screen?.id || !clientId) return undefined;
@@ -15584,6 +15620,57 @@ function PlayerPage() {
   const mediaCacheManifestKey = mediaCacheManifest.manifestKey;
   const activePlaylistWeightBytes = getPlaylistWeightBytes({ items: playerItems });
   const estimatedMonthlyTrafficBytes = activePlaylistWeightBytes * 30;
+  transitionDiagnosticRecorderRef.current = recordTransitionDiagnostic;
+
+  useEffect(() => {
+    const handler = (event) => {
+      const sourceEvent = event.detail?.event || "UNKNOWN";
+      const mapped = sourceEvent.match(/^(T[0-8])(?:_|$)/)?.[1];
+      const eventName = TEMPLATE_DIAGNOSTIC_EVENT_NAMES[mapped] || sourceEvent;
+      transitionDiagnosticRecorderRef.current?.(eventName, event.detail?.payload || {});
+      if (eventName === "PLAYER_T7") {
+        transitionDiagnosticTimersRef.current.forEach(clearTimeout);
+        transitionDiagnosticTimersRef.current = [100,250,500,1000,2000].map((delay) => setTimeout(() => {
+          transitionDiagnosticRecorderRef.current?.("PLAYER_AFTER_T7", { delayMs:delay });
+        }, delay));
+      }
+    };
+    globalThis.addEventListener?.("totempark-v2-diagnostic", handler);
+    return () => {
+      globalThis.removeEventListener?.("totempark-v2-diagnostic", handler);
+      transitionDiagnosticTimersRef.current.forEach(clearTimeout);
+      transitionDiagnosticTimersRef.current = [];
+    };
+  }, []);
+
+  useEffect(() => {
+    const safeIndex = mediaIndex >= playerItems.length ? 0 : mediaIndex;
+    const item = playerItems[safeIndex];
+    const currentMediaKey = item ? getPlayerItemKey(item,safeIndex) : "";
+    const next = {
+      mediaIndex,
+      previousMediaIndex,
+      currentMediaKey,
+      readyMediaKey,
+      currentMediaReady:Boolean(currentMediaKey && currentMediaKey === readyMediaKey),
+      activePlaylistRevision,
+    };
+    const previous = transitionDiagnosticPreviousRef.current;
+    const eventByKey = {
+      mediaIndex:"MEDIA_INDEX_CHANGED",
+      previousMediaIndex:"PREVIOUS_MEDIA_INDEX_CHANGED",
+      currentMediaKey:"CURRENT_MEDIA_KEY_CHANGED",
+      readyMediaKey:"READY_MEDIA_KEY_CHANGED",
+      currentMediaReady:"CURRENT_MEDIA_READY_CHANGED",
+      activePlaylistRevision:"PLAYLIST_REVISION_CHANGED",
+    };
+    Object.entries(next).forEach(([key,value]) => {
+      if (Object.prototype.hasOwnProperty.call(previous,key) && previous[key] !== value) {
+        recordTransitionDiagnostic(eventByKey[key], { changedField:key, previousValue:previous[key], nextValue:value });
+      }
+    });
+    transitionDiagnosticPreviousRef.current = next;
+  }, [activeItemsKey, activePlaylistRevision, mediaIndex, previousMediaIndex, readyMediaKey]);
 
   useEffect(() => {
     if (!playerItems.length) return;
@@ -15974,6 +16061,8 @@ function PlayerPage() {
   function goToNextMedia(reason = "UNKNOWN") {
     if (advancingRef.current) return;
 
+    recordTransitionDiagnostic("GO_TO_NEXT_MEDIA", { reason });
+
     recordJumpEvent("PLAYER_ADVANCE_REQUEST", { reason, index: mediaIndex, mediaId: playerItems[mediaIndex]?.mediaId || playerItems[mediaIndex]?.id || "" });
 
     const items = playerItems;
@@ -16045,14 +16134,54 @@ function PlayerPage() {
     telemetryTransitionRef.current = "";
   }
 
+  function recordTransitionDiagnostic(eventName, extra = {}) {
+    const diagnostic = transitionDiagnosticsRef.current;
+    if (!diagnostic?.isEnabled()) return;
+    const safeIndex = mediaIndex >= playerItems.length ? 0 : mediaIndex;
+    const current = playerItems[safeIndex];
+    const currentMediaKey = current ? getPlayerItemKey(current,safeIndex) : "";
+    const currentMediaReady = Boolean(currentMediaKey && currentMediaKey === readyMediaKey);
+    const retainedPreviousIndex = previousMediaIndex ?? (!currentMediaReady ? previousMediaIndexRef.current : null);
+    const layerModels = [];
+    if (!decoderReleasePending && retainedPreviousIndex !== null && retainedPreviousIndex !== safeIndex && playerItems[retainedPreviousIndex]) {
+      const item = playerItems[retainedPreviousIndex];
+      layerModels.push({ index:retainedPreviousIndex, key:getPlayerItemKey(item,retainedPreviousIndex), playerItemType:item.playerItemType || item.type || "", isCurrent:false, isPrevious:true, isPending:false, isVisible:true });
+    }
+    if (!decoderReleasePending && current) layerModels.push({ index:safeIndex, key:currentMediaKey, playerItemType:current.playerItemType || current.type || "", isCurrent:true, isPrevious:false, isPending:!currentMediaReady, isVisible:currentMediaReady });
+    const stage = globalThis.document?.querySelector?.(".player-transition-layer.is-current");
+    const style = stage ? globalThis.getComputedStyle?.(stage) : null;
+    const rect = stage?.getBoundingClientRect?.();
+    const snapshot = {
+      mediaIndex:safeIndex,
+      previousMediaIndex,
+      previousMediaIndexRef:previousMediaIndexRef.current,
+      currentMediaKey,
+      readyMediaKey,
+      currentMediaReady,
+      activePlaylistRevision,
+      visibleLayers:{ length:layerModels.length, layers:layerModels },
+      transition:{ inProgress:transitionInProgressRef.current, decoderReleasePending },
+      stage:{ mounted:Boolean(stage), className:stage?.className || "", display:style?.display || "", visibility:style?.visibility || "", opacity:style?.opacity || "", zIndex:style?.zIndex || "", width:rect?.width || 0, height:rect?.height || 0 },
+      ...extra,
+    };
+    diagnostic.record(eventName,snapshot);
+    const invariantFailure = layerModels.length === 0
+      || (eventName.startsWith("PLAYER_AFTER_T7") && !currentMediaReady)
+      || (previousMediaIndexRef.current === null && !currentMediaReady)
+      || (eventName.startsWith("PLAYER_AFTER_T7") && currentMediaKey !== readyMediaKey);
+    if (invariantFailure && eventName !== "PLAYER_VISIBILITY_INVARIANT_FAILURE") diagnostic.record("PLAYER_VISIBILITY_INVARIANT_FAILURE", snapshot);
+  }
+
   function finishCurrentTransition(item, index) {
     if (readyMediaKey !== getPlayerItemKey(item,index)) return;
+    recordTransitionDiagnostic("FINISH_CURRENT_TRANSITION", { itemKey:getPlayerItemKey(item,index), index });
     previousMediaIndexRef.current = null;
     setPreviousMediaIndex(null);
     transitionInProgressRef.current = false;
   }
 
   function skipFailedMedia() {
+    recordTransitionDiagnostic("PLAYER_ERROR_ADVANCE", { reason:"MEDIA_ERROR" });
     transitionInProgressRef.current = false;
     setReadyMediaKey("");
     goToNextMedia("ERROR");
@@ -16255,6 +16384,46 @@ function PlayerPage() {
     };
   }, [clientId, codigo]);
 
+  useEffect(() => {
+    if (!IS_TEMPLATES_V2_DIAGNOSTIC_BUILD || !clientId || !screen?.id || screen?.templatesV2TestMode !== true) return undefined;
+    let cancelled = false;
+    let uploading = false;
+    const rescue = async () => {
+      if (cancelled || uploading || globalThis.navigator?.onLine === false) return;
+      const stored = transitionDiagnosticRescueRef.current || readV20TransitionDiagnosticRescue();
+      if (!stored?.payload?.events?.length || stored.rescueUploaded === true) return;
+      uploading = true;
+      try {
+        const confirmation = await uploadTransitionDiagnosticRescue({
+          app: firebaseApp,
+          auth,
+          payload: {
+            ...stored.payload,
+            clientId,
+            screenId: screen.id,
+            deviceId: getTotemDeviceId(),
+            rescuedByVersion: import.meta.env.VITE_APP_VERSION || "1.0.0-v21-transition-diagnostic-rescue",
+          },
+        });
+        if (!cancelled && confirmation?.status === "STORED") {
+          transitionDiagnosticRescueRef.current = markV20TransitionDiagnosticRescueUploaded(globalThis.localStorage, confirmation);
+        }
+      } catch (error) {
+        console.log("Resgate diagnóstico V20 aguardando nova tentativa:", error);
+      } finally {
+        uploading = false;
+      }
+    };
+    rescue();
+    window.addEventListener("online", rescue);
+    const retry = window.setInterval(rescue, 15000);
+    return () => {
+      cancelled = true;
+      window.clearInterval(retry);
+      window.removeEventListener("online", rescue);
+    };
+  }, [clientId, screen?.id, screen?.templatesV2TestMode]);
+
   /*
   useEffect(() => {
     if (!clientId || !codigo) return;
@@ -16347,6 +16516,15 @@ function PlayerPage() {
         await updateDoc(screenDocRef, heartbeatPayload);
 
         const binding = playerBindingRef.current;
+        const pendingTransitionDiagnostic = transitionDiagnosticsRef.current.pending();
+        const canSyncTransitionDiagnostic = pendingTransitionDiagnostic
+          && binding?.status === "ACTIVE"
+          && binding.clientId === clientId
+          && binding.screenId === screen.id
+          && binding.deviceId === localDeviceId;
+        const canRescueTransitionDiagnostic = pendingTransitionDiagnostic
+          && IS_TEMPLATES_V2_DIAGNOSTIC_BUILD
+          && screen.templatesV2TestMode === true;
         const canSyncTelemetry = telemetrySnapshot
           && telemetryHeartbeat?.due
           && binding?.status === "ACTIVE"
@@ -16377,6 +16555,33 @@ function PlayerPage() {
           );
           telemetryRef.current.acknowledge(pending.sequence);
           lastTelemetryHistorySyncRef.current = Date.now();
+        }
+
+        if (canRescueTransitionDiagnostic) {
+          const confirmation = await uploadTransitionDiagnosticRescue({
+            app: firebaseApp,
+            auth,
+            payload: {
+              clientId,
+              screenId: screen.id,
+              deviceId: localDeviceId,
+              sourceAppVersion: pendingTransitionDiagnostic.session.appVersion,
+              rescuedByVersion: import.meta.env.VITE_APP_VERSION || "1.0.0-v21-transition-diagnostic-rescue",
+              diagnosticSessionId: pendingTransitionDiagnostic.session.diagnosticSessionId,
+              sequence: pendingTransitionDiagnostic.sequence,
+              events: pendingTransitionDiagnostic.transitionDiagnostics,
+            },
+          });
+          if (confirmation?.status === "STORED") {
+            transitionDiagnosticsRef.current.acknowledge(pendingTransitionDiagnostic.sequence);
+          }
+        } else if (canSyncTransitionDiagnostic) {
+          await setDoc(
+            doc(db, "clients", clientId, "screens", screen.id, "telemetrySessions", pendingTransitionDiagnostic.session.sessionId),
+            { ...pendingTransitionDiagnostic, updatedAt:serverTimestamp() },
+            { merge:true }
+          );
+          transitionDiagnosticsRef.current.acknowledge(pendingTransitionDiagnostic.sequence);
         }
       } catch (error) {
         console.log(error);
@@ -16785,6 +16990,7 @@ function PlayerPage() {
     setActiveMode(selected.mode);
 
     if (nextId && nextId !== previousId) {
+      recordTransitionDiagnostic("PLAYLIST_RESET", { previousPlaylistId:previousId || "", nextPlaylistId:nextId });
       transitionInProgressRef.current = false;
       previousMediaIndexRef.current = null;
       setPreviousMediaIndex(null);
@@ -16862,7 +17068,7 @@ function PlayerPage() {
     if (isPlaybackBlocked || advancingRef.current || isWaitingForAndroidTvVideo || isWaitingForTemplateAsset || isWaitingForTemplateTransition) return;
 
     playbackStartedAtRef.current = Date.now();
-    if (currentItem?.playerItemType === "template") logTemplatesV2Diagnostic("T8_DURATION_STARTED", { templateId:currentItem.templateId||currentItem.id||"", itemKey:currentKey, durationMs });
+    if (currentItem?.playerItemType === "template") logTemplatesV2Diagnostic("T8_DURATION_STARTED", { templateId:currentItem.templateId||currentItem.id||"", itemKey:currentKey, durationMs:durationInMs });
     const remaining = Math.max(0, playbackRemainingRef.current);
     const expectedFireAt = Date.now() + remaining;
     recordJumpEvent("TIMER_CREATED", { expectedFireAt, remainingMs: remaining, durationMs: durationInMs, index: safeIndex, mediaId: currentItem?.mediaId || currentItem?.id || "", timingKey });
@@ -17313,7 +17519,21 @@ function PlayerPage() {
         <div
           key={`${getPlayerItemKey(item, index)}-${activePlaylistRevision}`}
           className={`player-transition-layer player-buffer-layer ${state} ${transitionClass} ${transitionSpeedClass} ${item.playerItemType === "template" ? "template-layer" : ""}`}
-          onAnimationEnd={() => { if (state.includes("is-current") && state.includes("is-ready")) finishCurrentTransition(item,index); }}
+          onAnimationEnd={(event) => {
+            const animationPayload = {
+              animationName:event.animationName || "",
+              target:event.target?.className || event.target?.tagName || "",
+              currentTarget:event.currentTarget?.className || "",
+              isChildEvent:event.target !== event.currentTarget,
+              itemKey:getPlayerItemKey(item,index),
+              index,
+            };
+            recordTransitionDiagnostic("ANIMATION_END", animationPayload);
+            if (state.includes("is-current") && state.includes("is-ready")) {
+              recordTransitionDiagnostic("TRANSITION_END", animationPayload);
+              finishCurrentTransition(item,index);
+            }
+          }}
         >
           {renderPlayerItem(item, index, index === safeMediaIndex)}
         </div>

@@ -46,6 +46,13 @@ export async function revokeOwnPlayerBinding({ app, auth, reason = "PLAYER_RELEA
   return result.data;
 }
 
+export async function uploadTransitionDiagnosticRescue({ app, auth, payload }) {
+  await ensurePlayerAuth(auth);
+  const upload = httpsCallable(getFunctions(app), "uploadTransitionDiagnosticRescue");
+  const result = await upload(payload);
+  return result.data;
+}
+
 export function classifyPlayerIdentityFailure(error, online = globalThis.navigator?.onLine !== false) {
   const code = String(error?.code || "").toLowerCase();
   if (code.includes("permission-denied") || code.includes("failed-precondition")) {
