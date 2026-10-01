@@ -5964,7 +5964,17 @@ video.player-media::-webkit-media-controls-start-playback-button {
   background: #000000 !important;
   overflow: hidden !important;
   --tp-transition-duration: 0.45s;
+  will-change: auto;
+}
+
+.player-transition-layer.transition-active {
   will-change: opacity, transform, filter;
+}
+
+.player-transition-layer.is-current.is-ready:not(.transition-active) {
+  transform: none !important;
+  filter: none !important;
+  will-change: auto;
 }
 
 .player-transition-layer.speed-fast {

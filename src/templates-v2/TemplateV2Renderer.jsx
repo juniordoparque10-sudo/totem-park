@@ -1,7 +1,22 @@
+import { useLayoutEffect, useRef } from "react";
+import { Cloud, CloudLightning, CloudRain, CloudSun, Moon, Snowflake, Sun } from "lucide-react";
 import { TemplateClock, TemplateCTA, TemplateDate, TemplateLogo, TemplateMedia, TemplateNewsTicker, TemplateQRCode, TemplateV2VisualReadyProvider, TemplateWeather } from "./TemplateV2Modules";
 import { CLOCK_PRO_TYPE, HERO_BUSINESS_TYPE, KPI_INDICATORS_TYPE, SPORTS_PREMIUM_TYPE, WEATHER_PREMIUM_TYPE, getTemplateV2Name } from "./schema";
 import SportsPremiumRenderer from "./sports-v2/SportsPremiumRenderer";
+import { reportTemplateRenderDiagnostics } from "./render-diagnostics";
+import "@fontsource-variable/inter/wght.css";
 import "./template-v2.css";
+
+function WeatherVectorIcon({ glyph }) {
+  const Icon = glyph === "🌙" ? Moon
+    : glyph === "⛅" ? CloudSun
+    : glyph === "☁" ? Cloud
+    : glyph === "🌧" ? CloudRain
+    : glyph === "❄" ? Snowflake
+    : glyph === "⛈" ? CloudLightning
+    : Sun;
+  return <Icon aria-hidden="true" focusable="false" />;
+}
 
 function HeroBusiness({ config, orientation, name, compact, tv, type, dynamicData, mode }) {
   const style = config.style || {};
@@ -101,19 +116,40 @@ function WeatherPremium({ config, orientation, name, dynamicData, mode }) {
   const loading = dynamicData?.loading;
   const forecast = (weather?.forecast || []).slice(0,Math.max(3,Math.min(5,Number(weatherConfig.forecastDays)||5)));
   const visibility = config.visibility || {};
-  return <section className={`tpv2-root tpv2-weather-premium ${orientation === "Retrato" ? "is-portrait" : "is-landscape"} ${mode === "thumbnail" ? "is-thumbnail" : ""} ${config.modules?.news?.enabled ? `has-news-ticker ticker-${config.modules.news.tickerSize || "normal"}` : ""}`} style={dynamicStyle(config)}><DynamicBackdrop config={config} mode={mode}/>{visibility.showContent !== false && <div className="tpv2-weather-shell"><header>{visibility.showLogo !== false && <TemplateLogo asset={config.content?.logo} name={name}/>} {weatherConfig.showCity && <span>{weather?.city || weatherConfig.city}</span>}</header>{loading ? <div className="tpv2-weather-loading"><i/><i/><i/></div> : weather?.unavailable || !weather ? <div className="tpv2-weather-unavailable">Previsão temporariamente indisponível</div> : <><main>{weatherConfig.showCurrent && <><span className="tpv2-weather-icon">{weather.icon}</span><strong>{weather.temperature}°C</strong><div><b>{weather.condition}</b>{weatherConfig.showFeelsLike && <small>Sensação térmica {weather.sensation}°C</small>}</div></>}</main>{weatherConfig.showForecast && <div className="tpv2-forecast-grid">{forecast.map((day) => <article key={day.date}><span>{day.day}</span><b>{day.icon}</b><strong>{day.max}°</strong><small>{day.min}°</small></article>)}</div>}</>}</div>}{config.modules?.news?.enabled && <TemplateNewsTicker items={dynamicData?.news} config={config.modules.news} orientation={orientation}/>}</section>;
+  return <section className={`tpv2-root tpv2-weather-premium ${orientation === "Retrato" ? "is-portrait" : "is-landscape"} ${mode === "thumbnail" ? "is-thumbnail" : ""} ${config.modules?.news?.enabled ? `has-news-ticker ticker-${config.modules.news.tickerSize || "normal"}` : ""}`} style={dynamicStyle(config)}><DynamicBackdrop config={config} mode={mode}/>{visibility.showContent !== false && <div className="tpv2-weather-shell"><header>{visibility.showLogo !== false && <TemplateLogo asset={config.content?.logo} name={name}/>} {weatherConfig.showCity && <span>{weather?.city || weatherConfig.city}</span>}</header>{loading ? <div className="tpv2-weather-loading"><i/><i/><i/></div> : weather?.unavailable || !weather ? <div className="tpv2-weather-unavailable">Previsão temporariamente indisponível</div> : <><main>{weatherConfig.showCurrent && <><span className="tpv2-weather-icon"><WeatherVectorIcon glyph={weather.icon}/></span><strong>{weather.temperature}°C</strong><div><b>{weather.condition}</b>{weatherConfig.showFeelsLike && <small>Sensação térmica {weather.sensation}°C</small>}</div></>}</main>{weatherConfig.showForecast && <div className="tpv2-forecast-grid">{forecast.map((day) => <article key={day.date}><span>{day.day}</span><b><WeatherVectorIcon glyph={day.icon}/></b><strong>{day.max}°</strong><small>{day.min}°</small></article>)}</div>}</>}</div>}{config.modules?.news?.enabled && <TemplateNewsTicker items={dynamicData?.news} config={config.modules.news} orientation={orientation}/>}</section>;
 }
 
 export default function TemplateV2Renderer({ template, config, orientation, compact = false, tv = false, dynamicData = null, mode = "player", playbackExecutionId = null, onVisualEvent = null }) {
+  const diagnosticRootRef = useRef(null);
   const resolvedConfig = config || template?.published;
-  if (!resolvedConfig) return null;
   const type = template?.identity?.templateType || template?.templateType || HERO_BUSINESS_TYPE;
-  const resolvedOrientation = orientation || resolvedConfig.display?.defaultOrientation || "Paisagem";
+  const resolvedOrientation = orientation || resolvedConfig?.display?.defaultOrientation || "Paisagem";
+
+  useLayoutEffect(() => {
+    const report = (phase) => reportTemplateRenderDiagnostics(diagnosticRootRef.current, {
+      phase,
+      templateId:template?.id || template?.identity?.templateId || "",
+      templateName:getTemplateV2Name(template),
+      templateType:type,
+      playbackExecutionId,
+    });
+    report("layout");
+    const settledTimer = globalThis.setTimeout?.(() => report("stable"), 2000);
+    const onAnimationEnd = () => report("transition-end");
+    const layer = diagnosticRootRef.current?.closest?.(".player-transition-layer");
+    layer?.addEventListener?.("animationend", onAnimationEnd);
+    return () => {
+      if (settledTimer) globalThis.clearTimeout?.(settledTimer);
+      layer?.removeEventListener?.("animationend", onAnimationEnd);
+    };
+  }, [playbackExecutionId, template, type]);
+
+  if (!resolvedConfig) return null;
 
   let content;
   if (type === CLOCK_PRO_TYPE) content = <ClockPro config={resolvedConfig} orientation={resolvedOrientation} name={getTemplateV2Name(template)} dynamicData={dynamicData} mode={mode}/>;
   else if (type === WEATHER_PREMIUM_TYPE) content = <WeatherPremium config={resolvedConfig} orientation={resolvedOrientation} name={getTemplateV2Name(template)} dynamicData={dynamicData} mode={mode}/>;
   else if (type === SPORTS_PREMIUM_TYPE) content = <SportsPremiumRenderer config={resolvedConfig} orientation={resolvedOrientation} name={getTemplateV2Name(template)} dynamicData={dynamicData} mode={mode}/>;
   else content = <HeroBusiness config={resolvedConfig} orientation={resolvedOrientation} name={getTemplateV2Name(template)} compact={compact} tv={tv} type={type} dynamicData={dynamicData} mode={mode} isKpi={type === KPI_INDICATORS_TYPE} />;
-  return <TemplateV2VisualReadyProvider value={{ playbackExecutionId, onVisualEvent }}>{content}</TemplateV2VisualReadyProvider>;
+  return <TemplateV2VisualReadyProvider value={{ playbackExecutionId, onVisualEvent }}><div className="tpv2-diagnostic-root" ref={diagnosticRootRef}>{content}</div></TemplateV2VisualReadyProvider>;
 }
