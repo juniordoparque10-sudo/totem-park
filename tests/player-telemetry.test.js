@@ -27,7 +27,7 @@ test("one app execution keeps the same session between heartbeats and monotonic 
   assert.equal(second.session.uptimeSeconds, 15);
 });
 
-test("operational heartbeat keeps a compact schema 3 payload", () => {
+test("operational heartbeat keeps a compact schema 4 payload", () => {
   const telemetry = createPlayerTelemetry({ identity:{ screenId:"A", deviceId:"D" }, storage:memoryStorage() });
   telemetry.configure({ enabled:true, screenIds:["A"] });
   telemetry.updateOperational({
@@ -36,11 +36,21 @@ test("operational heartbeat keeps a compact schema 3 payload", () => {
     cache:{ cacheStatus:"pronto", cachedItems:2, totalCacheableItems:2 },
   });
   const result = telemetry.heartbeat();
-  assert.equal(result.snapshot.schemaVersion, 3);
+  assert.equal(result.snapshot.schemaVersion, 4);
   assert.equal(result.snapshot.app.versionCode, 26);
   assert.equal(result.snapshot.current.currentMediaSource, "LOCAL");
   assert.equal(result.snapshot.cache.cacheStatus, "pronto");
   assert.equal("counters" in result.snapshot, false);
+});
+
+test("schema 4 attaches traffic without changing the operational blocks", () => {
+  const telemetry = createPlayerTelemetry({ identity:{ screenId:"A" }, storage:memoryStorage() });
+  telemetry.configure({ enabled:true, screenIds:["A"] });
+  telemetry.updateTraffic({ networkMeasurementSupported:true, appInternetReceivedBytes:0, cacheHitRate:null });
+  const snapshot = telemetry.heartbeat().snapshot;
+  assert.equal(snapshot.schemaVersion, 4);
+  assert.equal(snapshot.traffic.appInternetReceivedBytes, 0);
+  assert.equal(snapshot.traffic.cacheHitRate, null);
 });
 
 test("disabled or failing telemetry remains a no-op side effect", () => {

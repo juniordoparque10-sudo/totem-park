@@ -461,12 +461,16 @@ async function downloadOfflineFile({ url, path, destinationUri, diagnostic, poli
       attempt += 1;
       const downloadId = startFileTransfer({ ...diagnostic, localPath: destinationUri, attempt });
       const startedAt = Date.now();
+      let transferredBytes = 0;
       const reportProgress = createProgressReporter({
         diagnostic: { ...diagnostic, downloadId, attempt },
         onEvent: recordLabEvent,
       });
       const progressHandle = await FileTransfer.addListener("progress", (event) => {
-        if (event.type === "download" && event.url === url) reportProgress(event);
+        if (event.type === "download" && event.url === url) {
+          transferredBytes = Math.max(transferredBytes, Number(event.bytes || 0));
+          reportProgress(event);
+        }
       });
 
       try {
@@ -489,7 +493,7 @@ async function downloadOfflineFile({ url, path, destinationUri, diagnostic, poli
           finalFileSizeBytes: validation.actual,
           durationMs: Date.now() - startedAt,
         });
-        return fileInfo;
+        return { ...fileInfo, transferredBytes, downloadOperationId: downloadId };
       } catch (downloadError) {
         const partial = await statOfflineFile(path);
         const partialSize = Number(partial?.size || 0);
@@ -543,6 +547,7 @@ export async function cacheOfflineAssets(urls, scope, storageKey, options = {}) 
   let downloadedBytes = 0;
   let removed = 0;
   let completed = 0;
+  const sizeByUrl = {};
 
   try {
     rawMap = JSON.parse(localStorage.getItem(storageKey) || "{}");
@@ -578,10 +583,17 @@ export async function cacheOfflineAssets(urls, scope, storageKey, options = {}) 
 
         fileInfo = await downloadOfflineFile({ url, path, destinationUri: destination.uri, diagnostic, policy });
         downloaded += 1;
-        downloadedBytes += Number(fileInfo.size || 0);
+        const transferredBytes = Number(fileInfo.transferredBytes || 0);
+        downloadedBytes += transferredBytes;
+        options.onDownloadComplete?.({
+          operationId: fileInfo.downloadOperationId,
+          bytes: transferredBytes,
+          remoteUrl: url,
+        });
       }
 
       rawMap[url] = fileInfo.uri;
+      sizeByUrl[url] = Number(fileInfo.size || 0);
     } catch (error) {
       await Filesystem.deleteFile({ path, directory: Directory.Data }).catch(() => {});
       delete rawMap[url];
@@ -622,6 +634,7 @@ export async function cacheOfflineAssets(urls, scope, storageKey, options = {}) 
     downloaded,
     downloadedBytes,
     removed,
+    sizeByUrl,
     total: uniqueUrls.length,
     urlMap: Object.fromEntries(
       Object.entries(rawMap).map(([remoteUrl, fileUri]) => [

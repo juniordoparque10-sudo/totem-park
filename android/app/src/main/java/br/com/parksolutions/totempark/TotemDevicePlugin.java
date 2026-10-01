@@ -5,7 +5,9 @@ import android.content.Context;
 import android.content.pm.PackageInfo;
 import android.content.pm.PackageManager;
 import android.content.res.Configuration;
+import android.net.TrafficStats;
 import android.os.Build;
+import android.os.Process;
 
 import com.getcapacitor.JSObject;
 import com.getcapacitor.Plugin;
@@ -49,6 +51,24 @@ public class TotemDevicePlugin extends Plugin {
 
         JSObject result = new JSObject();
         result.put("isTelevision", isTelevision);
+        call.resolve(result);
+    }
+
+    @PluginMethod
+    public void getNetworkStats(PluginCall call) {
+        int uid = Process.myUid();
+        long uidRxBytes = TrafficStats.getUidRxBytes(uid);
+        long uidTxBytes = TrafficStats.getUidTxBytes(uid);
+        boolean supported = uidRxBytes != TrafficStats.UNSUPPORTED
+            && uidTxBytes != TrafficStats.UNSUPPORTED;
+
+        JSObject result = new JSObject();
+        result.put("supported", supported);
+        result.put("measuredAt", System.currentTimeMillis());
+        if (supported) {
+            result.put("uidRxBytes", uidRxBytes);
+            result.put("uidTxBytes", uidTxBytes);
+        }
         call.resolve(result);
     }
 }

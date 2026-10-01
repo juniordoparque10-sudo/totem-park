@@ -26,6 +26,7 @@ function blank(identity, nowMs, monotonicMs) {
     player:{ state:"idle" },
     current:{ playerState:"idle", networkStatus:globalThis.navigator?.onLine === false ? "OFFLINE" : "ONLINE", currentItemId:"", currentItemType:"", currentMediaSource:"UNKNOWN" },
     cache:{ cacheStatus:"", cachedItems:0, totalCacheableItems:0 },
+    traffic:null,
     runtime:{ startedAtMs:nowMs, startedAtMonotonicMs:monotonicMs },
     outbox:[], lastQueuedAtMs:0, lastSyncedSequence:0,
   };
@@ -52,7 +53,15 @@ export function createPlayerTelemetry({ identity = {}, storage, now = () => Date
   let enabled = false;
   let syncIntervalMs = SYNC_INTERVAL_MS;
   const persist = () => save(state, storage);
-  const snapshot = () => ({ schemaVersion:state.schemaVersion, session:{...state.session}, app:{...state.app}, player:{...state.player}, current:{...state.current}, cache:{...state.cache} });
+  const snapshot = () => ({
+    schemaVersion:state.schemaVersion,
+    session:{...state.session},
+    app:{...state.app},
+    player:{...state.player},
+    current:{...state.current},
+    cache:{...state.cache},
+    ...(state.traffic ? { traffic:{...state.traffic} } : {}),
+  });
   return {
     configure(config = {}) { enabled = isTelemetryAllowed(config, state.session); syncIntervalMs = Math.max(60_000, numeric(config.syncIntervalMs) || SYNC_INTERVAL_MS); return enabled; },
     isEnabled: () => enabled,
@@ -72,6 +81,7 @@ export function createPlayerTelemetry({ identity = {}, storage, now = () => Date
       if (next.cache) state.cache = { ...state.cache, ...next.cache };
       persist();
     },
+    updateTraffic(traffic) { if (!enabled || !traffic) return; state.traffic = { ...traffic }; persist(); },
     record(type, data = {}) {
       if (!enabled) return;
       if (type === "PLAYBACK_START") state.player.state = state.current.playerState = "playing";

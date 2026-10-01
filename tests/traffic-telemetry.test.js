@@ -1,0 +1,126 @@
+import test from "node:test";
+import assert from "node:assert/strict";
+import fs from "node:fs";
+import {
+  createTrafficTelemetry,
+  isTrafficInstrumented,
+  TRAFFIC_TELEMETRY_SCHEMA_VERSION,
+} from "../src/traffic-telemetry.js";
+import { formatBytes } from "../src/format-bytes.js";
+
+function memoryStorage() {
+  const values = new Map();
+  return {
+    getItem:(key) => values.get(key) || null,
+    setItem:(key, value) => values.set(key, value),
+  };
+}
+
+test("A-C: native baseline, normal delta and counter reset never become negative", () => {
+  const telemetry = createTrafficTelemetry({ storage:memoryStorage() });
+  telemetry.recordNetworkStats({ supported:true, uidRxBytes:1000, uidTxBytes:200 });
+  assert.equal(telemetry.snapshot().appInternetReceivedBytes, 0);
+  telemetry.recordNetworkStats({ supported:true, uidRxBytes:1250, uidTxBytes:260 });
+  assert.equal(telemetry.snapshot().appInternetReceivedBytes, 250);
+  assert.equal(telemetry.snapshot().appInternetSentBytes, 60);
+  telemetry.recordNetworkStats({ supported:true, uidRxBytes:20, uidTxBytes:10 });
+  assert.equal(telemetry.snapshot().appInternetReceivedBytes, 250);
+  assert.equal(telemetry.snapshot().appInternetSentBytes, 60);
+});
+
+test("D: unsupported TrafficStats is explicit and never reported as zero", () => {
+  const telemetry = createTrafficTelemetry({ storage:memoryStorage() });
+  telemetry.recordNetworkStats({ supported:false });
+  assert.equal(telemetry.snapshot().networkMeasurementSupported, false);
+  assert.equal(telemetry.snapshot().appInternetReceivedBytes, null);
+  assert.equal(telemetry.snapshot().appInternetSentBytes, null);
+});
+
+test("E-G: only a completed unique download is counted", () => {
+  const telemetry = createTrafficTelemetry({ storage:memoryStorage() });
+  assert.equal(telemetry.recordDownloadComplete({ operationId:"download-1", bytes:4096 }), true);
+  assert.equal(telemetry.recordDownloadComplete({ operationId:"download-1", bytes:4096 }), false);
+  // Failed, partial and already-cached paths do not call recordDownloadComplete.
+  assert.equal(telemetry.snapshot().mediaDownloadedBytes, 4096);
+});
+
+test("H-L: local completion counts bytes once while interruption and preload do not", () => {
+  const telemetry = createTrafficTelemetry({ storage:memoryStorage() });
+  const video = { playbackExecutionId:1, itemId:"video", source:"LOCAL", mediaType:"VIDEO" };
+  const occurrenceId = telemetry.observePlaybackStart(video);
+  assert.ok(occurrenceId);
+  assert.equal(telemetry.recordLocalPlaybackComplete({ ...video, bytes:8000, occurrenceId }), true);
+  assert.equal(telemetry.recordLocalPlaybackComplete({ ...video, bytes:8000, occurrenceId }), false);
+  telemetry.observePlaybackStart({ playbackExecutionId:2, itemId:"interrupted", source:"LOCAL", mediaType:"VIDEO" });
+  telemetry.closeOccurrence({ playbackExecutionId:2, itemId:"interrupted", source:"LOCAL" });
+  assert.equal(telemetry.snapshot().localMediaReusedBytes, 8000);
+  assert.equal(telemetry.observePlaybackStart({ playbackExecutionId:3, itemId:"preload", source:"LOCAL", mediaType:"IMAGE", isCurrent:false }), null);
+});
+
+test("M-N: single-item video and image loops receive distinct telemetry occurrences", () => {
+  const telemetry = createTrafficTelemetry({ storage:memoryStorage() });
+  for (const mediaType of ["VIDEO", "IMAGE"]) {
+    const input = { playbackExecutionId:1, itemId:mediaType, source:"LOCAL", mediaType };
+    const first = telemetry.observePlaybackStart(input);
+    telemetry.recordLocalPlaybackComplete({ ...input, bytes:100, occurrenceId:first });
+    const second = telemetry.observePlaybackStart(input);
+    telemetry.recordLocalPlaybackComplete({ ...input, bytes:100, occurrenceId:second });
+    assert.notEqual(first, second);
+  }
+  assert.equal(telemetry.snapshot().cachePlaybackHits, 4);
+  assert.equal(telemetry.snapshot().localMediaReusedBytes, 400);
+});
+
+test("O-S: remote, fallback, templates and cache hit rate follow the contract", () => {
+  const telemetry = createTrafficTelemetry({ storage:memoryStorage() });
+  telemetry.observePlaybackStart({ playbackExecutionId:1, itemId:"remote", source:"REMOTE", mediaType:"VIDEO" });
+  // Merely deciding to try fallback causes no count; only observed start does.
+  assert.equal(telemetry.snapshot().fallbackPlaybackCount, 0);
+  telemetry.observePlaybackStart({ playbackExecutionId:2, itemId:"fallback", source:"FALLBACK", mediaType:"VIDEO" });
+  telemetry.observePlaybackStart({ playbackExecutionId:3, itemId:"local", source:"LOCAL", mediaType:"IMAGE" });
+  telemetry.observePlaybackStart({ playbackExecutionId:4, itemId:"template", source:"TEMPLATE", mediaType:"TEMPLATE_V2" });
+  const snapshot = telemetry.snapshot();
+  assert.equal(snapshot.remotePlaybackCount, 1);
+  assert.equal(snapshot.fallbackPlaybackCount, 1);
+  assert.equal(snapshot.cachePlaybackHits, 1);
+  assert.equal(snapshot.cacheablePlaybackCount, 3);
+  assert.equal(snapshot.cacheHitRate, 1 / 3);
+  assert.equal(createTrafficTelemetry({ storage:memoryStorage() }).snapshot().cacheHitRate, null);
+});
+
+test("T-W: restart preserves UTC daily totals, resets session baseline and keeps offline reuse", () => {
+  const storage = memoryStorage();
+  let clock = Date.parse("2026-10-01T12:00:00.000Z");
+  const first = createTrafficTelemetry({ storage, now:() => clock });
+  first.recordNetworkStats({ supported:true, uidRxBytes:100, uidTxBytes:20 });
+  first.recordNetworkStats({ supported:true, uidRxBytes:180, uidTxBytes:30 });
+  const local = { playbackExecutionId:1, itemId:"offline", source:"LOCAL", mediaType:"VIDEO" };
+  const occurrenceId = first.observePlaybackStart(local);
+  first.recordLocalPlaybackComplete({ ...local, bytes:500, occurrenceId });
+
+  clock += 60_000;
+  const restarted = createTrafficTelemetry({ storage, now:() => clock });
+  restarted.recordNetworkStats({ supported:true, uidRxBytes:200, uidTxBytes:35 });
+  assert.equal(restarted.snapshot().appInternetReceivedBytes, 0);
+  assert.equal(restarted.dailySnapshot().appInternetReceivedBytes, 100);
+  assert.equal(restarted.dailySnapshot().localMediaReusedBytes, 500);
+  restarted.recordNetworkStats({ supported:true, uidRxBytes:5, uidTxBytes:2 });
+  assert.equal(restarted.snapshot().appInternetReceivedBytes, 0);
+  assert.equal(restarted.dailySnapshot().appInternetReceivedBytes, 100);
+});
+
+test("X-Z: schema 3 is not instrumented, schema 4 requires traffic, and zero remains measured", () => {
+  assert.equal(TRAFFIC_TELEMETRY_SCHEMA_VERSION, 4);
+  assert.equal(isTrafficInstrumented({ schemaVersion:3 }), false);
+  assert.equal(isTrafficInstrumented({ schemaVersion:4 }), false);
+  assert.equal(isTrafficInstrumented({ schemaVersion:4, traffic:{ mediaDownloadedBytes:0 } }), true);
+  assert.equal(formatBytes(undefined, { unavailable:"Não instrumentado" }), "Não instrumentado");
+  assert.equal(formatBytes(0), "0 B");
+});
+
+test("AA-AB: integration reuses the one heartbeat and does not write Firestore per playback", () => {
+  const source = fs.readFileSync(new URL("../src/App.jsx", import.meta.url), "utf8");
+  assert.match(source, /TotemDevice\.getNetworkStats\(\)/);
+  assert.match(source, /setInterval\(\(\) => \{\s*sendHeartbeat\(\);\s*\}, OPERATIONAL_HEARTBEAT_INTERVAL_MS\)/);
+  assert.doesNotMatch(source, /recordLocalPlaybackComplete[\s\S]{0,300}(updateDoc|setDoc)\(/);
+});

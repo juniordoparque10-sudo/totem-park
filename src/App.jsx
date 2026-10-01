@@ -140,6 +140,7 @@ import {
 } from "./single-item-loop";
 import { createPlayerTelemetry, readPlayerTelemetryReport, TELEMETRY_DEFAULT_CONFIG } from "./player-telemetry";
 import { buildOperationalSnapshot, normalizeNativeAppInfo, normalizeOperationalMediaSource, OPERATIONAL_HEARTBEAT_INTERVAL_MS } from "./operational-telemetry";
+import { createTrafficTelemetry } from "./traffic-telemetry";
 import { comparePortalScreens, getPortalLastSignalMs, getPortalScreenPage, sortClientsAlphabetically } from "./portal-status";
 import { reportedAppVersion } from "./telemetry-card-data";
 import {
@@ -15148,6 +15149,7 @@ function PlayerPage() {
   const [offlineAssetMap, setOfflineAssetMap] = useState(() =>
     isNativeApp() ? restoreOfflineAssetMap(offlineStorageKey) : {}
   );
+  const [offlineAssetSizeMap, setOfflineAssetSizeMap] = useState({});
   const [mediaCacheMap, setMediaCacheMap] = useState({});
   const [offlineCacheStatus, setOfflineCacheStatus] = useState("");
   const [playerCacheStatus, setPlayerCacheStatus] = useState({
@@ -15192,6 +15194,7 @@ function PlayerPage() {
   const exitingTvRef = useRef(false);
   const playerSessionStartedAtRef = useRef(Date.now());
   const telemetryRef = useRef(null);
+  const trafficTelemetryRef = useRef(null);
   const telemetryTransitionRef = useRef("");
   const lastTelemetryHistorySyncRef = useRef(0);
   const transitionDiagnosticsRef = useRef(null);
@@ -15215,6 +15218,9 @@ function PlayerPage() {
         platform: isNativeApp() ? "ANDROID" : "WEB",
       },
     });
+  }
+  if (!trafficTelemetryRef.current) {
+    trafficTelemetryRef.current = createTrafficTelemetry();
   }
   if (!transitionDiagnosticsRef.current) {
     transitionDiagnosticRescueRef.current = captureV20TransitionDiagnosticBuffer();
@@ -15319,6 +15325,13 @@ function PlayerPage() {
     TotemDevice.getAppInfo()
       .then((value) => setOperationalAppInfo(normalizeNativeAppInfo(value)))
       .catch((error) => console.log("Não foi possível obter a versão nativa do Player:", error));
+  }, []);
+
+  useEffect(() => {
+    if (!isNativeApp() || !IS_OPERATIONAL_TELEMETRY_BUILD) return;
+    TotemDevice.getNetworkStats()
+      .then((stats) => trafficTelemetryRef.current.recordNetworkStats(stats))
+      .catch(() => trafficTelemetryRef.current.recordNetworkStats({ supported:false }));
   }, []);
 
   useEffect(() => {
@@ -15502,6 +15515,40 @@ function PlayerPage() {
       mediaCacheKey,
       currentMediaSource: fallbackMediaKeysRef.current.has(mediaCacheKey) ? "fallback" : "remote",
     };
+  }
+
+  function getTrafficMediaIdentity(item = {}) {
+    return item.mediaId || item.sourceMediaId || item.id || item.remotePreview || item.preview || "";
+  }
+
+  function getEffectiveTrafficSource(item = {}) {
+    return normalizeOperationalMediaSource(item.currentMediaSource);
+  }
+
+  function getMeasuredLocalMediaBytes(item = {}) {
+    const remoteUrl = item.remotePreview || item.preview || item.imageUrl || "";
+    return Number(offlineAssetSizeMap[remoteUrl] || 0);
+  }
+
+  function observeTrafficPlaybackStart(item, executionId, mediaType, isCurrent) {
+    if (!isNativeApp()) return null;
+    return trafficTelemetryRef.current.observePlaybackStart({
+      playbackExecutionId:executionId,
+      itemId:getTrafficMediaIdentity(item),
+      source:getEffectiveTrafficSource(item),
+      mediaType,
+      cacheable:isCacheableMediaItem(item),
+      isCurrent,
+    });
+  }
+
+  function closeTrafficPlayback(item, executionId) {
+    if (!isNativeApp()) return;
+    trafficTelemetryRef.current.closeOccurrence({
+      playbackExecutionId:executionId,
+      itemId:getTrafficMediaIdentity(item),
+      source:getEffectiveTrafficSource(item),
+    });
   }
 
   function fallbackToRemoteMedia(item) {
@@ -15905,12 +15952,14 @@ function PlayerPage() {
             return [remoteUrl, { mediaId: item.mediaId || item.id || "", mediaName: item.title || item.name || item.fileName || "", fileName: item.fileName || "", sizeBytes: Number(item.sizeBytes || 0), playlistId: activePlaylist?.id || "", screenId: screen?.id || "" }];
           }).filter(([url]) => /^https?:\/\//i.test(url))),
           onProgress: reportNativeOfflineProgress,
+          onDownloadComplete: (download) => trafficTelemetryRef.current.recordDownloadComplete(download),
         }
       ))
       .then((result) => {
         if (!active) return;
 
         setOfflineAssetMap(result.urlMap);
+        setOfflineAssetSizeMap(result.sizeByUrl || {});
 
         const finalStatus = {
           cacheStatus: result.failed > 0 ? "parcial" : "pronto",
@@ -16175,6 +16224,8 @@ function PlayerPage() {
     recordJumpEvent("PLAYER_ADVANCE_REQUEST", { reason, index: mediaIndex, mediaId: playerItems[mediaIndex]?.mediaId || playerItems[mediaIndex]?.id || "" });
 
     const items = playerItems;
+    const currentItemForTraffic = items[mediaIndex >= items.length ? 0 : mediaIndex];
+    if (currentItemForTraffic) closeTrafficPlayback(currentItemForTraffic, currentPlaybackExecutionIdRef.current);
 
     if (items.length === 1) {
       if (isSingleImagePlaylist(items)) {
@@ -16615,6 +16666,13 @@ function PlayerPage() {
       if (exitingTvRef.current) return;
 
       try {
+        if (isNativeApp() && IS_OPERATIONAL_TELEMETRY_BUILD) {
+          try {
+            trafficTelemetryRef.current.recordNetworkStats(await TotemDevice.getNetworkStats());
+          } catch {
+            trafficTelemetryRef.current.recordNetworkStats({ supported:false });
+          }
+        }
         const localDeviceId = getTotemDeviceId();
         const currentScreen = await getDoc(screenDocRef);
 
@@ -16627,6 +16685,7 @@ function PlayerPage() {
         }
 
         telemetryRef.current.updateOperational(operationalSnapshotRef.current || {});
+        if (isNativeApp()) telemetryRef.current.updateTraffic(trafficTelemetryRef.current.snapshot());
         const telemetryHeartbeat = telemetryRef.current.heartbeat();
         const telemetrySnapshot = telemetryHeartbeat?.snapshot;
         const binding = playerBindingRef.current;
@@ -17183,6 +17242,9 @@ function PlayerPage() {
 
     if (isPlaybackBlocked || advancingRef.current || isWaitingForAndroidTvVideo || isWaitingForTemplateAsset || isWaitingForTemplateTransition) return;
 
+    if (currentItem?.type === "Imagem") {
+      observeTrafficPlaybackStart(currentItem, currentPlaybackExecutionId, "IMAGE", true);
+    }
     playbackStartedAtRef.current = Date.now();
     if (currentItem?.playerItemType === "template") logTemplatesV2Diagnostic("T8_DURATION_STARTED", { templateId:currentItem.templateId||currentItem.id||"", itemKey:currentKey, durationMs:durationInMs });
     const remaining = Math.max(0, playbackRemainingRef.current);
@@ -17194,6 +17256,19 @@ function PlayerPage() {
       recordJumpEvent("TIMER_FIRED", { expectedFireAt, actualFireAt: Date.now(), remainingMs: remaining, durationMs: durationInMs, ...mediaElementSnapshot(video, currentItem?.mediaId || currentItem?.id || "", safeIndex) });
       playbackTimerRef.current = null;
       playbackRemainingRef.current = 0;
+      if (currentItem?.type === "Imagem") {
+        const source = getEffectiveTrafficSource(currentItem);
+        if (source === "LOCAL") {
+          trafficTelemetryRef.current.recordLocalPlaybackComplete({
+            playbackExecutionId:currentPlaybackExecutionId,
+            itemId:getTrafficMediaIdentity(currentItem),
+            source,
+            bytes:getMeasuredLocalMediaBytes(currentItem),
+          });
+        } else {
+          closeTrafficPlayback(currentItem, currentPlaybackExecutionId);
+        }
+      }
       goToNextMedia(currentItem?.playerItemType === "template" ? "TEMPLATE_TIMER" : currentItem?.type === "Imagem" ? "IMAGE_TIMER" : "VIDEO_TIMER");
     }, remaining);
 
@@ -17532,6 +17607,7 @@ function PlayerPage() {
             captureVideoEvent("playing", event);
             if (isCurrent && isAndroidSmartTv) markCurrentMediaReady(item, index);
             if (isCurrent) {
+              observeTrafficPlaybackStart(item, executionId, "VIDEO", true);
               recordPlayback("PLAYBACK_START", source, diagnosticMedia);
               telemetryRef.current.record("PLAYBACK_START", telemetryMedia);
             }
@@ -17546,6 +17622,17 @@ function PlayerPage() {
           onEnded={(event) => {
             if (!isCurrent || pauseMode) return;
             captureVideoEvent("ended", event);
+            const trafficSource = getEffectiveTrafficSource(item);
+            if (trafficSource === "LOCAL") {
+              trafficTelemetryRef.current.recordLocalPlaybackComplete({
+                playbackExecutionId:executionId,
+                itemId:getTrafficMediaIdentity(item),
+                source:trafficSource,
+                bytes:getMeasuredLocalMediaBytes(item),
+              });
+            } else {
+              closeTrafficPlayback(item, executionId);
+            }
             telemetryRef.current.record("PLAYBACK_END", telemetryMedia);
             recordPlayback("PLAYBACK_END", source, diagnosticMedia);
             if (isSingleVideoPlaylist(playerItems)) {
@@ -17565,6 +17652,7 @@ function PlayerPage() {
             if (IS_PLAYER_DECODER_LIFECYCLE_BUILD && releasingVideoNodesRef.current.has(event.currentTarget)) return;
             if (!isCurrent) return;
             operationalPlayerErrorRef.current = true;
+            closeTrafficPlayback(item, executionId);
             captureVideoEvent("error", event, { message: "Erro ao carregar vídeo" });
             telemetryRef.current.record("PLAYBACK_ERROR", { ...telemetryMedia, message: "Erro ao carregar vídeo" });
             recordPlayback("PLAYBACK_ERROR", source, { ...diagnosticMedia, message: "Erro ao carregar vídeo" });
@@ -17602,6 +17690,7 @@ function PlayerPage() {
         onError={() => {
           if (!isCurrent) return;
           operationalPlayerErrorRef.current = true;
+          closeTrafficPlayback(item, executionId);
           telemetryRef.current.record("PLAYBACK_ERROR", { ...telemetryMedia, message: "Erro ao carregar imagem" });
           recordPlayback("PLAYBACK_ERROR", source, { ...diagnosticMedia, message: "Erro ao carregar imagem" });
           if (fallbackToRemoteMedia(item)) return;

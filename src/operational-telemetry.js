@@ -1,16 +1,17 @@
-export const OPERATIONAL_TELEMETRY_SCHEMA_VERSION = 3;
+export const OPERATIONAL_TELEMETRY_SCHEMA_VERSION = 4;
+export const OPERATIONAL_TELEMETRY_MINIMUM_SCHEMA_VERSION = 3;
 export const OPERATIONAL_HEARTBEAT_INTERVAL_MS = 15_000;
 export const OPERATIONAL_ONLINE_THRESHOLD_MS = 45_000;
 
 export function isOperationalHeartbeatFresh(telemetry, now = Date.now(), thresholdMs = OPERATIONAL_ONLINE_THRESHOLD_MS) {
-  if (Number(telemetry?.schemaVersion || 0) < OPERATIONAL_TELEMETRY_SCHEMA_VERSION) return false;
+  if (Number(telemetry?.schemaVersion || 0) < OPERATIONAL_TELEMETRY_MINIMUM_SCHEMA_VERSION) return false;
   const heartbeatAt = Date.parse(telemetry?.session?.lastHeartbeatAt || "");
   return Number.isFinite(heartbeatAt) && now - heartbeatAt >= 0 && now - heartbeatAt < thresholdMs;
 }
 
 export function getPortalCurrentMediaSource(screen = {}, now = Date.now()) {
   const telemetry = screen.telemetry;
-  if (Number(telemetry?.schemaVersion || 0) >= OPERATIONAL_TELEMETRY_SCHEMA_VERSION) {
+  if (Number(telemetry?.schemaVersion || 0) >= OPERATIONAL_TELEMETRY_MINIMUM_SCHEMA_VERSION) {
     if (!isOperationalHeartbeatFresh(telemetry, now)) return "";
     return screen.currentMediaSource || telemetry?.current?.currentMediaSource || "";
   }

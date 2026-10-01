@@ -51,6 +51,16 @@ test("Android app version comes from PackageManager instead of a version string"
   assert.doesNotMatch(source, /v26-template-layout-stability/);
 });
 
+test("Android network counters use TrafficStats for the calling UID without extra permissions", () => {
+  const plugin = fs.readFileSync(new URL("../android/app/src/main/java/br/com/parksolutions/totempark/TotemDevicePlugin.java", import.meta.url), "utf8");
+  const manifest = fs.readFileSync(new URL("../android/app/src/main/AndroidManifest.xml", import.meta.url), "utf8");
+  assert.match(plugin, /Process\.myUid\(\)/);
+  assert.match(plugin, /TrafficStats\.getUidRxBytes\(uid\)/);
+  assert.match(plugin, /TrafficStats\.getUidTxBytes\(uid\)/);
+  assert.match(plugin, /TrafficStats\.UNSUPPORTED/);
+  assert.doesNotMatch(manifest, /PACKAGE_USAGE_STATS/);
+});
+
 test("binding conflict protection remains in place", () => {
   const source = fs.readFileSync(new URL("../functions/index.js", import.meta.url), "utf8");
   assert.match(source, /isUidConflict = Boolean\(previousConnectedUid && previousConnectedUid !== uid\)/);
