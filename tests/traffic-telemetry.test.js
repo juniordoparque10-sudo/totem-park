@@ -39,20 +39,30 @@ test("D: unsupported TrafficStats is explicit and never reported as zero", () =>
 
 test("E-G: only a completed unique download is counted", () => {
   const telemetry = createTrafficTelemetry({ storage:memoryStorage() });
-  assert.equal(telemetry.recordDownloadComplete({ operationId:"download-1", bytes:4096 }), true);
-  assert.equal(telemetry.recordDownloadComplete({ operationId:"download-1", bytes:4096 }), false);
-  // Failed, partial and already-cached paths do not call recordDownloadComplete.
-  assert.equal(telemetry.snapshot().mediaDownloadedBytes, 4096);
+  const playlistMedia = { classification:"playlistMedia", status:"complete" };
+  assert.equal(telemetry.recordDownloadComplete({ operationId:"studio-fire", bytes:11_366_669, ...playlistMedia }), true);
+  assert.equal(telemetry.recordDownloadComplete({ operationId:"studio-fire", bytes:11_366_669, ...playlistMedia }), false, "duplicate completion is ignored");
+  assert.equal(telemetry.recordDownloadComplete({ operationId:"client-logo", bytes:277_173, classification:"clientAsset", status:"complete" }), false);
+  assert.equal(telemetry.recordDownloadComplete({ operationId:"auxiliary", bytes:90_000, classification:"auxiliary", status:"complete" }), false);
+  assert.equal(telemetry.recordDownloadComplete({ operationId:"cache-hit", bytes:11_366_669, classification:"playlistMedia", status:"cacheHit" }), false);
+  assert.equal(telemetry.recordDownloadComplete({ operationId:"partial", bytes:500_000, classification:"playlistMedia", status:"failed" }), false);
+  assert.equal(telemetry.snapshot().mediaDownloadedBytes, 11_366_669);
+  telemetry.recordNetworkStats({ supported:true, uidRxBytes:1_000_000, uidTxBytes:100 });
+  telemetry.recordNetworkStats({ supported:true, uidRxBytes:1_277_173, uidTxBytes:150 });
+  assert.equal(telemetry.snapshot().appInternetReceivedBytes, 277_173, "TrafficStats still includes general app traffic");
+  assert.equal(telemetry.snapshot().mediaDownloadedBytes, 11_366_669, "general traffic does not become a media download");
 });
 
-test("G2: V28 traffic storage is isolated without touching binding or media cache", () => {
+test("G2: V29 traffic storage is isolated without touching binding or media cache", () => {
   const storage = memoryStorage();
-  const legacyKey = "totempark-player-traffic-v1";
-  const pollutedV28 = JSON.stringify({
+  const v1Key = "totempark-player-traffic-v1";
+  const v2Key = "totempark-player-traffic-v2";
+  const pollutedV1 = JSON.stringify({ version:1, daily:{ mediaDownloadedBytes:11_366_669 } });
+  const pollutedV29 = JSON.stringify({
     version:1,
     daily:{
       dateKey:"2026-10-01",
-      mediaDownloadedBytes:11_366_669,
+      mediaDownloadedBytes:277_173,
       localMediaReusedBytes:261_409_997,
       cachePlaybackHits:23,
       remotePlaybackCount:4,
@@ -61,20 +71,22 @@ test("G2: V28 traffic storage is isolated without touching binding or media cach
   });
   const binding = JSON.stringify({ clientId:"client-1", screenId:"screen-1" });
   const mediaCache = JSON.stringify({ "studio-fire":{ sizeBytes:11_366_669 } });
-  storage.setItem(legacyKey, pollutedV28);
+  storage.setItem(v1Key, pollutedV1);
+  storage.setItem(v2Key, pollutedV29);
   storage.setItem("totempark-tv-connection", binding);
   storage.setItem("totempark-player-media-cache-meta", mediaCache);
 
   const telemetry = createTrafficTelemetry({ storage, now:() => Date.parse("2026-10-01T15:00:00.000Z") });
   const snapshot = telemetry.snapshot();
-  assert.equal(TRAFFIC_TELEMETRY_STORAGE_KEY, "totempark-player-traffic-v2");
+  assert.equal(TRAFFIC_TELEMETRY_STORAGE_KEY, "totempark-player-traffic-v3");
   assert.equal(snapshot.measurementStartedAt, "2026-10-01T15:00:00.000Z");
   assert.equal(snapshot.mediaDownloadedBytes, 0);
   assert.equal(snapshot.localMediaReusedBytes, 0);
   assert.equal(snapshot.cachePlaybackHits, 0);
   assert.equal(snapshot.remotePlaybackCount, 0);
   assert.equal(snapshot.fallbackPlaybackCount, 0);
-  assert.equal(storage.getItem(legacyKey), pollutedV28);
+  assert.equal(storage.getItem(v1Key), pollutedV1);
+  assert.equal(storage.getItem(v2Key), pollutedV29);
   assert.equal(storage.getItem("totempark-tv-connection"), binding);
   assert.equal(storage.getItem("totempark-player-media-cache-meta"), mediaCache);
 

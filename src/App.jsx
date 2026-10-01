@@ -15901,6 +15901,22 @@ function PlayerPage() {
     hasActivePlaylistItems ? [] : screenTemplates,
     playlistsForOffline,
   ]);
+  const offlinePlaylistMediaItems = [
+    ...playerItems,
+    ...(defaultPlaylist?.items || []),
+    ...playlistsForOffline.flatMap((playlist) => playlist?.items || []),
+  ].filter(isCacheableMediaItem);
+  const offlinePlaylistMediaByUrl = Object.fromEntries(offlinePlaylistMediaItems.map((item) => {
+    const remoteUrl = item.remotePreview || item.preview || item.imageUrl || "";
+    return [remoteUrl, {
+      mediaId:item.mediaId || item.id || "",
+      mediaName:item.title || item.name || item.fileName || "",
+      fileName:item.fileName || "",
+      sizeBytes:Number(item.sizeBytes || 0),
+      playlistId:activePlaylist?.id || "",
+      screenId:screen?.id || "",
+    }];
+  }).filter(([url]) => /^https?:\/\//i.test(url)));
   const offlineAssetsKey = offlineAssetUrls.join("|");
 
   useEffect(() => {
@@ -15949,10 +15965,7 @@ function PlayerPage() {
         offlineStorageKey,
         {
           purgeUnused: true,
-          mediaByUrl: Object.fromEntries(playerItems.map((item) => {
-            const remoteUrl = item.remotePreview || item.preview || item.imageUrl || "";
-            return [remoteUrl, { mediaId: item.mediaId || item.id || "", mediaName: item.title || item.name || item.fileName || "", fileName: item.fileName || "", sizeBytes: Number(item.sizeBytes || 0), playlistId: activePlaylist?.id || "", screenId: screen?.id || "" }];
-          }).filter(([url]) => /^https?:\/\//i.test(url))),
+          mediaByUrl: offlinePlaylistMediaByUrl,
           onProgress: reportNativeOfflineProgress,
           onDownloadComplete: (download) => trafficTelemetryRef.current.recordDownloadComplete(download),
         }

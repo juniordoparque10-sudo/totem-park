@@ -1,5 +1,5 @@
 export const TRAFFIC_TELEMETRY_SCHEMA_VERSION = 4;
-export const TRAFFIC_TELEMETRY_STORAGE_KEY = "totempark-player-traffic-v2";
+export const TRAFFIC_TELEMETRY_STORAGE_KEY = "totempark-player-traffic-v3";
 
 const MAX_DEDUP_ENTRIES = 256;
 const COUNTER_KEYS = [
@@ -172,9 +172,15 @@ export function createTrafficTelemetry({ storage = globalThis.localStorage, now 
       daily.lastNativeTx = tx;
       persist();
     },
-    recordDownloadComplete({ operationId, bytes } = {}) {
+    recordDownloadComplete({ operationId, bytes, classification, status } = {}) {
       const value = number(bytes);
-      if (!operationId || value <= 0 || !markOnce(`download:${operationId}`)) return false;
+      if (
+        classification !== "playlistMedia" ||
+        status !== "complete" ||
+        !operationId ||
+        value <= 0 ||
+        !markOnce(`download:${operationId}`)
+      ) return false;
       increment("mediaDownloadedBytes", value);
       persist();
       return true;

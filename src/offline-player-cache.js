@@ -563,7 +563,8 @@ export async function cacheOfflineAssets(urls, scope, storageKey, options = {}) 
 
   for (const url of uniqueUrls) {
     const path = getAssetPath(scope, url);
-    const diagnostic = { ...(options.mediaByUrl?.[url] || {}), remoteUrl: url, localPath: path };
+    const playlistMedia = options.mediaByUrl?.[url] || null;
+    const diagnostic = { ...(playlistMedia || {}), remoteUrl: url, localPath: path };
     recordMediaResolve(diagnostic);
 
     try {
@@ -585,11 +586,15 @@ export async function cacheOfflineAssets(urls, scope, storageKey, options = {}) 
         downloaded += 1;
         const transferredBytes = Number(fileInfo.transferredBytes || 0);
         downloadedBytes += transferredBytes;
-        options.onDownloadComplete?.({
-          operationId: fileInfo.downloadOperationId,
-          bytes: transferredBytes,
-          remoteUrl: url,
-        });
+        if (playlistMedia) {
+          options.onDownloadComplete?.({
+            operationId: fileInfo.downloadOperationId,
+            bytes: transferredBytes,
+            remoteUrl: url,
+            classification: "playlistMedia",
+            status: "complete",
+          });
+        }
       }
 
       rawMap[url] = fileInfo.uri;
