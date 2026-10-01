@@ -5,6 +5,7 @@ import {
   createTrafficTelemetry,
   isTrafficInstrumented,
   TRAFFIC_TELEMETRY_SCHEMA_VERSION,
+  TRAFFIC_TELEMETRY_STORAGE_KEY,
 } from "../src/traffic-telemetry.js";
 import { formatBytes } from "../src/format-bytes.js";
 
@@ -44,6 +45,45 @@ test("E-G: only a completed unique download is counted", () => {
   assert.equal(telemetry.snapshot().mediaDownloadedBytes, 4096);
 });
 
+test("G2: V28 traffic storage is isolated without touching binding or media cache", () => {
+  const storage = memoryStorage();
+  const legacyKey = "totempark-player-traffic-v1";
+  const pollutedV28 = JSON.stringify({
+    version:1,
+    daily:{
+      dateKey:"2026-10-01",
+      mediaDownloadedBytes:11_366_669,
+      localMediaReusedBytes:261_409_997,
+      cachePlaybackHits:23,
+      remotePlaybackCount:4,
+      fallbackPlaybackCount:2,
+    },
+  });
+  const binding = JSON.stringify({ clientId:"client-1", screenId:"screen-1" });
+  const mediaCache = JSON.stringify({ "studio-fire":{ sizeBytes:11_366_669 } });
+  storage.setItem(legacyKey, pollutedV28);
+  storage.setItem("totempark-tv-connection", binding);
+  storage.setItem("totempark-player-media-cache-meta", mediaCache);
+
+  const telemetry = createTrafficTelemetry({ storage, now:() => Date.parse("2026-10-01T15:00:00.000Z") });
+  const snapshot = telemetry.snapshot();
+  assert.equal(TRAFFIC_TELEMETRY_STORAGE_KEY, "totempark-player-traffic-v2");
+  assert.equal(snapshot.measurementStartedAt, "2026-10-01T15:00:00.000Z");
+  assert.equal(snapshot.mediaDownloadedBytes, 0);
+  assert.equal(snapshot.localMediaReusedBytes, 0);
+  assert.equal(snapshot.cachePlaybackHits, 0);
+  assert.equal(snapshot.remotePlaybackCount, 0);
+  assert.equal(snapshot.fallbackPlaybackCount, 0);
+  assert.equal(storage.getItem(legacyKey), pollutedV28);
+  assert.equal(storage.getItem("totempark-tv-connection"), binding);
+  assert.equal(storage.getItem("totempark-player-media-cache-meta"), mediaCache);
+
+  telemetry.recordNetworkStats({ supported:true, uidRxBytes:900_000, uidTxBytes:20_000 });
+  assert.equal(telemetry.snapshot().appInternetReceivedBytes, 0, "first V29 TrafficStats sample is a fresh baseline");
+  telemetry.recordNetworkStats({ supported:true, uidRxBytes:901_500, uidTxBytes:20_100 });
+  assert.equal(telemetry.snapshot().appInternetReceivedBytes, 1_500);
+});
+
 test("H-L: local completion counts bytes once while interruption and preload do not", () => {
   const telemetry = createTrafficTelemetry({ storage:memoryStorage() });
   const video = { playbackExecutionId:1, itemId:"video", source:"LOCAL", mediaType:"VIDEO" };
@@ -69,6 +109,30 @@ test("M-N: single-item video and image loops receive distinct telemetry occurren
   }
   assert.equal(telemetry.snapshot().cachePlaybackHits, 4);
   assert.equal(telemetry.snapshot().localMediaReusedBytes, 400);
+});
+
+test("M2: repeated events, stale layers and remounts cannot close or multiply a physical cycle", () => {
+  const telemetry = createTrafficTelemetry({ storage:memoryStorage() });
+  const bytes = 11_366_669;
+  const video = { playbackExecutionId:28, itemId:"single-video", source:"LOCAL", mediaType:"VIDEO" };
+
+  const first = telemetry.observePlaybackStart(video);
+  assert.equal(telemetry.observePlaybackStart(video), first, "repeated playing/render/remount reuses the open occurrence");
+  assert.equal(telemetry.observePlaybackStart({ ...video, isCurrent:false }), null, "previous/hidden layer cannot start");
+  assert.equal(telemetry.snapshot().cachePlaybackHits, 1);
+
+  assert.equal(telemetry.recordLocalPlaybackComplete({ ...video, bytes, occurrenceId:first }), true);
+  assert.equal(telemetry.recordLocalPlaybackComplete({ ...video, bytes, occurrenceId:first }), false, "repeated ended is ignored");
+
+  const second = telemetry.observePlaybackStart(video);
+  assert.notEqual(second, first, "the next physical loop receives a new immutable occurrence");
+  assert.equal(telemetry.recordLocalPlaybackComplete({ ...video, bytes, occurrenceId:first }), false, "stale ended cannot close the new loop");
+  assert.equal(telemetry.recordLocalPlaybackComplete({ ...video, bytes }), false, "ended without its immutable occurrence is ignored");
+  assert.equal(telemetry.observePlaybackStart(video), second, "the new loop remains open after stale ended");
+  assert.equal(telemetry.recordLocalPlaybackComplete({ ...video, bytes, occurrenceId:second }), true);
+
+  assert.equal(telemetry.snapshot().cachePlaybackHits, 2);
+  assert.equal(telemetry.snapshot().localMediaReusedBytes, bytes * 2);
 });
 
 test("O-S: remote, fallback, templates and cache hit rate follow the contract", () => {

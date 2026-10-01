@@ -68,8 +68,8 @@ android {
         }
         playerRc {
             dimension "appMode"
-            versionCode 28
-            versionName "1.0.0-v28-traffic-telemetry-rc"
+            versionCode 29
+            versionName "1.0.0-v29-traffic-occurrence-fix-rc"
             manifestPlaceholders = [
                 appLabel: "Totem Park Player",
                 tvLauncherEnabled: "true"

@@ -1,5 +1,5 @@
 export const TRAFFIC_TELEMETRY_SCHEMA_VERSION = 4;
-export const TRAFFIC_TELEMETRY_STORAGE_KEY = "totempark-player-traffic-v1";
+export const TRAFFIC_TELEMETRY_STORAGE_KEY = "totempark-player-traffic-v2";
 
 const MAX_DEDUP_ENTRIES = 256;
 const COUNTER_KEYS = [
@@ -129,9 +129,10 @@ export function createTrafficTelemetry({ storage = globalThis.localStorage, now 
     return occurrenceId;
   }
 
-  function closeOccurrence({ playbackExecutionId, itemId, source } = {}) {
+  function closeOccurrence({ playbackExecutionId, itemId, source, occurrenceId:expectedOccurrenceId } = {}) {
     const base = occurrenceBase({ playbackExecutionId, itemId, source });
     const occurrenceId = session.activeOccurrences[base] || null;
+    if (expectedOccurrenceId && occurrenceId !== expectedOccurrenceId) return null;
     delete session.activeOccurrences[base];
     return occurrenceId;
   }
@@ -180,10 +181,10 @@ export function createTrafficTelemetry({ storage = globalThis.localStorage, now 
     },
     observePlaybackStart,
     recordLocalPlaybackComplete({ playbackExecutionId, itemId, source = "LOCAL", bytes, occurrenceId } = {}) {
-      const closedId = closeOccurrence({ playbackExecutionId, itemId, source });
-      const activeId = occurrenceId || closedId;
       const value = number(bytes);
-      if (!activeId || source !== "LOCAL" || value <= 0 || !markOnce(`reuse:${activeId}`)) return false;
+      if (!occurrenceId || source !== "LOCAL" || value <= 0) return false;
+      const closedId = closeOccurrence({ playbackExecutionId, itemId, source, occurrenceId });
+      if (closedId !== occurrenceId || !markOnce(`reuse:${occurrenceId}`)) return false;
       increment("localMediaReusedBytes", value);
       persist();
       return true;
