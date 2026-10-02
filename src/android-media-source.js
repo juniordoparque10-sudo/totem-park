@@ -14,8 +14,19 @@ export function isAndroidLocalMediaSource(value = "") {
 }
 
 export function isRemoteMediaSource(value = "") {
-  return /^https?:\/\//i.test(String(value || "").trim())
-    && !isAndroidLocalMediaSource(value);
+  return isRemoteDownloadSource(value);
+}
+
+export function isRemoteDownloadSource(value = "") {
+  const source = String(value || "").trim();
+  if (!/^https?:\/\//i.test(source) || isAndroidLocalMediaSource(source)) return false;
+  try {
+    const parsed = new URL(source);
+    if (/^(localhost|127\.0\.0\.1|\[::1\])$/i.test(parsed.hostname)) return false;
+  } catch {
+    return false;
+  }
+  return true;
 }
 
 export function resolveAndroidMediaSource(media = {}, options = {}) {

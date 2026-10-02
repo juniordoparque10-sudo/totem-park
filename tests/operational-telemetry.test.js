@@ -25,6 +25,16 @@ test("cache status never invents current media source", () => {
   assert.equal(snapshot.currentMediaSource, "REMOTE");
 });
 
+test("prefetch de mídia mantém o player tocando enquanto o cache prepara o próximo item", () => {
+  const snapshot = buildOperationalSnapshot({
+    playerState:"playing",
+    currentItem:{ id:"A", type:"Vídeo", currentMediaSource:"local" },
+    cache:{ cacheStatus:"preparando", cachedItems:2, totalCacheableItems:3 },
+  });
+  assert.equal(snapshot.playerState, "playing");
+  assert.equal(snapshot.cache.cacheStatus, "preparando");
+});
+
 test("a real local failure is reported as FALLBACK at the telemetry boundary", () => {
   const snapshot = buildOperationalSnapshot({ currentItem:{ id:"A", type:"Vídeo", currentMediaSource:"fallback" } });
   assert.equal(snapshot.currentMediaSource, "FALLBACK");

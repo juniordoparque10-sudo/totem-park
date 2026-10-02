@@ -93,8 +93,8 @@ export function createPlayerTelemetry({ identity = {}, storage, now = () => Date
     },
     increment: () => {}, setOperatingMode: () => {},
     setConnection(networkStatus) { if (!enabled) return; state.current.networkStatus = networkStatus === "OFFLINE" ? "OFFLINE" : "ONLINE"; persist(); },
-    startTransition() { if (!enabled) return ""; state.player.state = state.current.playerState = "loading"; persist(); return uid(); },
-    completeTransition(transitionId) { if (!enabled || !transitionId) return; state.player.state = state.current.playerState = "playing"; persist(); },
+    startTransition(details = {}) { if (!enabled) return ""; state.player.state = state.current.playerState = details.keepPlaying ? "playing" : "loading"; persist(); return uid(); },
+    completeTransition() { if (!enabled) return; state.player.state = state.current.playerState = "playing"; persist(); },
     heartbeat() {
       if (!enabled) return null;
       const nowMs = now();

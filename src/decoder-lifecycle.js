@@ -1,7 +1,7 @@
-export function isVideoToVideoTransition(items = [], currentIndex = 0) {
+export function isVideoToVideoTransition(items = [], currentIndex = 0, targetIndex) {
   if (items.length < 2) return false;
   const safeIndex = currentIndex >= 0 && currentIndex < items.length ? currentIndex : 0;
-  const nextIndex = (safeIndex + 1) % items.length;
+  const nextIndex = targetIndex >= 0 && targetIndex < items.length ? targetIndex : (safeIndex + 1) % items.length;
   return items[safeIndex]?.type === "Vídeo" && items[nextIndex]?.type === "Vídeo";
 }
 

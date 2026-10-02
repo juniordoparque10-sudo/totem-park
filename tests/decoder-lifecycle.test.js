@@ -10,6 +10,7 @@ test("isolates the experiment to transitions between distinct video items", () =
   assert.equal(isVideoToVideoTransition([video, video], 1), true);
   assert.equal(isVideoToVideoTransition([image, video], 0), false);
   assert.equal(isVideoToVideoTransition([video, image], 0), false);
+  assert.equal(isVideoToVideoTransition([video, image, video], 0, 2), true);
 });
 
 test("releases the prior video source before the next video can mount", () => {

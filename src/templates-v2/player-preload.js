@@ -1,5 +1,22 @@
 const decodedImagePromises = new Map();
 
+export function markTemplateV2BackgroundForOnlineRetry(retryKeys, key, online = globalThis.navigator?.onLine !== false) {
+  if (!retryKeys || !key || online) return false;
+  retryKeys.add(key);
+  return true;
+}
+
+export function takeTemplateV2BackgroundOnlineRetries(retryKeys) {
+  if (!retryKeys?.size) return [];
+  const keys = [...retryKeys];
+  retryKeys.clear();
+  return keys;
+}
+
+export function clearTemplateV2BackgroundOnlineRetry(retryKeys, key) {
+  retryKeys?.delete?.(key);
+}
+
 export function getTemplateV2ImageAssetUrl(asset) {
   if (!asset) return "";
   return String(asset.url || asset.preview || asset.publicUrl || "").trim();

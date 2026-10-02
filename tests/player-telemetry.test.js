@@ -68,3 +68,19 @@ test("history outbox remains bounded and acknowledged independently from heartbe
   telemetry.acknowledge(1);
   assert.equal(telemetry.getReport().outbox.length, 0);
 });
+
+test("READY finaliza loading mesmo sem token de transição", () => {
+  const telemetry = createPlayerTelemetry({ identity:{ clientId:"C", screenId:"A", deviceId:"D" }, storage:memoryStorage() });
+  telemetry.configure({ enabled:true, clientIds:["C"] });
+  telemetry.startTransition();
+  telemetry.completeTransition("");
+  assert.equal(telemetry.getReport().player.state, "playing");
+  assert.equal(telemetry.getReport().current.playerState, "playing");
+});
+
+test("prefetch mantém playing enquanto uma camada READY continua visível", () => {
+  const telemetry = createPlayerTelemetry({ identity:{ screenId:"screen-1" }, storage:memoryStorage(), now:() => 1_000 });
+  telemetry.configure({ enabled:true, screenIds:["screen-1"] });
+  telemetry.startTransition({ keepPlaying:true });
+  assert.equal(telemetry.getReport().current.playerState, "playing");
+});

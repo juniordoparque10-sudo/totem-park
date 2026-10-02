@@ -7,7 +7,7 @@ import {
   recordLabEvent,
   recordMediaResolve,
   startFileTransfer,
-} from "./android-diagnostics";
+} from "./android-diagnostics.js";
 import {
   ANDROID_DOWNLOAD_POLICY,
   createProgressReporter,
@@ -15,7 +15,12 @@ import {
   runSingleFlightDownload,
   shouldRetryDownload,
   validateDownloadedFile,
-} from "./android-download-policy";
+} from "./android-download-policy.js";
+import { getPlaylistMediaCanonicalIdentity, getPlaylistMediaContentVersion } from "./media-download-readiness.js";
+import { buildNativeIdentityRecord, classifyLegacyIdentityRecord, getNativeIdentityCacheStorageKey, getNativeIdentityDownloadKey, resolveNativeIdentityRecord } from "./native-cache-identity.js";
+import { isRemoteDownloadSource } from "./android-media-source.js";
+import { getNativeCacheJournalEntry, updateNativeCacheJournal } from "./native-cache-journal.js";
+import { promoteNativeCachePartial } from "./native-cache-transaction.js";
 
 const MEDIA_CACHE_NAME = "totempark-player-media-v1";
 const MEDIA_CACHE_META_KEY = "totempark-player-media-cache-meta";
@@ -31,6 +36,7 @@ function hashUrl(value) {
 
   return (hash >>> 0).toString(16);
 }
+
 
 function safeJsonParse(value, fallback) {
   try {
@@ -63,27 +69,11 @@ function getMediaRemoteUrl(item = {}) {
 }
 
 function getMediaStableId(item = {}, remoteUrl = "") {
-  return (
-    item.mediaId ||
-    item.sourceMediaId ||
-    item.id ||
-    item.storagePath ||
-    item.fileName ||
-    hashUrl(remoteUrl)
-  );
+  return getPlaylistMediaCanonicalIdentity(item) || hashUrl(remoteUrl);
 }
 
 function getMediaFileVersion(item = {}) {
-  return (
-    item.fileHash ||
-    item.contentHash ||
-    item.md5Hash ||
-    item.etag ||
-    item.mediaVersion ||
-    item.fileVersion ||
-    item.uploadVersion ||
-    ""
-  );
+  return getPlaylistMediaContentVersion(item);
 }
 
 export function buildMediaCacheManifest(clientId, items = []) {
@@ -147,20 +137,12 @@ export function isCacheableMediaItem(item = {}) {
 export function getMediaCacheKey(clientId, item = {}) {
   const url = getMediaRemoteUrl(item);
   const fileVersion = getMediaFileVersion(item);
-  const hasStableFileIdentity = Boolean(
-    item.storagePath ||
-    item.fileName ||
-    item.sizeBytes ||
-    fileVersion ||
-    url
-  );
   const versionParts = [
     clientId || "client",
     getMediaStableId(item, url),
     item.storagePath || "",
-    fileVersion || (hasStableFileIdentity ? "" : getTimestampVersion(item.updatedAt)),
+    fileVersion,
     item.sizeBytes || "",
-    url,
   ];
 
   return hashUrl(versionParts.join("|"));
@@ -443,8 +425,12 @@ function getFileExtension(url) {
   }
 }
 
-function getAssetPath(scope, url) {
+export function getAssetPath(scope, url) {
   return `totem-park/offline/${scope}/${hashUrl(url)}.${getFileExtension(url)}`;
+}
+
+export function getIdentityAssetPath(scope, cacheIdentity, contentVersion, url) {
+  return `totem-park/offline/${scope}/${hashUrl(getNativeIdentityDownloadKey(cacheIdentity,contentVersion))}.${getFileExtension(url)}`;
 }
 
 const sleep = (ms) => new Promise((resolve) => setTimeout(resolve, ms));
@@ -453,8 +439,17 @@ async function statOfflineFile(path) {
   return Filesystem.stat({ path, directory: Directory.Data }).catch(() => null);
 }
 
-async function downloadOfflineFile({ url, path, destinationUri, diagnostic, policy }) {
-  return runSingleFlightDownload(`${path}|${url}`, async () => {
+function createCacheOperationId() {
+  return `${Date.now().toString(36)}-${Math.random().toString(36).slice(2,10)}`;
+}
+
+export function getPartialAssetPath(finalPath, operationId) {
+  return `${finalPath.replace(/\.[^/.]+$/,"")}.${operationId}.partial`;
+}
+
+async function downloadOfflineFile({ url, tempPath, destinationUri, diagnostic, policy, downloadKey = `${tempPath}|${url}`, onTransferStart, onDownloaded, onValidated }) {
+  if (!isRemoteDownloadSource(url)) throw new Error("LOCAL_SOURCE_NOT_DOWNLOADABLE");
+  return runSingleFlightDownload(downloadKey, async () => {
     let attempt = 0;
 
     while (attempt <= policy.maxRetriesWithoutProgress) {
@@ -474,6 +469,7 @@ async function downloadOfflineFile({ url, path, destinationUri, diagnostic, poli
       });
 
       try {
+        onTransferStart?.({ downloadId, attempt });
         await FileTransfer.downloadFile({
           url,
           path: destinationUri,
@@ -481,11 +477,13 @@ async function downloadOfflineFile({ url, path, destinationUri, diagnostic, poli
           connectTimeout: policy.connectTimeoutMs,
           readTimeout: policy.inactivityTimeoutMs,
         });
-        const fileInfo = await statOfflineFile(path);
+        await onDownloaded?.({ downloadId, attempt, transferredBytes });
+        const fileInfo = await statOfflineFile(tempPath);
         const validation = validateDownloadedFile(fileInfo?.size, diagnostic.sizeBytes);
         if (!validation.valid) {
           throw new Error(`Arquivo baixado inválido: ${validation.reason} (${validation.actual}/${validation.expected})`);
         }
+        await onValidated?.({ downloadId, attempt, transferredBytes, fileInfo, validation });
         finishFileTransfer(downloadId, "complete", {
           ...diagnostic,
           localPath: fileInfo.uri,
@@ -495,7 +493,7 @@ async function downloadOfflineFile({ url, path, destinationUri, diagnostic, poli
         });
         return { ...fileInfo, transferredBytes, downloadOperationId: downloadId };
       } catch (downloadError) {
-        const partial = await statOfflineFile(path);
+        const partial = await statOfflineFile(tempPath);
         const partialSize = Number(partial?.size || 0);
         const timeout = isNativeTimeout(downloadError);
         recordLabEvent("FILETRANSFER_PARTIAL_FILE_SIZE", { ...diagnostic, downloadId, attempt, partialFileSize: partialSize });
@@ -522,37 +520,69 @@ async function downloadOfflineFile({ url, path, destinationUri, diagnostic, poli
   });
 }
 
+async function promoteValidatedPartial({ tempPath, finalPath, expectedSizeBytes = 0 }) {
+  const result = await promoteNativeCachePartial({
+    tempPath,
+    finalPath,
+    expectedSizeBytes,
+    statFile:statOfflineFile,
+    deleteFile:(path) => Filesystem.deleteFile({ path, directory:Directory.Data }).catch(() => {}),
+    renameFile:(from,to) => Filesystem.rename({ from, to, directory:Directory.Data, toDirectory:Directory.Data }),
+    validateFile:validateDownloadedFile,
+  });
+  return result.fileInfo;
+}
+
 export function restoreOfflineAssetMap(storageKey) {
   try {
     const stored = JSON.parse(localStorage.getItem(storageKey) || "{}");
-
-    return Object.fromEntries(
+    const restored = Object.fromEntries(
       Object.entries(stored).map(([remoteUrl, fileUri]) => [
         remoteUrl,
         Capacitor.convertFileSrc(fileUri),
       ])
     );
+    const identityRecords = JSON.parse(localStorage.getItem(getNativeIdentityCacheStorageKey(storageKey)) || "{}");
+    Object.values(identityRecords).forEach((record) => {
+      if (!record?.cacheIdentity || !record?.localUri) return;
+      const converted = Capacitor.convertFileSrc(record.localUri);
+      restored[`identity:${record.cacheIdentity}`] = converted;
+      [record.canonicalUrl,...(record.aliases || [])].filter(Boolean).forEach((alias) => { restored[alias] = converted; });
+    });
+    return restored;
   } catch {
     return {};
   }
 }
 
 export async function cacheOfflineAssets(urls, scope, storageKey, options = {}) {
-  const uniqueUrls = [...new Set(urls.filter((url) => /^https?:\/\//i.test(url || "")))];
-  const keepUrls = new Set(uniqueUrls);
+  const uniqueUrls = [...new Set(urls.filter(isRemoteDownloadSource))];
+  const mediaTotal = new Set(uniqueUrls
+    .filter((url) => Boolean(options.mediaByUrl?.[url]))
+    .map((url) => options.mediaByUrl[url].cacheIdentity || url)).size;
   const policy = { ...ANDROID_DOWNLOAD_POLICY, ...(options.downloadPolicy || {}) };
   let rawMap;
+  let identityRecords;
   let failed = 0;
   let downloaded = 0;
   let downloadedBytes = 0;
   let removed = 0;
   let completed = 0;
+  let mediaCompleted = 0;
+  let mediaFailed = 0;
+  let mediaDownloaded = 0;
+  let mediaDownloadedBytes = 0;
   const sizeByUrl = {};
 
   try {
     rawMap = JSON.parse(localStorage.getItem(storageKey) || "{}");
   } catch {
     rawMap = {};
+  }
+  try {
+    identityRecords = JSON.parse(localStorage.getItem(getNativeIdentityCacheStorageKey(storageKey)) || "{}");
+  } catch {
+    identityRecords = {};
   }
 
   await Filesystem.mkdir({
@@ -562,51 +592,206 @@ export async function cacheOfflineAssets(urls, scope, storageKey, options = {}) 
   }).catch(() => {});
 
   for (const url of uniqueUrls) {
-    const path = getAssetPath(scope, url);
     const playlistMedia = options.mediaByUrl?.[url] || null;
-    const diagnostic = { ...(playlistMedia || {}), remoteUrl: url, localPath: path };
+    const cacheIdentity = playlistMedia?.cacheIdentity || "";
+    const contentVersion = playlistMedia?.contentVersion || "";
+    const aliases = [...new Set([url,...(playlistMedia?.aliases || [])].filter(isRemoteDownloadSource))];
+    let path = cacheIdentity
+      ? getIdentityAssetPath(scope,cacheIdentity,contentVersion,url)
+      : getAssetPath(scope,url);
+    const diagnostic = { ...(playlistMedia || {}), cacheIdentity, contentVersion, remoteUrl:url, localPath:path };
+    let itemFailed = false;
+    let downloadedThisRun = false;
+    let journalRecoveredThisRun = false;
+    let partialPath = "";
+    const previousRawUri = rawMap[url];
+    const previousIdentityRecord = cacheIdentity ? identityRecords[cacheIdentity] : undefined;
+    const previousPersistedRawMap = localStorage.getItem(storageKey);
+    const identityStorageKey = getNativeIdentityCacheStorageKey(storageKey);
+    const previousPersistedIdentityRecords = localStorage.getItem(identityStorageKey);
     recordMediaResolve(diagnostic);
 
     try {
       let fileInfo;
+      let cacheHit = false;
 
-      try {
-        fileInfo = await Filesystem.stat({ path, directory: Directory.Data });
-        const validation = validateDownloadedFile(fileInfo.size, diagnostic.sizeBytes);
-        if (!validation.valid) throw new Error(`Cache local inválido: ${validation.reason}`);
-        recordCacheResult(true, { ...diagnostic, sizeBytes: validation.actual });
-      } catch {
-        recordCacheResult(false, diagnostic);
-        const destination = await Filesystem.getUri({
-          path,
-          directory: Directory.Data,
-        });
-
-        fileInfo = await downloadOfflineFile({ url, path, destinationUri: destination.uri, diagnostic, policy });
-        downloaded += 1;
-        const transferredBytes = Number(fileInfo.transferredBytes || 0);
-        downloadedBytes += transferredBytes;
-        if (playlistMedia) {
-          options.onDownloadComplete?.({
-            operationId: fileInfo.downloadOperationId,
-            bytes: transferredBytes,
-            remoteUrl: url,
-            classification: "playlistMedia",
-            status: "complete",
-          });
+      const identityRecord = cacheIdentity
+        ? resolveNativeIdentityRecord(identityRecords,cacheIdentity,contentVersion)
+        : null;
+      if (identityRecord?.localPath) {
+        const stat = await statOfflineFile(identityRecord.localPath);
+        const validation = validateDownloadedFile(stat?.size,diagnostic.sizeBytes);
+        if (validation.valid) {
+          path = identityRecord.localPath;
+          fileInfo = { ...stat, uri:identityRecord.localUri || stat.uri };
+          cacheHit = true;
+          identityRecords[cacheIdentity] = buildNativeIdentityRecord({ ...identityRecord, canonicalUrl:url, aliases:[...(identityRecord.aliases || []),...aliases], sizeBytes:validation.actual, validatedAt:Date.now() });
         }
       }
 
+      if (!cacheHit && cacheIdentity) {
+        const deterministicStat = await statOfflineFile(path);
+        const deterministicValidation = validateDownloadedFile(deterministicStat?.size,diagnostic.sizeBytes);
+        if (deterministicValidation.valid) {
+          fileInfo = { ...deterministicStat, size:deterministicValidation.actual };
+          cacheHit = true;
+          identityRecords[cacheIdentity] = buildNativeIdentityRecord({ cacheIdentity, contentVersion, canonicalUrl:url, aliases, localUri:deterministicStat.uri, localPath:path, sizeBytes:deterministicValidation.actual, validatedAt:Date.now() });
+          recordLabEvent("IDENTITY_CACHE_REINDEXED", { ...diagnostic, sizeBytes:deterministicValidation.actual });
+        }
+      }
+
+      if (!cacheHit && cacheIdentity) {
+        const journalEntry = getNativeCacheJournalEntry(storageKey,cacheIdentity,contentVersion);
+        if (journalEntry?.tempPath) {
+          const partialStat = await statOfflineFile(journalEntry.tempPath);
+          const partialValidation = validateDownloadedFile(partialStat?.size,diagnostic.sizeBytes);
+          if (partialValidation.valid) {
+            const promoted = await promoteValidatedPartial({ tempPath:journalEntry.tempPath, finalPath:path, expectedSizeBytes:diagnostic.sizeBytes });
+            fileInfo = promoted;
+            cacheHit = true;
+            journalRecoveredThisRun = true;
+            identityRecords[cacheIdentity] = buildNativeIdentityRecord({ cacheIdentity, contentVersion, canonicalUrl:url, aliases, localUri:promoted.uri, localPath:path, sizeBytes:promoted.size, validatedAt:Date.now() });
+            recordLabEvent("IDENTITY_CACHE_JOURNAL_RECOVERED", { ...diagnostic, operationId:journalEntry.operationId || "", sizeBytes:promoted.size });
+          } else if (partialStat) {
+            await Filesystem.deleteFile({ path:journalEntry.tempPath, directory:Directory.Data }).catch(() => {});
+          }
+        }
+      }
+
+      if (!cacheHit && cacheIdentity) {
+        const legacyResult = await classifyLegacyIdentityRecord({
+          rawMap, aliases, cacheIdentity, contentVersion, canonicalUrl:url, expectedSizeBytes:diagnostic.sizeBytes,
+          getLegacyPath:(alias) => getAssetPath(scope,alias),
+          statFile:statOfflineFile,
+          validateFile:validateDownloadedFile,
+        });
+        const migrated = legacyResult.record;
+        if (migrated) {
+          path = migrated.localPath;
+          fileInfo = { uri:migrated.localUri, size:migrated.sizeBytes };
+          cacheHit = true;
+          identityRecords[cacheIdentity] = migrated;
+        }
+        recordLabEvent("LEGACY_CACHE_CLASSIFIED", { ...diagnostic, legacyStatus:legacyResult.status, matchedAlias:legacyResult.alias || "" });
+      }
+
+      if (!cacheHit && !cacheIdentity) {
+        const stat = await statOfflineFile(path);
+        const validation = validateDownloadedFile(stat?.size,diagnostic.sizeBytes);
+        if (validation.valid) {
+          fileInfo = stat;
+          cacheHit = true;
+        }
+      }
+
+      if (!cacheHit) {
+        if (!isRemoteDownloadSource(url)) throw new Error("LOCAL_SOURCE_NOT_DOWNLOADABLE");
+        recordCacheResult(false, diagnostic);
+        const operationId = createCacheOperationId();
+        partialPath = getPartialAssetPath(path,operationId);
+        updateNativeCacheJournal(storageKey,{ cacheIdentity:cacheIdentity || url, contentVersion, remoteUrl:url, tempPath:partialPath, finalPath:path, operationId, state:"pending" });
+        const destination = await Filesystem.getUri({
+          path:partialPath,
+          directory: Directory.Data,
+        });
+
+        const onTransferStart = ({ downloadId, attempt }) => {
+          updateNativeCacheJournal(storageKey,{ cacheIdentity:cacheIdentity || url, contentVersion, remoteUrl:url, tempPath:partialPath, finalPath:path, operationId, downloadId, attempt, state:"downloading" });
+          options.onDownloadStart?.({
+            url,
+            cacheIdentity,
+            downloadId,
+            attempt,
+            playlistMedia:Boolean(playlistMedia),
+            mediaCompleted,
+            mediaTotal,
+            mediaFailed,
+            mediaDownloaded,
+            mediaDownloadedBytes,
+          });
+        };
+
+        const onDownloaded = ({ downloadId, attempt, transferredBytes }) => updateNativeCacheJournal(storageKey,{ cacheIdentity:cacheIdentity || url, contentVersion, remoteUrl:url, tempPath:partialPath, finalPath:path, operationId, downloadId, attempt, transferredBytes, state:"downloaded" });
+        const onValidated = ({ downloadId, attempt, transferredBytes, validation }) => updateNativeCacheJournal(storageKey,{ cacheIdentity:cacheIdentity || url, contentVersion, remoteUrl:url, tempPath:partialPath, finalPath:path, operationId, downloadId, attempt, transferredBytes, sizeBytes:validation.actual, state:"validated" });
+
+        if (cacheIdentity) {
+          fileInfo = await downloadOfflineFile({ url, tempPath:partialPath, destinationUri: destination.uri, diagnostic, policy, downloadKey:getNativeIdentityDownloadKey(cacheIdentity,contentVersion), onTransferStart, onDownloaded, onValidated });
+        } else {
+          fileInfo = await downloadOfflineFile({ url, tempPath:partialPath, destinationUri: destination.uri, diagnostic, policy, onTransferStart, onDownloaded, onValidated });
+        }
+        const transferredBytes = Number(fileInfo.transferredBytes || 0);
+        const downloadOperationId = fileInfo.downloadOperationId;
+        fileInfo = { ...(await promoteValidatedPartial({ tempPath:partialPath, finalPath:path, expectedSizeBytes:diagnostic.sizeBytes })), transferredBytes, downloadOperationId };
+        downloadedThisRun = true;
+      }
+
       rawMap[url] = fileInfo.uri;
+      if (cacheIdentity) {
+        const existing = identityRecords[cacheIdentity] || {};
+        identityRecords[cacheIdentity] = buildNativeIdentityRecord({
+          ...existing,
+          cacheIdentity,
+          contentVersion,
+          canonicalUrl:url,
+          aliases:[...(existing.aliases || []),...aliases],
+          localUri:fileInfo.uri,
+          localPath:path,
+          sizeBytes:Number(fileInfo.size || 0),
+          validatedAt:Date.now(),
+        });
+      }
+      localStorage.setItem(storageKey, JSON.stringify(rawMap));
+      localStorage.setItem(identityStorageKey, JSON.stringify(identityRecords));
+      if (downloadedThisRun || journalRecoveredThisRun) {
+        const journalEntry = getNativeCacheJournalEntry(storageKey,cacheIdentity || url,contentVersion);
+        updateNativeCacheJournal(storageKey,{ ...(journalEntry || {}), cacheIdentity:cacheIdentity || url, contentVersion, remoteUrl:url, tempPath:partialPath, finalPath:path, operationId:journalEntry?.operationId || "", state:"committed" });
+      }
+
+      if (cacheHit) recordCacheResult(true, { ...diagnostic, localPath:path, sizeBytes:Number(fileInfo.size || 0) });
+
+      if (downloadedThisRun) {
+        downloaded += 1;
+        if (playlistMedia) mediaDownloaded += 1;
+        const transferredBytes = Number(fileInfo.transferredBytes || 0);
+        downloadedBytes += transferredBytes;
+        if (playlistMedia) mediaDownloadedBytes += transferredBytes;
+        if (playlistMedia) {
+          options.onDownloadComplete?.({
+            operationId:fileInfo.downloadOperationId,
+            bytes:transferredBytes,
+            remoteUrl:url,
+            classification:"playlistMedia",
+            status:"complete",
+          });
+        }
+      }
       sizeByUrl[url] = Number(fileInfo.size || 0);
     } catch (error) {
-      await Filesystem.deleteFile({ path, directory: Directory.Data }).catch(() => {});
-      delete rawMap[url];
+      if (partialPath) await Filesystem.deleteFile({ path:partialPath, directory:Directory.Data }).catch(() => {});
+      if (previousRawUri === undefined) delete rawMap[url];
+      else rawMap[url] = previousRawUri;
+      if (cacheIdentity) {
+        if (previousIdentityRecord === undefined) delete identityRecords[cacheIdentity];
+        else identityRecords[cacheIdentity] = previousIdentityRecord;
+      }
+      try {
+        if (previousPersistedRawMap === null) localStorage.removeItem(storageKey);
+        else localStorage.setItem(storageKey,previousPersistedRawMap);
+        if (previousPersistedIdentityRecords === null) localStorage.removeItem(identityStorageKey);
+        else localStorage.setItem(identityStorageKey,previousPersistedIdentityRecords);
+      } catch {
+        // A próxima execução volta a validar arquivo e registros antes de usá-los.
+      }
       failed += 1;
+      itemFailed = true;
       console.log("Falha ao baixar midia para uso offline:", url, error);
       recordLabEvent("CACHE_ERROR", { ...diagnostic, message: error?.message || "Falha no cache" });
     } finally {
       completed += 1;
+      if (playlistMedia) {
+        mediaCompleted += 1;
+        if (itemFailed) mediaFailed += 1;
+      }
       options.onProgress?.({
         completed,
         total: uniqueUrls.length,
@@ -614,25 +799,32 @@ export async function cacheOfflineAssets(urls, scope, storageKey, options = {}) 
         downloaded,
         downloadedBytes,
         removed,
+        url,
+        cacheIdentity,
+        playlistMedia:Boolean(playlistMedia),
+        mediaCompleted,
+        mediaTotal,
+        mediaFailed,
+        mediaDownloaded,
+        mediaDownloadedBytes,
+        mediaDownloadActive:false,
       });
     }
   }
 
-  if (options.purgeUnused !== false) {
-    for (const cachedUrl of Object.keys(rawMap)) {
-      if (keepUrls.has(cachedUrl)) continue;
-
-      await Filesystem.deleteFile({
-        path: getAssetPath(scope, cachedUrl),
-        directory: Directory.Data,
-      }).catch(() => {});
-
-      delete rawMap[cachedUrl];
-      removed += 1;
-    }
-  }
+  // V39 keeps every unclassified legacy URL and file. Absence from the current
+  // aliases is not proof that a historical cache entry is invalid.
 
   localStorage.setItem(storageKey, JSON.stringify(rawMap));
+  localStorage.setItem(getNativeIdentityCacheStorageKey(storageKey), JSON.stringify(identityRecords));
+
+  const urlMap = Object.fromEntries(Object.entries(rawMap).map(([remoteUrl,fileUri]) => [remoteUrl,Capacitor.convertFileSrc(fileUri)]));
+  Object.values(identityRecords).forEach((record) => {
+    if (!record?.cacheIdentity || !record?.localUri) return;
+    const converted = Capacitor.convertFileSrc(record.localUri);
+    urlMap[`identity:${record.cacheIdentity}`] = converted;
+    [record.canonicalUrl,...(record.aliases || [])].filter(Boolean).forEach((alias) => { urlMap[alias] = converted; });
+  });
 
   return {
     failed,
@@ -641,11 +833,11 @@ export async function cacheOfflineAssets(urls, scope, storageKey, options = {}) 
     removed,
     sizeByUrl,
     total: uniqueUrls.length,
-    urlMap: Object.fromEntries(
-      Object.entries(rawMap).map(([remoteUrl, fileUri]) => [
-        remoteUrl,
-        Capacitor.convertFileSrc(fileUri),
-      ])
-    ),
+    mediaTotal,
+    mediaCompleted,
+    mediaFailed,
+    mediaDownloaded,
+    mediaDownloadedBytes,
+    urlMap,
   };
 }

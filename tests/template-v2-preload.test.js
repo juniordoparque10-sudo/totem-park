@@ -1,6 +1,6 @@
 import test from "node:test";
 import assert from "node:assert/strict";
-import { getTemplateV2CriticalImageState, getTemplateV2CriticalImageUrl, getTemplateV2ImageAssetUrl, getTemplateV2ReadinessFingerprint, localizeTemplateV2Assets, prepareTemplateV2CriticalImage, preloadImageForPaint, suppressTemplateV2CriticalImage } from "../src/templates-v2/player-preload.js";
+import { clearTemplateV2BackgroundOnlineRetry, getTemplateV2CriticalImageState, getTemplateV2CriticalImageUrl, getTemplateV2ImageAssetUrl, getTemplateV2ReadinessFingerprint, localizeTemplateV2Assets, markTemplateV2BackgroundForOnlineRetry, prepareTemplateV2CriticalImage, preloadImageForPaint, suppressTemplateV2CriticalImage, takeTemplateV2BackgroundOnlineRetries } from "../src/templates-v2/player-preload.js";
 
 test("localiza o fundo publicado sem alterar o documento original", () => {
   const item = { published: { media: { primary: { type: "image", url: "https://cdn/fundo.jpg" } } } };
@@ -128,4 +128,38 @@ test("preloader e renderer resolvem exatamente a mesma URL autoritativa", () => 
   const item = { templatePublishedResolved:true, published:{ media:{ primary:asset } } };
   assert.equal(getTemplateV2CriticalImageUrl(item), getTemplateV2ImageAssetUrl(asset));
   assert.equal(getTemplateV2CriticalImageUrl(item), "https://cdn/preview.jpg");
+});
+
+test("background que falha offline volta a ser elegível no evento online", async () => {
+  const retryKeys = new Set();
+  const url = "https://cdn/recovery.jpg";
+  let online = false;
+  let attempts = 0;
+  class RecoveringImage {
+    set src(_value) { attempts += 1; queueMicrotask(() => online ? this.onload() : this.onerror()); }
+    async decode() {}
+  }
+  const item = { published:{ media:{ primary:{ type:"image", url } } } };
+  const failed = await prepareTemplateV2CriticalImage(item, RecoveringImage, { maxAttempts:1 });
+  assert.equal(failed.status, "failed");
+  assert.equal(markTemplateV2BackgroundForOnlineRetry(retryKeys, "template-1", online), true);
+  online = true;
+  assert.deepEqual(takeTemplateV2BackgroundOnlineRetries(retryKeys), ["template-1"]);
+  const recovered = await prepareTemplateV2CriticalImage(item, RecoveringImage, { maxAttempts:1 });
+  assert.equal(recovered.status, "ready");
+  clearTemplateV2BackgroundOnlineRetry(retryKeys, "template-1");
+  assert.equal(attempts, 2);
+  assert.equal(retryKeys.size, 0);
+});
+
+test("background válido permanece no cache e não gera novo download", async () => {
+  const url = "https://cdn/already-valid.jpg";
+  let attempts = 0;
+  class ReadyImage {
+    set src(_value) { attempts += 1; queueMicrotask(() => this.onload()); }
+    async decode() {}
+  }
+  await preloadImageForPaint(url, ReadyImage);
+  await preloadImageForPaint(url, ReadyImage);
+  assert.equal(attempts, 1);
 });

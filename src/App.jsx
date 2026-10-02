@@ -7,8 +7,12 @@ import QRCodeLayer from "./QRCodeLayer";
 import { normalizeTemplatesV2Override, resolveTemplatesV2Entitlement } from "./templates-v2/entitlement";
 import { normalizeSportsV2Config } from "./templates-v2/sports-v2/config";
 import { resolveSportsDataProvider } from "./templates-v2/sports-v2/data/SportsDataProvider";
-import { getTemplateV2CriticalImageState, getTemplateV2CriticalImageUrl, getTemplateV2ReadinessFingerprint, localizeTemplateV2Assets, prepareTemplateV2CriticalImage, preloadImageForPaint, suppressTemplateV2CriticalImage } from "./templates-v2/player-preload";
-import { getTemplatePlaybackLayerKey, getTemplatePlaybackReadyKey, isCurrentPlaybackExecution, nextPlaybackExecutionId } from "./templates-v2/player-execution";
+import { canRevealSportsV2, withSportsV2ReadinessTimeout } from "./templates-v2/sports-v2/readiness";
+import { clearTemplateV2BackgroundOnlineRetry, getTemplateV2CriticalImageState, getTemplateV2CriticalImageUrl, getTemplateV2ReadinessFingerprint, localizeTemplateV2Assets, markTemplateV2BackgroundForOnlineRetry, prepareTemplateV2CriticalImage, preloadImageForPaint, suppressTemplateV2CriticalImage, takeTemplateV2BackgroundOnlineRetries } from "./templates-v2/player-preload";
+import { confirmTemplateImageForPaint, getTemplatePlaybackLayerKey, getTemplatePlaybackReadyKey, isCurrentPlaybackExecution, nextPlaybackExecutionId } from "./templates-v2/player-execution";
+import { deriveMediaCacheState, finalizeCompletedMediaCache } from "./player-cache-state";
+import { findNextReadyMediaIndex, getCanonicalPlaylistMediaEntries, getNativeOfflineQueueUrls, getPlaylistMediaPreparation } from "./media-download-readiness";
+import { localizeOfflineAssetFields } from "./offline-asset-localization";
 import { linkedAtForScreen, telemetryStatus } from "./telemetry-v1";
 import { createTransitionDiagnostics } from "./transition-diagnostics";
 import {
@@ -10550,7 +10554,7 @@ function getMarketingDefaultForm() {
   };
 }
 
-const OFFLINE_ASSET_FIELDS = new Set(["preview", "imageUrl", "logoUrl"]);
+const OFFLINE_ASSET_FIELDS = new Set(["preview", "remotePreview", "imageUrl", "logoUrl"]);
 
 function collectOfflineAssetUrls(values) {
   const urls = new Set();
@@ -10589,14 +10593,7 @@ function collectOfflineAssetUrls(values) {
 function applyOfflineAssetUrls(item, urlMap) {
   if (!item) return item;
 
-  const localized = { ...item };
-
-  OFFLINE_ASSET_FIELDS.forEach((field) => {
-    if (localized[field] && urlMap[localized[field]]) {
-      if (field === "preview") localized.remotePreview = localized[field];
-      localized[field] = urlMap[localized[field]];
-    }
-  });
+  const localized = localizeOfflineAssetFields(item,urlMap);
 
   const qrUrl = buildQrUrl(buildQRCodeValue(localized.qrCode || localized.qrText || localized.whatsapp || ""));
   if (qrUrl && urlMap[qrUrl]) localized.qrImageUrl = urlMap[qrUrl];
@@ -13640,7 +13637,6 @@ function TemplateVisualPreview({ template, compact = false, tv = false, playback
   if (isTemplateV2(template)) {
     return <TemplateV2LivePreview template={template} compact={compact} tv={tv} playbackExecutionId={playbackExecutionId} onVisualEvent={onVisualEvent} />;
   }
-
   return <LegacyTemplateVisualPreview template={template} compact={compact} tv={tv} />;
 }
 
@@ -13675,6 +13671,10 @@ function TemplateV2LivePreview({ template, compact = false, tv = false, playback
   const weatherConfig = config?.modules?.weather || {};
   const newsConfig = config?.modules?.news || {};
   const [dynamicData, setDynamicData] = useState(null);
+  const backgroundReadyRef = useRef(false);
+  const readyReportedRef = useRef(false);
+  const sportsEnabled = Boolean(config?.sports?.provider);
+  const backgroundConfigured = getTemplateV2CriticalImageState(template).configured;
   const dynamicKey = JSON.stringify({ city:weatherConfig.city || "", enabledWeather:weatherConfig.enabled, enabledNews:newsConfig.enabled, feed:newsConfig.newsFeedUrl || "", sources:newsConfig.selectedNewsSources || [], sports:config?.sports || null });
 
   useLayoutEffect(() => {
@@ -13686,14 +13686,12 @@ function TemplateV2LivePreview({ template, compact = false, tv = false, playback
     async function load() {
       const next = {};
       if (weatherConfig.enabled) next.weather = await loadTemplateV2Weather(weatherConfig.city || "Sua cidade");
-      if (newsConfig.enabled) {
-        next.news = await loadTemplateV2News(newsConfig);
-      }
+      if (newsConfig.enabled) next.news = await loadTemplateV2News(newsConfig);
       if (config?.sports?.provider) {
         const sports = normalizeSportsV2Config(config.sports);
         logTemplatesV2Diagnostic("SPORTS_PUBLISHED_CONFIG", { templateId:template.id||template.templateId||"", schemaVersion:template.schemaVersion||null, provider:sports.provider, mode:sports.mode, selectedSports:sports.selectedSports, selectedSport:sports.selectedSport, competitionId:sports.items?.[sports.selectedSport]?.competitionId||"", season:sports.items?.[sports.selectedSport]?.season||"", modules:sports.items?.[sports.selectedSport]?.modules||{} });
         const provider = resolveSportsDataProvider(sports, { diagnostic:(event,payload)=>logTemplatesV2Diagnostic(`SPORTS_${event}`,{templateId:template.id||template.templateId||"",...payload}) });
-        const settled = await Promise.allSettled(sports.selectedSports.map(async (sport) => [sport,await provider.getSnapshot(sport)]));
+        const settled = await withSportsV2ReadinessTimeout(Promise.allSettled(sports.selectedSports.map(async (sport) => [sport,await provider.getSnapshot(sport)])));
         next.sports = Object.fromEntries(settled.filter((result)=>result.status === "fulfilled").map((result)=>result.value));
         next.sportsErrors = sports.selectedSports.filter((_,index)=>settled[index].status === "rejected");
         logTemplatesV2Diagnostic("SPORTS_RENDER_DATA_READY", { templateId:template.id||template.templateId||"", receivedSportsData:Object.keys(next.sports).length>0, sports:Object.fromEntries(Object.entries(next.sports).map(([sport,snapshot])=>[sport,{results:Number(snapshot?.data?.results?.length||0),upcoming:Number(snapshot?.data?.upcoming?.length||0),standings:Number(snapshot?.data?.standings?.length||0),events:Number(snapshot?.data?.events?.length||0)}])), errors:next.sportsErrors });
@@ -13707,7 +13705,53 @@ function TemplateV2LivePreview({ template, compact = false, tv = false, playback
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [dynamicKey]);
 
-  return <TemplateV2Renderer template={template} config={config} orientation={config?.display?.defaultOrientation || template.orientation || "Paisagem"} compact={compact} tv={tv} dynamicData={dynamicData} playbackExecutionId={playbackExecutionId} onVisualEvent={onVisualEvent} />;
+  useEffect(() => {
+    backgroundReadyRef.current = false;
+    readyReportedRef.current = false;
+  }, [playbackExecutionId, dynamicKey]);
+
+  const reportVisualEvent = (event, details = {}) => {
+    if (!sportsEnabled) {
+      onVisualEvent?.(event, details);
+      return;
+    }
+
+    if (event !== "ready") {
+      onVisualEvent?.(event, details);
+      return;
+    }
+
+    backgroundReadyRef.current = true;
+
+    if (
+      !readyReportedRef.current &&
+      canRevealSportsV2({
+        dynamicData,
+        backgroundConfigured,
+        backgroundReady: true,
+      })
+    ) {
+      readyReportedRef.current = true;
+      onVisualEvent?.("ready", details);
+    }
+  };
+
+  useEffect(() => {
+    if (!sportsEnabled || readyReportedRef.current) return;
+
+    if (
+      !canRevealSportsV2({
+        dynamicData,
+        backgroundConfigured,
+        backgroundReady: backgroundReadyRef.current,
+      })
+    ) return;
+
+    readyReportedRef.current = true;
+    onVisualEvent?.("ready", { sportsFinal: true });
+  }, [backgroundConfigured, dynamicData, onVisualEvent, sportsEnabled]);
+
+  return <TemplateV2Renderer template={template} config={config} orientation={config?.display?.defaultOrientation || template.orientation || "Paisagem"} compact={compact} tv={tv} dynamicData={dynamicData} playbackExecutionId={playbackExecutionId} onVisualEvent={reportVisualEvent} />;
 }
 
 function LegacyTemplateVisualPreview({ template, compact = false, tv = false }) {
@@ -13792,7 +13836,6 @@ function LegacyTemplateVisualPreview({ template, compact = false, tv = false }) 
       ? 3 * 60 * 1000
       : 10 * 60 * 1000;
     const interval = setInterval(() => loadTemplateContent(true), refreshInterval);
-
     return () => {
       cancelled = true;
       clearInterval(interval);
@@ -15145,6 +15188,8 @@ function PlayerPage() {
   const [decoderReleasePending, setDecoderReleasePending] = useState(false);
   const [readyMediaKey, setReadyMediaKey] = useState("");
   const [suppressedTemplateBackgroundKeys, setSuppressedTemplateBackgroundKeys] = useState(() => new Set());
+  const retryableTemplateBackgroundKeysRef = useRef(new Set());
+  const [templateBackgroundRecoveryRevision, setTemplateBackgroundRecoveryRevision] = useState(0);
   const [isAndroidTv, setIsAndroidTv] = useState(null);
   const [offlineAssetMap, setOfflineAssetMap] = useState(() =>
     isNativeApp() ? restoreOfflineAssetMap(offlineStorageKey) : {}
@@ -15177,6 +15222,9 @@ function PlayerPage() {
   const cacheQueueRef = useRef(Promise.resolve());
   const mediaCacheRunRef = useRef(0);
   const mediaCacheProgressReportAtRef = useRef(0);
+  const pendingNativeMediaUrlsRef = useRef(new Set());
+  const queuedNativeMediaUrlsRef = useRef(new Set());
+  const activeNativeMediaDownloadsRef = useRef(new Set());
   const mediaCacheObjectUrlsRef = useRef(new Set());
   const fallbackMediaKeysRef = useRef(new Set());
   const lastCacheStatusPayloadRef = useRef("");
@@ -15836,20 +15884,25 @@ function PlayerPage() {
     const diagnosticPayload = { templateId:currentItem.templateId||currentItem.id||"", itemKey:currentItemKey, playbackExecutionId:executionId };
     logTemplatesV2Diagnostic("T2_ASSET_RESOLVED", { ...diagnosticPayload, hasCriticalAsset:Boolean(criticalUrl), CURRENT_VISIBLE:previousMediaIndexRef.current !== null, NEXT_PENDING:true });
     logTemplatesV2Diagnostic("T3_ASSET_SOURCE_DEFINED", { ...diagnosticPayload, source:/^(blob:|file:|data:|capacitor:)/i.test(criticalUrl)?"LOCAL":"REMOTE", CURRENT_VISIBLE:previousMediaIndexRef.current !== null, NEXT_PENDING:true });
+    const sportsNeedsFinalData = Boolean(currentItem?.published?.sports?.provider);
     const reveal = () => {
       if (active && isCurrentPlaybackExecution(executionId,currentPlaybackExecutionIdRef.current)) markCurrentMediaReady(currentItem, safeIndex, executionId);
     };
 
     if (suppressedTemplateBackgroundKeys.has(currentItemKey)) {
       logTemplatesV2Diagnostic("CRITICAL_BACKGROUND_FALLBACK_ACTIVE", { ...diagnosticPayload, CURRENT_VISIBLE:previousMediaIndexRef.current !== null, NEXT_PENDING:true });
-      reveal();
+      if (!sportsNeedsFinalData) reveal();
     } else {
       prepareTemplateV2CriticalImage(currentItem, globalThis.Image, {
         maxAttempts:2,
-        onFailure:(error,details)=>logTemplatesV2Diagnostic("CRITICAL_BACKGROUND_PRELOAD_FAILED",{...diagnosticPayload,...details,message:String(error?.message||error||"").slice(0,300),CURRENT_VISIBLE:previousMediaIndexRef.current !== null,NEXT_PENDING:true}),
+        onFailure:(error,details)=>{
+          markTemplateV2BackgroundForOnlineRetry(retryableTemplateBackgroundKeysRef.current, currentItemKey);
+          logTemplatesV2Diagnostic("CRITICAL_BACKGROUND_PRELOAD_FAILED",{...diagnosticPayload,...details,message:String(error?.message||error||"").slice(0,300),CURRENT_VISIBLE:previousMediaIndexRef.current !== null,NEXT_PENDING:true});
+        },
       }).then((result) => {
         if (!active || !isCurrentPlaybackExecution(executionId,currentPlaybackExecutionIdRef.current)) return;
-        if (result.status === "no-background") reveal();
+        if (result.status === "ready") clearTemplateV2BackgroundOnlineRetry(retryableTemplateBackgroundKeysRef.current, currentItemKey);
+        if (result.status === "no-background" && !sportsNeedsFinalData) reveal();
         else if (result.status === "ready" && !isTemplateV2(currentItem)) reveal();
         else if (result.status === "ready") return;
         else logTemplatesV2Diagnostic("CRITICAL_BACKGROUND_NOT_READY", { ...diagnosticPayload, status:result.status, attempts:result.attempts, CURRENT_VISIBLE:previousMediaIndexRef.current !== null, NEXT_PENDING:true });
@@ -15861,7 +15914,22 @@ function PlayerPage() {
     if (nextUrl) preloadImageForPaint(nextUrl).catch(() => {});
 
     return () => { active = false; };
-  }, [activeItemsKey, mediaIndex, suppressedTemplateBackgroundKeys, currentPlaybackExecutionId]);
+  }, [activeItemsKey, mediaIndex, suppressedTemplateBackgroundKeys, currentPlaybackExecutionId, templateBackgroundRecoveryRevision]);
+
+  useEffect(() => {
+    const retryBackgrounds = () => {
+      const retryKeys = takeTemplateV2BackgroundOnlineRetries(retryableTemplateBackgroundKeysRef.current);
+      if (!retryKeys.length) return;
+      setSuppressedTemplateBackgroundKeys((previous) => {
+        const next = new Set(previous);
+        retryKeys.forEach((key) => next.delete(key));
+        return next;
+      });
+      setTemplateBackgroundRecoveryRevision((revision) => revision + 1);
+    };
+    window.addEventListener("online", retryBackgrounds);
+    return () => window.removeEventListener("online", retryBackgrounds);
+  }, []);
 
   useEffect(() => {
     const safeIndex = mediaIndex >= playerItems.length ? 0 : mediaIndex;
@@ -15906,9 +15974,13 @@ function PlayerPage() {
     ...(defaultPlaylist?.items || []),
     ...playlistsForOffline.flatMap((playlist) => playlist?.items || []),
   ].filter(isCacheableMediaItem);
-  const offlinePlaylistMediaByUrl = Object.fromEntries(offlinePlaylistMediaItems.map((item) => {
-    const remoteUrl = item.remotePreview || item.preview || item.imageUrl || "";
-    return [remoteUrl, {
+  const canonicalPlaylistMediaEntries = getCanonicalPlaylistMediaEntries(offlinePlaylistMediaItems);
+  const offlinePlaylistMediaByUrl = Object.fromEntries(canonicalPlaylistMediaEntries.map((entry) => {
+    const item = entry.item;
+    return [entry.url, {
+      cacheIdentity:entry.identity,
+      contentVersion:entry.contentVersion,
+      aliases:entry.aliases,
       mediaId:item.mediaId || item.id || "",
       mediaName:item.title || item.name || item.fileName || "",
       fileName:item.fileName || "",
@@ -15916,30 +15988,70 @@ function PlayerPage() {
       playlistId:activePlaylist?.id || "",
       screenId:screen?.id || "",
     }];
-  }).filter(([url]) => /^https?:\/\//i.test(url)));
-  const offlineAssetsKey = offlineAssetUrls.join("|");
+  }));
+  const nativeOfflineAssetUrls = getNativeOfflineQueueUrls(offlineAssetUrls, offlinePlaylistMediaItems);
+  const offlineAssetsKey = nativeOfflineAssetUrls.join("|");
 
   useEffect(() => {
-    if (!isNativeApp() || offlineAssetUrls.length === 0) return;
+    if (!isNativeApp() || nativeOfflineAssetUrls.length === 0) return;
 
     let active = true;
+    let mediaDownloadStarted = false;
+    const mediaPreparation = getPlaylistMediaPreparation(offlinePlaylistMediaItems, offlineAssetMap);
+    pendingNativeMediaUrlsRef.current = new Set(mediaPreparation.pendingUrls);
+    mediaPreparation.pendingUrls.forEach((url) => {
+      const identity = offlinePlaylistMediaByUrl[url]?.cacheIdentity || url;
+      if (!queuedNativeMediaUrlsRef.current.has(identity) && !activeNativeMediaDownloadsRef.current.has(identity)) {
+        queuedNativeMediaUrlsRef.current.add(identity);
+      }
+    });
     clearTimeout(offlineStatusTimerRef.current);
-    setOfflineCacheStatus("downloading");
+    setOfflineCacheStatus("");
+
+    const initialMediaState = deriveMediaCacheState({
+      completed:mediaPreparation.cached,
+      total:mediaPreparation.total,
+      downloadStarted:mediaPreparation.pendingUrls.length > 0,
+    });
+    const initialStatus = {
+      cacheStatus:initialMediaState.cacheStatus || "pronto",
+      cachedItems:initialMediaState.cachedItems,
+      totalCacheableItems:initialMediaState.totalCacheableItems,
+      failedCacheItems:0,
+      cacheDownloadedItems:0,
+      currentMediaSource:"internet",
+      activePlaylistWeightBytes,
+      estimatedMonthlyTrafficBytes,
+    };
+    setPlayerCacheStatus((previous) => ({ ...previous, ...initialStatus }));
+    reportCacheStatus(initialStatus);
 
     const reportNativeOfflineProgress = (payload = {}) => {
-      const total = Number(payload.total || offlineAssetUrls.length || 0);
-      const failed = Number(payload.failed || 0);
-      const downloaded = Number(payload.downloaded || 0);
+      const wasPending = pendingNativeMediaUrlsRef.current.has(payload.url);
+      const queueIdentity = payload.cacheIdentity || payload.url;
+      queuedNativeMediaUrlsRef.current.delete(queueIdentity);
+      activeNativeMediaDownloadsRef.current.delete(queueIdentity);
+      if (!payload.playlistMedia || (!active && !wasPending)) return;
+      pendingNativeMediaUrlsRef.current.delete(payload.url);
+      const mediaTotal = Number(payload.mediaTotal || mediaPreparation.total || 0);
+      const state = deriveMediaCacheState({
+        completed:Math.max(0, mediaTotal - pendingNativeMediaUrlsRef.current.size),
+        total:mediaTotal,
+        failed:payload.mediaFailed,
+        downloadActive:payload.mediaDownloadActive,
+        downloadStarted:mediaDownloadStarted,
+      });
+      if (!state.cacheStatus) return;
       const statusPayload = {
-        cacheStatus: "preparando",
-        cachedItems: Math.max(0, Number(payload.completed || 0) - failed),
-        totalCacheableItems: total,
-        failedCacheItems: failed,
-        cacheDownloadedItems: downloaded,
+        cacheStatus:state.cacheStatus,
+        cachedItems:state.cachedItems,
+        totalCacheableItems:state.totalCacheableItems,
+        failedCacheItems:state.failedCacheItems,
+        cacheDownloadedItems:Number(payload.mediaDownloaded || 0),
         cacheRemovedItems: Number(payload.removed || 0),
-        lastMediaDownloadBytes: Number(payload.downloadedBytes || 0),
+        lastMediaDownloadBytes:Number(payload.mediaDownloadedBytes || 0),
         cacheUpdatedAt: serverTimestamp(),
-        currentMediaSource: downloaded > 0 ? "mixed" : "internet",
+        currentMediaSource:Number(payload.mediaDownloaded || 0) > 0 ? "mixed" : "internet",
         activePlaylistWeightBytes,
         estimatedMonthlyTrafficBytes,
       };
@@ -15949,23 +16061,63 @@ function PlayerPage() {
         ...statusPayload,
       }));
 
-      if (Date.now() - mediaCacheProgressReportAtRef.current > 3000 || payload.completed === total) {
+      if (state.showReady) {
+        const readyMessageWasShown = localStorage.getItem(offlineReadyMessageKey) === "true";
+        if (mediaDownloadStarted || !readyMessageWasShown) {
+          setOfflineCacheStatus("ready");
+          localStorage.setItem(offlineReadyMessageKey, "true");
+          clearTimeout(offlineStatusTimerRef.current);
+          offlineStatusTimerRef.current = setTimeout(() => setOfflineCacheStatus(""), 3000);
+        } else {
+          setOfflineCacheStatus("");
+        }
+      } else if (!state.showDownloading) {
+        setOfflineCacheStatus("");
+      }
+
+      if (Date.now() - mediaCacheProgressReportAtRef.current > 3000 || !state.hasPendingMedia) {
         mediaCacheProgressReportAtRef.current = Date.now();
         reportCacheStatus(statusPayload);
       }
     };
 
-    reportNativeOfflineProgress({ completed: 0, total: offlineAssetUrls.length });
+    const beginNativeMediaDownload = (payload = {}) => {
+      const queueIdentity = payload.cacheIdentity || payload.url;
+      queuedNativeMediaUrlsRef.current.delete(queueIdentity);
+      activeNativeMediaDownloadsRef.current.add(queueIdentity);
+      if (!payload.playlistMedia || !pendingNativeMediaUrlsRef.current.has(payload.url)) return;
+      mediaDownloadStarted = true;
+      pendingNativeMediaUrlsRef.current.add(payload.url);
+      localStorage.removeItem(offlineReadyMessageKey);
+      clearTimeout(offlineStatusTimerRef.current);
+      setOfflineCacheStatus("downloading");
+      const mediaTotal = Number(payload.mediaTotal || mediaPreparation.total || 0);
+      const state = deriveMediaCacheState({ completed:Math.max(0, mediaTotal - pendingNativeMediaUrlsRef.current.size), total:mediaTotal, failed:payload.mediaFailed, downloadActive:true, downloadStarted:true });
+      const statusPayload = {
+        cacheStatus:state.cacheStatus,
+        cachedItems:state.cachedItems,
+        totalCacheableItems:state.totalCacheableItems,
+        failedCacheItems:state.failedCacheItems,
+        cacheDownloadedItems:Number(payload.mediaDownloaded || 0),
+        lastMediaDownloadBytes:Number(payload.mediaDownloadedBytes || 0),
+        currentMediaSource:"internet",
+        activePlaylistWeightBytes,
+        estimatedMonthlyTrafficBytes,
+      };
+      setPlayerCacheStatus((previous) => ({ ...previous, ...statusPayload }));
+      reportCacheStatus(statusPayload);
+    };
 
     cacheQueueRef.current = cacheQueueRef.current
       .catch(() => {})
       .then(() => cacheOfflineAssets(
-        offlineAssetUrls,
+        nativeOfflineAssetUrls,
         offlineScope,
         offlineStorageKey,
         {
           purgeUnused: true,
           mediaByUrl: offlinePlaylistMediaByUrl,
+          onDownloadStart: beginNativeMediaDownload,
           onProgress: reportNativeOfflineProgress,
           onDownloadComplete: (download) => trafficTelemetryRef.current.recordDownloadComplete(download),
         }
@@ -15973,24 +16125,25 @@ function PlayerPage() {
       .then((result) => {
         if (!active) return;
 
+        pendingNativeMediaUrlsRef.current.clear();
         setOfflineAssetMap(result.urlMap);
         setOfflineAssetSizeMap(result.sizeByUrl || {});
 
         const finalStatus = {
-          cacheStatus: result.failed > 0 ? "parcial" : "pronto",
-          cachedItems: Math.max(0, Number(result.total || 0) - Number(result.failed || 0)),
-          totalCacheableItems: Number(result.total || 0),
-          failedCacheItems: Number(result.failed || 0),
-          cacheDownloadedItems: Number(result.downloaded || 0),
+          cacheStatus:result.mediaFailed > 0 ? "parcial" : "pronto",
+          cachedItems:Math.max(0, Number(result.mediaTotal || 0) - Number(result.mediaFailed || 0)),
+          totalCacheableItems:Number(result.mediaTotal || 0),
+          failedCacheItems:Number(result.mediaFailed || 0),
+          cacheDownloadedItems:Number(result.mediaDownloaded || 0),
           cacheRemovedItems: Number(result.removed || 0),
-          lastMediaDownloadBytes: Number(result.downloadedBytes || 0),
+          lastMediaDownloadBytes:Number(result.mediaDownloadedBytes || 0),
           cacheUpdatedAt: serverTimestamp(),
-          currentMediaSource: result.downloaded > 0 ? "mixed" : "internet",
+          currentMediaSource:result.mediaDownloaded > 0 ? "mixed" : "internet",
           activePlaylistWeightBytes,
           estimatedMonthlyTrafficBytes,
         };
 
-        if (result.downloaded > 0) {
+        if (result.mediaDownloaded > 0) {
           finalStatus.lastMediaDownloadAt = serverTimestamp();
         }
 
@@ -16000,7 +16153,12 @@ function PlayerPage() {
         }));
         reportCacheStatus(finalStatus);
 
-        if (result.failed > 0) {
+        if (result.mediaTotal === 0) {
+          setOfflineCacheStatus("");
+          return;
+        }
+
+        if (result.mediaFailed > 0) {
           setOfflineCacheStatus("partial");
           offlineStatusTimerRef.current = setTimeout(() => {
             setOfflineCacheStatus("");
@@ -16010,7 +16168,7 @@ function PlayerPage() {
 
         const readyMessageWasShown = localStorage.getItem(offlineReadyMessageKey) === "true";
 
-        if (readyMessageWasShown) {
+        if (readyMessageWasShown && !mediaDownloadStarted) {
           setOfflineCacheStatus("");
           return;
         }
@@ -16019,16 +16177,22 @@ function PlayerPage() {
         setOfflineCacheStatus("ready");
         offlineStatusTimerRef.current = setTimeout(() => {
           setOfflineCacheStatus("");
-        }, 4000);
+        }, 3000);
       })
       .catch((error) => {
         console.log("Erro ao preparar playlist offline:", error);
+        mediaPreparation.pendingUrls.forEach((url) => {
+          const identity = offlinePlaylistMediaByUrl[url]?.cacheIdentity || url;
+          queuedNativeMediaUrlsRef.current.delete(identity);
+          activeNativeMediaDownloadsRef.current.delete(identity);
+        });
         if (active) {
+          pendingNativeMediaUrlsRef.current.clear();
           const errorStatus = {
             cacheStatus: "parcial",
             cachedItems: 0,
-            totalCacheableItems: offlineAssetUrls.length,
-            failedCacheItems: offlineAssetUrls.length,
+            totalCacheableItems:Object.keys(offlinePlaylistMediaByUrl).length,
+            failedCacheItems:Object.keys(offlinePlaylistMediaByUrl).length,
             cacheDownloadedItems: 0,
             cacheRemovedItems: 0,
             cacheUpdatedAt: serverTimestamp(),
@@ -16051,6 +16215,8 @@ function PlayerPage() {
 
     return () => {
       active = false;
+      pendingNativeMediaUrlsRef.current.clear();
+      clearTimeout(offlineStatusTimerRef.current);
     };
   }, [offlineAssetsKey, offlineReadyMessageKey, offlineScope, offlineStorageKey, activePlaylistWeightBytes, estimatedMonthlyTrafficBytes]);
 
@@ -16247,12 +16413,21 @@ function PlayerPage() {
     }
 
     const currentItemForTraffic = items[mediaIndex >= items.length ? 0 : mediaIndex];
+    const nextItemIndex = findNextReadyMediaIndex({ items, currentIndex:mediaIndex, native:isNativeApp(), pendingUrls:pendingNativeMediaUrlsRef.current });
+    if (nextItemIndex < 0) return;
+    if (nextItemIndex === mediaIndex) {
+      recordJumpEvent("PLAYER_PENDING_MEDIA_SKIPPED_LOOP_CURRENT", { reason, index:mediaIndex });
+      const currentVideo = document.querySelector(".player-transition-layer.is-current video.player-media");
+      if (currentVideo) restartSingleVideo(currentVideo);
+      else setSingleImageLoopCycle((cycle) => cycle + 1);
+      return;
+    }
+
     if (currentItemForTraffic) closeTrafficPlayback(currentItemForTraffic, currentPlaybackExecutionIdRef.current);
 
-    const nextItemIndex = mediaIndex + 1 >= items.length ? 0 : mediaIndex + 1;
     logTemplatesV2Diagnostic("T0_NEXT_ITEM_SELECTED", { reason, fromIndex:mediaIndex, toIndex:nextItemIndex, templateId:items[nextItemIndex]?.templateId||items[nextItemIndex]?.id||"", itemKey:getPlayerItemKey(items[nextItemIndex],nextItemIndex), CURRENT_VISIBLE:true, NEXT_PENDING:true });
     const singleDecoderTransition = IS_PLAYER_DECODER_LIFECYCLE_BUILD &&
-      isVideoToVideoTransition(items, mediaIndex);
+      isVideoToVideoTransition(items, mediaIndex, nextItemIndex);
 
     advancingRef.current = true;
     clearTimeout(playbackTimerRef.current);
@@ -16278,11 +16453,12 @@ function PlayerPage() {
     }
 
     const safePrev = mediaIndex >= items.length ? 0 : mediaIndex;
-    const nextIndex = safePrev + 1 >= items.length ? 0 : safePrev + 1;
+    const nextIndex = nextItemIndex;
     telemetryTransitionRef.current = telemetryRef.current.startTransition({
       fromMediaId: items[safePrev]?.mediaId || items[safePrev]?.id || "",
       toMediaId: items[nextIndex]?.mediaId || items[nextIndex]?.id || "",
       reason,
+      keepPlaying:Boolean(readyMediaKey) && !singleDecoderTransition,
     });
     transitionInProgressRef.current = true;
     if (!singleDecoderTransition) {
@@ -17229,9 +17405,7 @@ function PlayerPage() {
       Number.isFinite(durationInSeconds) && durationInSeconds > 0
         ? durationInSeconds * 1000
         : fallbackDuration * 1000;
-    const timingKey = `${currentKey}-${durationInMs}-${
-      isSingleImagePlaylist(items) ? singleImageLoopCycle : ""
-    }`;
+    const timingKey = `${currentKey}-${durationInMs}-${singleImageLoopCycle}`;
     const isPlaybackBlocked =
       pauseMode || takeoverMessage || blackoutMode || maintenanceMode;
     const isWaitingForAndroidTvVideo =
@@ -17346,11 +17520,10 @@ function PlayerPage() {
       )}
     </>
   ) : null;
-  const playerCacheSyncLabel = getCacheSyncLabel(playerCacheStatus);
-  const shouldShowPlayerCacheSyncLabel = Boolean(
-    playerCacheSyncLabel &&
-    playerCacheStatus.cacheStatus === "preparando"
-  );
+  const finalizedPlayerCacheStatus = finalizeCompletedMediaCache(playerCacheStatus);
+  const hasRealCacheWork = finalizedPlayerCacheStatus.cacheStatus === "preparando"
+    && Number(finalizedPlayerCacheStatus.cachedItems || 0) + Number(finalizedPlayerCacheStatus.failedCacheItems || 0) < Number(finalizedPlayerCacheStatus.totalCacheableItems || 0);
+  const visibleOfflineCacheStatus = offlineCacheStatus === "downloading" && !hasRealCacheWork ? "" : offlineCacheStatus;
 
   if (loading || clientLoading) {
     return <div className="player-screen">Carregando player...</div>;
@@ -17427,23 +17600,17 @@ function PlayerPage() {
           tv
         />
 
-        {offlineCacheStatus && (
-          <div className={`offline-cache-status ${offlineCacheStatus}`}>
-            {offlineCacheStatus === "downloading"
-              ? "Baixando conteúdo offline..."
-              : offlineCacheStatus === "ready"
-                ? "Conteúdo disponível offline"
+        {visibleOfflineCacheStatus && (
+          <div className={`offline-cache-status ${visibleOfflineCacheStatus}`}>
+            {visibleOfflineCacheStatus === "downloading"
+              ? "Baixando conteúdo…"
+              : visibleOfflineCacheStatus === "ready"
+                ? "Conteúdo atualizado ✓"
                 : "Cache offline parcial"}
           </div>
         )}
 
         {demoPlayerOverlay}
-
-        {shouldShowPlayerCacheSyncLabel && !offlineCacheStatus && (
-          <div className="offline-cache-status smart-cache-status">
-            {playerCacheSyncLabel}
-          </div>
-        )}
 
         <button
           className="tv-player-exit-button"
@@ -17488,7 +17655,7 @@ function PlayerPage() {
     app:operationalAppInfo,
     playerState:operationalPlayerState,
     currentItem:currentMedia,
-    cache:playerCacheStatus,
+    cache:finalizedPlayerCacheStatus,
     networkStatus:navigator.onLine === false ? "OFFLINE" : "ONLINE",
   });
   const transitionClass = getTransitionClass(activePlaylist?.transition || "Fade suave");
@@ -17713,8 +17880,13 @@ function PlayerPage() {
         src={resolvedSource.src}
         alt={item.title}
         className="player-media"
-        onLoad={() => {
-          if (isCurrent) { markCurrentMediaReady(item, index); recordPlayback("PLAYBACK_START", source, diagnosticMedia); telemetryRef.current.record("PLAYBACK_START", telemetryMedia); }
+        onLoad={async (event) => {
+          if (!isCurrent) return;
+          await confirmTemplateImageForPaint(event.currentTarget);
+          if (!isCurrentPlaybackExecution(executionId,currentPlaybackExecutionIdRef.current)) return;
+          markCurrentMediaReady(item, index);
+          recordPlayback("PLAYBACK_START", source, diagnosticMedia);
+          telemetryRef.current.record("PLAYBACK_START", telemetryMedia);
         }}
         onError={() => {
           if (!isCurrent) return;
@@ -17738,19 +17910,13 @@ function PlayerPage() {
       {IS_PLAYER_LINK_FIX_BUILD && <button className="player-lab-badge" onClick={() => navigate("/diagnostico-link-fix")}>LINK-FIX · Diagnóstico</button>}
       {IS_PLAYER_TELEMETRY_BUILD && <button className="player-lab-badge" onClick={() => navigate("/diagnostico-telemetria")}>2A.2-C · Diagnóstico</button>}
       {(IS_PLAYER_JUMP_DIAG_BUILD || IS_PLAYER_DECODER_EXPERIMENT_BUILD) && <button className="player-lab-badge" onClick={() => navigate("/diagnostico-salto")}>SALTO · Diagnóstico</button>}
-      {offlineCacheStatus && (
-        <div className={`offline-cache-status ${offlineCacheStatus}`}>
-          {offlineCacheStatus === "downloading"
-            ? "Baixando conteúdo offline..."
-            : offlineCacheStatus === "ready"
-              ? "Conteúdo disponível offline"
+      {visibleOfflineCacheStatus && (
+        <div className={`offline-cache-status ${visibleOfflineCacheStatus}`}>
+          {visibleOfflineCacheStatus === "downloading"
+            ? "Baixando conteúdo…"
+            : visibleOfflineCacheStatus === "ready"
+              ? "Conteúdo atualizado ✓"
               : "Cache offline parcial"}
-        </div>
-      )}
-
-      {shouldShowPlayerCacheSyncLabel && !offlineCacheStatus && (
-        <div className="offline-cache-status smart-cache-status">
-          {playerCacheSyncLabel}
         </div>
       )}
 
