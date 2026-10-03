@@ -91,6 +91,7 @@ import {
   updateDoc,
   setDoc,
   getDoc,
+  getDocFromCache,
   getDocs,
   getDocsFromServer,
   runTransaction,
@@ -141,6 +142,7 @@ import {
   readTvConnection,
   updateTvConnectionScreenId,
 } from "./android-link-lifecycle";
+import { readCachedPlayerDocument } from "./player-local-first";
 import {
   isSingleImagePlaylist,
   isSingleVideoPlaylist,
@@ -16703,7 +16705,7 @@ function PlayerPage() {
       }, isNativeApp() ? 10000 : 0);
     }
 
-    function handleScreenData(screenDoc) {
+    function handleScreenData(screenDoc, { source = "remote" } = {}) {
       if (cancelled) return;
       if (exitingTvRef.current) return;
 
@@ -16743,7 +16745,7 @@ function PlayerPage() {
         screenId: screenDoc.id,
       });
       setLinkValidationState(LINK_STATES.VALIDATED);
-      logLinkEvent(LINK_STATES.VALIDATED, { screenId: screenDoc.id });
+      logLinkEvent(LINK_STATES.VALIDATED, { screenId: screenDoc.id, source });
       setScreen(screenData);
       setLoading(false);
     }
@@ -16773,7 +16775,15 @@ function PlayerPage() {
         }
 
         if (savedTvConnection?.screenId) {
-          subscribeToScreenRef(doc(db, "clients", clientId, "screens", savedTvConnection.screenId));
+          const screenRef = doc(db, "clients", clientId, "screens", savedTvConnection.screenId);
+          const cachedScreen = await readCachedPlayerDocument({
+            getFromCache: getDocFromCache,
+            reference: screenRef,
+            expectedId: savedTvConnection.screenId,
+          });
+          if (cancelled) return;
+          if (cachedScreen) handleScreenData(cachedScreen, { source: "cache" });
+          subscribeToScreenRef(screenRef);
           return;
         }
 
@@ -16919,17 +16929,40 @@ function PlayerPage() {
   useEffect(() => {
     if (!clientId) return undefined;
 
-    return onSnapshot(
-      doc(db, "clients", clientId),
-      (snapshot) => {
-        setPlayerClient(snapshot.exists() ? { id: snapshot.id, ...snapshot.data() } : null);
-        setClientLoading(false);
-      },
-      (error) => {
-        console.log("Erro ao carregar cliente do player:", error);
+    let cancelled = false;
+    let unsubscribeClient = null;
+    const clientRef = doc(db, "clients", clientId);
+
+    async function restoreClientThenSubscribe() {
+      const cachedClient = await readCachedPlayerDocument({
+        getFromCache: getDocFromCache,
+        reference: clientRef,
+        expectedId: clientId,
+      });
+      if (cancelled) return;
+      if (cachedClient) {
+        setPlayerClient({ id: cachedClient.id, ...cachedClient.data() });
         setClientLoading(false);
       }
-    );
+
+      unsubscribeClient = onSnapshot(
+        clientRef,
+        (snapshot) => {
+          setPlayerClient(snapshot.exists() ? { id: snapshot.id, ...snapshot.data() } : null);
+          setClientLoading(false);
+        },
+        (error) => {
+          console.log("Erro ao carregar cliente do player:", error);
+          setClientLoading(false);
+        }
+      );
+    }
+
+    restoreClientThenSubscribe();
+    return () => {
+      cancelled = true;
+      unsubscribeClient?.();
+    };
   }, [clientId]);
 
   useEffect(() => {

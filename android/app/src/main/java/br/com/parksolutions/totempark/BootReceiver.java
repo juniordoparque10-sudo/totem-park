@@ -15,12 +15,12 @@ public class BootReceiver extends BroadcastReceiver {
             if (!isPlayerApp(context)) return;
 
             launchPlayer(context);
-            startBootService(context);
 
             if (isBootLikeEvent(intent)) {
                 schedulePlayerLaunch(context, 3_000, 3003);
                 schedulePlayerLaunch(context, 10_000, 3010);
                 schedulePlayerLaunch(context, 25_000, 3025);
+                schedulePlayerLaunch(context, 45_000, 3045);
             }
         }
     }
@@ -56,21 +56,6 @@ public class BootReceiver extends BroadcastReceiver {
         launchIntent.addFlags(Intent.FLAG_ACTIVITY_CLEAR_TOP);
         launchIntent.addFlags(Intent.FLAG_ACTIVITY_SINGLE_TOP);
         context.startActivity(launchIntent);
-    }
-
-    private void startBootService(Context context) {
-        Intent serviceIntent = new Intent(context, PlayerBootService.class);
-
-        try {
-            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
-                context.startForegroundService(serviceIntent);
-                return;
-            }
-
-            context.startService(serviceIntent);
-        } catch (IllegalStateException | SecurityException ignored) {
-            // Some TV firmwares block background starts during boot. The alarm fallback remains active.
-        }
     }
 
     private void schedulePlayerLaunch(Context context, long delayMillis, int requestCode) {
