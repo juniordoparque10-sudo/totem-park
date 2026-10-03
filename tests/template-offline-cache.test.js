@@ -2,7 +2,7 @@ import test from "node:test";
 import assert from "node:assert/strict";
 import { Buffer } from "node:buffer";
 import { readFileSync } from "node:fs";
-import { buildTemplateDataCacheKey, clearTemplateDataMemoryCacheForTests, readTemplateDataCache, writeTemplateDataCache } from "../src/templates-v2/offline-data-cache.js";
+import { buildSportsDataCacheContext, buildTemplateDataCacheKey, clearTemplateDataMemoryCacheForTests, createSportsDataFingerprintConfig, mergeSportsLastKnown, readSportsTemplateDataCache, readTemplateDataCache, writeSportsTemplateDataCache, writeTemplateDataCache } from "../src/templates-v2/offline-data-cache.js";
 import { clearTemplateAssetMemoryCacheForTests, collectTemplateAssetUrls, createOfflineSafeTemplate, fetchTemplateAssetResponse, prepareTemplateAssets, refreshTemplateAsset } from "../src/templates-v2/offline-asset-cache.js";
 import { shouldRevealTemplateImmediately } from "../src/templates-v2/offline-readiness.js";
 import { getNextTemplateToPrepare } from "../src/templates-v2/offline-preload.js";
@@ -233,4 +233,137 @@ test("módulo de assets permanece isolado dos módulos V40", () => {
     "android-media-source",
   ].forEach((moduleName) => assert.doesNotMatch(source, new RegExp(`from [\\"'].*${moduleName}`)));
   assert.doesNotMatch(source, /@capacitor\/file-transfer/);
+});
+
+const sportsScope = { clientId:"client-1", screenId:"screen-1", templateId:"template-sports" };
+const sportsConfig = {
+  provider:"thesportsdb",
+  mode:"rotation",
+  selectedSport:"football",
+  selectedSports:["football","basketball","motorsport"],
+  transition:"fade",
+  items:{
+    football:{ competitionId:"brasileirao_a", duration:5, modules:{ results:true, upcoming:true, standings:true } },
+    basketball:{ competitionId:"daily", duration:5, modules:{ events:true } },
+    motorsport:{ competitionId:"daily", duration:5, modules:{ events:true } },
+  },
+};
+const sportsPayload = {
+  sports:{
+    football:{ data:{ results:[{ id:"football-result" }], upcoming:[], standings:[], events:[] } },
+    basketball:{ data:{ results:[], upcoming:[], standings:[], events:[{ id:"basketball-event" }] } },
+    motorsport:{ data:{ results:[], upcoming:[], standings:[], events:[{ id:"motorsport-event" }] } },
+  },
+  sportsErrors:[],
+};
+
+test("Sports online salvo é restaurado offline", () => {
+  const storage = new MemoryStorage();
+  writeSportsTemplateDataCache(sportsScope, sportsConfig, sportsPayload, { storage, now:101 });
+  assert.deepEqual(readSportsTemplateDataCache(sportsScope, sportsConfig, storage)?.payload, sportsPayload);
+});
+
+test("cache Sports sobrevive a nova instância lógica", () => {
+  const storage = new MemoryStorage();
+  writeSportsTemplateDataCache(sportsScope, sportsConfig, sportsPayload, { storage, now:102 });
+  clearTemplateDataMemoryCacheForTests();
+  assert.equal(readSportsTemplateDataCache(sportsScope, sportsConfig, storage)?.timestamp, 102);
+});
+
+test("segunda leitura após hidratação encontra a configuração correta", () => {
+  const storage = new MemoryStorage();
+  const embedded = { ...sportsConfig, selectedSports:["football"], items:{ ...sportsConfig.items, football:{ ...sportsConfig.items.football, competitionId:"embedded-old" } } };
+  writeSportsTemplateDataCache(sportsScope, sportsConfig, sportsPayload, { storage });
+  clearTemplateDataMemoryCacheForTests();
+  assert.equal(readSportsTemplateDataCache(sportsScope, embedded, storage), null);
+  assert.deepEqual(readSportsTemplateDataCache(sportsScope, sportsConfig, storage)?.payload, sportsPayload);
+});
+
+test("propriedades visuais não alteram fingerprint Sports", () => {
+  const visualChange = {
+    ...sportsConfig,
+    mode:"split",
+    transition:"slide",
+    visualPreset:"neon",
+    background:"blob:https://localhost/background",
+    color:"#fff",
+    items:{ ...sportsConfig.items, football:{ ...sportsConfig.items.football, duration:99, homeLogo:{ url:"blob:https://localhost/logo" }, modules:{ ...sportsConfig.items.football.modules, internalRotation:true } } },
+  };
+  assert.deepEqual(createSportsDataFingerprintConfig(visualChange), createSportsDataFingerprintConfig(sportsConfig));
+});
+
+test("competitionId altera fingerprint Sports", () => {
+  const changed = { ...sportsConfig, items:{ ...sportsConfig.items, football:{ ...sportsConfig.items.football, competitionId:"brasileirao_d" } } };
+  assert.notEqual(buildTemplateDataCacheKey(buildSportsDataCacheContext(sportsScope, changed)), buildTemplateDataCacheKey(buildSportsDataCacheContext(sportsScope, sportsConfig)));
+});
+
+test("esporte selecionado altera fingerprint Sports", () => {
+  const changed = { ...sportsConfig, selectedSport:"football", selectedSports:["football"] };
+  assert.notEqual(buildTemplateDataCacheKey(buildSportsDataCacheContext(sportsScope, changed)), buildTemplateDataCacheKey(buildSportsDataCacheContext(sportsScope, sportsConfig)));
+});
+
+test("módulo de dados altera fingerprint Sports", () => {
+  const changed = { ...sportsConfig, items:{ ...sportsConfig.items, football:{ ...sportsConfig.items.football, modules:{ ...sportsConfig.items.football.modules, standings:false } } } };
+  assert.notEqual(buildTemplateDataCacheKey(buildSportsDataCacheContext(sportsScope, changed)), buildTemplateDataCacheKey(buildSportsDataCacheContext(sportsScope, sportsConfig)));
+});
+
+test("READ e WRITE Sports compartilham escopo, módulo e fingerprint", () => {
+  const storage = new MemoryStorage();
+  const context = buildSportsDataCacheContext(sportsScope, sportsConfig);
+  writeSportsTemplateDataCache(sportsScope, sportsConfig, sportsPayload, { storage });
+  assert.equal(context.module, "sports");
+  assert.ok(storage.getItem(buildTemplateDataCacheKey(context)));
+  assert.deepEqual(readSportsTemplateDataCache(sportsScope, sportsConfig, storage)?.payload, sportsPayload);
+});
+
+test("restauração offline Sports não depende de provider remoto", () => {
+  const storage = new MemoryStorage();
+  let providerCalls = 0;
+  writeSportsTemplateDataCache(sportsScope, sportsConfig, sportsPayload, { storage });
+  clearTemplateDataMemoryCacheForTests();
+  const restored = readSportsTemplateDataCache(sportsScope, sportsConfig, storage);
+  assert.equal(providerCalls, 0);
+  assert.deepEqual(restored.payload, sportsPayload);
+});
+
+test("falha remota não apaga last-known Sports", () => {
+  const previous = { weather:{ temperature:28 }, ...sportsPayload };
+  assert.equal(mergeSportsLastKnown(previous, null), previous);
+});
+
+test("payload remoto vazio não apaga last-known Sports", () => {
+  const previous = { ...sportsPayload };
+  assert.equal(mergeSportsLastKnown(previous, { sports:{}, sportsErrors:["football"] }), previous);
+});
+
+test("payload Sports preserva football, basketball e motorsport", () => {
+  const merged = mergeSportsLastKnown({}, sportsPayload);
+  assert.deepEqual(Object.keys(merged.sports).sort(), ["basketball","football","motorsport"]);
+  assert.deepEqual(merged.sportsErrors, []);
+});
+
+test("Weather permanece isolado do cache Sports", () => {
+  const storage = new MemoryStorage();
+  writeSportsTemplateDataCache(sportsScope, sportsConfig, sportsPayload, { storage });
+  assert.equal(readTemplateDataCache({ ...sportsScope, module:"weather", config:createSportsDataFingerprintConfig(sportsConfig) }, storage), null);
+});
+
+test("News permanece isolado do cache Sports", () => {
+  const storage = new MemoryStorage();
+  writeSportsTemplateDataCache(sportsScope, sportsConfig, sportsPayload, { storage });
+  assert.equal(readTemplateDataCache({ ...sportsScope, module:"news", config:createSportsDataFingerprintConfig(sportsConfig) }, storage), null);
+});
+
+test("cache legado Sports é entregue, migrado e reutilizado pela chave canônica", () => {
+  const storage = new MemoryStorage();
+  const legacyContext = { ...sportsScope, module:"sports", config:sportsConfig };
+  const canonicalContext = buildSportsDataCacheContext(sportsScope, sportsConfig);
+  writeTemplateDataCache(legacyContext, sportsPayload, { storage, now:777, source:"sports-v2" });
+  clearTemplateDataMemoryCacheForTests();
+  const migrated = readSportsTemplateDataCache(sportsScope, sportsConfig, storage);
+  assert.deepEqual(migrated.payload, sportsPayload);
+  assert.ok(storage.getItem(buildTemplateDataCacheKey(canonicalContext)));
+  clearTemplateDataMemoryCacheForTests();
+  const visualChange = { ...sportsConfig, transition:"zoom", backgroundUrl:"blob:https://localhost/new" };
+  assert.deepEqual(readSportsTemplateDataCache(sportsScope, visualChange, storage)?.payload, sportsPayload);
 });

@@ -1,3 +1,5 @@
+import { normalizeSportsV2Config } from "./sports-v2/config.js";
+
 const DATA_PREFIX = "totempark.template-data.v1";
 const memoryCache = new Map();
 
@@ -46,6 +48,60 @@ export function writeTemplateDataCache(context, payload, { source = "remote", no
   memoryCache.set(key, record);
   try { storageOrDefault(storage)?.setItem(key, JSON.stringify(record)); } catch { /* Storage pressure must not affect playback. */ }
   return record;
+}
+
+export function createSportsDataFingerprintConfig(value = {}) {
+  const sports = normalizeSportsV2Config(value || {});
+  const selectedSports = [...new Set(sports.selectedSports || [])].sort();
+  const dataModuleNames = ["results","upcoming","standings","events","live","statistics","advancedStats","sets"];
+  return {
+    provider:sports.provider,
+    selectedSports,
+    items:Object.fromEntries(selectedSports.map((sport) => [sport, {
+      competitionId:String(sports.items?.[sport]?.competitionId || ""),
+      modules:Object.fromEntries(dataModuleNames.filter((module) => Object.hasOwn(sports.items?.[sport]?.modules || {}, module)).map((module) => [module, Boolean(sports.items[sport].modules[module])])),
+    }])),
+  };
+}
+
+export function buildSportsDataCacheContext(scope = {}, sportsConfig = {}) {
+  return { ...scope, module:"sports", config:createSportsDataFingerprintConfig(sportsConfig) };
+}
+
+export function hasUsableSportsPayload(payload) {
+  if (!payload?.sports || typeof payload.sports !== "object") return false;
+  return Object.values(payload.sports).some((snapshot) => {
+    const data = snapshot?.data;
+    if (!data || typeof data !== "object") return false;
+    return ["results","upcoming","standings","events"].some((field) => Array.isArray(data[field]) && data[field].length > 0);
+  });
+}
+
+export function mergeSportsLastKnown(previous, payload) {
+  if (!hasUsableSportsPayload(payload)) return previous;
+  return { ...(previous || {}), sports:payload.sports, sportsErrors:Array.isArray(payload.sportsErrors) ? payload.sportsErrors : [] };
+}
+
+export function writeSportsTemplateDataCache(scope, sportsConfig, payload, options = {}) {
+  if (!hasUsableSportsPayload(payload)) return null;
+  return writeTemplateDataCache(buildSportsDataCacheContext(scope, sportsConfig), payload, options);
+}
+
+export function readSportsTemplateDataCache(scope, sportsConfig, storage) {
+  const canonicalContext = buildSportsDataCacheContext(scope, sportsConfig);
+  const canonical = readTemplateDataCache(canonicalContext, storage);
+  if (hasUsableSportsPayload(canonical?.payload)) return canonical;
+
+  const legacyContext = { ...scope, module:"sports", config:sportsConfig };
+  if (buildTemplateDataCacheKey(legacyContext) === buildTemplateDataCacheKey(canonicalContext)) return null;
+  const legacy = readTemplateDataCache(legacyContext, storage);
+  if (!hasUsableSportsPayload(legacy?.payload)) return null;
+
+  return writeTemplateDataCache(canonicalContext, legacy.payload, {
+    storage,
+    source:legacy.source || "sports-v2-legacy-migration",
+    now:legacy.timestamp,
+  });
 }
 
 export function clearTemplateDataMemoryCacheForTests() {

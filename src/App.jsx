@@ -10,7 +10,7 @@ import { resolveSportsDataProvider } from "./templates-v2/sports-v2/data/SportsD
 import { withSportsV2ReadinessTimeout } from "./templates-v2/sports-v2/readiness";
 import { clearTemplateV2BackgroundOnlineRetry, getTemplateV2CriticalImageState, getTemplateV2CriticalImageUrl, getTemplateV2ReadinessFingerprint, localizeTemplateV2Assets, markTemplateV2BackgroundForOnlineRetry, prepareTemplateV2CriticalImage, preloadImageForPaint, suppressTemplateV2CriticalImage, takeTemplateV2BackgroundOnlineRetries } from "./templates-v2/player-preload";
 import { collectTemplateAssetUrls, createOfflineSafeTemplate, prepareTemplateAssets, refreshTemplateAssets } from "./templates-v2/offline-asset-cache";
-import { readTemplateDataCache, writeTemplateDataCache } from "./templates-v2/offline-data-cache";
+import { buildSportsDataCacheContext, buildTemplateDataCacheKey, hasUsableSportsPayload, mergeSportsLastKnown, readSportsTemplateDataCache, readTemplateDataCache, writeSportsTemplateDataCache, writeTemplateDataCache } from "./templates-v2/offline-data-cache";
 import { shouldRevealTemplateImmediately } from "./templates-v2/offline-readiness";
 import { getNextTemplateToPrepare } from "./templates-v2/offline-preload";
 import { confirmTemplateImageForPaint, getTemplatePlaybackLayerKey, getTemplatePlaybackReadyKey, isCurrentPlaybackExecution, nextPlaybackExecutionId } from "./templates-v2/player-execution";
@@ -13708,11 +13708,14 @@ function TemplateV2LivePreview({ template, sourceTemplate = template, compact = 
   const weatherConfig = originalConfig?.modules?.weather || {};
   const newsConfig = originalConfig?.modules?.news || {};
   const sportsConfig = originalConfig?.sports || null;
+  const sportsCanonicalCacheKey = sportsConfig?.provider ? buildTemplateDataCacheKey(buildSportsDataCacheContext(scope, sportsConfig)) : "";
+  const sportsLegacyCacheKey = sportsConfig?.provider ? buildTemplateDataCacheKey({ ...scope, module:"sports", config:sportsConfig }) : "";
+  const restoredSportsRef = useRef("");
   const readModule = (module, moduleConfig) => readTemplateDataCache({ ...scope, module, config:moduleConfig });
   const initialDynamicData = () => {
     const weather = weatherConfig.enabled ? readModule("weather", weatherConfig) : null;
     const news = newsConfig.enabled ? readModule("news", newsConfig) : null;
-    const sports = sportsConfig?.provider ? readModule("sports", sportsConfig) : null;
+    const sports = sportsConfig?.provider ? readSportsTemplateDataCache(scope, sportsConfig) : null;
     [["weather",weather],["news",news],["sports",sports]].forEach(([module,record]) => logTemplateOffline(record ? "TEMPLATE_DATA_CACHE_HIT" : "TEMPLATE_DATA_CACHE_MISS", { templateId, module }));
     return { ...(weather ? { weather:weather.payload } : {}), ...(news ? { news:news.payload } : {}), ...(sports ? sports.payload : {}) };
   };
@@ -13723,6 +13726,18 @@ function TemplateV2LivePreview({ template, sourceTemplate = template, compact = 
   useLayoutEffect(() => {
     logTemplatesV2Diagnostic("T1_RENDERER_MOUNTED", { templateId: template.id || template.templateId || "", templateType: template.identity?.templateType || template.templateType || template.type || "", playbackExecutionId });
   }, [template.id, template.templateId, template.identity?.templateType, template.templateType, template.type, playbackExecutionId]);
+
+  useEffect(() => {
+    if (!sportsConfig?.provider) return;
+    const cachedSports = readSportsTemplateDataCache(scope, sportsConfig);
+    if (!cachedSports) return;
+    const resolvedKey = `${sportsCanonicalCacheKey}|${sportsLegacyCacheKey}|${cachedSports.timestamp}`;
+    if (restoredSportsRef.current === resolvedKey) return;
+    restoredSportsRef.current = resolvedKey;
+    setDynamicData((previous) => mergeSportsLastKnown(previous, cachedSports.payload));
+  // Sports cache identity is the complete boundary for local rehydration.
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [sportsCanonicalCacheKey, sportsLegacyCacheKey]);
 
   useEffect(() => {
     let cancelled = false;
@@ -13749,9 +13764,9 @@ function TemplateV2LivePreview({ template, sourceTemplate = template, compact = 
         const sportsData = Object.fromEntries(settled.filter((result)=>result.status === "fulfilled").map((result)=>result.value));
         const sportsErrors = sports.selectedSports.filter((_,index)=>settled[index].status === "rejected");
         const payload = { sports:sportsData, sportsErrors };
-        if (Object.keys(sportsData).length) writeTemplateDataCache({ ...scope, module:"sports", config:sportsConfig }, payload, { source:"sports-v2" });
+        if (hasUsableSportsPayload(payload)) writeSportsTemplateDataCache(scope, sportsConfig, payload, { source:"sports-v2" });
         logTemplatesV2Diagnostic("SPORTS_RENDER_DATA_READY", { templateId, receivedSportsData:Object.keys(sportsData).length>0, sports:Object.fromEntries(Object.entries(sportsData).map(([sport,snapshot])=>[sport,{results:Number(snapshot?.data?.results?.length||0),upcoming:Number(snapshot?.data?.upcoming?.length||0),standings:Number(snapshot?.data?.standings?.length||0),events:Number(snapshot?.data?.events?.length||0)}])), errors:sportsErrors });
-        return payload;
+        return hasUsableSportsPayload(payload) ? payload : {};
       })());
       const settledModules = await Promise.allSettled(tasks);
       const next = Object.assign({}, ...settledModules.filter((result) => result.status === "fulfilled").map((result) => result.value));
