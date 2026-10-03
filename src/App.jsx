@@ -7,8 +7,12 @@ import QRCodeLayer from "./QRCodeLayer";
 import { normalizeTemplatesV2Override, resolveTemplatesV2Entitlement } from "./templates-v2/entitlement";
 import { normalizeSportsV2Config } from "./templates-v2/sports-v2/config";
 import { resolveSportsDataProvider } from "./templates-v2/sports-v2/data/SportsDataProvider";
-import { canRevealSportsV2, withSportsV2ReadinessTimeout } from "./templates-v2/sports-v2/readiness";
+import { withSportsV2ReadinessTimeout } from "./templates-v2/sports-v2/readiness";
 import { clearTemplateV2BackgroundOnlineRetry, getTemplateV2CriticalImageState, getTemplateV2CriticalImageUrl, getTemplateV2ReadinessFingerprint, localizeTemplateV2Assets, markTemplateV2BackgroundForOnlineRetry, prepareTemplateV2CriticalImage, preloadImageForPaint, suppressTemplateV2CriticalImage, takeTemplateV2BackgroundOnlineRetries } from "./templates-v2/player-preload";
+import { collectTemplateAssetUrls, createOfflineSafeTemplate, prepareTemplateAssets, refreshTemplateAssets } from "./templates-v2/offline-asset-cache";
+import { readTemplateDataCache, writeTemplateDataCache } from "./templates-v2/offline-data-cache";
+import { shouldRevealTemplateImmediately } from "./templates-v2/offline-readiness";
+import { getNextTemplateToPrepare } from "./templates-v2/offline-preload";
 import { confirmTemplateImageForPaint, getTemplatePlaybackLayerKey, getTemplatePlaybackReadyKey, isCurrentPlaybackExecution, nextPlaybackExecutionId } from "./templates-v2/player-execution";
 import { deriveMediaCacheState, finalizeCompletedMediaCache } from "./player-cache-state";
 import { findNextReadyMediaIndex, getCanonicalPlaylistMediaEntries, getNativeOfflineQueueUrls, getPlaylistMediaPreparation } from "./media-download-readiness";
@@ -13633,11 +13637,38 @@ function SparklineIcon() {
   );
 }
 
-function TemplateVisualPreview({ template, compact = false, tv = false, playbackExecutionId = null, onVisualEvent = null }) {
+function TemplateVisualPreview({ template, compact = false, tv = false, playbackExecutionId = null, onVisualEvent = null, offlineContext = null }) {
+  const templateId = template.id || template.templateId || template.identity?.templateId || "";
+  const [offlineTemplate, setOfflineTemplate] = useState(() => createOfflineSafeTemplate(template));
+  const assetKey = JSON.stringify([...collectTemplateAssetUrls(template)]);
+  useEffect(() => {
+    let active = true;
+    prepareTemplateAssets(template).then((result) => {
+      if (!active) return;
+      logTemplateOffline(result.hits ? "TEMPLATE_ASSET_CACHE_HIT" : "TEMPLATE_ASSET_CACHE_MISS", { templateId, hits:result.hits, misses:result.misses });
+      setOfflineTemplate(result.template);
+      if (result.hits) logTemplateOffline("TEMPLATE_PRELOAD_LOCAL_READY", { templateId, assets:result.hits });
+    }).catch(() => {});
+    const refreshRemoteAssets = () => {
+      if (navigator.onLine === false) return;
+      logTemplateOffline("TEMPLATE_REMOTE_REFRESH_STARTED", { templateId, type:"assets" });
+      refreshTemplateAssets(template).then((results) => {
+        const failed = results.filter((result) => result.status === "failed").length;
+        logTemplateOffline(failed ? "TEMPLATE_REMOTE_REFRESH_FAILED" : "TEMPLATE_REMOTE_REFRESH_COMPLETED", { templateId, type:"assets", failed });
+        return prepareTemplateAssets(template);
+      }).then((result) => { if (active) setOfflineTemplate(result.template); }).catch(() => {});
+    };
+    refreshRemoteAssets();
+    window.addEventListener("online", refreshRemoteAssets);
+    return () => { active = false; window.removeEventListener("online", refreshRemoteAssets); };
+  // Asset URLs are the refresh boundary; object identity is intentionally ignored.
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [assetKey, templateId]);
   if (isTemplateV2(template)) {
-    return <TemplateV2LivePreview template={template} compact={compact} tv={tv} playbackExecutionId={playbackExecutionId} onVisualEvent={onVisualEvent} />;
+    return <TemplateV2LivePreview template={offlineTemplate} sourceTemplate={template} compact={compact} tv={tv} playbackExecutionId={playbackExecutionId} onVisualEvent={onVisualEvent} offlineContext={offlineContext} />;
   }
-  return <LegacyTemplateVisualPreview template={template} compact={compact} tv={tv} />;
+
+  return <LegacyTemplateVisualPreview template={offlineTemplate} sourceTemplate={template} compact={compact} tv={tv} offlineContext={offlineContext} />;
 }
 
 function ScaledTemplatePortalPreview({ template }) {
@@ -13666,16 +13697,28 @@ async function loadTemplateV2News(config = {}) {
   return lists.flat().filter((item) => item?.title).slice(0,8);
 }
 
-function TemplateV2LivePreview({ template, compact = false, tv = false, playbackExecutionId = null, onVisualEvent = null }) {
+function logTemplateOffline(event, payload = {}) {
+  if (import.meta.env.DEV) console.debug(`[${event}]`, payload);
+}
+
+function TemplateV2LivePreview({ template, sourceTemplate = template, compact = false, tv = false, playbackExecutionId = null, onVisualEvent = null, offlineContext = null }) {
+  const templateId = template.id || template.templateId || template.identity?.templateId || "";
+  const scope = { clientId:offlineContext?.clientId || "", screenId:offlineContext?.screenId || "", templateId };
+  const originalConfig = sourceTemplate.published;
+  const weatherConfig = originalConfig?.modules?.weather || {};
+  const newsConfig = originalConfig?.modules?.news || {};
+  const sportsConfig = originalConfig?.sports || null;
+  const readModule = (module, moduleConfig) => readTemplateDataCache({ ...scope, module, config:moduleConfig });
+  const initialDynamicData = () => {
+    const weather = weatherConfig.enabled ? readModule("weather", weatherConfig) : null;
+    const news = newsConfig.enabled ? readModule("news", newsConfig) : null;
+    const sports = sportsConfig?.provider ? readModule("sports", sportsConfig) : null;
+    [["weather",weather],["news",news],["sports",sports]].forEach(([module,record]) => logTemplateOffline(record ? "TEMPLATE_DATA_CACHE_HIT" : "TEMPLATE_DATA_CACHE_MISS", { templateId, module }));
+    return { ...(weather ? { weather:weather.payload } : {}), ...(news ? { news:news.payload } : {}), ...(sports ? sports.payload : {}) };
+  };
   const config = template.published;
-  const weatherConfig = config?.modules?.weather || {};
-  const newsConfig = config?.modules?.news || {};
-  const [dynamicData, setDynamicData] = useState(null);
-  const backgroundReadyRef = useRef(false);
-  const readyReportedRef = useRef(false);
-  const sportsEnabled = Boolean(config?.sports?.provider);
-  const backgroundConfigured = getTemplateV2CriticalImageState(template).configured;
-  const dynamicKey = JSON.stringify({ city:weatherConfig.city || "", enabledWeather:weatherConfig.enabled, enabledNews:newsConfig.enabled, feed:newsConfig.newsFeedUrl || "", sources:newsConfig.selectedNewsSources || [], sports:config?.sports || null });
+  const [dynamicData, setDynamicData] = useState(initialDynamicData);
+  const dynamicKey = JSON.stringify({ city:weatherConfig.city || "", enabledWeather:weatherConfig.enabled, enabledNews:newsConfig.enabled, feed:newsConfig.newsFeedUrl || "", sources:newsConfig.selectedNewsSources || [], sports:sportsConfig });
 
   useLayoutEffect(() => {
     logTemplatesV2Diagnostic("T1_RENDERER_MOUNTED", { templateId: template.id || template.templateId || "", templateType: template.identity?.templateType || template.templateType || template.type || "", playbackExecutionId });
@@ -13684,77 +13727,51 @@ function TemplateV2LivePreview({ template, compact = false, tv = false, playback
   useEffect(() => {
     let cancelled = false;
     async function load() {
-      const next = {};
-      if (weatherConfig.enabled) next.weather = await loadTemplateV2Weather(weatherConfig.city || "Sua cidade");
-      if (newsConfig.enabled) next.news = await loadTemplateV2News(newsConfig);
-      if (config?.sports?.provider) {
-        const sports = normalizeSportsV2Config(config.sports);
+      if (navigator.onLine === false) return;
+      logTemplateOffline("TEMPLATE_REMOTE_REFRESH_STARTED", { templateId, type:"data" });
+      const tasks = [];
+      if (weatherConfig.enabled) tasks.push(loadTemplateV2Weather(weatherConfig.city || "Sua cidade").then((weather) => {
+        if (weather?.unavailable) return {};
+        writeTemplateDataCache({ ...scope, module:"weather", config:weatherConfig }, weather, { source:"open-meteo" });
+        return { weather };
+      }));
+      if (newsConfig.enabled) tasks.push(loadTemplateV2News(newsConfig).then((news) => {
+        const isDefaultFeed = JSON.stringify(news) === JSON.stringify(DEFAULT_NEWS_ITEMS.slice(0,8));
+        if (!news?.length || isDefaultFeed) return {};
+        writeTemplateDataCache({ ...scope, module:"news", config:newsConfig }, news, { source:"rss" });
+        return { news };
+      }));
+      if (sportsConfig?.provider) tasks.push((async () => {
+        const sports = normalizeSportsV2Config(sportsConfig);
         logTemplatesV2Diagnostic("SPORTS_PUBLISHED_CONFIG", { templateId:template.id||template.templateId||"", schemaVersion:template.schemaVersion||null, provider:sports.provider, mode:sports.mode, selectedSports:sports.selectedSports, selectedSport:sports.selectedSport, competitionId:sports.items?.[sports.selectedSport]?.competitionId||"", season:sports.items?.[sports.selectedSport]?.season||"", modules:sports.items?.[sports.selectedSport]?.modules||{} });
         const provider = resolveSportsDataProvider(sports, { diagnostic:(event,payload)=>logTemplatesV2Diagnostic(`SPORTS_${event}`,{templateId:template.id||template.templateId||"",...payload}) });
         const settled = await withSportsV2ReadinessTimeout(Promise.allSettled(sports.selectedSports.map(async (sport) => [sport,await provider.getSnapshot(sport)])));
-        next.sports = Object.fromEntries(settled.filter((result)=>result.status === "fulfilled").map((result)=>result.value));
-        next.sportsErrors = sports.selectedSports.filter((_,index)=>settled[index].status === "rejected");
-        logTemplatesV2Diagnostic("SPORTS_RENDER_DATA_READY", { templateId:template.id||template.templateId||"", receivedSportsData:Object.keys(next.sports).length>0, sports:Object.fromEntries(Object.entries(next.sports).map(([sport,snapshot])=>[sport,{results:Number(snapshot?.data?.results?.length||0),upcoming:Number(snapshot?.data?.upcoming?.length||0),standings:Number(snapshot?.data?.standings?.length||0),events:Number(snapshot?.data?.events?.length||0)}])), errors:next.sportsErrors });
-      }
-      if (!cancelled) setDynamicData(next);
+        const sportsData = Object.fromEntries(settled.filter((result)=>result.status === "fulfilled").map((result)=>result.value));
+        const sportsErrors = sports.selectedSports.filter((_,index)=>settled[index].status === "rejected");
+        const payload = { sports:sportsData, sportsErrors };
+        if (Object.keys(sportsData).length) writeTemplateDataCache({ ...scope, module:"sports", config:sportsConfig }, payload, { source:"sports-v2" });
+        logTemplatesV2Diagnostic("SPORTS_RENDER_DATA_READY", { templateId, receivedSportsData:Object.keys(sportsData).length>0, sports:Object.fromEntries(Object.entries(sportsData).map(([sport,snapshot])=>[sport,{results:Number(snapshot?.data?.results?.length||0),upcoming:Number(snapshot?.data?.upcoming?.length||0),standings:Number(snapshot?.data?.standings?.length||0),events:Number(snapshot?.data?.events?.length||0)}])), errors:sportsErrors });
+        return payload;
+      })());
+      const settledModules = await Promise.allSettled(tasks);
+      const next = Object.assign({}, ...settledModules.filter((result) => result.status === "fulfilled").map((result) => result.value));
+      if (!cancelled && Object.keys(next).length) setDynamicData((previous) => ({ ...(previous || {}), ...next }));
+      logTemplateOffline(settledModules.some((result) => result.status === "rejected") ? "TEMPLATE_REMOTE_REFRESH_FAILED" : "TEMPLATE_REMOTE_REFRESH_COMPLETED", { templateId, type:"data" });
     }
-    load().catch(() => { if (!cancelled) setDynamicData({}); });
-    const interval = setInterval(load, config?.sports?.provider ? 15 * 60 * 1000 : 10 * 60 * 1000);
-    return () => { cancelled = true; clearInterval(interval); };
+    load().catch(() => logTemplateOffline("TEMPLATE_REMOTE_REFRESH_FAILED", { templateId, type:"data" }));
+    const interval = setInterval(load, sportsConfig?.provider ? 15 * 60 * 1000 : 10 * 60 * 1000);
+    window.addEventListener("online", load);
+    return () => { cancelled = true; clearInterval(interval); window.removeEventListener("online", load); };
   // The serialized configuration is the refresh boundary for existing live sources.
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [dynamicKey]);
 
-  useEffect(() => {
-    backgroundReadyRef.current = false;
-    readyReportedRef.current = false;
-  }, [playbackExecutionId, dynamicKey]);
-
-  const reportVisualEvent = (event, details = {}) => {
-    if (!sportsEnabled) {
-      onVisualEvent?.(event, details);
-      return;
-    }
-
-    if (event !== "ready") {
-      onVisualEvent?.(event, details);
-      return;
-    }
-
-    backgroundReadyRef.current = true;
-
-    if (
-      !readyReportedRef.current &&
-      canRevealSportsV2({
-        dynamicData,
-        backgroundConfigured,
-        backgroundReady: true,
-      })
-    ) {
-      readyReportedRef.current = true;
-      onVisualEvent?.("ready", details);
-    }
-  };
-
-  useEffect(() => {
-    if (!sportsEnabled || readyReportedRef.current) return;
-
-    if (
-      !canRevealSportsV2({
-        dynamicData,
-        backgroundConfigured,
-        backgroundReady: backgroundReadyRef.current,
-      })
-    ) return;
-
-    readyReportedRef.current = true;
-    onVisualEvent?.("ready", { sportsFinal: true });
-  }, [backgroundConfigured, dynamicData, onVisualEvent, sportsEnabled]);
+  const reportVisualEvent = (event, details = {}) => onVisualEvent?.(event, details);
 
   return <TemplateV2Renderer template={template} config={config} orientation={config?.display?.defaultOrientation || template.orientation || "Paisagem"} compact={compact} tv={tv} dynamicData={dynamicData} playbackExecutionId={playbackExecutionId} onVisualEvent={reportVisualEvent} />;
 }
 
-function LegacyTemplateVisualPreview({ template, compact = false, tv = false }) {
+function LegacyTemplateVisualPreview({ template, sourceTemplate = template, compact = false, tv = false, offlineContext = null }) {
   const [locationRotationTick, setLocationRotationTick] = useState(Date.now());
   const activeTemplate = (template.templateType || template.type) === "clima_premium_v2"
     ? {
@@ -13764,7 +13781,9 @@ function LegacyTemplateVisualPreview({ template, compact = false, tv = false }) 
         tideBeach: getActiveTemplateTideBeach(template, locationRotationTick),
       }
     : template;
-  const initialLiveContent = getCachedTemplateLiveContent(activeTemplate);
+  const legacyDataContext = { clientId:offlineContext?.clientId || "", screenId:offlineContext?.screenId || "", templateId:sourceTemplate.id || sourceTemplate.templateId || "", module:"legacy-live", config:{ type:sourceTemplate.templateType || sourceTemplate.type, city:sourceTemplate.city || sourceTemplate.weatherCity, feed:sourceTemplate.newsFeedUrl, sports:sourceTemplate.sportsConfig } };
+  const persistentLiveContent = readTemplateDataCache(legacyDataContext)?.payload || null;
+  const initialLiveContent = getCachedTemplateLiveContent(activeTemplate) || persistentLiveContent;
   const [weather, setWeather] = useState(initialLiveContent?.weather || null);
   const [news, setNews] = useState(initialLiveContent?.news || DEFAULT_NEWS_ITEMS);
   const [realSportsData, setRealSportsData] = useState(initialLiveContent?.sportsData || null);
@@ -13795,15 +13814,29 @@ function LegacyTemplateVisualPreview({ template, compact = false, tv = false }) 
       if (Object.hasOwn(data, "tideForecast")) setRealTideForecast(data.tideForecast);
     }
 
+    function persistRealLiveContent(data = {}) {
+      const real = {};
+      if (data.weather && data.weather.temperature !== "--") real.weather = data.weather;
+      if (Array.isArray(data.news) && data.news.length && JSON.stringify(data.news) !== JSON.stringify(DEFAULT_NEWS_ITEMS)) real.news = data.news;
+      if (data.sportsData) real.sportsData = data.sportsData;
+      if (data.tideForecast) real.tideForecast = data.tideForecast;
+      if (Object.keys(real).length) writeTemplateDataCache(legacyDataContext, { ...(persistentLiveContent || {}), ...real }, { source:"legacy-live" });
+    }
+
     async function loadTemplateContent(force = false) {
       try {
         const cached = getCachedTemplateLiveContent(activeTemplate);
         if (!force && cached && !cancelled) applyLiveContent(cached);
 
+        if (navigator.onLine === false) return;
+
         setLoading(!cached);
 
         const data = await primeTemplateLiveContent(activeTemplate, { force });
-        if (!cancelled && data) applyLiveContent(data);
+        if (!cancelled && data) {
+          applyLiveContent(data);
+          persistRealLiveContent(data);
+        }
       } catch (error) {
         console.log(error);
 
@@ -13836,9 +13869,13 @@ function LegacyTemplateVisualPreview({ template, compact = false, tv = false }) 
       ? 3 * 60 * 1000
       : 10 * 60 * 1000;
     const interval = setInterval(() => loadTemplateContent(true), refreshInterval);
+    const refreshOnline = () => loadTemplateContent(true);
+    window.addEventListener("online", refreshOnline);
+
     return () => {
       cancelled = true;
       clearInterval(interval);
+      window.removeEventListener("online", refreshOnline);
     };
   }, [liveContentKey]);
 
@@ -15889,6 +15926,12 @@ function PlayerPage() {
       if (active && isCurrentPlaybackExecution(executionId,currentPlaybackExecutionIdRef.current)) markCurrentMediaReady(currentItem, safeIndex, executionId);
     };
 
+    if (shouldRevealTemplateImmediately(currentItem)) {
+      logTemplatesV2Diagnostic("TEMPLATE_NETWORK_INDEPENDENT_READY", { ...diagnosticPayload, CURRENT_VISIBLE:previousMediaIndexRef.current !== null, NEXT_PENDING:false });
+      reveal();
+      return () => { active = false; };
+    }
+
     if (suppressedTemplateBackgroundKeys.has(currentItemKey)) {
       logTemplatesV2Diagnostic("CRITICAL_BACKGROUND_FALLBACK_ACTIVE", { ...diagnosticPayload, CURRENT_VISIBLE:previousMediaIndexRef.current !== null, NEXT_PENDING:true });
       if (!sportsNeedsFinalData) reveal();
@@ -15915,6 +15958,38 @@ function PlayerPage() {
 
     return () => { active = false; };
   }, [activeItemsKey, mediaIndex, suppressedTemplateBackgroundKeys, currentPlaybackExecutionId, templateBackgroundRecoveryRevision]);
+
+  useEffect(() => {
+    if (playerItems.length < 2) return undefined;
+    const safeIndex = mediaIndex >= playerItems.length ? 0 : mediaIndex;
+    const nextItem = getNextTemplateToPrepare(playerItems, safeIndex);
+    if (!nextItem || !isTemplateV2(nextItem)) return undefined;
+    let active = true;
+    const templateId = nextItem.templateId || nextItem.id || "";
+    prepareTemplateAssets(nextItem).then((result) => {
+      if (!active) return;
+      logTemplateOffline(result.hits ? "TEMPLATE_PRELOAD_LOCAL_READY" : "TEMPLATE_ASSET_CACHE_MISS", { templateId, hits:result.hits, misses:result.misses, fromType:playerItems[safeIndex]?.type || playerItems[safeIndex]?.playerItemType || "" });
+    }).catch(() => {});
+    const nextConfig = nextItem.published || {};
+    const preloadScope = { clientId, screenId:screen?.id || "", templateId };
+    const cachedModules = [
+      ["weather",nextConfig.modules?.weather],
+      ["news",nextConfig.modules?.news],
+      ["sports",nextConfig.sports],
+    ].filter(([,moduleConfig]) => moduleConfig?.enabled || moduleConfig?.provider);
+    cachedModules.forEach(([module,moduleConfig]) => {
+      const record = readTemplateDataCache({ ...preloadScope, module, config:moduleConfig });
+      logTemplateOffline(record ? "TEMPLATE_DATA_CACHE_HIT" : "TEMPLATE_DATA_CACHE_MISS", { templateId, module, preload:true });
+    });
+    if (navigator.onLine !== false) {
+      refreshTemplateAssets(nextItem).then((results) => {
+        if (!active) return;
+        const failed = results.filter((result) => result.status === "failed").length;
+        logTemplateOffline(failed ? "TEMPLATE_REMOTE_REFRESH_FAILED" : "TEMPLATE_REMOTE_REFRESH_COMPLETED", { templateId, type:"preload-assets", failed });
+      }).catch(() => {});
+    }
+    return () => { active = false; };
+  }, [activeItemsKey, clientId, mediaIndex, screen?.id]);
 
   useEffect(() => {
     const retryBackgrounds = () => {
@@ -17598,6 +17673,7 @@ function PlayerPage() {
         <TemplateVisualPreview
           template={applyOfflineAssetUrls(activeTemplate, offlineAssetMap)}
           tv
+          offlineContext={{ clientId, screenId:screen?.id || "" }}
         />
 
         {visibleOfflineCacheStatus && (
@@ -17709,7 +17785,7 @@ function PlayerPage() {
         if (event === "decoded") logTemplatesV2Diagnostic("T5_IMAGE_DECODED", diagnosticPayload);
         if (event === "ready") markCurrentMediaReady(item,index,executionId);
       } : null;
-      return <TemplateVisualPreview template={renderItem} tv playbackExecutionId={executionId} onVisualEvent={onVisualEvent} />;
+      return <TemplateVisualPreview template={renderItem} tv playbackExecutionId={executionId} onVisualEvent={onVisualEvent} offlineContext={{ clientId, screenId:screen?.id || "" }} />;
     }
 
     if (item.type === "Vídeo") {
