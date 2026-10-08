@@ -12,6 +12,7 @@ import {
 } from "firebase/firestore";
 
 import { getStorage } from "firebase/storage";
+import { getFunctions } from "firebase/functions";
 
 const firebaseConfig = {
   apiKey: "AIzaSyBk775KTH959oIIEqnWiJRFW7Fo-1AX5AY",
@@ -42,5 +43,6 @@ export const db = initializeFirestore(app, {
   }) : memoryLocalCache(),
 });
 export const storage = getStorage(app);
+export const functions = getFunctions(app, "us-central1");
 
 export default app;
