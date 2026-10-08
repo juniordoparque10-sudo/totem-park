@@ -34,4 +34,10 @@ function verifyPreviewToken(token, expectedPayload, { purpose, clientVersion, no
   return envelope;
 }
 
-module.exports = { createPreviewToken, verifyPreviewToken };
+function readPreviewTokenPayload(token) {
+  const [encoded] = String(token || "").split(".");
+  if (!encoded) throw new Error("preview-invalid");
+  return JSON.parse(Buffer.from(encoded, "base64url").toString("utf8")).payload;
+}
+
+module.exports = { createPreviewToken, verifyPreviewToken, readPreviewTokenPayload };

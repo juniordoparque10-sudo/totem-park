@@ -116,6 +116,10 @@ async function isMaster(request) {
   return emails.map((item) => clean(item).toLowerCase()).includes(email);
 }
 
+Object.assign(exports, require("./billing/callables").createBillingCallables({
+  onCall, HttpsError, db, FieldValue, isMaster,
+}));
+
 function playerRebindAuthorizationRef(clientId, screenId) {
   return db.doc(`clients/${clientId}/screens/${screenId}/system/rebindAuthorization`);
 }
