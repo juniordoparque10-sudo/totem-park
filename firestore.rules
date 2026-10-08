@@ -36,6 +36,29 @@ service cloud.firestore {
         && clientDoc(clientId).data.get("accountStatus", "active") != "pending_commercial_validation";
     }
 
+    function changesFinancialSummary() {
+      return request.resource.data.diff(resource.data).affectedKeys().hasAny([
+        "financialModelVersion",
+        "financialMode",
+        "activeContractId",
+        "financialStatus",
+        "financialRestriction",
+        "financialDaysOverdue",
+        "financialReferenceInvoiceId",
+        "financialUpdatedAt"
+      ]);
+    }
+
+    function isFinancialSubcollection(name) {
+      return name in [
+        "contracts",
+        "invoices",
+        "financialNotifications",
+        "financialAudit",
+        "financialEmailDeliveries"
+      ];
+    }
+
     function isOwnAccountRequest() {
       return signedIn()
         && resource.data.email == request.auth.token.email;
@@ -150,7 +173,31 @@ service cloud.firestore {
     match /clients/{clientId} {
       allow read: if true;
       allow create: if isMaster();
-      allow update, delete: if isMaster() || isClientOwner(clientId);
+      allow update: if isMaster() || (isClientOwner(clientId) && !changesFinancialSummary());
+      allow delete: if isMaster() || isClientOwner(clientId);
+
+      match /contracts/{contractId} {
+        allow read: if isMaster() || isClientOwner(clientId);
+        allow write: if isMaster();
+      }
+
+      match /invoices/{invoiceId} {
+        allow read: if isMaster() || isClientOwner(clientId);
+        allow write: if isMaster();
+      }
+
+      match /financialNotifications/{notificationId} {
+        allow read: if isMaster() || isClientOwner(clientId);
+        allow write: if isMaster();
+      }
+
+      match /financialAudit/{auditId} {
+        allow read, write: if isMaster();
+      }
+
+      match /financialEmailDeliveries/{deliveryId} {
+        allow read, write: if isMaster();
+      }
 
       match /screens/{screenId} {
         allow read: if true;
@@ -198,9 +245,11 @@ service cloud.firestore {
       }
 
       match /{subcollection}/{documentId} {
-        allow read: if true;
+        allow read: if !isFinancialSubcollection(subcollection);
         allow write: if isMaster()
-          || (subcollection != "screens" && isClientOwner(clientId));
+          || (!isFinancialSubcollection(subcollection)
+            && subcollection != "screens"
+            && isClientOwner(clientId));
       }
     }
 
