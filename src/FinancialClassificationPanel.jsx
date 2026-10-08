@@ -33,7 +33,7 @@ export default function FinancialClassificationPanel({ client }) {
     </div>
     <button className="client-action primary" disabled={busy} onClick={requestPreview}>Gerar prévia</button>
     {error && <p className="financial-error">{error}</p>}
-    {preview && <div className="financial-preview"><h3>Prévia da ativação</h3><p>Contrato: {preview.normalizedContract.startDate} até {preview.normalizedContract.endDate}</p><p>Primeira cobrança: {preview.firstInvoice.competence} · {preview.firstInvoice.dueDate}</p><p>Estado atual: {preview.currentAccess.restriction} → após ativação: {preview.projectedAccess.restriction}</p><p>Nenhuma competência anterior será criada.</p>
+    {preview && <div className="financial-preview"><h3>Prévia da ativação</h3><p>Contrato: {preview.normalizedContract.startDate} até {preview.normalizedContract.endDate}</p><p>Primeira cobrança: {preview.firstInvoice.competence} · {preview.firstInvoice.dueDate}</p><p>Calendário inicial: {(preview.upcomingInvoices || [preview.firstInvoice]).map((item) => `${item.competence} em ${item.dueDate}`).join("; ")}</p><p>Estado atual: {preview.currentAccess.restriction} → após ativação: {preview.projectedAccess.restriction}</p><p>Nenhuma competência anterior será criada.</p>
       {preview.requiresOperationalChangeConfirmation && <label className="financial-confirm"><input type="checkbox" checked={operationalChangeConfirmed} onChange={(event) => setOperationalChangeConfirmed(event.target.checked)} /> Confirmo especificamente a mudança operacional de acesso indicada acima.</label>}
       <button className="client-action primary" disabled={busy || (preview.requiresOperationalChangeConfirmation && !operationalChangeConfirmed)} onClick={confirm}>Confirmar ativação</button>
     </div>}

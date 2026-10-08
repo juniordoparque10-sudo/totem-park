@@ -38,13 +38,16 @@ test('client cannot read another client or write financial records and projectio
   await assertFails(getDoc(doc(db, 'clients/c1/invoices/i1')));
   await assertFails(setDoc(doc(db, 'clients/c2/invoices/forged'), { amountCents: 1 }));
   await assertFails(updateDoc(doc(db, 'clients/c2'), { financialStatus: 'paid' }));
+  await assertFails(updateDoc(doc(db, 'clients/c2'), { dueDate: '2030-01-01' }));
+  await assertFails(updateDoc(doc(db, 'clients/c2'), { status: 'Ativo', graceUnlockUntil: '2030-01-01' }));
 });
 
-test('master reads and writes finance while anonymous access is denied', async () => {
+test('master reads finance but client SDK writes remain backend-only', async () => {
   const master = env.authenticatedContext('master', { email: 'master@example.com' }).firestore();
   const anon = env.unauthenticatedContext().firestore();
   await assertSucceeds(getDoc(doc(master, 'clients/c1/financialAudit/a1')));
-  await assertSucceeds(updateDoc(doc(master, 'clients/c1/invoices/i1'), { status: 'paid' }));
+  await assertFails(updateDoc(doc(master, 'clients/c1/invoices/i1'), { status: 'paid' }));
+  await assertFails(updateDoc(doc(master, 'clients/c1'), { financialStatus: 'paid' }));
   await assertFails(getDoc(doc(anon, 'clients/c1/invoices/i1')));
 });
 

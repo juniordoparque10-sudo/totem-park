@@ -1,7 +1,7 @@
 const { onCall, HttpsError } = require("firebase-functions/v2/https");
 const { onSchedule } = require("firebase-functions/v2/scheduler");
 const { initializeApp } = require("firebase-admin/app");
-const { getFirestore, FieldValue, Timestamp } = require("firebase-admin/firestore");
+const { getFirestore, FieldValue, FieldPath, Timestamp } = require("firebase-admin/firestore");
 const { validateRescueRequest } = require("./transition-diagnostic-rescue");
 const { REBIND_AUTHORIZATION_TTL_MS, evaluateRebindAuthorization, canRebindKnownDevice } = require("./player-rebind");
 
@@ -118,13 +118,13 @@ async function isMaster(request) {
 }
 
 Object.assign(exports, require("./billing/callables").createBillingCallables({
-  onCall, HttpsError, db, FieldValue, isMaster,
+  onCall, HttpsError, db, FieldValue, FieldPath, isMaster,
 }));
 
 exports.processBillingCycle = onSchedule({ schedule: "every 6 hours", timeZone: "America/Sao_Paulo", timeoutSeconds: 300 }, async () => {
   const { createFirestoreBillingRepository } = require("./billing/repository");
   const { createBillingJobs } = require("./billing/jobs");
-  return createBillingJobs({ repository: createFirestoreBillingRepository(db, FieldValue) }).runBillingCycle();
+  return createBillingJobs({ repository: createFirestoreBillingRepository(db, FieldValue, FieldPath) }).runBillingCycle();
 });
 
 function playerRebindAuthorizationRef(clientId, screenId) {

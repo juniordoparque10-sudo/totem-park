@@ -45,7 +45,15 @@ service cloud.firestore {
         "financialRestriction",
         "financialDaysOverdue",
         "financialReferenceInvoiceId",
-        "financialUpdatedAt"
+        "financialUpdatedAt",
+        "financialRevision",
+        "dueDate",
+        "billing",
+        "plan",
+        "status",
+        "suspensionReason",
+        "suspendedAt",
+        "graceUnlockUntil"
       ]);
     }
 
@@ -173,30 +181,32 @@ service cloud.firestore {
     match /clients/{clientId} {
       allow read: if true;
       allow create: if isMaster();
-      allow update: if isMaster() || (isClientOwner(clientId) && !changesFinancialSummary());
-      allow delete: if isMaster() || isClientOwner(clientId);
+      allow update: if (isMaster() || isClientOwner(clientId)) && !changesFinancialSummary();
+      allow delete: if isMaster();
 
       match /contracts/{contractId} {
         allow read: if isMaster() || isClientOwner(clientId);
-        allow write: if isMaster();
+        allow write: if false;
       }
 
       match /invoices/{invoiceId} {
         allow read: if isMaster() || isClientOwner(clientId);
-        allow write: if isMaster();
+        allow write: if false;
       }
 
       match /financialNotifications/{notificationId} {
         allow read: if isMaster() || isClientOwner(clientId);
-        allow write: if isMaster();
+        allow write: if false;
       }
 
       match /financialAudit/{auditId} {
-        allow read, write: if isMaster();
+        allow read: if isMaster();
+        allow write: if false;
       }
 
       match /financialEmailDeliveries/{deliveryId} {
-        allow read, write: if isMaster();
+        allow read: if isMaster();
+        allow write: if false;
       }
 
       match /screens/{screenId} {
@@ -246,10 +256,9 @@ service cloud.firestore {
 
       match /{subcollection}/{documentId} {
         allow read: if !isFinancialSubcollection(subcollection);
-        allow write: if isMaster()
-          || (!isFinancialSubcollection(subcollection)
-            && subcollection != "screens"
-            && isClientOwner(clientId));
+        allow write: if !isFinancialSubcollection(subcollection)
+          && subcollection != "screens"
+          && (isMaster() || isClientOwner(clientId));
       }
     }
 
@@ -279,8 +288,9 @@ service cloud.firestore {
       allow list, update, delete: if isMaster();
     }
 
-    match /{document=**} {
-      allow read, write: if isMaster();
+    match /{collection}/{document=**} {
+      allow read: if isMaster();
+      allow write: if isMaster() && collection != "clients";
     }
   }
 }

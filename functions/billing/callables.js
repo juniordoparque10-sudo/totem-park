@@ -1,9 +1,9 @@
 "use strict";
 
-function createBillingCallables({ onCall, HttpsError, db, FieldValue, isMaster }) {
+function createBillingCallables({ onCall, HttpsError, db, FieldValue, FieldPath, isMaster }) {
   const { createFirestoreBillingRepository } = require("./repository");
   const { createBillingService } = require("./service");
-  const repository = createFirestoreBillingRepository(db, FieldValue);
+  const repository = createFirestoreBillingRepository(db, FieldValue, FieldPath);
   const service = createBillingService({ repository, previewSecret: process.env.BILLING_PREVIEW_SECRET || (process.env.FUNCTIONS_EMULATOR ? "emulator-billing-preview-secret" : "") });
   function endpoint(handler) {
     return onCall(async (request) => {
@@ -19,6 +19,7 @@ function createBillingCallables({ onCall, HttpsError, db, FieldValue, isMaster }
     reverseFinancialSettlement: endpoint(service.reverseSettlement),
     previewFinancialReversion: endpoint(service.previewReversion),
     confirmFinancialReversion: endpoint(service.confirmReversion),
+    renewFinancialContract: endpoint(service.renewContract),
   };
 }
 

@@ -1,5 +1,12 @@
 "use strict";
 
+function civilDateInTimeZone(date = new Date(), timeZone = "America/Sao_Paulo") {
+  const parts = new Intl.DateTimeFormat("en-CA", {
+    timeZone, year: "numeric", month: "2-digit", day: "2-digit",
+  }).formatToParts(date).reduce((result, part) => ({ ...result, [part.type]: part.value }), {});
+  return `${parts.year}-${parts.month}-${parts.day}`;
+}
+
 const DAY_MS = 86400000;
 
 function parseCivilDate(value) {
@@ -95,6 +102,7 @@ function combineOperationalAccess({ financial, clientStatus, suspensionReason })
 }
 
 module.exports = {
+  civilDateInTimeZone,
   parseCivilDate, formatCivilDate, daysInMonth, clampAnchorDay, nextDueDate,
   normalizeCompetence, nextCompetence, invoiceId, daysOverdue,
   evaluateFinancialState, combineOperationalAccess,

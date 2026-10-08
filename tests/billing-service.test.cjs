@@ -8,21 +8,26 @@ function memoryRepository(client = {}) {
     state,
     async getClient() { return structuredClone(state.client); },
     async getInvoice(_clientId, invoiceId) { return structuredClone(state.invoices[invoiceId] || null); },
+    async getContract(_clientId, contractId) { return structuredClone(state.contracts[contractId] || null); },
     async getOpenInvoices() { return Object.values(state.invoices).filter((item) => ['pending', 'overdue'].includes(item.status)); },
-    async activate({ clientPatch, contract, invoice, audit }) {
-      if (state.client.financialModelVersion === 1) return { repeated: true };
+    async activate({ expectedClientVersion, clientPatch, contract, invoice, audit }) {
+      if (state.client.financialMode === 'active' && state.client.activeContractId === contract.id) return { repeated: true };
+      if (String(state.client.financialRevision ?? state.client.updatedAtMs ?? 'legacy') !== String(expectedClientVersion)) throw new Error('stale-financial-preview');
       state.contracts[contract.id] = contract; state.invoices[invoice.id] = invoice; state.audits[audit.id] = audit;
-      Object.assign(state.client, clientPatch); return { repeated: false };
+      Object.assign(state.client, clientPatch); state.client.financialRevision = Number(state.client.financialRevision || 0) + 1; return { repeated: false };
     },
     async mutateInvoice({ invoiceId, mutate, audit, buildClientPatch, resolveNotifications }) {
       const current = state.invoices[invoiceId];
       if (!current) throw new Error('invoice-not-found');
-      state.invoices[invoiceId] = mutate(structuredClone(current));
+      const outcome = mutate(structuredClone(current));
+      if (outcome.repeated) return outcome;
+      state.invoices[invoiceId] = outcome.invoice;
       if (audit && !state.audits[audit.id]) state.audits[audit.id] = audit;
       if (resolveNotifications) Object.values(state.notifications).filter((n) => n.invoiceId === invoiceId).forEach((n) => { n.status = 'resolved'; });
-      Object.assign(state.client, buildClientPatch(Object.values(state.invoices))); return state.invoices[invoiceId];
+      Object.assign(state.client, buildClientPatch(Object.values(state.invoices))); state.client.financialRevision = Number(state.client.financialRevision || 0) + 1; return { repeated: false, invoice: state.invoices[invoiceId] };
     },
-    async revert({ contractId, clientPatch, audit }) { state.contracts[contractId].status = 'reverted'; state.audits[audit.id] = audit; Object.assign(state.client, clientPatch); },
+    async revert({ contractId, expectedClientVersion, clientPatch, audit }) { if (String(state.client.financialRevision ?? state.client.updatedAtMs ?? 'legacy') !== String(expectedClientVersion)) throw new Error('stale-financial-preview'); state.contracts[contractId].status = 'reverted'; state.audits[audit.id] = audit; Object.assign(state.client, clientPatch); state.client.financialRevision = Number(state.client.financialRevision || 0) + 1; return { repeated: false }; },
+    async renew({ contractId, expectedEndDate, newEndDate, audit }) { if (state.contracts[contractId].endDate !== expectedEndDate) throw new Error('contract-changed'); state.contracts[contractId].endDate = newEndDate; state.audits[audit.id] = audit; return { repeated: false, contractId, endDate: newEndDate }; },
   };
 }
 
@@ -51,6 +56,14 @@ test('activation requires highlighted confirmation when access changes and write
   assert.equal(Object.keys(repo.state.invoices).length, 1);
   const repeated = await service.confirmActivation(actor, { previewToken: preview.previewToken, idempotencyKey: 'activate-1', operationalChangeConfirmed: true });
   assert.equal(repeated.repeated, true);
+});
+
+test('activation confirmation rejects a preview after financial state changes', async () => {
+  const repo = memoryRepository();
+  const service = createBillingService({ repository: repo, previewSecret: secret, now: () => new Date('2026-10-08T12:00:00Z') });
+  const preview = await service.previewActivation(actor, { clientId: 'c1', planKey: 'start', planName: 'Start', startDate: '2026-10-08', endDate: '2027-10-07', billingPeriod: 'monthly', billingAnchorDay: 8, firstCompetence: '2026-10', firstDueDate: '2026-10-08', amountCents: 4990 });
+  repo.state.client.financialRevision = 2;
+  await assert.rejects(() => service.confirmActivation(actor, { previewToken: preview.previewToken, idempotencyKey: 'stale' }), /preview-mismatch|stale-financial-preview/);
 });
 
 test('manual settlement is audited, idempotent and preserves another overdue debt', async () => {
@@ -92,4 +105,14 @@ test('reversion preview is read-only and confirmation preserves all financial hi
   assert.equal(repo.state.client.dueDate, '2026-11-08');
   assert.equal(repo.state.contracts.k1.status, 'reverted');
   assert.ok(repo.state.invoices.i1);
+});
+
+test('authorized renewal extends the active contract without generating retroactive invoices', async () => {
+  const repo = memoryRepository({ financialModelVersion: 1, financialMode: 'active', activeContractId: 'k1' });
+  repo.state.contracts.k1 = { id: 'k1', status: 'active', endDate: '2027-10-07' };
+  const service = createBillingService({ repository: repo, previewSecret: secret, now: () => new Date('2026-10-08T12:00:00Z') });
+  await service.renewContract(actor, { clientId: 'c1', newEndDate: '2028-10-07', idempotencyKey: 'renew-1' });
+  assert.equal(repo.state.contracts.k1.endDate, '2028-10-07');
+  assert.equal(Object.keys(repo.state.invoices).length, 0);
+  assert.ok(Object.values(repo.state.audits).some((item) => item.type === 'contract_renewed'));
 });

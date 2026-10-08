@@ -13,9 +13,9 @@ async function processEmailDelivery({ invoice, eventType, provider = disabledEma
   if (invoice.status === "paid" || invoice.status === "canceled") return { ...base, status: "not_configured", skippedReason: "invoice-not-open" };
   if (!provider?.configured) return { ...base, status: "not_configured", skippedReason: "provider-not-configured" };
   try {
-    const response = await provider.send(invoice, eventType);
-    if (!response?.confirmed) return { ...base, status: "pending" };
-    return { ...base, status: "sent", sentAt: now, providerReference: response.reference || null };
+    const response = await provider.send(invoice, eventType, { idempotencyKey: base.id });
+    if (!response?.confirmed || !response?.reference) return { ...base, status: "pending" };
+    return { ...base, status: "sent", sentAt: now, providerReference: response.reference };
   } catch (error) {
     return { ...base, status: "failed", errorCode: String(error?.code || "send-failed").slice(0, 80), errorMessage: String(error?.message || "Email delivery failed").slice(0, 160) };
   }

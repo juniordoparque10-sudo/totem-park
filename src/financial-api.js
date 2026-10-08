@@ -12,3 +12,4 @@ export const settleFinancialInvoice = callable("settleFinancialInvoice");
 export const reverseFinancialSettlement = callable("reverseFinancialSettlement");
 export const previewFinancialReversion = callable("previewFinancialReversion");
 export const confirmFinancialReversion = callable("confirmFinancialReversion");
+export const renewFinancialContract = callable("renewFinancialContract");

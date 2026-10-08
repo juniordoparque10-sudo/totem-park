@@ -35,6 +35,7 @@
     "test:rules:identity": "firebase emulators:exec --project demo-totem-identity --config firebase.test.json --only firestore \"node --test tests/firestore-player-identity.rules.test.mjs\"",
     "test:functions:identity": "firebase emulators:exec --project demo-totem-identity --config firebase.test.json --only auth,firestore,functions \"node --test tests/player-binding-functions.test.mjs\"",
     "test:billing": "node --test tests/billing-domain.test.cjs tests/billing-service.test.cjs tests/billing-jobs.test.cjs tests/billing-ui.test.mjs",
+    "test:billing:integration": "firebase emulators:exec --project demo-totem-billing-integration --config firebase.test.json --only firestore \"node --test tests/billing-functions.integration.test.mjs tests/firestore-billing.rules.test.mjs\"",
     "lint": "eslint .",
     "preview": "vite preview"
   },

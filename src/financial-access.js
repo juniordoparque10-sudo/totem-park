@@ -13,7 +13,8 @@ function financialMessage(restriction, days) {
 export function getEffectivePlanAccess(client, legacyEvaluator) {
   if (!isFinancialModelActive(client)) return legacyEvaluator(client);
   const administrative = client.status === "Cancelado" || (client.status === "Suspenso" && !String(client.suspensionReason || "").toLowerCase().includes("inadimpl"));
-  const restriction = administrative ? "suspended" : (client.financialRestriction || "none");
+  const temporaryUnlock = !administrative && client.graceUnlockUntil && client.graceUnlockUntil >= localCivilDate();
+  const restriction = administrative ? "suspended" : temporaryUnlock ? "none" : (client.financialRestriction || "none");
   const days = Number(client.financialDaysOverdue || 0);
   const isSuspended = restriction === "suspended";
   const isStrongRestriction = restriction === "strong";
@@ -24,22 +25,27 @@ export function getEffectivePlanAccess(client, legacyEvaluator) {
   return {
     statusLabel: administrative ? client.status : restriction === "none" ? "Ativo" : restriction === "warning" ? "Vencido" : restriction === "partial" ? "Restrição Parcial" : restriction === "strong" ? "Restrição Forte" : "Suspenso",
     daysOverdue: days, isActive: restriction === "none", isOverdue: days > 0,
-    isPartialRestriction, isStrongRestriction, isSuspended, hasTemporaryUnlock: false,
+    isPartialRestriction, isStrongRestriction, isSuspended, hasTemporaryUnlock: Boolean(temporaryUnlock),
     canUseSystem: !isSuspended, canCreate, canEdit, canUpload: canCreate,
     canCreateScreens: canCreate, canCreatePlaylists: canCreate, canCreateTemplates: canCreate, canCreateMarketing: canCreate,
     canEditScreens: canEdit, canEditPlaylists: canEdit, canEditTemplates: canEdit, canEditMarketing: canEdit,
     canShowTvContent: !isSuspended, message,
     severity: isSuspended ? "suspended" : isStrongRestriction ? "strong" : isPartialRestriction ? "partial" : restriction === "warning" ? "warning" : "success",
-    cause: administrative ? "administrative" : restriction === "none" ? "none" : "financial",
+    cause: administrative ? "administrative" : temporaryUnlock ? "temporary_unlock" : restriction === "none" ? "none" : "financial",
   };
 }
 
 function civilDay(value) { return Date.parse(`${value}T00:00:00Z`); }
 
-export function getFinancialCardState(client, invoice, today = new Date().toISOString().slice(0, 10)) {
+function localCivilDate(date = new Date()) {
+  const parts = new Intl.DateTimeFormat("en-CA", { timeZone: "America/Sao_Paulo", year: "numeric", month: "2-digit", day: "2-digit" }).formatToParts(date).reduce((result, part) => ({ ...result, [part.type]: part.value }), {});
+  return `${parts.year}-${parts.month}-${parts.day}`;
+}
+
+export function getFinancialCardState(client, invoice, today = localCivilDate()) {
   if (!invoice) return { title: client?.billing === "Anual" ? "Próxima cobrança anual" : "Próxima mensalidade", tone: "neutral", status: "Sem cobrança aberta", days: null };
   const difference = Math.round((civilDay(invoice.dueDate) - civilDay(today)) / 86400000);
-  const annual = invoice.billingPeriod === "annual" || client?.billing === "Anual";
+  const annual = invoice.billingPeriod ? invoice.billingPeriod === "annual" : client?.billing === "Anual";
   return {
     title: annual ? "Próxima cobrança anual" : "Próxima mensalidade",
     tone: difference < 0 ? "danger" : difference === 0 ? "today" : difference <= 5 ? "warning" : "success",
