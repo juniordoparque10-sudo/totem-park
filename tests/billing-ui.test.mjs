@@ -19,6 +19,31 @@ test('active financial projection maps to existing access contract', () => {
   assert.equal(access.canShowTvContent, true);
 });
 
+test('financial copy distinguishes pending, paid and overdue from operational access', () => {
+  const pending = getEffectivePlanAccess({ financialModelVersion: 1, financialMode: 'active', financialStatus: 'pending', financialRestriction: 'none', financialDaysOverdue: 0 }, () => null);
+  const paid = getEffectivePlanAccess({ financialModelVersion: 1, financialMode: 'active', financialStatus: 'paid', financialRestriction: 'none', financialDaysOverdue: 0 }, () => null);
+  const overdue = getEffectivePlanAccess({ financialModelVersion: 1, financialMode: 'active', financialStatus: 'overdue', financialRestriction: 'warning', financialDaysOverdue: 2 }, () => null);
+  assert.match(pending.message, /Pagamento pendente/);
+  assert.match(paid.message, /Nenhuma mensalidade pendente/);
+  assert.match(overdue.message, /Pagamento atrasado/);
+  assert.equal(pending.canUseSystem, true);
+});
+
+test('administrative suspension remains authoritative over financial presentation', () => {
+  const suspended = getEffectivePlanAccess({
+    financialModelVersion: 1,
+    financialMode: 'active',
+    financialStatus: 'pending',
+    financialRestriction: 'none',
+    financialDaysOverdue: 0,
+    status: 'Suspenso',
+    suspensionReason: 'Administrativo',
+  }, () => null);
+  assert.equal(suspended.isSuspended, true);
+  assert.equal(suspended.canUseSystem, false);
+  assert.match(suspended.message, /administrativo ou contratual/);
+});
+
 test('card state distinguishes due soon, today, overdue and annual copy', () => {
   const client = { financialModelVersion: 1, financialMode: 'active', billing: 'Anual', plan: 'Start' };
   assert.equal(getFinancialCardState(client, { dueDate: '2026-10-13', amountCents: 4990, competence: '2026' }, '2026-10-08').tone, 'warning');
@@ -41,6 +66,15 @@ test('portal integrates classification, management and persistent notifications 
   assert.match(management, /Marcar como pago/);
   assert.match(management, /Corrigir quitação/);
   assert.match(management, /Prévia da reversão/);
+  assert.match(management, /formatBillingCompetence/);
+  assert.match(management, /financialStatusLabel/);
+  assert.match(management, /auditEventLabel/);
+  const notifications = fs.readFileSync('src/FinancialNotifications.jsx', 'utf8');
+  assert.match(notifications, /invoices\[item\.invoiceId\]/);
+  assert.match(notifications, /billingNotificationCopy/);
+  assert.match(app, /selectHeaderInvoice/);
+  assert.match(app, /sem cobrança aberta/);
+  assert.match(app, /currentClient\.dueDate/);
 });
 
 test('local billing homologation is opt-in and cannot redirect production accidentally', () => {

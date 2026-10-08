@@ -2,12 +2,14 @@ export function isFinancialModelActive(client) {
   return client?.financialModelVersion === 1 && client?.financialMode === "active";
 }
 
-function financialMessage(restriction, days) {
+function financialMessage(restriction, days, financialStatus) {
   if (restriction === "suspended") return "Seu plano foi temporariamente suspenso por inadimplência. Regularize para reativar o serviço.";
   if (restriction === "strong") return `Pagamento atrasado há ${days} dias. O sistema está em modo de visualização.`;
   if (restriction === "partial") return `Pagamento atrasado há ${days} dias. Novas criações estão temporariamente bloqueadas.`;
   if (restriction === "warning") return `Pagamento atrasado há ${days} dia(s). Regularize para evitar restrições.`;
-  return "Cobrança em dia. Todos os recursos estão disponíveis.";
+  if (financialStatus === "pending") return "Pagamento pendente. O plano permanece operacional até o vencimento.";
+  if (financialStatus === "overdue") return "Pagamento atrasado. O plano permanece operacional durante o período sem restrição.";
+  return "Nenhuma mensalidade pendente. Todos os recursos estão disponíveis.";
 }
 
 export function getEffectivePlanAccess(client, legacyEvaluator) {
@@ -21,7 +23,7 @@ export function getEffectivePlanAccess(client, legacyEvaluator) {
   const isPartialRestriction = restriction === "partial";
   const canCreate = !isSuspended && !isStrongRestriction && !isPartialRestriction;
   const canEdit = !isSuspended && !isStrongRestriction;
-  const message = administrative ? "Acesso bloqueado por motivo administrativo ou contratual." : financialMessage(restriction, days);
+  const message = administrative ? "Acesso bloqueado por motivo administrativo ou contratual." : financialMessage(restriction, days, client.financialStatus);
   return {
     statusLabel: administrative ? client.status : restriction === "none" ? "Ativo" : restriction === "warning" ? "Vencido" : restriction === "partial" ? "Restrição Parcial" : restriction === "strong" ? "Restrição Forte" : "Suspenso",
     daysOverdue: days, isActive: restriction === "none", isOverdue: days > 0,

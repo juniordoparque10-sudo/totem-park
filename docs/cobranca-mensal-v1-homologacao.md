@@ -13,6 +13,9 @@
 - e-mail backend desativado com estados verdadeiros;
 - fachada que preserva integralmente clientes legados;
 - painel administrativo, card e notificações do cliente;
+- apresentação brasileira centralizada para competências, datas, estados financeiros e auditorias;
+- cabeçalho financeiro baseado na cobrança aberta prioritária, sem reutilizar `dueDate` em clientes classificados;
+- separação visual entre situação operacional do plano e situação financeira da mensalidade;
 - regras financeiras isoladas no Firestore.
 
 ## Revisão independente e correções
@@ -30,12 +33,14 @@ A revisão independente encontrou riscos de concorrência, cursor não serializ�
 
 ## Evidências da verificação final
 
-- domínio, serviços, jobs e UI: 21 testes aprovados;
+- domínio, serviços, jobs e UI: 34 testes aprovados;
 - integração Firestore: 6 testes aprovados, incluindo concorrência real e regras;
 - identidade, vínculo e telemetria do Player: 18 testes aprovados;
 - regressão das ações do portal: aprovada;
 - build web de produção: aprovado, com apenas o aviso preexistente de tamanho do bundle;
 - lint direcionado aos arquivos da Cobrança V1: aprovado.
+- quitação manual validada visualmente no emulador: a competência passou a “Pago”, o aviso foi encerrado, o cabeçalho exibiu “sem cobrança aberta” e o evento auditável foi preservado;
+- fixture restaurada ao estado pendente após a validação, pronta para homologação visual.
 
 ## Como validar localmente
 
@@ -56,6 +61,8 @@ O portal só conecta aos emuladores quando `VITE_USE_FIREBASE_EMULATORS=true`. A
 5. Iniciar o Vite com `VITE_USE_FIREBASE_EMULATORS=true`.
 
 Cliente determinístico: `billing-ux-demo-client`. A fixture ativa demonstra vigência de 11/09/2026 a 10/09/2027, mensalidade Business de R$ 99,00, aviso de vencimento e quitação manual auditável.
+
+Prévia atualizada: `docs/billing-v1-final.png`.
 
 ## Roteiro visual
 
