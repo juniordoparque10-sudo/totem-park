@@ -203,17 +203,20 @@ Antes de confirmar, uma função backend somente de cálculo validará os dados 
 
 A prévia não modifica dados. A confirmação recalcula e rejeita dados divergentes ou cliente alterado desde a prévia.
 
+Quando a comparação indicar qualquer mudança operacional de acesso — introdução, aumento, redução ou remoção de aviso, restrição ou suspensão — a resposta marcará `requiresOperationalChangeConfirmation: true` e descreverá de forma destacada o estado anterior e o estado proposto. Nesses casos, a confirmação comum não será suficiente: o administrador deverá realizar uma segunda confirmação específica, enviando a versão da prévia e uma declaração explícita de ciência da mudança operacional. O backend rejeitará a ativação se essa confirmação destacada estiver ausente, não corresponder à prévia vigente ou se o estado tiver mudado.
+
 ### 6.3 Confirmação atômica
 
 Uma única transação:
 
 1. confirma que o cliente continua elegível e não foi classificado;
 2. valida o token e recalcula a prévia;
-3. grava o contrato;
-4. grava a primeira cobrança;
-5. grava a auditoria;
-6. atualiza o resumo financeiro;
-7. grava `financialModelVersion: 1` e `financialMode: "active"` na mesma confirmação atômica.
+3. valida a confirmação específica quando a prévia indicar mudança operacional de acesso;
+4. grava o contrato;
+5. grava a primeira cobrança;
+6. grava a auditoria;
+7. atualiza o resumo financeiro;
+8. grava `financialModelVersion: 1` e `financialMode: "active"` na mesma confirmação atômica.
 
 Embora o marcador seja conceitualmente a última etapa, nenhuma gravação parcial fica visível porque todas as operações pertencem à mesma transação.
 
@@ -228,6 +231,24 @@ Assim, um contrato com dia-base 31 vence em 28 ou 29 de fevereiro, 30 de abril e
 Cobrança mensal avança por mês de calendário. Cobrança anual avança por ano e preserva mês e dia contratados, ajustando 29 de fevereiro ao último dia válido quando necessário.
 
 Uma nova cobrança não liquida, substitui nem cancela competências anteriores. A cobrança aberta vencida mais antiga determina a contagem de atraso.
+
+### 7.1 Geração das próximas cobranças
+
+A primeira cobrança será criada exclusivamente pela confirmação da classificação. As cobranças seguintes serão geradas antecipadamente pelo processamento agendado quando sua competência entrar em uma janela configurada de geração, inicialmente limitada aos próximos 35 dias. Essa antecedência garante que o aviso de cinco dias sempre encontre uma cobrança persistida sem criar um histórico futuro desnecessário.
+
+Para cada contrato ativo, a próxima competência será derivada da maior competência já persistida, nunca apenas da cobrança mais recente por data de criação. O identificador seguirá uma composição canônica e determinística de `contractId` e competência normalizada. A criação usará transação ou precondição de inexistência; duas execuções concorrentes produzirão no máximo um documento.
+
+O gerador poderá criar somente competências:
+
+- posteriores ou iguais à primeira competência autorizada;
+- posteriores à maior competência já existente;
+- cujo vencimento pertença à vigência do contrato;
+- compatíveis com a periodicidade mensal ou anual do contrato;
+- pertencentes a contrato `active` e cliente em `financialMode: "active"`.
+
+Não serão geradas cobranças com vencimento posterior a `endDate`, nem para contrato encerrado, cancelado ou revertido. O término da vigência não renova o contrato, não estende datas e não cria nova cobrança sem renovação administrativa expressa. A renovação autorizada será uma operação própria, auditável e responsável por definir a nova vigência antes que o gerador possa avançar.
+
+Pendências anteriores permanecem intactas independentemente da geração de nova competência. O processo nunca apagará, substituirá, marcará como paga nem cancelará automaticamente uma cobrança anterior.
 
 ## 8. Avaliação financeira e restrições
 
@@ -272,6 +293,7 @@ A reversão também exige prévia backend obrigatória. A prévia mostra:
 
 A reversão é rejeitada caso os dados mudem após a prévia. Na confirmação transacional:
 
+- quando houver mudança operacional, valida-se uma confirmação administrativa destacada e específica vinculada à prévia vigente;
 - grava-se auditoria de reversão;
 - o contrato ativo recebe estado `reverted`;
 - o cliente recebe `financialMode: "reverted"` e deixa de usar o contrato para acesso;
@@ -288,6 +310,20 @@ Uma função agendada no backend avaliará cobranças ativas nos eventos de cinc
 Cada evento possuirá chave idempotente. A função poderá ser executada repetidamente sem criar notificações ou envios duplicados. Quitação resolve lembretes daquela competência e cria atualização apropriada sem apagar o histórico.
 
 As notificações persistidas continuam disponíveis quando o cliente retorna ao portal e respeitam o isolamento por cliente.
+
+### 11.1 Consultas econômicas
+
+O processamento agendado não varrerá a coleção de clientes. Ele consultará cobranças por `status`, `dueDate` e estado de processamento usando collection group e índices direcionados. Cada execução trabalhará somente com cobranças elegíveis dentro de janelas limitadas: geração futura próxima, lembretes a vencer e cobranças abertas já vencidas que ainda necessitem avaliação.
+
+Os contratos usados para geração terão um campo indexável `nextInvoiceDueDate` ou equivalente, atualizado transacionalmente após cada geração. Assim, o gerador consulta somente contratos ativos cujo próximo vencimento esteja dentro da janela, em vez de percorrer todos os contratos ou clientes.
+
+Consultas serão paginadas por ordem estável, com tamanho máximo de lote. Cada documento será processado de forma independente e idempotente. A execução encerrará antes do limite de tempo e persistirá um checkpoint operacional contendo a consulta, o último cursor confirmado, a versão do job e o horário. O checkpoint será avançado somente depois de o lote correspondente ser confirmado.
+
+### 11.2 Retomada segura
+
+Em nova execução, um checkpoint compatível permite continuar do último cursor confirmado. Se o checkpoint estiver ausente, inválido ou pertencer a outra versão do job, a consulta reinicia pela janela elegível; as chaves determinísticas impedem duplicações. Uma interrupção entre a gravação do resultado e o avanço do cursor pode reprocessar o último item, mas nunca duplicar cobrança, notificação, auditoria ou registro de entrega.
+
+Falhas isoladas serão registradas com referência ao documento e não impedirão o restante do lote. Itens com falha permanecerão elegíveis para nova tentativa controlada. Métricas mínimas registrarão itens lidos, processados, ignorados, falhos e cursores, sem armazenar dados sensíveis desnecessários.
 
 ## 12. Infraestrutura de e-mail
 
@@ -372,6 +408,8 @@ A V1 não implementará gateway, QR Code, PIX Copia e Cola, webhook, débito aut
 - anos bissextos;
 - periodicidade anual;
 - competência e IDs determinísticos;
+- geração mensal e anual dentro da janela permitida;
+- interrupção no término da vigência;
 - estados de pagamento;
 - marcos exatos de 5, 10 e 15 dias;
 - precedência de bloqueios não financeiros;
@@ -382,11 +420,15 @@ A V1 não implementará gateway, QR Code, PIX Copia e Cola, webhook, débito aut
 
 - prévia sem gravação;
 - ativação atômica;
+- exigência da confirmação destacada quando houver mudança operacional;
 - rejeição por mudança após prévia;
 - ausência de retroatividade;
+- geração antecipada sem duplicação e sem alteração de pendências anteriores;
+- paginação, checkpoint e retomada segura do processamento agendado;
 - quitação e correção auditáveis;
 - preservação de outras pendências;
 - reversão com prévia e sem exclusão;
+- reversão com confirmação destacada quando houver mudança operacional;
 - falha concorrente e repetição segura;
 - falha de e-mail sem impacto financeiro.
 
