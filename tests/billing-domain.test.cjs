@@ -40,3 +40,14 @@ test('oldest open invoice controls access and non-financial suspension wins', ()
   assert.equal(financial.restriction, 'suspended');
   assert.equal(combineOperationalAccess({ financial, clientStatus: 'Suspenso', suspensionReason: 'Administrativo' }).cause, 'administrative');
 });
+
+test('preview tokens bind purpose, client version, payload and expiration', () => {
+  const { createPreviewToken, verifyPreviewToken } = require('../functions/billing/preview-token');
+  const payload = { clientId: 'c1', amountCents: 4990, requiresOperationalChangeConfirmation: true };
+  const token = createPreviewToken(payload, { purpose: 'activation', clientVersion: 'v1', nowMs: 1000, ttlMs: 5000, secret: 'test-secret' });
+  assert.deepEqual(verifyPreviewToken(token, payload, { purpose: 'activation', clientVersion: 'v1', nowMs: 5999, secret: 'test-secret' }).payload, payload);
+  assert.throws(() => verifyPreviewToken(token, payload, { purpose: 'reversion', clientVersion: 'v1', nowMs: 2000, secret: 'test-secret' }), /preview-mismatch/);
+  assert.throws(() => verifyPreviewToken(token, { ...payload, amountCents: 5000 }, { purpose: 'activation', clientVersion: 'v1', nowMs: 2000, secret: 'test-secret' }), /preview-mismatch/);
+  assert.throws(() => verifyPreviewToken(token, payload, { purpose: 'activation', clientVersion: 'v2', nowMs: 2000, secret: 'test-secret' }), /preview-mismatch/);
+  assert.throws(() => verifyPreviewToken(token, payload, { purpose: 'activation', clientVersion: 'v1', nowMs: 6001, secret: 'test-secret' }), /preview-expired/);
+});
