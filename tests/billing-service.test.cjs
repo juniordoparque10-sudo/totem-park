@@ -7,19 +7,20 @@ function memoryRepository(client = {}) {
   return {
     state,
     async getClient() { return structuredClone(state.client); },
+    async getInvoice(_clientId, invoiceId) { return structuredClone(state.invoices[invoiceId] || null); },
     async getOpenInvoices() { return Object.values(state.invoices).filter((item) => ['pending', 'overdue'].includes(item.status)); },
     async activate({ clientPatch, contract, invoice, audit }) {
       if (state.client.financialModelVersion === 1) return { repeated: true };
       state.contracts[contract.id] = contract; state.invoices[invoice.id] = invoice; state.audits[audit.id] = audit;
       Object.assign(state.client, clientPatch); return { repeated: false };
     },
-    async mutateInvoice({ invoiceId, mutate, audit, clientPatch, resolveNotifications }) {
+    async mutateInvoice({ invoiceId, mutate, audit, buildClientPatch, resolveNotifications }) {
       const current = state.invoices[invoiceId];
       if (!current) throw new Error('invoice-not-found');
       state.invoices[invoiceId] = mutate(structuredClone(current));
-      state.audits[audit.id] = audit;
+      if (audit && !state.audits[audit.id]) state.audits[audit.id] = audit;
       if (resolveNotifications) Object.values(state.notifications).filter((n) => n.invoiceId === invoiceId).forEach((n) => { n.status = 'resolved'; });
-      Object.assign(state.client, clientPatch); return state.invoices[invoiceId];
+      Object.assign(state.client, buildClientPatch(Object.values(state.invoices))); return state.invoices[invoiceId];
     },
     async revert({ contractId, clientPatch, audit }) { state.contracts[contractId].status = 'reverted'; state.audits[audit.id] = audit; Object.assign(state.client, clientPatch); },
   };
@@ -50,4 +51,45 @@ test('activation requires highlighted confirmation when access changes and write
   assert.equal(Object.keys(repo.state.invoices).length, 1);
   const repeated = await service.confirmActivation(actor, { previewToken: preview.previewToken, idempotencyKey: 'activate-1', operationalChangeConfirmed: true });
   assert.equal(repeated.repeated, true);
+});
+
+test('manual settlement is audited, idempotent and preserves another overdue debt', async () => {
+  const repo = memoryRepository({ financialModelVersion: 1, financialMode: 'active', activeContractId: 'k1', status: 'Ativo' });
+  repo.state.invoices.i1 = { id: 'i1', contractId: 'k1', dueDate: '2026-09-01', status: 'overdue' };
+  repo.state.invoices.i2 = { id: 'i2', contractId: 'k1', dueDate: '2026-09-20', status: 'overdue' };
+  repo.state.notifications.n1 = { id: 'n1', invoiceId: 'i1', status: 'active' };
+  const service = createBillingService({ repository: repo, previewSecret: secret, now: () => new Date('2026-10-08T12:00:00Z') });
+  await service.settleInvoice(actor, { clientId: 'c1', invoiceId: 'i1', idempotencyKey: 'pay-i1', paidAt: '2026-10-08T11:00:00Z' });
+  assert.equal(repo.state.invoices.i1.status, 'paid');
+  assert.equal(repo.state.notifications.n1.status, 'resolved');
+  assert.equal(repo.state.client.financialReferenceInvoiceId, 'i2');
+  assert.equal(repo.state.client.financialRestriction, 'suspended');
+  await service.settleInvoice(actor, { clientId: 'c1', invoiceId: 'i1', idempotencyKey: 'pay-i1' });
+  assert.equal(Object.values(repo.state.audits).filter((a) => a.type === 'invoice_settled').length, 1);
+});
+
+test('settlement correction preserves history and does not remove administrative suspension', async () => {
+  const repo = memoryRepository({ financialModelVersion: 1, financialMode: 'active', activeContractId: 'k1', status: 'Suspenso', suspensionReason: 'Administrativo' });
+  repo.state.invoices.i1 = { id: 'i1', contractId: 'k1', dueDate: '2026-10-01', status: 'paid', paidAt: '2026-10-02T00:00:00Z' };
+  const service = createBillingService({ repository: repo, previewSecret: secret, now: () => new Date('2026-10-08T12:00:00Z') });
+  await service.reverseSettlement(actor, { clientId: 'c1', invoiceId: 'i1', idempotencyKey: 'reverse-i1', reason: 'Lançamento indevido' });
+  assert.equal(repo.state.invoices.i1.status, 'overdue');
+  assert.equal(repo.state.client.status, 'Suspenso');
+  assert.equal(repo.state.client.suspensionReason, 'Administrativo');
+  assert.ok(Object.values(repo.state.audits).some((a) => a.type === 'settlement_reversed'));
+});
+
+test('reversion preview is read-only and confirmation preserves all financial history', async () => {
+  const repo = memoryRepository({ financialModelVersion: 1, financialMode: 'active', activeContractId: 'k1', dueDate: '2026-11-08' });
+  repo.state.contracts.k1 = { id: 'k1', status: 'active' };
+  repo.state.invoices.i1 = { id: 'i1', contractId: 'k1', dueDate: '2026-10-01', status: 'overdue' };
+  const service = createBillingService({ repository: repo, previewSecret: secret, now: () => new Date('2026-10-08T12:00:00Z') });
+  const preview = await service.previewReversion(actor, { clientId: 'c1' });
+  assert.equal(repo.state.contracts.k1.status, 'active');
+  await assert.rejects(() => service.confirmReversion(actor, { previewToken: preview.previewToken, idempotencyKey: 'revert-1' }), /operational-confirmation-required/);
+  await service.confirmReversion(actor, { previewToken: preview.previewToken, idempotencyKey: 'revert-1', operationalChangeConfirmed: true });
+  assert.equal(repo.state.client.financialMode, 'reverted');
+  assert.equal(repo.state.client.dueDate, '2026-11-08');
+  assert.equal(repo.state.contracts.k1.status, 'reverted');
+  assert.ok(repo.state.invoices.i1);
 });

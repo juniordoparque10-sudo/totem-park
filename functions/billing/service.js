@@ -27,6 +27,9 @@ function legacyFinancial(client, today) {
 }
 
 function createBillingService({ repository, previewSecret, now = () => new Date() }) {
+  function financialPatch(state, timestamp) {
+    return { financialStatus: state.status, financialRestriction: state.restriction, financialDaysOverdue: state.daysOverdue, financialReferenceInvoiceId: state.referenceInvoiceId, financialUpdatedAt: timestamp };
+  }
   async function previewActivation(actor, rawInput) {
     const input = validateActivation(rawInput);
     const client = await repository.getClient(input.clientId);
@@ -69,7 +72,65 @@ function createBillingService({ repository, previewSecret, now = () => new Date(
     return repository.activate({ clientId: payload.input.clientId, clientPatch, contract, invoice, audit, idempotencyKey });
   }
 
-  return { previewActivation, confirmActivation };
+  async function settleInvoice(actor, { clientId, invoiceId: targetInvoiceId, idempotencyKey, paidAt }) {
+    const invoice = await repository.getInvoice(clientId, targetInvoiceId);
+    if (!invoice) throw new Error("invoice-not-found");
+    if (invoice.status === "paid") {
+      if (invoice.settlementIdempotencyKey === idempotencyKey) return { repeated: true, invoice };
+      throw new Error("invoice-already-paid");
+    }
+    if (!["pending", "overdue"].includes(invoice.status)) throw new Error("invoice-not-payable");
+    const timestamp = now().toISOString();
+    const audit = { id: eventId("settlement", idempotencyKey), type: "invoice_settled", idempotencyKey, clientId, invoiceId: targetInvoiceId, contractId: invoice.contractId, actorUid: actor.uid, actorEmail: actor.email, createdAt: timestamp };
+    const result = await repository.mutateInvoice({
+      clientId, invoiceId: targetInvoiceId, audit, resolveNotifications: true,
+      mutate: (current) => ({ ...current, status: "paid", paymentOrigin: "manual_admin", paidAt: paidAt || timestamp, confirmedAt: timestamp, confirmedByUid: actor.uid, confirmedByEmail: actor.email, settlementIdempotencyKey: idempotencyKey, updatedAt: timestamp }),
+      buildClientPatch: (invoices) => financialPatch(evaluateFinancialState({ invoices, today: isoDay(now()) }), timestamp),
+    });
+    return { repeated: false, invoice: result };
+  }
+
+  async function reverseSettlement(actor, { clientId, invoiceId: targetInvoiceId, idempotencyKey, reason }) {
+    if (!String(reason || "").trim()) throw new Error("reversal-reason-required");
+    const invoice = await repository.getInvoice(clientId, targetInvoiceId);
+    if (!invoice) throw new Error("invoice-not-found");
+    if (invoice.reversalIdempotencyKey === idempotencyKey) return { repeated: true, invoice };
+    if (invoice.status !== "paid") throw new Error("invoice-not-paid");
+    const timestamp = now().toISOString();
+    const reopenedStatus = invoice.dueDate < isoDay(now()) ? "overdue" : "pending";
+    const audit = { id: eventId("reversal", idempotencyKey), type: "settlement_reversed", idempotencyKey, reason: String(reason).trim(), clientId, invoiceId: targetInvoiceId, contractId: invoice.contractId, actorUid: actor.uid, actorEmail: actor.email, createdAt: timestamp, previousPayment: { paidAt: invoice.paidAt, confirmedByUid: invoice.confirmedByUid, paymentOrigin: invoice.paymentOrigin } };
+    const result = await repository.mutateInvoice({
+      clientId, invoiceId: targetInvoiceId, audit, resolveNotifications: false,
+      mutate: (current) => ({ ...current, status: reopenedStatus, reversedAt: timestamp, reversedByUid: actor.uid, reversedByEmail: actor.email, reversalReason: String(reason).trim(), reversalIdempotencyKey: idempotencyKey, updatedAt: timestamp }),
+      buildClientPatch: (invoices) => financialPatch(evaluateFinancialState({ invoices, today: isoDay(now()) }), timestamp),
+    });
+    return { repeated: false, invoice: result };
+  }
+
+  async function previewReversion(actor, { clientId }) {
+    const client = await repository.getClient(clientId);
+    if (!client || client.financialModelVersion !== 1 || client.financialMode !== "active" || !client.activeContractId) throw new Error("financial-model-not-active");
+    const invoices = await repository.getOpenInvoices(clientId);
+    const currentAccess = evaluateFinancialState({ invoices, today: isoDay(now()) });
+    const projectedAccess = legacyFinancial(client, isoDay(now()));
+    const requiresOperationalChangeConfirmation = currentAccess.restriction !== projectedAccess.restriction;
+    const payload = { actorUid: actor.uid, clientId, contractId: client.activeContractId, clientVersion: clientVersion(client), currentAccess, projectedAccess, requiresOperationalChangeConfirmation };
+    return { previewToken: createPreviewToken(payload, { purpose: "reversion", clientVersion: payload.clientVersion, secret: previewSecret }), currentAccess, projectedAccess, requiresOperationalChangeConfirmation, operationalChange: requiresOperationalChangeConfirmation ? { from: currentAccess.restriction, to: projectedAccess.restriction } : null };
+  }
+
+  async function confirmReversion(actor, { previewToken, idempotencyKey, operationalChangeConfirmed = false }) {
+    const payload = readPreviewTokenPayload(previewToken);
+    const client = await repository.getClient(payload.clientId);
+    verifyPreviewToken(previewToken, payload, { purpose: "reversion", clientVersion: clientVersion(client), secret: previewSecret });
+    if (payload.actorUid !== actor.uid) throw new Error("preview-actor-mismatch");
+    if (payload.requiresOperationalChangeConfirmation && !operationalChangeConfirmed) throw new Error("operational-confirmation-required");
+    const timestamp = now().toISOString();
+    const audit = { id: eventId("reversion", idempotencyKey), type: "financial_reversion", idempotencyKey, clientId: payload.clientId, contractId: payload.contractId, actorUid: actor.uid, actorEmail: actor.email, createdAt: timestamp, before: payload.currentAccess, after: payload.projectedAccess };
+    await repository.revert({ clientId: payload.clientId, contractId: payload.contractId, audit, clientPatch: { financialMode: "reverted", activeContractId: null, ...financialPatch(payload.projectedAccess, timestamp) } });
+    return { repeated: false, financialMode: "reverted" };
+  }
+
+  return { previewActivation, confirmActivation, settleInvoice, reverseSettlement, previewReversion, confirmReversion };
 }
 
 module.exports = { createBillingService, validateActivation, eventId };

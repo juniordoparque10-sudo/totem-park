@@ -15,6 +15,10 @@ function createBillingCallables({ onCall, HttpsError, db, FieldValue, isMaster }
   return {
     previewFinancialActivation: endpoint(service.previewActivation),
     confirmFinancialActivation: endpoint(service.confirmActivation),
+    settleFinancialInvoice: endpoint(service.settleInvoice),
+    reverseFinancialSettlement: endpoint(service.reverseSettlement),
+    previewFinancialReversion: endpoint(service.previewReversion),
+    confirmFinancialReversion: endpoint(service.confirmReversion),
   };
 }
 
