@@ -1,5 +1,6 @@
 const { onCall, HttpsError } = require("firebase-functions/v2/https");
 const { onSchedule } = require("firebase-functions/v2/scheduler");
+const { defineSecret } = require("firebase-functions/params");
 const { initializeApp } = require("firebase-admin/app");
 const { getFirestore, FieldValue, FieldPath, Timestamp } = require("firebase-admin/firestore");
 const { validateRescueRequest } = require("./transition-diagnostic-rescue");
@@ -7,6 +8,7 @@ const { REBIND_AUTHORIZATION_TTL_MS, evaluateRebindAuthorization, canRebindKnown
 
 initializeApp();
 const db = getFirestore();
+const billingPreviewSecret = defineSecret("BILLING_PREVIEW_SECRET");
 
 const SPORTSDB_API_BASE = "https://www.thesportsdb.com/api/v1/json/123";
 const SPORTS_V2_COMPETITIONS = Object.freeze({
@@ -118,7 +120,7 @@ async function isMaster(request) {
 }
 
 Object.assign(exports, require("./billing/callables").createBillingCallables({
-  onCall, HttpsError, db, FieldValue, FieldPath, isMaster,
+  onCall, HttpsError, db, FieldValue, FieldPath, isMaster, previewSecret: billingPreviewSecret,
 }));
 
 exports.processBillingCycle = onSchedule({ schedule: "every 6 hours", timeZone: "America/Sao_Paulo", timeoutSeconds: 300 }, async () => {
