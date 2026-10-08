@@ -2907,7 +2907,7 @@ function getLegacyClientPlanAccess(client, currentDate = new Date()) {
 }
 
 function getClientPlanAccess(client, currentDate = new Date()) {
-  return getEffectivePlanAccess(client, (legacyClient) => getLegacyClientPlanAccess(legacyClient, currentDate));
+  return getEffectivePlanAccess(client, (legacyClient) => getLegacyClientPlanAccess(legacyClient, currentDate), currentDate);
 }
 
 function getPlanRestrictionAlert(access, action = "editar conteúdos") {
@@ -7108,7 +7108,7 @@ function ClientsPage({ onOpenClient }) {
 function ClientInternalPanel({ client, onBack, hideBackButton = false, isAdmin = false, adminUser = null }) {
   const [tab, setTab] = useState("dashboard");
   const [currentClient, setCurrentClient] = useState(client);
-  const [headerInvoices, setHeaderInvoices] = useState([]);
+  const [headerInvoiceState, setHeaderInvoiceState] = useState({ clientId: null, items: [] });
 
   useEffect(() => {
     setCurrentClient(client);
@@ -7121,15 +7121,21 @@ function ClientInternalPanel({ client, onBack, hideBackButton = false, isAdmin =
     });
   }, [client]);
 
+  const financialModelActive = isFinancialModelActive(currentClient);
   useEffect(() => {
-    if (!currentClient?.id || !isFinancialModelActive(currentClient)) { setHeaderInvoices([]); return undefined; }
-    return onSnapshot(collection(db, "clients", currentClient.id, "invoices"), (snapshot) => setHeaderInvoices(snapshot.docs.map((item) => ({ id: item.id, ...item.data() }))));
-  }, [currentClient?.id, currentClient?.financialModelVersion, currentClient?.financialMode]);
+    if (!currentClient?.id || !financialModelActive) return undefined;
+    const clientId = currentClient.id;
+    return onSnapshot(collection(db, "clients", clientId, "invoices"), (snapshot) => {
+      setHeaderInvoiceState({ clientId, items: snapshot.docs.map((item) => ({ id: item.id, ...item.data() })) });
+    });
+  }, [currentClient?.id, financialModelActive]);
 
   const planAccess = getClientPlanAccess(currentClient);
-  const headerInvoice = isFinancialModelActive(currentClient) ? selectHeaderInvoice(headerInvoices) : null;
-  const headerDueText = isFinancialModelActive(currentClient)
-    ? headerInvoice ? `${formatCivilDateBr(headerInvoice.dueDate)}${headerInvoice.status === "overdue" ? " (atrasada)" : ""}` : "sem cobrança aberta"
+  const headerInvoices = headerInvoiceState.clientId === currentClient?.id ? headerInvoiceState.items : [];
+  const headerInvoice = financialModelActive ? selectHeaderInvoice(headerInvoices) : null;
+  const headerInvoiceOverdue = headerInvoice ? getFinancialCardState(currentClient, headerInvoice).days < 0 : false;
+  const headerDueText = financialModelActive
+    ? headerInvoice ? `${formatCivilDateBr(headerInvoice.dueDate)}${headerInvoiceOverdue ? " (atrasada)" : ""}` : "sem cobrança aberta"
     : currentClient.dueDate || "não informado";
   const operationalAccess = isAdmin
     ? {
@@ -7181,7 +7187,7 @@ function ClientInternalPanel({ client, onBack, hideBackButton = false, isAdmin =
 
       <PlanStatusBanner access={planAccess} />
 
-      {isAdmin && !isFinancialModelActive(currentClient) && <AdminPlanControls client={currentClient} adminUser={adminUser} />}
+      {isAdmin && <AdminPlanControls client={currentClient} adminUser={adminUser} operationalOnly={financialModelActive} />}
       {isAdmin && !isFinancialModelActive(currentClient) && <FinancialClassificationPanel client={currentClient} />}
       {isAdmin && isFinancialModelActive(currentClient) && <FinancialManagementPanel client={currentClient} />}
       {!isAdmin && isFinancialModelActive(currentClient) && planAccess.isSuspended && <FinancialNotifications clientId={currentClient.id} />}
@@ -7259,7 +7265,7 @@ function ClientDashboard({ client, access = getClientPlanAccess(client) }) {
   const [media, setMedia] = useState([]);
   const [playlists, setPlaylists] = useState([]);
   const [screens, setScreens] = useState([]);
-  const [financialInvoices, setFinancialInvoices] = useState([]);
+  const [financialInvoiceState, setFinancialInvoiceState] = useState({ clientId: null, items: [] });
   const [now, setNow] = useState(new Date());
 
   useEffect(() => {
@@ -7299,17 +7305,16 @@ function ClientDashboard({ client, access = getClientPlanAccess(client) }) {
     };
   }, [client.id]);
 
+  const financialModelActive = isFinancialModelActive(client);
   useEffect(() => {
-    if (!isFinancialModelActive(client)) {
-      setFinancialInvoices([]);
-      return undefined;
-    }
-    return onSnapshot(collection(db, "clients", client.id, "invoices"), (snapshot) => {
-      setFinancialInvoices(snapshot.docs.map((item) => ({ id: item.id, ...item.data() }))
+    if (!financialModelActive) return undefined;
+    const clientId = client.id;
+    return onSnapshot(collection(db, "clients", clientId, "invoices"), (snapshot) => {
+      setFinancialInvoiceState({ clientId, items: snapshot.docs.map((item) => ({ id: item.id, ...item.data() }))
         .filter((item) => item.status === "pending" || item.status === "overdue")
-        .sort((left, right) => String(left.dueDate).localeCompare(String(right.dueDate))));
+        .sort((left, right) => String(left.dueDate).localeCompare(String(right.dueDate))) });
     });
-  }, [client]);
+  }, [client.id, financialModelActive]);
 
   function timeToMinutes(time) {
     if (!time) return 0;
@@ -7397,7 +7402,8 @@ function ClientDashboard({ client, access = getClientPlanAccess(client) }) {
   const storageLimitBytes = getClientStorageLimit(client);
   const storageUsage = getStorageUsage(storageUsedBytes, storageLimitBytes);
   const setupInfo = getSetupInfo(client);
-  const financialCard = isFinancialModelActive(client) ? getFinancialCardState(client, financialInvoices[0]) : null;
+  const financialInvoices = financialInvoiceState.clientId === client.id ? financialInvoiceState.items : [];
+  const financialCard = financialModelActive ? getFinancialCardState(client, financialInvoices[0]) : null;
   const screenReports = screens.map((screen) => {
     const active = getActivePlaylist(screen);
     const connection = getScreenConnectionStatus(screen);
@@ -18736,7 +18742,7 @@ function TvSuspensionScreen({ client, access, orientationClass }) {
   );
 }
 
-function AdminPlanControls({ client, adminUser }) {
+function AdminPlanControls({ client, adminUser, operationalOnly = false }) {
   const [form, setForm] = useState({
     plan: getPlanConfig(client.plan).name,
     billing: client.billing || "Mensal",
@@ -18838,7 +18844,7 @@ function AdminPlanControls({ client, adminUser }) {
       <div className="admin-plan-controls-header">
         <div>
           <div className="kicker">Gestão do plano</div>
-          <h2>Liberação e renovação</h2>
+            <h2>{operationalOnly ? "Liberação temporária" : "Liberação e renovação"}</h2>
           <p>Status calculado: <strong>{access.statusLabel}</strong></p>
         </div>
         <div className="admin-plan-quick-actions">
@@ -18853,7 +18859,7 @@ function AdminPlanControls({ client, adminUser }) {
         </div>
       </div>
 
-      <div className="form-grid">
+        {!operationalOnly && <div className="form-grid">
         <div className="form-group">
           <label>Novo plano</label>
           <select
@@ -18915,14 +18921,14 @@ function AdminPlanControls({ client, adminUser }) {
           </select>
           <small>Plano: {getPlanConfig(form.plan).name} · acesso efetivo: <strong>{templatesV2Entitlement.allowed ? "LIBERADO" : "BLOQUEADO"}</strong> {templatesV2Entitlement.source === "plan" ? "pelo plano" : "por override"}</small>
         </div>
-      </div>
+        </div>}
 
-      <div className="panel-actions">
+        {!operationalOnly && <div className="panel-actions">
         <button className="upload-button" onClick={renewPlan} disabled={saving}>
           <CreditCard size={18} />
           {saving ? "Salvando..." : "Renovar plano"}
         </button>
-      </div>
+      </div>}
     </section>
   );
 }

@@ -12,10 +12,11 @@ function financialMessage(restriction, days, financialStatus) {
   return "Nenhuma mensalidade pendente. Todos os recursos estão disponíveis.";
 }
 
-export function getEffectivePlanAccess(client, legacyEvaluator) {
+export function getEffectivePlanAccess(client, legacyEvaluator, now = new Date()) {
   if (!isFinancialModelActive(client)) return legacyEvaluator(client);
   const administrative = client.status === "Cancelado" || (client.status === "Suspenso" && !String(client.suspensionReason || "").toLowerCase().includes("inadimpl"));
-  const temporaryUnlock = !administrative && client.graceUnlockUntil && client.graceUnlockUntil >= localCivilDate();
+  const unlockExpiration = Date.parse(client.graceUnlockUntil || "");
+  const temporaryUnlock = !administrative && Number.isFinite(unlockExpiration) && unlockExpiration > now.getTime();
   const restriction = administrative ? "suspended" : temporaryUnlock ? "none" : (client.financialRestriction || "none");
   const days = Number(client.financialDaysOverdue || 0);
   const isSuspended = restriction === "suspended";
@@ -34,6 +35,7 @@ export function getEffectivePlanAccess(client, legacyEvaluator) {
     canShowTvContent: !isSuspended, message,
     severity: isSuspended ? "suspended" : isStrongRestriction ? "strong" : isPartialRestriction ? "partial" : restriction === "warning" ? "warning" : "success",
     cause: administrative ? "administrative" : temporaryUnlock ? "temporary_unlock" : restriction === "none" ? "none" : "financial",
+    graceUnlockUntil: client.graceUnlockUntil || null,
   };
 }
 

@@ -39,6 +39,5 @@ export function billingNotificationCopy(notification = {}, invoice = {}) {
 
 export function selectHeaderInvoice(invoices = []) {
   const open = invoices.filter((item) => ["pending", "overdue"].includes(item.status));
-  const overdue = open.filter((item) => item.status === "overdue").sort((a, b) => a.dueDate.localeCompare(b.dueDate));
-  return overdue[0] || open.sort((a, b) => a.dueDate.localeCompare(b.dueDate))[0] || null;
+  return open.sort((a, b) => String(a.dueDate).localeCompare(String(b.dueDate)))[0] || null;
 }

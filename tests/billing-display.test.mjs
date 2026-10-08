@@ -23,7 +23,7 @@ test('translates audit events to friendly Portuguese labels', () => {
   assert.equal(auditEventLabel('financial_reversion'), 'Retorno ao modelo legado');
 });
 
-test('header prioritizes the oldest overdue invoice, then the next pending invoice', () => {
+test('header selects the oldest open invoice regardless of stale persisted status', () => {
   const invoices = [
     { id: 'future', status: 'pending', dueDate: '2026-11-08' },
     { id: 'old', status: 'overdue', dueDate: '2026-09-08' },
@@ -31,6 +31,10 @@ test('header prioritizes the oldest overdue invoice, then the next pending invoi
     { id: 'paid', status: 'paid', dueDate: '2026-08-08' },
   ];
   assert.equal(selectHeaderInvoice(invoices).id, 'old');
+  assert.equal(selectHeaderInvoice([
+    { id: 'older-pending', status: 'pending', dueDate: '2026-09-08' },
+    { id: 'newer-overdue', status: 'overdue', dueDate: '2026-10-01' },
+  ]).id, 'older-pending');
   assert.equal(selectHeaderInvoice(invoices.filter((item) => item.status !== 'overdue')).id, 'future');
   assert.equal(selectHeaderInvoice(invoices.filter((item) => item.status === 'paid')), null);
 });

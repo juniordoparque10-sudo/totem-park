@@ -44,6 +44,31 @@ test('administrative suspension remains authoritative over financial presentatio
   assert.match(suspended.message, /administrativo ou contratual/);
 });
 
+test('temporary unlock compares the full instant and preserves its expiration', () => {
+  const expiredAt = '2026-10-08T08:00:00.000Z';
+  const expired = getEffectivePlanAccess({
+    financialModelVersion: 1,
+    financialMode: 'active',
+    financialRestriction: 'suspended',
+    graceUnlockUntil: expiredAt,
+  }, () => null, new Date('2026-10-08T18:00:00.000Z'));
+  assert.equal(expired.hasTemporaryUnlock, false);
+  assert.equal(expired.canUseSystem, false);
+  assert.equal(expired.canShowTvContent, false);
+  assert.equal(expired.graceUnlockUntil, expiredAt);
+
+  const activeAt = '2026-10-09T08:00:00.000Z';
+  const active = getEffectivePlanAccess({
+    financialModelVersion: 1,
+    financialMode: 'active',
+    financialRestriction: 'suspended',
+    graceUnlockUntil: activeAt,
+  }, () => null, new Date('2026-10-08T18:00:00.000Z'));
+  assert.equal(active.hasTemporaryUnlock, true);
+  assert.equal(active.canUseSystem, true);
+  assert.equal(active.graceUnlockUntil, activeAt);
+});
+
 test('card state distinguishes due soon, today, overdue and annual copy', () => {
   const client = { financialModelVersion: 1, financialMode: 'active', billing: 'Anual', plan: 'Start' };
   assert.equal(getFinancialCardState(client, { dueDate: '2026-10-13', amountCents: 4990, competence: '2026' }, '2026-10-08').tone, 'warning');
@@ -73,6 +98,7 @@ test('portal integrates classification, management and persistent notifications 
   assert.match(notifications, /invoices\[item\.invoiceId\]/);
   assert.match(notifications, /billingNotificationCopy/);
   assert.match(app, /selectHeaderInvoice/);
+  assert.match(app, /operationalOnly={financialModelActive}/);
   assert.match(app, /sem cobrança aberta/);
   assert.match(app, /currentClient\.dueDate/);
 });
