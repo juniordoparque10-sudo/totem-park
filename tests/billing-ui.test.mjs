@@ -42,3 +42,22 @@ test('portal integrates classification, management and persistent notifications 
   assert.match(management, /Corrigir quitação/);
   assert.match(management, /Prévia da reversão/);
 });
+
+test('local billing homologation is opt-in and cannot redirect production accidentally', () => {
+  const firebase = fs.readFileSync('src/firebase.js', 'utf8');
+  assert.match(firebase, /VITE_USE_FIREBASE_EMULATORS/);
+  assert.match(firebase, /connectFirestoreEmulator/);
+  assert.match(firebase, /connectFunctionsEmulator/);
+  assert.match(firebase, /connectAuthEmulator/);
+  assert.match(firebase, /=== "true"/);
+});
+
+test('billing UX fixture is emulator-only and supports the same client before and after classification', () => {
+  const fixture = fs.readFileSync('scripts/seed-billing-v1-emulator.cjs', 'utf8');
+  assert.match(fixture, /FIRESTORE_EMULATOR_HOST/);
+  assert.match(fixture, /FIREBASE_AUTH_EMULATOR_HOST/);
+  assert.match(fixture, /demo-totem-billing-ux/);
+  assert.match(fixture, /billing-ux-demo-client/);
+  assert.match(fixture, /legacy/);
+  assert.match(fixture, /active/);
+});

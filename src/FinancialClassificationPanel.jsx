@@ -1,27 +1,42 @@
-import { useMemo, useState } from "react";
+import { useMemo, useRef, useState } from "react";
 import { previewFinancialActivation, confirmFinancialActivation } from "./financial-api";
+import { buildClassificationSuggestions, mergeUntouchedSuggestions } from "./billing-form-suggestions";
 
 function moneyToCents(value) { return Math.round(Number(String(value).replace(",", ".")) * 100); }
 
-export default function FinancialClassificationPanel({ client }) {
-  const [form, setForm] = useState(() => ({
-    startDate: client.startDate || "", endDate: "", billingPeriod: client.billing === "Anual" ? "annual" : "monthly",
-    billingAnchorDay: client.dueDate ? Number(client.dueDate.slice(-2)) : 1,
-    firstCompetence: client.billing === "Anual" ? new Date().getFullYear().toString() : new Date().toISOString().slice(0, 7),
-    firstDueDate: "", amount: "",
-  }));
+export default function FinancialClassificationPanel({ client, planPriceMonthly }) {
+  const touched = useRef({});
+  const [form, setForm] = useState(() => {
+    const billingPeriod = client.billing === "Anual" ? "annual" : "monthly";
+    const startDate = client.startDate || "";
+    return { startDate, billingPeriod, ...buildClassificationSuggestions({ client: { ...client, planPriceMonthly }, startDate, billingPeriod }) };
+  });
   const [preview, setPreview] = useState(null);
   const [operationalChangeConfirmed, setOperationalChangeConfirmed] = useState(false);
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState("");
   const payload = useMemo(() => ({ clientId: client.id, planKey: String(client.plan || "").toLowerCase(), planName: client.plan, startDate: form.startDate, endDate: form.endDate, billingPeriod: form.billingPeriod, billingAnchorDay: Number(form.billingAnchorDay), firstCompetence: form.firstCompetence, firstDueDate: form.firstDueDate, amountCents: moneyToCents(form.amount) }), [client, form]);
 
-  function field(name, value) { setForm((current) => ({ ...current, [name]: value })); setPreview(null); setOperationalChangeConfirmed(false); }
+  function field(name, value) {
+    touched.current[name] = true;
+    setForm((current) => {
+      const next = { ...current, [name]: value };
+      if (!["startDate", "billingPeriod", "firstCompetence", "billingAnchorDay"].includes(name)) return next;
+      const suggestions = buildClassificationSuggestions({
+        client: { ...client, planPriceMonthly }, startDate: next.startDate, billingPeriod: next.billingPeriod,
+        firstCompetence: touched.current.firstCompetence ? next.firstCompetence : undefined,
+        billingAnchorDay: touched.current.billingAnchorDay ? next.billingAnchorDay : undefined,
+      });
+      return mergeUntouchedSuggestions(next, suggestions, touched.current);
+    });
+    setPreview(null); setOperationalChangeConfirmed(false);
+  }
   async function requestPreview() { try { setBusy(true); setError(""); setPreview(await previewFinancialActivation(payload)); } catch (current) { setError(current.message || "Não foi possível calcular a prévia."); } finally { setBusy(false); } }
   async function confirm() { try { setBusy(true); setError(""); await confirmFinancialActivation({ previewToken: preview.previewToken, idempotencyKey: `activation-${client.id}-${Date.now()}`, operationalChangeConfirmed }); setPreview(null); } catch (current) { setError(current.message || "Não foi possível ativar o modelo financeiro."); } finally { setBusy(false); } }
 
   return <section className="financial-panel">
     <div className="financial-panel-header"><div><div className="kicker">Cobrança V1</div><h2>Classificar cliente</h2><p>O comportamento legado permanece ativo até a confirmação final.</p></div></div>
+    <p className="financial-form-note">A vigência define por quanto tempo o contrato permanece válido. A periodicidade define quando as cobranças serão geradas durante esse período.</p>
     <div className="financial-form-grid">
       <label>Início do contrato<input type="date" value={form.startDate} onChange={(event) => field("startDate", event.target.value)} /></label>
       <label>Término do contrato<input type="date" value={form.endDate} onChange={(event) => field("endDate", event.target.value)} /></label>

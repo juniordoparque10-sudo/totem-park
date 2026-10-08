@@ -45,6 +45,18 @@ A revisão independente encontrou riscos de concorrência, cursor não serializ�
 4. Executar `npm.cmd run build`.
 5. Iniciar `npm.cmd run dev -- --host 127.0.0.1` e abrir o portal local.
 
+## Homologação visual isolada
+
+O portal só conecta aos emuladores quando `VITE_USE_FIREBASE_EMULATORS=true`. A fixture recusa execução se Auth e Firestore não apontarem para `127.0.0.1` ou se o projeto não for `demo-totem-billing-ux`.
+
+1. Iniciar Auth, Firestore e Functions pelo `firebase.test.json` no projeto `demo-totem-billing-ux`.
+2. Definir `FIRESTORE_EMULATOR_HOST=127.0.0.1:8189`, `FIREBASE_AUTH_EMULATOR_HOST=127.0.0.1:9198` e `GCLOUD_PROJECT=demo-totem-billing-ux`.
+3. Executar `node scripts/seed-billing-v1-emulator.cjs legacy` para o estado anterior à classificação.
+4. Executar `node scripts/seed-billing-v1-emulator.cjs active` para o mesmo cliente após a classificação.
+5. Iniciar o Vite com `VITE_USE_FIREBASE_EMULATORS=true`.
+
+Cliente determinístico: `billing-ux-demo-client`. A fixture ativa demonstra vigência de 11/09/2026 a 10/09/2027, mensalidade Business de R$ 99,00, aviso de vencimento e quitação manual auditável.
+
 ## Roteiro visual
 
 - Abrir cliente legado e confirmar card e restrições baseados em `dueDate`.
