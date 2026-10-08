@@ -1,6 +1,7 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import { getEffectivePlanAccess, getFinancialCardState, isFinancialModelActive } from '../src/financial-access.js';
+import fs from 'node:fs';
 
 test('legacy and reverted clients delegate unchanged to legacy evaluator', () => {
   const sentinel = { statusLabel: 'LEGACY', canCreate: false };
@@ -24,4 +25,20 @@ test('card state distinguishes due soon, today, overdue and annual copy', () => 
   assert.equal(getFinancialCardState(client, { dueDate: '2026-10-08', amountCents: 4990, competence: '2026' }, '2026-10-08').tone, 'today');
   assert.equal(getFinancialCardState(client, { dueDate: '2026-10-01', amountCents: 4990, competence: '2026' }, '2026-10-08').tone, 'danger');
   assert.equal(getFinancialCardState(client, { dueDate: '2026-10-13', amountCents: 4990, competence: '2026' }, '2026-10-08').title, 'Próxima cobrança anual');
+});
+
+test('portal integrates classification, management and persistent notifications without removing legacy card', () => {
+  const app = fs.readFileSync('src/App.jsx', 'utf8');
+  const classification = fs.readFileSync('src/FinancialClassificationPanel.jsx', 'utf8');
+  const management = fs.readFileSync('src/FinancialManagementPanel.jsx', 'utf8');
+  assert.match(app, /getEffectivePlanAccess/);
+  assert.match(app, /FinancialClassificationPanel/);
+  assert.match(app, /FinancialManagementPanel/);
+  assert.match(app, /FinancialNotifications/);
+  assert.match(app, /title="Vencimento"/);
+  assert.match(classification, /Prévia da ativação/);
+  assert.match(classification, /operationalChangeConfirmed/);
+  assert.match(management, /Marcar como pago/);
+  assert.match(management, /Corrigir quitação/);
+  assert.match(management, /Prévia da reversão/);
 });
