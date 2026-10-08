@@ -1,4 +1,5 @@
 const { onCall, HttpsError } = require("firebase-functions/v2/https");
+const { onSchedule } = require("firebase-functions/v2/scheduler");
 const { initializeApp } = require("firebase-admin/app");
 const { getFirestore, FieldValue, Timestamp } = require("firebase-admin/firestore");
 const { validateRescueRequest } = require("./transition-diagnostic-rescue");
@@ -119,6 +120,12 @@ async function isMaster(request) {
 Object.assign(exports, require("./billing/callables").createBillingCallables({
   onCall, HttpsError, db, FieldValue, isMaster,
 }));
+
+exports.processBillingCycle = onSchedule({ schedule: "every 6 hours", timeZone: "America/Sao_Paulo", timeoutSeconds: 300 }, async () => {
+  const { createFirestoreBillingRepository } = require("./billing/repository");
+  const { createBillingJobs } = require("./billing/jobs");
+  return createBillingJobs({ repository: createFirestoreBillingRepository(db, FieldValue) }).runBillingCycle();
+});
 
 function playerRebindAuthorizationRef(clientId, screenId) {
   return db.doc(`clients/${clientId}/screens/${screenId}/system/rebindAuthorization`);

@@ -65,7 +65,44 @@ function createFirestoreBillingRepository(db, FieldValue) {
         return { repeated: false };
       });
     },
+    async listEligibleContracts({ cutoff, cursor, limit }) {
+      let query = db.collectionGroup("contracts").where("status", "==", "active").where("nextInvoiceDueDate", "<=", cutoff).orderBy("nextInvoiceDueDate").limit(limit);
+      if (cursor) query = query.startAfter(cursor);
+      const snapshot = await query.get();
+      return { items: snapshot.docs.map(snapshotData), nextCursor: snapshot.docs.at(-1) || null };
+    },
+    async createInvoiceIfAbsent(invoice) {
+      const ref = db.doc(`clients/${invoice.clientId}/invoices/${invoice.id}`);
+      return db.runTransaction(async (transaction) => {
+        if ((await transaction.get(ref)).exists) return false;
+        transaction.create(ref, { ...invoice, createdAt: FieldValue.serverTimestamp(), updatedAt: FieldValue.serverTimestamp() });
+        return true;
+      });
+    },
+    async updateContractNextDue(contractId, nextInvoiceDueDate, nextCompetence, clientId) {
+      await db.doc(`clients/${clientId}/contracts/${contractId}`).update({ nextInvoiceDueDate, nextCompetence, updatedAt: FieldValue.serverTimestamp() });
+    },
+    async listEligibleInvoices({ today, cursor, limit }) {
+      let query = db.collectionGroup("invoices").where("status", "in", ["pending", "overdue"]).where("dueDate", "<=", addDaysForRepository(today, 5)).orderBy("dueDate").limit(limit);
+      if (cursor) query = query.startAfter(cursor);
+      const snapshot = await query.get();
+      return { items: snapshot.docs.map(snapshotData), nextCursor: snapshot.docs.at(-1) || null };
+    },
+    async createNotificationIfAbsent(notification) {
+      const ref = db.doc(`clients/${notification.clientId}/financialNotifications/${notification.id}`);
+      return db.runTransaction(async (transaction) => {
+        if ((await transaction.get(ref)).exists) return false;
+        transaction.create(ref, { ...notification, createdAt: FieldValue.serverTimestamp(), updatedAt: FieldValue.serverTimestamp() });
+        return true;
+      });
+    },
+    async saveDelivery(delivery) { await db.doc(`clients/${delivery.clientId}/financialEmailDeliveries/${delivery.id}`).set({ ...delivery, updatedAt: FieldValue.serverTimestamp() }, { merge: true }); },
+    async saveCheckpoint(checkpoint) { await db.doc(`billingJobs/${checkpoint.job}`).set({ ...checkpoint, updatedAt: FieldValue.serverTimestamp() }, { merge: true }); },
   };
+}
+
+function addDaysForRepository(value, days) {
+  const date = new Date(`${value}T00:00:00Z`); date.setUTCDate(date.getUTCDate() + days); return date.toISOString().slice(0, 10);
 }
 
 module.exports = { createFirestoreBillingRepository };

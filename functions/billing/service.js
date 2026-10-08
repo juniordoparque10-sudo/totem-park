@@ -1,7 +1,7 @@
 "use strict";
 
 const crypto = require("node:crypto");
-const { parseCivilDate, normalizeCompetence, invoiceId, evaluateFinancialState } = require("./domain");
+const { parseCivilDate, normalizeCompetence, invoiceId, evaluateFinancialState, nextDueDate, nextCompetence } = require("./domain");
 const { createPreviewToken, verifyPreviewToken, readPreviewTokenPayload } = require("./preview-token");
 
 function isoDay(date) { return date.toISOString().slice(0, 10); }
@@ -65,7 +65,7 @@ function createBillingService({ repository, previewSecret, now = () => new Date(
     if (payload.actorUid !== actor.uid) throw new Error("preview-actor-mismatch");
     if (payload.requiresOperationalChangeConfirmation && !operationalChangeConfirmed) throw new Error("operational-confirmation-required");
     const timestamp = now().toISOString();
-    const contract = { id: payload.contractId, clientId: payload.input.clientId, schemaVersion: 1, planKey: payload.input.planKey, planName: payload.input.planName, startDate: payload.input.startDate, endDate: payload.input.endDate, status: "active", billingPeriod: payload.input.billingPeriod, billingAnchorDay: payload.input.billingAnchorDay, firstCompetence: payload.input.firstCompetence, defaultAmountCents: payload.input.amountCents, currency: "BRL", activatedAt: timestamp, activatedByUid: actor.uid, activatedByEmail: actor.email };
+    const contract = { id: payload.contractId, clientId: payload.input.clientId, schemaVersion: 1, planKey: payload.input.planKey, planName: payload.input.planName, startDate: payload.input.startDate, endDate: payload.input.endDate, status: "active", financialMode: "active", billingPeriod: payload.input.billingPeriod, billingAnchorDay: payload.input.billingAnchorDay, firstCompetence: payload.input.firstCompetence, nextCompetence: nextCompetence({ billingPeriod: payload.input.billingPeriod, competence: payload.input.firstCompetence }), nextInvoiceDueDate: nextDueDate({ dueDate: payload.input.firstDueDate, billingPeriod: payload.input.billingPeriod, anchorDay: payload.input.billingAnchorDay }), defaultAmountCents: payload.input.amountCents, currency: "BRL", activatedAt: timestamp, activatedByUid: actor.uid, activatedByEmail: actor.email };
     const invoice = { ...payload.firstInvoice, createdAt: timestamp, updatedAt: timestamp };
     const audit = { id: eventId("activation", idempotencyKey), type: "financial_activation", idempotencyKey, clientId: payload.input.clientId, contractId: contract.id, invoiceId: invoice.id, actorUid: actor.uid, actorEmail: actor.email, createdAt: timestamp, before: payload.currentAccess, after: payload.projectedAccess };
     const clientPatch = { financialModelVersion: 1, financialMode: "active", activeContractId: contract.id, financialStatus: payload.projectedAccess.status, financialRestriction: payload.projectedAccess.restriction, financialDaysOverdue: payload.projectedAccess.daysOverdue, financialReferenceInvoiceId: payload.projectedAccess.referenceInvoiceId, financialUpdatedAt: timestamp };
