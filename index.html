@@ -93,16 +93,5 @@
 
     <script type="module" src="/src/main.jsx"></script>
 
-    <script>
-      if ("serviceWorker" in navigator) {
-        window.addEventListener("load", function () {
-          navigator.serviceWorker
-            .register("/sw.js")
-            .catch(function (error) {
-              console.log("Erro ao registrar service worker:", error);
-            });
-        });
-      }
-    </script>
   </body>
 </html>

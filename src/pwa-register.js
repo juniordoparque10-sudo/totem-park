@@ -4,8 +4,9 @@ export function registerTotemParkPWA() {
   applyRoutePwaMetadata();
 
   window.addEventListener("load", () => {
+    const fingerprint = getCurrentBundleFingerprint();
     navigator.serviceWorker
-      .register("/sw.js")
+      .register(`/sw.js?v=${encodeURIComponent(fingerprint)}`, { updateViaCache: "none" })
       .then(() => {
         console.log("Totem Park TV PWA registrado com sucesso.");
       })
@@ -13,6 +14,13 @@ export function registerTotemParkPWA() {
         console.log("Erro ao registrar PWA:", error);
       });
   });
+}
+
+export function getCurrentBundleFingerprint(documentRef = globalThis.document) {
+  const scripts = Array.from(documentRef?.querySelectorAll?.('script[type="module"][src]') || []);
+  const executable = scripts.find((script) => /\/assets\/index-[^/]+\.js(?:\?|$)/.test(script.src || ""));
+  const match = /\/assets\/index-([A-Za-z0-9_-]+)\.js(?:\?|$)/.exec(executable?.src || "");
+  return match?.[1] || "development";
 }
 
 function applyRoutePwaMetadata() {

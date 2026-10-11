@@ -21,6 +21,7 @@ import { shouldRevealTemplateImmediately } from "./templates-v2/offline-readines
 import { getNextTemplateToPrepare } from "./templates-v2/offline-preload";
 import { confirmTemplateImageForPaint, getTemplatePlaybackLayerKey, getTemplatePlaybackReadyKey, isCurrentPlaybackExecution, nextPlaybackExecutionId } from "./templates-v2/player-execution";
 import { deriveMediaCacheState, finalizeCompletedMediaCache } from "./player-cache-state";
+import { formatScheduledPlaylistSummary } from "./portal-schedule-presentation";
 import { findNextReadyMediaIndex, getCanonicalPlaylistMediaEntries, getNativeOfflineQueueUrls, getPlaylistMediaPreparation } from "./media-download-readiness";
 import { localizeOfflineAssetFields } from "./offline-asset-localization";
 import { linkedAtForScreen, telemetryStatus } from "./telemetry-v1";
@@ -168,6 +169,10 @@ import {
   uploadTransitionDiagnosticRescue,
 } from "./player-identity";
 import { deleteStoredAsset, uploadStorageAsset } from "./storage-service";
+import {
+  isStandalonePwa,
+  shouldClearUploadInputImmediately,
+} from "./pwa-upload-flow";
 import TemplateV2Editor from "./templates-v2/editor/TemplateV2Editor";
 import TemplateV2Renderer from "./templates-v2/TemplateV2Renderer";
 import TemplateV2DynamicStage from "./templates-v2/editor/TemplateV2DynamicStage";
@@ -7723,6 +7728,16 @@ function ClientDashboard({ client, access = getClientPlanAccess(client) }) {
 }
 
 
+function PortalSuccessToast({ message, tone = "success" }) {
+  if (!message) return null;
+  return (
+    <div className={`playlist-success-toast tone-${tone}`} role="status" aria-live="polite" aria-atomic="true">
+      <span><CheckCircle2 size={20} aria-hidden="true" /></span>
+      <strong>{message}</strong>
+    </div>
+  );
+}
+
 function ClientMediaPage({ client, access = getClientPlanAccess(client) }) {
   const [uploadNotice, setUploadNotice] = useState(null);
   const [mediaList, setMediaList] = useState([]);
@@ -7820,13 +7835,17 @@ function ClientMediaPage({ client, access = getClientPlanAccess(client) }) {
       ...dimensions,
       sound: isVideo ? form.sound : false,
     });
+    return true;
   }
 
   async function handleFileChange(event) {
     const file = event.target.files[0];
-    await handleSelectedFile(file);
+    const accepted = await handleSelectedFile(file);
 
-    if (!isNativeApp()) {
+    if (!accepted || shouldClearUploadInputImmediately({
+      standalone: isStandalonePwa(),
+      native: isNativeApp(),
+    })) {
       event.target.value = "";
     }
   }
@@ -8362,6 +8381,8 @@ function ClientPlaylistsPage({ client, access = getClientPlanAccess(client), isA
   const [draggedMediaId, setDraggedMediaId] = useState(null);
   const [draftPlaylistItems, setDraftPlaylistItems] = useState([]);
   const [portalNotice, setPortalNotice] = useState(null);
+  const [playlistSuccessNotice, setPlaylistSuccessNotice] = useState("");
+  const [playlistNoticeTone, setPlaylistNoticeTone] = useState("success");
   const playlistEditorRef = useRef(null);
   const canUsePremiumTemplates = hasPremiumTemplates(client);
   const templatesV2Entitlement = getTemplatesV2Entitlement(client, isAdmin);
@@ -8379,6 +8400,21 @@ function ClientPlaylistsPage({ client, access = getClientPlanAccess(client), isA
     startTime: "08:00",
     endTime: "18:00",
   });
+
+  useEffect(() => {
+    if (!playlistSuccessNotice) return undefined;
+    const timeoutId = globalThis.setTimeout(() => setPlaylistSuccessNotice(""), 3600);
+    return () => globalThis.clearTimeout(timeoutId);
+  }, [playlistSuccessNotice]);
+
+  function showPlaylistNotice(message, tone = "success") {
+    setPlaylistNoticeTone(tone);
+    setPlaylistSuccessNotice(message);
+  }
+
+  function showPlaylistSuccess(message) {
+    showPlaylistNotice(message, "success");
+  }
 
   useEffect(() => {
     const unsubMedia = onSnapshot(
@@ -9039,18 +9075,22 @@ function ClientPlaylistsPage({ client, access = getClientPlanAccess(client), isA
           ))
         );
 
-        alert(
-          affectedScreens.length > 0
-            ? `Playlist atualizada e enviada para ${affectedScreens.length} tela(s)!`
-            : "Playlist atualizada com sucesso!"
-        );
+        if (form.scheduleEnabled) {
+          showPlaylistSuccess("Programação agendada atualizada com sucesso");
+        } else {
+          showPlaylistSuccess("Playlist atualizada com sucesso");
+        }
       } else {
         await addDoc(collection(db, "clients", client.id, "playlists"), {
           ...playlistData,
           createdAt: serverTimestamp(),
         });
 
-        alert("Playlist criada com sucesso!");
+        if (form.scheduleEnabled) {
+          showPlaylistSuccess("Programação agendada salva com sucesso");
+        } else {
+          showPlaylistSuccess("Playlist criada com sucesso");
+        }
       }
 
       resetPlaylistForm();
@@ -9149,6 +9189,7 @@ function ClientPlaylistsPage({ client, access = getClientPlanAccess(client), isA
   return (
     <>
       {portalNotice && <PortalModal title={portalNotice.title} message={portalNotice.message} onClose={() => setPortalNotice(null)} />}
+      <PortalSuccessToast message={playlistSuccessNotice} tone={playlistNoticeTone} />
       <section
         ref={playlistEditorRef}
         className={editingPlaylist ? "playlist-builder playlist-builder-editing" : "playlist-builder"}
@@ -9646,7 +9687,7 @@ function ClientPlaylistsPage({ client, access = getClientPlanAccess(client), isA
 
                   {playlist.scheduleEnabled ? (
                     <div className="schedule-badge active">
-                      Agendada: {playlist.startDate} até {playlist.endDate} • {playlist.startTime} às {playlist.endTime} • {playlist.targetScreenIds?.length || 0} tela(s)
+                      Agendada: {formatScheduledPlaylistSummary(playlist)}
                     </div>
                   ) : (
                     <div className="schedule-badge">
@@ -9744,7 +9785,14 @@ function ClientScreensPage({ client, access = getClientPlanAccess(client), isAdm
   const [now, setNow] = useState(Date.now());
   const [editingScreen, setEditingScreen] = useState(null);
   const [rebindDialog, setRebindDialog] = useState(null);
+  const [screenSuccessNotice, setScreenSuccessNotice] = useState("");
   const screenEditorRef = useRef(null);
+
+  useEffect(() => {
+    if (!screenSuccessNotice) return undefined;
+    const timeoutId = globalThis.setTimeout(() => setScreenSuccessNotice(""), 3600);
+    return () => globalThis.clearTimeout(timeoutId);
+  }, [screenSuccessNotice]);
 
   const [form, setForm] = useState({
     name: "",
@@ -9998,7 +10046,7 @@ function ClientScreensPage({ client, access = getClientPlanAccess(client), isAdm
 
         await syncTvCode(editingScreen.id, editingScreen.code, form.name);
 
-        alert("Tela atualizada com sucesso!");
+        setScreenSuccessNotice("Tela atualizada com sucesso");
       } else {
         const code = generateCode();
 
@@ -10013,7 +10061,7 @@ function ClientScreensPage({ client, access = getClientPlanAccess(client), isAdm
 
         await syncTvCode(screenRef.id, code, form.name);
 
-        alert("Tela cadastrada com sucesso!");
+        setScreenSuccessNotice("Tela cadastrada com sucesso");
       }
 
       resetScreenForm();
@@ -10157,6 +10205,7 @@ function ClientScreensPage({ client, access = getClientPlanAccess(client), isAdm
 
   return (
     <>
+      <PortalSuccessToast message={screenSuccessNotice} />
       <section className="panel screen-editor-panel" ref={screenEditorRef}>
         <div className="playlist-editor-header">
           <div>

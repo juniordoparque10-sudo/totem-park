@@ -6,6 +6,11 @@ import {
 } from "firebase/storage";
 
 import { auth, storage } from "./firebase";
+import {
+  isStandalonePwa,
+  observeResumableUploadTask,
+  shouldRetryUploadWithStableFile,
+} from "./pwa-upload-flow";
 
 const DEFAULT_STORAGE_PROVIDER = "firebase";
 const STORAGE_PROVIDER = (import.meta.env.VITE_STORAGE_PROVIDER || DEFAULT_STORAGE_PROVIDER).toLowerCase();
@@ -38,23 +43,9 @@ function normalizeCustomMetadata(metadata = {}) {
 }
 
 function uploadFirebaseFile(storageRef, file, metadata, onProgress) {
-  return new Promise((resolve, reject) => {
-    const uploadTask = uploadBytesResumable(storageRef, file, metadata);
-
-    uploadTask.on(
-      "state_changed",
-      (snapshot) => {
-        const totalBytes = Number(snapshot.totalBytes || 0);
-        const bytesTransferred = Number(snapshot.bytesTransferred || 0);
-        const percent = totalBytes > 0
-          ? Math.round((bytesTransferred / totalBytes) * 100)
-          : 0;
-        onProgress?.(percent);
-      },
-      reject,
-      () => resolve(uploadTask.snapshot.ref)
-    );
-  });
+  const uploadTask = uploadBytesResumable(storageRef, file, metadata);
+  return observeResumableUploadTask({ task: uploadTask, onProgress })
+    .then((snapshot) => snapshot.ref);
 }
 
 async function uploadFirebaseAsset({ path, file, contentType, customMetadata, onProgress }) {
@@ -75,9 +66,13 @@ async function uploadFirebaseAsset({ path, file, contentType, customMetadata, on
       url: publicUrl,
     };
   } catch (uploadError) {
-    if (!isNativeRuntime()) throw uploadError;
+    const native = isNativeRuntime();
+    const standalone = isStandalonePwa();
+    if (!shouldRetryUploadWithStableFile({ error: uploadError, standalone, native })) {
+      throw uploadError;
+    }
 
-    console.log("Upload resumível falhou no app; tentando arquivo estabilizado:", uploadError);
+    console.log("Upload resumível não iniciou; tentando arquivo estabilizado:", uploadError);
     onProgress?.(0);
     const stableFile = await buildStableUploadFile(file, metadata.contentType);
     const uploadedRef = await uploadFirebaseFile(storageRef, stableFile, metadata, onProgress);
