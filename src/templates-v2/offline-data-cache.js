@@ -2,6 +2,7 @@ import { normalizeSportsV2Config } from "./sports-v2/config.js";
 
 const DATA_PREFIX = "totempark.template-data.v1";
 const memoryCache = new Map();
+const inflightRefreshes = new Map();
 
 function stableSerialize(value) {
   if (Array.isArray(value)) return `[${value.map(stableSerialize).join(",")}]`;
@@ -41,13 +42,59 @@ export function readTemplateDataCache(context, storage) {
   return record;
 }
 
-export function writeTemplateDataCache(context, payload, { source = "remote", now = Date.now(), storage } = {}) {
+export function writeTemplateDataCache(context, payload, { source = "remote", now = Date.now(), fetchedAt, refreshAttemptAt, storage } = {}) {
   if (payload == null) return null;
   const key = buildTemplateDataCacheKey(context);
-  const record = { version:1, payload, timestamp:now, source, configVersion:hash(stableSerialize(context?.config)) };
+  const record = { version:1, payload, timestamp:now, ...(fetchedAt != null ? { fetchedAt } : {}), ...(refreshAttemptAt != null ? { refreshAttemptAt } : {}), source, configVersion:hash(stableSerialize(context?.config)) };
   memoryCache.set(key, record);
   try { storageOrDefault(storage)?.setItem(key, JSON.stringify(record)); } catch { /* Storage pressure must not affect playback. */ }
   return record;
+}
+
+export function createWeatherDataFingerprintConfig(value = {}) {
+  return {
+    city:String(value.city || "").trim(),
+    ...(value.latitude != null ? { latitude:Number(value.latitude) } : {}),
+    ...(value.longitude != null ? { longitude:Number(value.longitude) } : {}),
+    ...(value.forecastDays != null ? { forecastDays:Number(value.forecastDays) } : {}),
+  };
+}
+
+export function createNewsDataFingerprintConfig(value = {}) {
+  return {
+    newsSource:String(value.newsSource || "").trim(),
+    newsFeedUrl:String(value.newsFeedUrl || "").trim(),
+    selectedNewsSources:(value.selectedNewsSources || []).map((item) => String(item).trim()).filter(Boolean),
+  };
+}
+
+export async function refreshTemplateDataIfNeeded(context, { ttlMs, fetcher, now = Date.now(), storage, online = true, source = "remote", isUsable = (payload) => payload != null } = {}) {
+  const key = buildTemplateDataCacheKey(context);
+  const cached = readTemplateDataCache(context, storage);
+  if (cached?.fetchedAt != null && now - cached.fetchedAt < ttlMs) {
+    return { payload:cached.payload, fetched:false, reason:"fresh", record:cached };
+  }
+  if (cached?.refreshAttemptAt != null && now - cached.refreshAttemptAt < ttlMs) {
+    return { payload:cached.payload, fetched:false, reason:"retry-deferred", record:cached };
+  }
+  if (!online) return { payload:cached?.payload ?? null, fetched:false, reason:"offline", record:cached };
+  if (inflightRefreshes.has(key)) return inflightRefreshes.get(key);
+
+  const refresh = (async () => {
+    try {
+      const payload = await fetcher();
+      if (!isUsable(payload)) return { payload:cached?.payload ?? null, fetched:true, reason:"unusable", record:cached };
+      const record = writeTemplateDataCache(context, payload, { source, now, fetchedAt:now, refreshAttemptAt:now, storage });
+      return { payload, fetched:true, reason:"refreshed", record };
+    } catch (error) {
+      const record = cached ? writeTemplateDataCache(context, cached.payload, { source:cached.source, now:cached.timestamp, fetchedAt:cached.fetchedAt, refreshAttemptAt:now, storage }) : null;
+      return { payload:cached?.payload ?? null, fetched:true, reason:"failed", record, error };
+    } finally {
+      inflightRefreshes.delete(key);
+    }
+  })();
+  inflightRefreshes.set(key, refresh);
+  return refresh;
 }
 
 export function createSportsDataFingerprintConfig(value = {}) {
@@ -106,4 +153,5 @@ export function readSportsTemplateDataCache(scope, sportsConfig, storage) {
 
 export function clearTemplateDataMemoryCacheForTests() {
   memoryCache.clear();
+  inflightRefreshes.clear();
 }

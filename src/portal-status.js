@@ -41,6 +41,7 @@ export function getPortalLastSignalMs(screen = {}) {
 }
 
 export function getPortalScreenStatus(screen, now = Date.now()) {
+  if (!screen?.connectedDeviceId && !screen?.activeDeviceId) return "OFFLINE";
   const lastSeenAt = getPortalLastSignalMs(screen);
   if (!lastSeenAt) return "OFFLINE";
   const age = Math.max(0, now - lastSeenAt);
@@ -80,25 +81,30 @@ function compareScreenNames(left = {}, right = {}) {
   return 0;
 }
 
-function isScreenOnlineForOrder(screen, now) {
-  if (screen.portalStatus) return screen.portalStatus === "ONLINE";
-  return Boolean(screen.connectedDeviceId || screen.activeDeviceId)
-    && getPortalScreenStatus(screen, now) === "ONLINE";
-}
-
-export function comparePortalScreens(left = {}, right = {}, now = Date.now()) {
-  const leftOnline = isScreenOnlineForOrder(left, now);
-  const rightOnline = isScreenOnlineForOrder(right, now);
-  if (leftOnline !== rightOnline) return leftOnline ? -1 : 1;
-  if (!leftOnline) {
-    const lastSeenDifference = getPortalLastSignalMs(right) - getPortalLastSignalMs(left);
-    if (lastSeenDifference !== 0) return lastSeenDifference;
-  }
+export function comparePortalScreens(left = {}, right = {}) {
   return compareScreenNames(left, right);
 }
 
-export function compareTelemetryScreens(left = {}, right = {}, now = Date.now()) {
-  return comparePortalScreens(left, right, now);
+export function compareTelemetryScreens(left = {}, right = {}) {
+  return comparePortalScreens(left, right);
+}
+
+export function compareTelemetryOperationalScreens(left = {}, right = {}) {
+  const leftOnline = left?.portalStatus === "ONLINE";
+  const rightOnline = right?.portalStatus === "ONLINE";
+  if (leftOnline !== rightOnline) return leftOnline ? -1 : 1;
+  if (leftOnline) {
+    const leftUptime = Number(left?.telemetry?.session?.uptimeSeconds);
+    const rightUptime = Number(right?.telemetry?.session?.uptimeSeconds);
+    const leftMeasured = Number.isFinite(leftUptime) && leftUptime >= 0;
+    const rightMeasured = Number.isFinite(rightUptime) && rightUptime >= 0;
+    if (leftMeasured !== rightMeasured) return leftMeasured ? -1 : 1;
+    if (leftMeasured && rightMeasured && leftUptime !== rightUptime) return rightUptime - leftUptime;
+  } else {
+    const communicationOrder = getPortalLastSignalMs(right) - getPortalLastSignalMs(left);
+    if (communicationOrder) return communicationOrder;
+  }
+  return compareScreenNames(left, right);
 }
 
 export function getPortalScreenPage(screens = [], requestedPage = 1, pageSize = 8) {

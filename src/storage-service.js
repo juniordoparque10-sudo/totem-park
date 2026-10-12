@@ -1,11 +1,13 @@
 import {
   deleteObject,
   getDownloadURL,
+  getMetadata,
   ref,
   uploadBytesResumable,
 } from "firebase/storage";
 
 import { auth, storage } from "./firebase";
+import { getMediaVersionFields } from "./media-content-version";
 import {
   isStandalonePwa,
   observeResumableUploadTask,
@@ -44,8 +46,25 @@ function normalizeCustomMetadata(metadata = {}) {
 
 function uploadFirebaseFile(storageRef, file, metadata, onProgress) {
   const uploadTask = uploadBytesResumable(storageRef, file, metadata);
-  return observeResumableUploadTask({ task: uploadTask, onProgress })
-    .then((snapshot) => snapshot.ref);
+  return observeResumableUploadTask({ task: uploadTask, onProgress });
+}
+
+async function finalizeFirebaseUpload(snapshot, path) {
+  const uploadedRef = snapshot.ref;
+  const publicUrl = await getDownloadURL(uploadedRef);
+  const objectMetadata = await getMetadata(uploadedRef).catch(() => snapshot.metadata || {});
+  const versionFields = getMediaVersionFields(objectMetadata);
+  if (!versionFields.contentVersion) {
+    throw new Error("Firebase Storage não retornou versão confiável do objeto.");
+  }
+
+  return {
+    storageProvider: "firebase",
+    storagePath: path,
+    publicUrl,
+    url: publicUrl,
+    ...versionFields,
+  };
 }
 
 async function uploadFirebaseAsset({ path, file, contentType, customMetadata, onProgress }) {
@@ -55,16 +74,9 @@ async function uploadFirebaseAsset({ path, file, contentType, customMetadata, on
     customMetadata: normalizeCustomMetadata(customMetadata),
   };
 
+  let snapshot;
   try {
-    const uploadedRef = await uploadFirebaseFile(storageRef, file, metadata, onProgress);
-    const publicUrl = await getDownloadURL(uploadedRef);
-
-    return {
-      storageProvider: "firebase",
-      storagePath: path,
-      publicUrl,
-      url: publicUrl,
-    };
+    snapshot = await uploadFirebaseFile(storageRef, file, metadata, onProgress);
   } catch (uploadError) {
     const native = isNativeRuntime();
     const standalone = isStandalonePwa();
@@ -75,16 +87,10 @@ async function uploadFirebaseAsset({ path, file, contentType, customMetadata, on
     console.log("Upload resumível não iniciou; tentando arquivo estabilizado:", uploadError);
     onProgress?.(0);
     const stableFile = await buildStableUploadFile(file, metadata.contentType);
-    const uploadedRef = await uploadFirebaseFile(storageRef, stableFile, metadata, onProgress);
-    const publicUrl = await getDownloadURL(uploadedRef);
-
-    return {
-      storageProvider: "firebase",
-      storagePath: path,
-      publicUrl,
-      url: publicUrl,
-    };
+    snapshot = await uploadFirebaseFile(storageRef, stableFile, metadata, onProgress);
   }
+
+  return finalizeFirebaseUpload(snapshot, path);
 }
 
 async function getAuthHeader() {
@@ -123,15 +129,32 @@ async function uploadR2Asset({ path, file, contentType, customMetadata, onProgre
     throw new Error("Worker R2 não retornou publicUrl.");
   }
 
+  const versionFields = getMediaVersionFields(result);
+  if (!versionFields.contentVersion) throw new Error("R2 não retornou versão confiável do objeto. Atualize o Worker antes de usar este backend.");
   return {
     storageProvider: "r2",
     storagePath: result.storagePath || path,
     storageKey: result.storageKey || path,
     publicUrl,
     url: publicUrl,
-    fileHash: result.fileHash || "",
-    etag: result.etag || "",
+    ...versionFields,
   };
+}
+
+export async function getStorageAssetVersionMetadata({ storagePath, storageProvider = getStorageProvider() } = {}) {
+  if (!storagePath) throw new Error("Caminho do arquivo não informado.");
+  if (storageProvider === "r2") {
+    if (!STORAGE_API_URL) throw new Error("Storage R2 configurado sem VITE_STORAGE_API_URL.");
+    const response = await fetch(`${STORAGE_API_URL}/metadata`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json", ...(await getAuthHeader()) },
+      body: JSON.stringify({ storagePath }),
+    });
+    if (!response.ok) throw new Error(`Falha ao consultar metadata R2 (${response.status})`);
+    return { ...(await response.json()), storageProvider: "r2", storagePath };
+  }
+  const metadata = await getMetadata(ref(storage, storagePath));
+  return { ...metadata, storageProvider: "firebase", storagePath };
 }
 
 export function getStorageProvider() {

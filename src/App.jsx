@@ -7,16 +7,25 @@ import QRCodeLayer from "./QRCodeLayer";
 import FinancialClassificationPanel from "./FinancialClassificationPanel";
 import FinancialManagementPanel from "./FinancialManagementPanel";
 import FinancialNotifications from "./FinancialNotifications";
+import { buildClassificationSuggestions } from "./billing-form-suggestions";
 import { getEffectivePlanAccess, getFinancialCardState, isFinancialModelActive } from "./financial-access";
-import { formatCivilDateBr, selectHeaderInvoice } from "./financial-display";
+import { formatCivilDateBr, selectClientDueDate, selectHeaderInvoice } from "./financial-display";
+import {
+  confirmOrphanAuthRemoval,
+  confirmPermanentClientDeletion,
+  createFinancialClient,
+  previewOrphanAuthRemoval,
+  previewPermanentClientDeletion,
+  updateFinancialContract,
+} from "./financial-api";
 import "./financial.css";
 import { normalizeTemplatesV2Override, resolveTemplatesV2Entitlement } from "./templates-v2/entitlement";
 import { normalizeSportsV2Config } from "./templates-v2/sports-v2/config";
 import { resolveSportsDataProvider } from "./templates-v2/sports-v2/data/SportsDataProvider";
 import { withSportsV2ReadinessTimeout } from "./templates-v2/sports-v2/readiness";
 import { clearTemplateV2BackgroundOnlineRetry, getTemplateV2CriticalImageState, getTemplateV2CriticalImageUrl, getTemplateV2ReadinessFingerprint, localizeTemplateV2Assets, markTemplateV2BackgroundForOnlineRetry, prepareTemplateV2CriticalImage, preloadImageForPaint, suppressTemplateV2CriticalImage, takeTemplateV2BackgroundOnlineRetries } from "./templates-v2/player-preload";
-import { collectTemplateAssetUrls, createOfflineSafeTemplate, prepareTemplateAssets, refreshTemplateAssets } from "./templates-v2/offline-asset-cache";
-import { buildSportsDataCacheContext, buildTemplateDataCacheKey, hasUsableSportsPayload, mergeSportsLastKnown, readSportsTemplateDataCache, readTemplateDataCache, writeSportsTemplateDataCache, writeTemplateDataCache } from "./templates-v2/offline-data-cache";
+import { collectTemplateAssetUrls, createOfflineSafeTemplate, prepareTemplateAssets, refreshTemplateAssets, releaseRetiredTemplateAssetUrls } from "./templates-v2/offline-asset-cache";
+import { buildSportsDataCacheContext, buildTemplateDataCacheKey, createNewsDataFingerprintConfig, createWeatherDataFingerprintConfig, hasUsableSportsPayload, mergeSportsLastKnown, readSportsTemplateDataCache, readTemplateDataCache, refreshTemplateDataIfNeeded, writeSportsTemplateDataCache, writeTemplateDataCache } from "./templates-v2/offline-data-cache";
 import { shouldRevealTemplateImmediately } from "./templates-v2/offline-readiness";
 import { getNextTemplateToPrepare } from "./templates-v2/offline-preload";
 import { confirmTemplateImageForPaint, getTemplatePlaybackLayerKey, getTemplatePlaybackReadyKey, isCurrentPlaybackExecution, nextPlaybackExecutionId } from "./templates-v2/player-execution";
@@ -158,7 +167,7 @@ import {
 import { createPlayerTelemetry, readPlayerTelemetryReport, TELEMETRY_DEFAULT_CONFIG } from "./player-telemetry";
 import { buildOperationalSnapshot, normalizeNativeAppInfo, normalizeOperationalMediaSource, OPERATIONAL_HEARTBEAT_INTERVAL_MS } from "./operational-telemetry";
 import { createTrafficTelemetry } from "./traffic-telemetry";
-import { comparePortalScreens, getPortalLastSignalMs, getPortalScreenPage, sortClientsAlphabetically } from "./portal-status";
+import { comparePortalScreens, getPortalLastSignalMs, getPortalScreenPage, getPortalScreenStatus, sortClientsAlphabetically } from "./portal-status";
 import { reportedAppVersion } from "./telemetry-card-data";
 import {
   authorizePlayerRebind,
@@ -168,11 +177,19 @@ import {
   revokeOwnPlayerBinding,
   uploadTransitionDiagnosticRescue,
 } from "./player-identity";
-import { deleteStoredAsset, uploadStorageAsset } from "./storage-service";
+import { deleteStoredAsset, getStorageAssetVersionMetadata, uploadStorageAsset } from "./storage-service";
 import {
+  createUploadPreviewLifecycle,
   isStandalonePwa,
+  recordUploadStage,
   shouldClearUploadInputImmediately,
 } from "./pwa-upload-flow";
+import {
+  applyMediaVersionToPlaylistItems,
+  backfillMediaContentVersions,
+  getCanonicalMediaContentVersion,
+  getMediaVersionFields,
+} from "./media-content-version";
 import TemplateV2Editor from "./templates-v2/editor/TemplateV2Editor";
 import TemplateV2Renderer from "./templates-v2/TemplateV2Renderer";
 import TemplateV2DynamicStage from "./templates-v2/editor/TemplateV2DynamicStage";
@@ -182,6 +199,7 @@ import PreviewModal from "./PreviewModal";
 import { getPublishedTemplateV2View, isTemplateV2 } from "./templates-v2/schema";
 import { getTemplatesV2ScreenCapability } from "./templates-v2/player-capability";
 import logo from "./assets/logo.png";
+import isotipo from "./assets/isotipo.png";
 import "./App.css";
 import "./portal-theme.css";
 
@@ -439,10 +457,9 @@ function getScreenLastSeenDate(screen = {}) {
 function getScreenConnectionStatus(screen = {}, nowValue = Date.now()) {
   const nowMs = getTimestampMs(nowValue) || Date.now();
   const lastSeenDate = getScreenLastSeenDate(screen);
-  const lastSeenMs = lastSeenDate?.getTime?.() || 0;
-  const diffInSeconds = lastSeenMs ? (nowMs - lastSeenMs) / 1000 : Infinity;
   const hasDevice = Boolean(screen.connectedDeviceId || screen.activeDeviceId);
-  const isOnline = hasDevice && diffInSeconds < SCREEN_ONLINE_WINDOW_SECONDS;
+  const portalStatus = getPortalScreenStatus(screen, nowMs);
+  const isOnline = portalStatus === "ONLINE";
 
   if (isOnline) {
     return {
@@ -2910,6 +2927,14 @@ function getLegacyClientPlanAccess(client, currentDate = new Date()) {
   };
 }
 
+function getClientPlanAccess(client, currentDate = new Date()) {
+  return getEffectivePlanAccess(
+    client,
+    (legacyClient) => getLegacyClientPlanAccess(legacyClient, currentDate),
+    currentDate,
+  );
+}
+
 function getPlanRestrictionAlert(access, action = "editar conteúdos") {
   if (access.isStrongRestriction || access.isSuspended) {
     return `Plano em modo visualização. Regularize para ${action}.`;
@@ -3786,6 +3811,9 @@ const IS_PLAYER_TELEMETRY_BUILD = APP_BUILD_MODE === "playerTelemetry";
 const IS_OPERATIONAL_TELEMETRY_BUILD = IS_PLAYER_RC_BUILD || IS_PLAYER_TELEMETRY_BUILD;
 const IS_PLAYER_JUMP_DIAG_BUILD = APP_BUILD_MODE === "playerJumpDiag";
 const IS_PLAYER_DECODER_EXPERIMENT_BUILD = APP_BUILD_MODE === "playerDecoderExperiment";
+const IS_TEMPLATE_DATA_FRESHNESS_EXPERIMENT = IS_PLAYER_RC_BUILD || APP_BUILD_MODE === "playerDecoderExperiment";
+const IS_TEMPLATE_ASSET_CACHE_EXPERIMENT = IS_PLAYER_RC_BUILD || (IS_PLAYER_DECODER_EXPERIMENT_BUILD && import.meta.env.VITE_TEMPLATE_ASSET_CACHE_EXPERIMENT === "1");
+const templateAssetCacheOptions = IS_TEMPLATE_ASSET_CACHE_EXPERIMENT ? { cachePolicyEnabled: true } : {};
 const IS_PLAYER_DECODER_LIFECYCLE_BUILD = IS_PLAYER_RC_BUILD || IS_PLAYER_DECODER_EXPERIMENT_BUILD;
 const IS_PLAYER_PHASE_B_BUILD = APP_BUILD_MODE === "playerPhaseB";
 const IS_PLAYER_LINK_FIX_BUILD = APP_BUILD_MODE === "playerLinkFix";
@@ -7843,12 +7871,40 @@ function PortalSuccessToast({ message, tone = "success" }) {
 
 function ClientMediaPage({ client, access = getClientPlanAccess(client) }) {
   const [uploadNotice, setUploadNotice] = useState(null);
+  const [mediaUploadSuccessNotice, setMediaUploadSuccessNotice] = useState("");
+  const [mediaNoticeTone, setMediaNoticeTone] = useState("success");
+  const [pendingMediaDeletion, setPendingMediaDeletion] = useState(null);
   const [mediaList, setMediaList] = useState([]);
   const [uploading, setUploading] = useState(false);
+  const [backfillingVersions, setBackfillingVersions] = useState(false);
   const [progress, setProgress] = useState(0);
   const [editingMedia, setEditingMedia] = useState(null);
   const mediaEditorRef = useRef(null);
   const mediaFileInputRef = useRef(null);
+  const uploadPreviewLifecycleRef = useRef(null);
+  if (!uploadPreviewLifecycleRef.current) {
+    uploadPreviewLifecycleRef.current = createUploadPreviewLifecycle();
+  }
+
+  useEffect(() => {
+    if (!mediaUploadSuccessNotice) return undefined;
+    const timeoutId = globalThis.setTimeout(() => setMediaUploadSuccessNotice(""), 3600);
+    return () => globalThis.clearTimeout(timeoutId);
+  }, [mediaUploadSuccessNotice]);
+
+  useEffect(() => () => {
+    uploadPreviewLifecycleRef.current?.release();
+    if (mediaFileInputRef.current) mediaFileInputRef.current.value = "";
+  }, []);
+
+  function showMediaNotice(message, tone = "success") {
+    setMediaNoticeTone(tone);
+    setMediaUploadSuccessNotice(message);
+  }
+
+  function showMediaUploadSuccess(message) {
+    showMediaNotice(message, "success");
+  }
 
   const storageUsedBytes = getMediaStorageUsed(mediaList);
   const storageLimitBytes = getClientStorageLimit(client);
@@ -14082,7 +14138,6 @@ function TemplateV2LivePreview({ template, sourceTemplate = template, compact = 
       const tasks = [];
       if (weatherConfig.enabled && modules.includes("weather")) {
         const fetchWeather = async () => {
-          playerTrafficDiagnostics.record("weatherFetchCount", { reason, templateId });
           return loadTemplateV2Weather(weatherConfig.city || "Sua cidade");
         };
         tasks.push((IS_TEMPLATE_DATA_FRESHNESS_EXPERIMENT
@@ -14095,7 +14150,6 @@ function TemplateV2LivePreview({ template, sourceTemplate = template, compact = 
       }
       if (newsConfig.enabled && modules.includes("news")) {
         const fetchNews = async () => {
-          playerTrafficDiagnostics.record("rssFetchCount", { reason, templateId });
           return loadTemplateV2News(newsConfig);
         };
         const isUsableNews = (news) => Boolean(news?.length) && JSON.stringify(news) !== JSON.stringify(DEFAULT_NEWS_ITEMS.slice(0,8));
@@ -14113,7 +14167,6 @@ function TemplateV2LivePreview({ template, sourceTemplate = template, compact = 
         logTemplatesV2Diagnostic("SPORTS_PUBLISHED_CONFIG", { templateId:template.id||template.templateId||"", schemaVersion:template.schemaVersion||null, provider:sports.provider, mode:sports.mode, selectedSports:sports.selectedSports, selectedSport:sports.selectedSport, competitionId:sports.items?.[sports.selectedSport]?.competitionId||"", season:sports.items?.[sports.selectedSport]?.season||"", modules:sports.items?.[sports.selectedSport]?.modules||{} });
         const provider = resolveSportsDataProvider(sports, { diagnostic:(event,payload)=>logTemplatesV2Diagnostic(`SPORTS_${event}`,{templateId:template.id||template.templateId||"",...payload}) });
         const settled = await withSportsV2ReadinessTimeout(Promise.allSettled(sports.selectedSports.map(async (sport) => {
-          playerTrafficDiagnostics.record("sportsFetchCount", { reason, templateId });
           return [sport,await provider.getSnapshot(sport)];
         })));
         const sportsData = Object.fromEntries(settled.filter((result)=>result.status === "fulfilled").map((result)=>result.value));

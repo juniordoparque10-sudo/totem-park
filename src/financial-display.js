@@ -9,6 +9,8 @@ const AUDIT_LABELS = Object.freeze({
   invoice_settled: "Mensalidade marcada como paga",
   settlement_reversed: "Quitação corrigida",
   contract_renewed: "Vigência contratual renovada",
+  contract_updated: "Contrato financeiro atualizado",
+  invoice_settled_batch: "Mensalidade quitada em lote",
   financial_reversion: "Retorno ao modelo legado",
 });
 
@@ -40,4 +42,11 @@ export function billingNotificationCopy(notification = {}, invoice = {}) {
 export function selectHeaderInvoice(invoices = []) {
   const open = invoices.filter((item) => ["pending", "overdue"].includes(item.status));
   return open.sort((a, b) => String(a.dueDate).localeCompare(String(b.dueDate)))[0] || null;
+}
+
+export function selectClientDueDate(client, invoices = []) {
+  if (client?.financialModelVersion === 1 && client?.financialMode === "active") {
+    return selectHeaderInvoice(invoices)?.dueDate || null;
+  }
+  return client?.dueDate || null;
 }

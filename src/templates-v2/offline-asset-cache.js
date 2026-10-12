@@ -3,6 +3,12 @@ import { Capacitor, CapacitorHttp } from "@capacitor/core";
 const ASSET_CACHE_NAME = "totempark-template-assets-v1";
 const inflightRefreshes = new Map();
 const resolvedLocalUrls = new Map();
+const retiredLocalUrlsByRemote = new Map();
+
+export const TEMPLATE_ASSET_URL_ONLY_TTL_MS = 60 * 60 * 1000;
+
+const CACHE_IDENTITY_HEADER = "x-totempark-asset-identity";
+const CACHE_VALIDATED_AT_HEADER = "x-totempark-asset-validated-at";
 
 const IMAGE_CONTENT_TYPES_BY_EXTENSION = {
   avif:"image/avif",
@@ -41,6 +47,37 @@ export function collectTemplateAssetUrls(value, found = new Set(), parentKey = "
       if (isVisualUrlField(key, value, parentKey)) found.add(entry.trim());
     } else if (entry && typeof entry === "object") {
       collectTemplateAssetUrls(entry, found, `${parentKey}.${key}`);
+    }
+  }
+  return found;
+}
+
+function getAssetIdentity(asset, remoteUrl) {
+  const fileHash = String(asset?.fileHash || asset?.hash || "").trim();
+  if (fileHash) return { key:`hash:${fileHash}`, strong:true };
+  const mediaId = String(asset?.mediaId || asset?.id || "").trim();
+  const assetRevision = String(asset?.revision || asset?.version || "").trim();
+  if (mediaId && assetRevision) return { key:`media:${mediaId}:${assetRevision}`, strong:true };
+  if (assetRevision) return { key:`revision:${assetRevision}`, strong:true };
+  const contentVersion = String(asset?.contentVersion || "").trim();
+  if (contentVersion) return { key:`content:${contentVersion}`, strong:true };
+  return { key:`url:${remoteUrl}`, strong:false };
+}
+
+function collectTemplateAssetDescriptors(value, found = new Map(), parentKey = "") {
+  if (!value) return found;
+  if (Array.isArray(value)) {
+    value.forEach((entry) => collectTemplateAssetDescriptors(entry, found, parentKey));
+    return found;
+  }
+  if (typeof value !== "object") return found;
+  for (const [key, entry] of Object.entries(value)) {
+    if (typeof entry === "string" && isRemoteUrl(entry) && isVisualUrlField(key, value, parentKey)) {
+      const descriptor = { remoteUrl:entry.trim(), ...getAssetIdentity(value, entry.trim()) };
+      const previous = found.get(descriptor.remoteUrl);
+      if (!previous || (!previous.strong && descriptor.strong)) found.set(descriptor.remoteUrl, descriptor);
+    } else if (entry && typeof entry === "object") {
+      collectTemplateAssetDescriptors(entry, found, `${parentKey}.${key}`);
     }
   }
   return found;
@@ -133,38 +170,82 @@ export async function fetchTemplateAssetResponse(remoteUrl, {
   }
 }
 
-export async function resolveCachedTemplateAsset(remoteUrl, { cacheStorage = globalThis.caches, createObjectURL = globalThis.URL?.createObjectURL?.bind(globalThis.URL) } = {}) {
+function getCachedResponseSignature(response) {
+  const identity = response?.headers?.get?.(CACHE_IDENTITY_HEADER) || "legacy";
+  const validatedAt = response?.headers?.get?.(CACHE_VALIDATED_AT_HEADER) || "0";
+  return `${identity}|${validatedAt}`;
+}
+
+async function resolveCachedTemplateAssetDetails(remoteUrl, { cacheStorage = globalThis.caches, createObjectURL = globalThis.URL?.createObjectURL?.bind(globalThis.URL) } = {}) {
   if (!isRemoteUrl(remoteUrl)) return remoteUrl || "";
-  if (resolvedLocalUrls.has(remoteUrl)) return resolvedLocalUrls.get(remoteUrl);
   const cache = await openCache(cacheStorage);
   const response = await cache?.match(remoteUrl);
-  if (!response?.ok) return "";
+  if (!response?.ok) return { localUrl:"", retiredLocalUrls:[] };
+  const signature = getCachedResponseSignature(response);
+  const current = resolvedLocalUrls.get(remoteUrl);
+  if (current?.signature === signature) {
+    return { localUrl:current.localUrl, retiredLocalUrls:[...(retiredLocalUrlsByRemote.get(remoteUrl) || [])] };
+  }
   const blob = await response.blob();
-  if (!blob?.size || !createObjectURL) return "";
+  if (!blob?.size || !createObjectURL) return { localUrl:"", retiredLocalUrls:[] };
   const localUrl = createObjectURL(blob);
-  resolvedLocalUrls.set(remoteUrl, localUrl);
-  return localUrl;
+  if (current?.localUrl && current.localUrl !== localUrl) {
+    const retired = retiredLocalUrlsByRemote.get(remoteUrl) || new Set();
+    retired.add(current.localUrl);
+    retiredLocalUrlsByRemote.set(remoteUrl, retired);
+  }
+  resolvedLocalUrls.set(remoteUrl, { localUrl, signature });
+  return { localUrl, retiredLocalUrls:[...(retiredLocalUrlsByRemote.get(remoteUrl) || [])] };
+}
+
+export async function resolveCachedTemplateAsset(remoteUrl, options = {}) {
+  if (!isRemoteUrl(remoteUrl)) return remoteUrl || "";
+  return (await resolveCachedTemplateAssetDetails(remoteUrl, options)).localUrl;
+}
+
+function isCachedAssetFresh(response, identity, now, ttlMs) {
+  if (!response?.ok) return false;
+  if (response.headers.get(CACHE_IDENTITY_HEADER) !== identity.key) return false;
+  if (identity.strong) return true;
+  const validatedAt = Number(response.headers.get(CACHE_VALIDATED_AT_HEADER) || 0);
+  return validatedAt > 0 && now - validatedAt < ttlMs;
 }
 
 export async function refreshTemplateAsset(remoteUrl, options = {}) {
   const { cacheStorage = globalThis.caches } = options;
   const fetchImpl = options.fetchImpl || globalThis.fetch;
   if (!isRemoteUrl(remoteUrl) || !fetchImpl) return { status:"ignored", remoteUrl };
-  if (inflightRefreshes.has(remoteUrl)) return inflightRefreshes.get(remoteUrl);
+  if (inflightRefreshes.has(remoteUrl)) {
+    const inflight = inflightRefreshes.get(remoteUrl);
+    if (!options.cachePolicyEnabled) return inflight;
+    return inflight.then(() => refreshTemplateAsset(remoteUrl, options));
+  }
   const refresh = (async () => {
     const cache = await openCache(cacheStorage);
     if (!cache) return { status:"unsupported", remoteUrl };
     const previous = await cache.match(remoteUrl);
+    const identity = options.assetIdentity || getAssetIdentity(null, remoteUrl);
+    const now = Number(options.now ?? Date.now());
+    if (options.cachePolicyEnabled && isCachedAssetFresh(previous, identity, now, Number(options.urlOnlyTtlMs) || TEMPLATE_ASSET_URL_ONLY_TTL_MS)) {
+      return { status:"fresh", remoteUrl };
+    }
     try {
       const response = await fetchTemplateAssetResponse(remoteUrl, { ...options, fetchImpl });
-      const { blob } = await validateTemplateAssetResponse(response, remoteUrl);
-      await cache.put(remoteUrl, response.clone());
-      const oldLocalUrl = resolvedLocalUrls.get(remoteUrl);
-      if (oldLocalUrl) {
-        try { globalThis.URL?.revokeObjectURL?.(oldLocalUrl); } catch { /* noop */ }
+      const { blob, contentType } = await validateTemplateAssetResponse(response, remoteUrl);
+      if (options.cachePolicyEnabled) {
+        const headers = new Headers(response.headers);
+        headers.set(CACHE_IDENTITY_HEADER, identity.key);
+        headers.set(CACHE_VALIDATED_AT_HEADER, String(now));
+        await cache.put(remoteUrl, new Response(blob, { status:response.status, statusText:response.statusText, headers }));
+      } else {
+        await cache.put(remoteUrl, response.clone());
+      }
+      const oldLocalEntry = resolvedLocalUrls.get(remoteUrl);
+      if (!options.cachePolicyEnabled && oldLocalEntry?.localUrl) {
+        try { (options.revokeObjectURL || globalThis.URL?.revokeObjectURL?.bind(globalThis.URL))?.(oldLocalEntry.localUrl); } catch { /* noop */ }
         resolvedLocalUrls.delete(remoteUrl);
       }
-      return { status:previous ? "updated" : "stored", remoteUrl, size:blob.size };
+      return { status:previous ? "updated" : "stored", remoteUrl, size:blob.size, contentType };
     } catch (error) {
       return { status:previous ? "preserved" : "failed", remoteUrl, error };
     }
@@ -190,21 +271,36 @@ export function createOfflineSafeTemplate(template) {
 }
 
 export async function prepareTemplateAssets(template, options = {}) {
-  const urls = [...collectTemplateAssetUrls(template)];
+  const descriptors = [...collectTemplateAssetDescriptors(template).values()];
+  const urls = descriptors.map(({ remoteUrl }) => remoteUrl);
   const localByRemote = new Map();
+  const retiredLocalUrls = new Set();
   await Promise.all(urls.map(async (url) => {
-    const localUrl = await resolveCachedTemplateAsset(url, options);
-    if (localUrl) localByRemote.set(url, localUrl);
+    const result = await resolveCachedTemplateAssetDetails(url, options);
+    if (result.localUrl) localByRemote.set(url, result.localUrl);
+    result.retiredLocalUrls.forEach((localUrl) => retiredLocalUrls.add(localUrl));
   }));
-  return { template:replaceRemoteUrls(template, localByRemote), urls, localByRemote, hits:localByRemote.size, misses:urls.length-localByRemote.size };
+  return { template:replaceRemoteUrls(template, localByRemote), urls, localByRemote, retiredLocalUrls:[...retiredLocalUrls], hits:localByRemote.size, misses:urls.length-localByRemote.size };
 }
 
 export async function refreshTemplateAssets(template, options = {}) {
-  const urls = [...collectTemplateAssetUrls(template)];
-  return Promise.all(urls.map((url) => refreshTemplateAsset(url, options)));
+  const descriptors = [...collectTemplateAssetDescriptors(template).values()];
+  return Promise.all(descriptors.map(({ remoteUrl, key, strong }) => refreshTemplateAsset(remoteUrl, { ...options, assetIdentity:{ key, strong } })));
+}
+
+export function releaseRetiredTemplateAssetUrls(localUrls = [], { revokeObjectURL = globalThis.URL?.revokeObjectURL?.bind(globalThis.URL) } = {}) {
+  const released = new Set(localUrls);
+  released.forEach((localUrl) => {
+    try { revokeObjectURL?.(localUrl); } catch { /* noop */ }
+  });
+  retiredLocalUrlsByRemote.forEach((urls, remoteUrl) => {
+    released.forEach((localUrl) => urls.delete(localUrl));
+    if (!urls.size) retiredLocalUrlsByRemote.delete(remoteUrl);
+  });
 }
 
 export function clearTemplateAssetMemoryCacheForTests() {
   resolvedLocalUrls.clear();
   inflightRefreshes.clear();
+  retiredLocalUrlsByRemote.clear();
 }
