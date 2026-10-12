@@ -64,6 +64,17 @@ export function getCurrentSourceGroup(screen = {}) {
   return SOURCE_GROUPS[value] || SOURCE_GROUPS.UNKNOWN;
 }
 
+export function aggregateCurrentPlaybackOrigins(screens = []) {
+  const counts = { local:0, remote:0, fallback:0, template:0, mixed:0, unknown:0 };
+  let total = 0;
+  for (const screen of screens) {
+    if (!isCurrentTelemetryScreen(screen)) continue;
+    counts[getCurrentSourceGroup(screen).key] += 1;
+    total += 1;
+  }
+  return { counts, total };
+}
+
 export function aggregateSchema4Traffic(screens = []) {
   const totals = {
     currentSchema4Screens:0, networkScreens:0, downloadedScreens:0, reusedScreens:0, avoidedScreens:0, cacheRateScreens:0,

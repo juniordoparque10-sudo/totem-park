@@ -1,6 +1,6 @@
 import test from "node:test";
 import assert from "node:assert/strict";
-import { aggregateSchema4Traffic, getCurrentSourceGroup, getTelemetryCardData, isSchema4Traffic, reportedAppVersion } from "./telemetry-card-data.js";
+import { aggregateCurrentPlaybackOrigins, aggregateSchema4Traffic, getCurrentSourceGroup, getTelemetryCardData, isSchema4Traffic, reportedAppVersion } from "./telemetry-card-data.js";
 
 test("V5 active time follows checkpoints without treating legacy display time as active time", () => {
   const v5 = { telemetry: { schemaVersion: 3, session: { uptimeSeconds: 60 } } };
@@ -64,4 +64,22 @@ test("current media source uses the complete schema 4 grouping", () => {
     assert.equal(getCurrentSourceGroup({ portalStatus:"ONLINE", telemetry:{ current:{ currentMediaSource:source } } }).key, key);
   }
   assert.equal(getCurrentSourceGroup({ portalStatus:"OFFLINE", telemetry:{ current:{ currentMediaSource:"LOCAL" } } }).key, "unknown");
+});
+
+test("playback origin chart considers only online screens and keeps unknown online origins", () => {
+  const result = aggregateCurrentPlaybackOrigins([
+    { portalStatus:"ONLINE", currentMediaSource:"LOCAL" },
+    { portalStatus:"ONLINE", currentMediaSource:"UNKNOWN" },
+    { portalStatus:"OFFLINE", currentMediaSource:"LOCAL" },
+    ...Array.from({ length:8 }, () => ({ portalStatus:"OFFLINE" })),
+  ]);
+
+  assert.deepEqual(result, {
+    counts:{ local:1, remote:0, fallback:0, template:0, mixed:0, unknown:1 },
+    total:2,
+  });
+  assert.deepEqual(aggregateCurrentPlaybackOrigins([{ portalStatus:"OFFLINE", currentMediaSource:"LOCAL" }]), {
+    counts:{ local:0, remote:0, fallback:0, template:0, mixed:0, unknown:0 },
+    total:0,
+  });
 });
