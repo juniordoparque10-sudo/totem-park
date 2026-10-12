@@ -86,7 +86,14 @@ export function comparePortalScreens(left = {}, right = {}) {
 }
 
 export function compareTelemetryScreens(left = {}, right = {}) {
-  return comparePortalScreens(left, right);
+  const statusOrder = { ONLINE: 0, ATTENTION: 1, OFFLINE: 2 };
+  const statusComparison = (statusOrder[left?.portalStatus] ?? 3) - (statusOrder[right?.portalStatus] ?? 3);
+  if (statusComparison) return statusComparison;
+
+  const communicationComparison = getPortalLastSignalMs(right) - getPortalLastSignalMs(left);
+  if (communicationComparison) return communicationComparison;
+
+  return compareScreenNames(left, right);
 }
 
 export function compareTelemetryOperationalScreens(left = {}, right = {}) {

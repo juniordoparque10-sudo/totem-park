@@ -63,17 +63,17 @@ test("V5 checkpoints change presence without reordering screens that remain onli
   assert.deepEqual(order(), ["a", "b"]);
 });
 
-test("online screens stay alphabetical as heartbeats change", () => {
+test("telemetry screens put online first and then sort by latest communication", () => {
   const screens = [
-    { id: "b", clientName: "Flluxo", name: "TV Zebra", portalStatus: "ONLINE", lastSeenAt: 900 },
-    { id: "a", clientName: "Árvore", name: "TV A", portalStatus: "ONLINE", lastSeenAt: 100 },
-    { id: "c", clientName: "Flluxo", name: "TV Alfa", portalStatus: "ONLINE", lastSeenAt: 500 },
+    { id: "offline-old", clientName: "Flluxo", name: "TV Zebra", portalStatus: "OFFLINE", lastSeenAt: 100 },
+    { id: "online-old", clientName: "Árvore", name: "TV A", portalStatus: "ONLINE", lastSeenAt: 200 },
+    { id: "offline-new", clientName: "Flluxo", name: "TV Alfa", portalStatus: "OFFLINE", lastSeenAt: 400 },
+    { id: "online-new", clientName: "Zebra", name: "TV Z", portalStatus: "ONLINE", lastSeenAt: 300 },
   ];
-  assert.deepEqual([...screens].sort(compareTelemetryScreens).map((screen) => screen.id), ["a", "c", "b"]);
-  screens[0].lastSeenAt = 2_000;
-  screens[1].lastSeenAt = 3_000;
-  screens[2].lastSeenAt = 1_000;
-  assert.deepEqual([...screens].sort(compareTelemetryScreens).map((screen) => screen.id), ["a", "c", "b"]);
+  assert.deepEqual(
+    [...screens].sort(compareTelemetryScreens).map((screen) => screen.id),
+    ["online-new", "online-old", "offline-new", "offline-old"]
+  );
 });
 
 test("offline screens follow online and sort by last communication", () => {
