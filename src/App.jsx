@@ -9393,7 +9393,7 @@ function ClientPlaylistsPage({ client, access = getClientPlanAccess(client), isA
       >
         <UniversalPreview item={media} className="playlist-preview-frame" compact />
 
-        <strong>{media.title}</strong>
+        <strong className="playlist-picker-item-title" title={media.title}>{media.title}</strong>
 
         <span>
           {media.type} • {media.duration}s • {getPreviewOrientationLabel(media)}
