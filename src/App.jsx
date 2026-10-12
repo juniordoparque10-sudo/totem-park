@@ -183,6 +183,7 @@ import { getPublishedTemplateV2View, isTemplateV2 } from "./templates-v2/schema"
 import { getTemplatesV2ScreenCapability } from "./templates-v2/player-capability";
 import logo from "./assets/logo.png";
 import "./App.css";
+import "./portal-theme.css";
 
 const PUBLIC_WEB_URL = "https://totempark.com.br";
 const BOOTSTRAP_MASTER_EMAILS = [
@@ -415,8 +416,6 @@ function getTimestampMs(value) {
   return 0;
 }
 
-const SCREEN_ONLINE_WINDOW_SECONDS = 45;
-const SCREEN_ATTENTION_WINDOW_SECONDS = 90;
 const SCREEN_LOCATION_CACHE_KEY = "totempark-screen-location-cache";
 const SCREEN_LOCATION_CACHE_TTL_MS = 30 * 60 * 1000;
 let screenLocationRetryAfter = 0;
@@ -459,7 +458,7 @@ function getScreenConnectionStatus(screen = {}, nowValue = Date.now()) {
     };
   }
 
-  if (hasDevice && diffInSeconds < SCREEN_ATTENTION_WINDOW_SECONDS) {
+  if (portalStatus === "ATTENTION") {
     return {
       key: "attention",
       className: "attention",
@@ -1149,7 +1148,7 @@ function UniversalPreview({
   if (isMarketingArt) {
     content = <MarketingArtPreview art={measuredItem} compact={compact} />;
   } else if (isTemplate) {
-    content = <ScaledTemplatePortalPreview template={measuredItem} />;
+    content = <ScaledTemplatePortalPreview template={measuredItem} playlistThumbnail={useDirectMediaPreview} />;
   } else if (mediaSrc) {
     content = isVideoItem(measuredItem) && (compact || (!useDirectMediaPreview && !(controls && !compact))) ? (
       <VideoPreviewMedia
@@ -2911,10 +2910,6 @@ function getLegacyClientPlanAccess(client, currentDate = new Date()) {
   };
 }
 
-function getClientPlanAccess(client, currentDate = new Date()) {
-  return getEffectivePlanAccess(client, (legacyClient) => getLegacyClientPlanAccess(legacyClient, currentDate), currentDate);
-}
-
 function getPlanRestrictionAlert(access, action = "editar conteúdos") {
   if (access.isStrongRestriction || access.isSuspended) {
     return `Plano em modo visualização. Regularize para ${action}.`;
@@ -4231,8 +4226,11 @@ function AdminApp({ screenRotation, onScreenRotationChange }) {
   if (authStatus === "AUTH_LOADING" || (authStatus === "AUTHENTICATED" && !user)) {
     return (
       <div className="login-page">
-        <div className="login-card">
-          <h1>Carregando...</h1>
+        <div className="login-card auth-loading-card">
+          <h1 className="auth-loading-title">Carregando...</h1>
+          <div className="auth-loading-brand">
+            Desenvolvido por <strong>Park Solutions</strong>
+          </div>
         </div>
       </div>
     );
@@ -4289,7 +4287,7 @@ function AdminApp({ screenRotation, onScreenRotationChange }) {
           <aside className="sidebar">
             <div className="logo-area">
               <div className="logo-image-box">
-                <img src={logo} alt="Totem Park" className="logo-image" />
+                <img src={isotipo} alt="Isotipo Totem Park" className="logo-image" />
               </div>
 
               <div>
@@ -4365,7 +4363,7 @@ function AdminApp({ screenRotation, onScreenRotationChange }) {
         <aside className="sidebar">
           <div className="logo-area">
             <div className="logo-image-box">
-              <img src={logo} alt="Totem Park" className="logo-image" />
+              <img src={isotipo} alt="Isotipo Totem Park" className="logo-image" />
             </div>
 
             <div>
@@ -5056,7 +5054,6 @@ function Dashboard({ onNavigate, onOpenTelemetry }) {
   const [now, setNow] = useState(Date.now());
   const [screenStatusFilter, setScreenStatusFilter] = useState("all");
   const [screenPage, setScreenPage] = useState(1);
-  const [cachePanelExpanded, setCachePanelExpanded] = useState(false);
 
   useEffect(() => {
     const interval = setInterval(() => {
@@ -5395,7 +5392,8 @@ function Dashboard({ onNavigate, onOpenTelemetry }) {
       risk,
     };
   });
-  const visibleTrafficCards = cachePanelExpanded ? trafficCards : trafficCards.slice(0, 4);
+  const highTrafficRiskCount = trafficCards.filter(({ risk }) => risk.key === "high").length;
+  const mediumTrafficRiskCount = trafficCards.filter(({ risk }) => risk.key === "medium").length;
 
   return (
     <>
@@ -5487,54 +5485,20 @@ function Dashboard({ onNavigate, onOpenTelemetry }) {
         <div className="mrr"><span>Adesões pagas</span><strong>{formatCurrencyBr(paidSetupRevenue)}</strong></div>
       </section>
 
-      <section className="premium-panel traffic-cache-panel">
+      <section className="premium-panel">
         <div className="premium-panel-header">
           <div>
-            <h2>Consumo e Cache</h2>
-            <p>Monitoramento administrativo para reduzir downloads repetidos de mídias.</p>
+            <h2>Exceções de consumo e cache</h2>
+            <p>Resumo dos clientes que precisam de acompanhamento.</p>
           </div>
-          {trafficCards.length > 0 && (
-            <div className="traffic-cache-actions">
-              <span>
-                {visibleTrafficCards.length}/{trafficCards.length} cliente(s)
-              </span>
-              <button
-                type="button"
-                className="client-action"
-                onClick={() => setCachePanelExpanded((current) => !current)}
-              >
-                {cachePanelExpanded ? "Recolher" : "Expandir"}
-              </button>
-            </div>
-          )}
+          <button type="button" className="client-action" onClick={() => onNavigate?.("telemetry")}>
+            Ver na Telemetria
+          </button>
         </div>
 
-        <div className={`traffic-cache-grid ${cachePanelExpanded ? "expanded" : "collapsed"}`}>
-          {trafficCards.length === 0 ? (
-            <div className="premium-empty">Nenhum cliente para monitorar ainda.</div>
-          ) : (
-            visibleTrafficCards.map(({ client, statusGroups, storageUsed, activePlaylistWeightBytes, estimatedMonthlyTrafficBytes, cacheStatus, mediaSource, risk }) => (
-              <div className={`traffic-cache-card risk-${risk.key}`} key={client.id}>
-                <div className="traffic-cache-card-top">
-                  <div>
-                    <strong>{client.name}</strong>
-                    <span>Plano {getPlanConfig(client.plan).name}</span>
-                  </div>
-                  <b>{risk.label}</b>
-                </div>
-
-                <div className="traffic-cache-metrics">
-                  <span>Telas: {statusGroups.online.length} online • {statusGroups.attention.length} atenção • {statusGroups["logged-offline"].length} offline • {statusGroups["not-logged"].length} não logada(s)</span>
-                  <span>Storage: {formatStorageSize(storageUsed)} / {formatStorageSize(getClientStorageLimit(client), 0)}</span>
-                  <span>Playlist ativa: {formatStorageSize(activePlaylistWeightBytes)}</span>
-                  <span>Cache: {cacheStatus} • {mediaSource}</span>
-                  <span>Tráfego estimado: {formatStorageSize(estimatedMonthlyTrafficBytes)}</span>
-                </div>
-
-                <p>{risk.message}</p>
-              </div>
-            ))
-          )}
+        <div className="admin-plan-kpis">
+          <div className="strong"><span>Risco alto</span><strong>{highTrafficRiskCount}</strong></div>
+          <div className="warning"><span>Risco médio</span><strong>{mediumTrafficRiskCount}</strong></div>
         </div>
       </section>
 
@@ -5592,6 +5556,8 @@ function Dashboard({ onNavigate, onOpenTelemetry }) {
               visibleRealtimeScreens.map((screen) => {
                 const connection = getScreenConnectionStatus(screen, now);
                 const deviceLocation = getScreenDisplayLocation(screen);
+                const previewOrientation = screen.nowPlayingOrientation || screen.orientation || "Paisagem";
+                const isPortraitPreview = /retrato|portrait/i.test(previewOrientation);
 
                 return (
                   <div className="premium-screen-row realtime-screen-card" key={`${screen.clientId}-${screen.id}`} role="button" tabIndex={0} onClick={() => onOpenTelemetry?.(screen)} onKeyDown={(event) => {
@@ -5600,19 +5566,27 @@ function Dashboard({ onNavigate, onOpenTelemetry }) {
                     <div className="realtime-screen-identity">
                       <div className="realtime-screen-identity-head">
                         <div className={`premium-screen-dot ${connection.className}`}></div>
-                        <div className="premium-screen-icon premium-screen-thumb">
-                          {renderLivePreviewMedia(
-                            screen,
-                            getDashboardActivePlaylist(screen)?.items?.[0],
-                            <Monitor size={24} />
-                          )}
-                        </div>
                         <div className="realtime-screen-name">
                           <strong>{screen.name}</strong>
                           <span>{screen.clientName} • {screen.location || "Não informado"}</span>
                         </div>
                       </div>
-                      <span className={`premium-live-badge ${connection.className}`}>{connection.label}</span>
+
+                      <div className="realtime-screen-preview-line">
+                        <div className={`realtime-screen-preview-wrap ${isPortraitPreview ? "portrait" : "landscape"}`}>
+                          <span className="realtime-screen-orientation">
+                            {previewOrientation}
+                          </span>
+                          <div className="premium-screen-icon premium-screen-thumb">
+                            {renderLivePreviewMedia(
+                              screen,
+                              getDashboardActivePlaylist(screen)?.items?.[0],
+                              <Monitor size={24} />
+                            )}
+                          </div>
+                        </div>
+                        <span className={`premium-live-badge ${connection.className}`}>{connection.label}</span>
+                      </div>
                     </div>
 
                     <div className="realtime-screen-section">
@@ -6007,6 +5981,8 @@ function ClientsPage({ onOpenClient }) {
   const [showCreateModal, setShowCreateModal] = useState(false);
   const [editingClient, setEditingClient] = useState(null);
   const [savingClient, setSavingClient] = useState(false);
+  const [deletionModal, setDeletionModal] = useState(null);
+  const [clientActionMessage, setClientActionMessage] = useState("");
   const [searchTerm, setSearchTerm] = useState("");
   const [statusFilter, setStatusFilter] = useState("Todos");
   const [clientUsage, setClientUsage] = useState({});
@@ -6019,6 +5995,10 @@ function ClientsPage({ onOpenClient }) {
     billing: "Mensal",
     startDate: "",
     dueDate: "",
+    contractEndDate: "",
+    billingAnchorDay: "",
+    financialAmount: "49,90",
+    financialAmountCustomized: false,
     screensLimit: "1",
     storageLimitGb: "5",
     maxVideoSizeMb: "100",
@@ -6051,7 +6031,7 @@ function ClientsPage({ onOpenClient }) {
       const list = snapshot.docs.map((clientDoc) => ({
         id: clientDoc.id,
         ...clientDoc.data(),
-      }));
+      })).filter((client) => client.accountStatus !== "permanently_deleted" && client.lifecycleStatus !== "permanently_deleted");
 
       setClientsError("");
       setClients(sortClientsAlphabetically(list));
@@ -6140,7 +6120,22 @@ function ClientsPage({ onOpenClient }) {
         }
       );
 
-      return [screensUnsub, mediaUnsub];
+      const invoicesUnsub = isFinancialModelActive(client) ? onSnapshot(
+        collection(db, "clients", client.id, "invoices"),
+        (snapshot) => {
+          const openInvoices = snapshot.docs.map((item) => ({ id: item.id, ...item.data() }))
+            .filter((item) => item.status === "pending" || item.status === "overdue");
+          setClientUsage((previous) => ({
+            ...previous,
+            [client.id]: {
+              ...(previous[client.id] || {}),
+              openInvoices,
+            },
+          }));
+        }
+      ) : () => {};
+
+      return [screensUnsub, mediaUnsub, invoicesUnsub];
     });
 
     return () => {
@@ -6158,9 +6153,9 @@ function ClientsPage({ onOpenClient }) {
     return Math.ceil(diff / (1000 * 60 * 60 * 24));
   }
 
-  function getDueInfo(client) {
+  function getDueInfo(client, dueDate = client.dueDate) {
     const access = getClientPlanAccess(client);
-    const days = getDaysToDue(client.dueDate);
+    const days = getDaysToDue(dueDate);
 
     if (days === null) {
       return {
@@ -6220,27 +6215,6 @@ function ClientsPage({ onOpenClient }) {
     return matchesSearch && matchesStatus;
   });
 
-  async function createClientAuthUser(email, password) {
-    const secondaryApp = initializeApp(
-      firebaseConfig,
-      `secondary-client-${Date.now()}`
-    );
-
-    const secondaryAuth = getAuth(secondaryApp);
-
-    try {
-      const userCredential = await createUserWithEmailAndPassword(
-        secondaryAuth,
-        email,
-        password
-      );
-
-      return userCredential.user.uid;
-    } finally {
-      await deleteApp(secondaryApp);
-    }
-  }
-
   function resetForm() {
     setForm({
       name: "",
@@ -6250,6 +6224,10 @@ function ClientsPage({ onOpenClient }) {
       billing: "Mensal",
       startDate: "",
       dueDate: "",
+      contractEndDate: "",
+      billingAnchorDay: "",
+      financialAmount: "49,90",
+      financialAmountCustomized: false,
       screensLimit: "1",
       storageLimitGb: "5",
       maxVideoSizeMb: "100",
@@ -6272,25 +6250,45 @@ function ClientsPage({ onOpenClient }) {
       logoFile: null,
       logoPreview: "",
       logoUrl: "",
+      onboardingIdempotencyKey: "",
     });
   }
 
   function openCreateClientModal() {
     setEditingClient(null);
     resetForm();
+    const startDate = getTodayDateInput(0);
+    const suggestions = buildClassificationSuggestions({ client: { plan: "Start" }, startDate, billingPeriod: "monthly" });
+    setForm((current) => ({ ...current, name: "", email: "", password: "", plan: "Start", billing: "Mensal", startDate, dueDate: suggestions.firstDueDate, contractEndDate: suggestions.endDate, billingAnchorDay: String(suggestions.billingAnchorDay), financialAmount: suggestions.amount, financialAmountCustomized: false, onboardingIdempotencyKey: crypto.randomUUID(), logoFile: null, logoPreview: "", logoUrl: "" }));
     setShowCreateModal(true);
   }
 
-  function openEditClientModal(client) {
+  async function openEditClientModal(client) {
+    let activeContract = null;
+    if (isFinancialModelActive(client) && client.activeContractId) {
+      try {
+        const snapshot = await getDoc(doc(db, "clients", client.id, "contracts", client.activeContractId));
+        if (!snapshot.exists()) throw new Error("active-contract-not-found");
+        activeContract = snapshot.data();
+      } catch (error) {
+        console.log(error);
+        alert("Não foi possível carregar o contrato financeiro para edição.");
+        return;
+      }
+    }
     setEditingClient(client);
     setForm({
       name: client.name || "",
       email: client.email || "",
       password: "",
       plan: getPlanConfig(client.plan).name,
-      billing: client.billing || "Mensal",
-      startDate: client.startDate || "",
+      billing: activeContract?.billingPeriod === "annual" ? "Anual" : client.billing || "Mensal",
+      startDate: activeContract?.startDate || client.startDate || "",
       dueDate: client.dueDate || "",
+      contractEndDate: activeContract?.endDate || "",
+      billingAnchorDay: String(activeContract?.billingAnchorDay || (client.dueDate ? Number(client.dueDate.slice(8, 10)) : "")),
+      financialAmount: (Number(activeContract?.defaultAmountCents ?? getPlanConfig(client.plan).priceMonthly * 100) / 100).toFixed(2).replace(".", ","),
+      financialAmountCustomized: Boolean(activeContract),
       screensLimit: String(getClientScreenLimit(client)),
       storageLimitGb: String(getClientStorageLimit(client) / STORAGE_GB),
       maxVideoSizeMb: String(getClientMaxVideoSize(client) / STORAGE_MB),
@@ -6330,6 +6328,7 @@ function ClientsPage({ onOpenClient }) {
     setForm((current) => ({
       ...current,
       plan: planConfig.name,
+      financialAmount: current.financialAmountCustomized ? current.financialAmount : planConfig.priceMonthly.toFixed(2).replace(".", ","),
       screensLimit: String(planConfig.screensLimit),
       storageLimitGb: String(planLimits.storageLimitBytes / STORAGE_GB),
       maxVideoSizeMb: String(planLimits.maxVideoSizeBytes / STORAGE_MB),
@@ -6345,6 +6344,13 @@ function ClientsPage({ onOpenClient }) {
         ? DEFAULT_DEMO_TICKER_TEXT
         : current.demoTickerText,
     }));
+  }
+
+  function handleFinancialStartDate(startDate) {
+    setForm((current) => {
+      const suggestions = buildClassificationSuggestions({ client: { plan: current.plan }, startDate, billingPeriod: current.billing === "Anual" ? "annual" : "monthly", billingAnchorDay: current.billingAnchorDay || undefined });
+      return { ...current, startDate, dueDate: suggestions.firstDueDate, contractEndDate: suggestions.endDate, billingAnchorDay: String(suggestions.billingAnchorDay), financialAmount: current.financialAmountCustomized ? current.financialAmount : suggestions.amount };
+    });
   }
 
   function handleClientLogoFile(file) {
@@ -6388,8 +6394,8 @@ function ClientsPage({ onOpenClient }) {
       return;
     }
 
-    if (!form.dueDate) {
-      alert("Informe o vencimento do plano.");
+    if (!form.dueDate || (!editingClient && (!form.startDate || !form.contractEndDate || !form.billingAnchorDay))) {
+      alert("Informe início, término e dia de vencimento do contrato.");
       return;
     }
 
@@ -6437,22 +6443,24 @@ function ClientsPage({ onOpenClient }) {
           logoUrl = await uploadClientLogo(editingClient.id, form.logoFile);
         }
 
-        await updateDoc(doc(db, "clients", editingClient.id), {
-          ...clientData,
-          logoUrl,
-        });
+        if (isFinancialModelActive(editingClient)) {
+          const profile = { ...clientData };
+          ["updatedAt", "email", "plan", "billing", "startDate", "dueDate"].forEach((key) => delete profile[key]);
+          await updateFinancialContract({ clientId: editingClient.id, startDate: form.startDate, endDate: form.contractEndDate, billingAnchorDay: Number(form.billingAnchorDay), billingPeriod: form.billing === "Anual" ? "annual" : "monthly", planKey: String(form.plan).toLowerCase(), planName: form.plan, amountCents: Math.round(Number(String(form.financialAmount).replace(",", ".")) * 100), profile, idempotencyKey: `contract-update-${editingClient.id}-${Date.now()}` });
+          if (logoUrl !== (editingClient.logoUrl || "")) await updateDoc(doc(db, "clients", editingClient.id), { logoUrl, updatedAt: serverTimestamp() });
+        } else {
+          await updateDoc(doc(db, "clients", editingClient.id), { ...clientData, logoUrl });
+        }
 
         closeClientModal();
         alert("Cliente atualizado com sucesso!");
       } else {
-        const uid = await createClientAuthUser(form.email.trim(), form.password);
-        const clientRef = await addDoc(collection(db, "clients"), {
-          ...clientData,
-          accountStatus: "active",
-          uid,
-          logoUrl: "",
-          createdAt: serverTimestamp(),
-        });
+        const billingPeriod = form.billing === "Anual" ? "annual" : "monthly";
+        const suggestions = buildClassificationSuggestions({ client: { plan: form.plan }, startDate: form.startDate, billingPeriod, billingAnchorDay: Number(form.billingAnchorDay) });
+        const plainClientData = { ...clientData };
+        delete plainClientData.updatedAt;
+        const created = await createFinancialClient({ email: form.email.trim(), password: form.password, idempotencyKey: form.onboardingIdempotencyKey, clientData: { ...plainClientData, logoUrl: "" }, financial: { planKey: String(form.plan).toLowerCase(), planName: form.plan, startDate: form.startDate, endDate: form.contractEndDate, billingPeriod, billingAnchorDay: Number(form.billingAnchorDay), firstCompetence: suggestions.firstCompetence, firstDueDate: suggestions.firstDueDate, amountCents: Math.round(Number(String(form.financialAmount).replace(",", ".")) * 100) } });
+        const clientRef = doc(db, "clients", created.clientId);
 
         if (form.logoFile) {
           try {
@@ -6465,13 +6473,30 @@ function ClientsPage({ onOpenClient }) {
         }
 
         closeClientModal();
-        alert("Cliente cadastrado com login, senha e vencimento!");
+        alert("Cliente cadastrado com contrato financeiro ativo!");
       }
     } catch (error) {
       console.log(error);
+      const errorMessage = String(error?.message || "");
 
-      if (error.code === "auth/email-already-in-use") {
-        alert("Este e-mail já está em uso.");
+      if (error.code === "auth/email-already-in-use" || errorMessage.includes("auth-email-already-in-use")) {
+        alert("Este e-mail já possui um login sem vínculo recuperável confirmado. Nenhum cliente foi reassociado; confira a identidade antes de tentar novamente.");
+        return;
+      }
+      if (errorMessage.includes("client-requires-regularization")) {
+        alert("Este cliente está suspenso ou possui pendência. Regularize o cadastro existente; um novo acesso não será criado.");
+        return;
+      }
+      if (errorMessage.includes("client-canceled")) {
+        alert("Este cliente cancelado ainda está registrado. Reative ou trate o cadastro existente antes de criar outro.");
+        return;
+      }
+      if (errorMessage.includes("client-email-already-linked")) {
+        alert("Este e-mail já pertence a um cliente ativo e não pode ser duplicado.");
+        return;
+      }
+      if (errorMessage.includes("email-deletion-pending")) {
+        alert("A exclusão anterior deste e-mail ainda está pendente. Conclua ou retome a operação antes de cadastrar um novo cliente.");
         return;
       }
 
@@ -6479,24 +6504,59 @@ function ClientsPage({ onOpenClient }) {
         alert("A senha precisa ter no mínimo 6 caracteres.");
         return;
       }
-      alert(editingClient ? "Erro ao atualizar cliente." : "Erro ao cadastrar cliente.");
+      alert(editingClient ? "Erro ao atualizar cliente." : "Cadastro não concluído. O sistema não confirmou a criação; você pode tentar novamente com segurança.");
     } finally {
       setSavingClient(false);
     }
   }
 
-  async function deleteClient(id) {
-    const confirmDelete = window.confirm(
-      "Tem certeza que deseja excluir este cliente do Firestore?"
-    );
-
-    if (!confirmDelete) return;
-
+  async function deleteClient(client) {
+    setClientActionMessage("");
+    setDeletionModal({ client, preview: null, loading: true, deleting: false, error: "" });
     try {
-      await deleteDoc(doc(db, "clients", id));
+      const preview = await previewPermanentClientDeletion({ clientId: client.id });
+      setDeletionModal((current) => current?.client.id === client.id
+        ? { ...current, preview, loading: false }
+        : current);
     } catch (error) {
       console.log(error);
-      alert("Erro ao excluir cliente.");
+      setDeletionModal((current) => current?.client.id === client.id
+        ? { ...current, loading: false, error: String(error?.message || "Não foi possível carregar a prévia da exclusão.") }
+        : current);
+    }
+  }
+
+  async function confirmClientDeletion() {
+    if (!deletionModal?.preview || deletionModal.deleting) return;
+    setDeletionModal((current) => ({ ...current, deleting: true, error: "" }));
+    try {
+      const result = await confirmPermanentClientDeletion({ previewToken: deletionModal.preview.previewToken, confirmation: "EXCLUIR PERMANENTEMENTE" });
+      if (result.status !== "completed") throw new Error("deletion-not-completed");
+      setDeletionModal(null);
+      setClientActionMessage("Cliente excluído permanentemente");
+    } catch (error) {
+      console.log(error);
+      const message = String(error?.message || "").includes("auth-delete-pending")
+        ? "A exclusão foi iniciada, mas a remoção do login está pendente. Tente novamente no mesmo cliente; o e-mail ainda não foi liberado."
+        : String(error?.message || "Não foi possível concluir a exclusão. Nenhuma liberação de e-mail foi confirmada.");
+      setDeletionModal((current) => current ? { ...current, deleting: false, error: message } : current);
+    }
+  }
+
+  async function resolveOrphanLogin() {
+    const email = window.prompt("Informe o e-mail do login órfão a verificar:");
+    if (!email) return;
+    try {
+      const preview = await previewOrphanAuthRemoval({ email });
+      const accepted = window.confirm(`LOGIN ÓRFÃO\n\nE-mail: ${preview.identity.email}\nUID: ${preview.identity.uid}\n\nNenhum cliente está vinculado. Deseja preparar a remoção deste login?`);
+      if (!accepted) return;
+      const typed = window.prompt("Para confirmar, digite exatamente: REMOVER LOGIN ORFAO");
+      if (typed !== "REMOVER LOGIN ORFAO") return;
+      await confirmOrphanAuthRemoval({ previewToken: preview.previewToken, confirmation: typed });
+      alert("Login órfão removido. O e-mail pode ser reutilizado.");
+    } catch (error) {
+      console.log(error);
+      alert("A remoção não foi concluída. Confirme que não há vínculos ativos e que a identidade não é administrativa protegida.");
     }
   }
 
@@ -6555,19 +6615,27 @@ function ClientsPage({ onOpenClient }) {
           <p>Gerencie clientes, planos, vencimentos, acessos e limites de telas.</p>
         </div>
 
-        <button
-          className="clients-create-button"
-          onClick={openCreateClientModal}
-        >
-          <Plus size={20} />
-          Novo cliente
-        </button>
+        <div className="clients-actions">
+          <button className="client-action" onClick={resolveOrphanLogin}>
+            Resolver login órfão
+          </button>
+          <button className="clients-create-button" onClick={openCreateClientModal}>
+            <Plus size={20} />
+            Novo cliente
+          </button>
+        </div>
       </header>
 
       {clientsError && (
         <div className="admin-data-alert">
           <strong>Clientes não carregados</strong>
           <span>{clientsError}</span>
+        </div>
+      )}
+
+      {clientActionMessage && (
+        <div className="admin-data-alert client-action-success">
+          <strong>{clientActionMessage}</strong>
         </div>
       )}
 
@@ -6636,11 +6704,12 @@ function ClientsPage({ onOpenClient }) {
           </div>
         ) : (
           filteredClients.map((client) => {
-            const dueInfo = getDueInfo(client);
             const planAccess = getClientPlanAccess(client);
             const planConfig = getPlanConfig(client.plan);
             const setupInfo = getSetupInfo(client);
             const usage = clientUsage[client.id] || {};
+            const displayedDueDate = selectClientDueDate(client, usage.openInvoices || []);
+            const dueInfo = getDueInfo(client, displayedDueDate);
             const screensUsed = Number(usage.screensCount || 0);
             const storageUsedBytes = Number(usage.storageUsedBytes || 0);
             const storageLimitBytes = getClientStorageLimit(client);
@@ -6672,7 +6741,7 @@ function ClientsPage({ onOpenClient }) {
                 </div>
 
                 <div>
-                  <strong>{client.dueDate || "Não informado"}</strong>
+                  <strong>{displayedDueDate ? formatCivilDateBr(displayedDueDate) : "Sem cobrança aberta"}</strong>
                   <span className={`client-due ${dueInfo.className}`}>
                     {dueInfo.text}
                   </span>
@@ -6727,7 +6796,7 @@ function ClientsPage({ onOpenClient }) {
 
                   <button
                     className="client-action danger"
-                    onClick={() => deleteClient(client.id)}
+                    onClick={() => deleteClient(client)}
                   >
                     <Trash2 size={15} />
                   </button>
@@ -6737,6 +6806,42 @@ function ClientsPage({ onOpenClient }) {
           })
         )}
       </section>
+
+      {deletionModal && (
+        <div className="client-modal-overlay">
+          <div className="client-modal client-delete-modal" role="dialog" aria-modal="true" aria-labelledby="delete-client-title">
+            <div className="client-modal-header">
+              <div>
+                <div className="kicker">Ação definitiva</div>
+                <h2 id="delete-client-title">Excluir cliente permanentemente</h2>
+                <p>Revise os dados antes de concluir.</p>
+              </div>
+            </div>
+
+            <div className="client-delete-summary">
+              <div><span>Cliente</span><strong>{deletionModal.client.name || "Não informado"}</strong></div>
+              <div><span>E-mail</span><strong>{deletionModal.preview?.identity?.email || deletionModal.client.email || "Carregando..."}</strong></div>
+              <div><span>Telas</span><strong>{deletionModal.loading ? "—" : deletionModal.preview?.resources?.screens || 0}</strong></div>
+              <div><span>Players vinculados</span><strong>{deletionModal.loading ? "—" : deletionModal.preview?.resources?.playerBindings || 0}</strong></div>
+            </div>
+
+            <div className="client-delete-warning">
+              Esta exclusão é definitiva. O e-mail será liberado para um novo cadastro somente após a conclusão.
+            </div>
+
+            {deletionModal.error && <div className="client-delete-error">{deletionModal.error}</div>}
+
+            <div className="client-modal-actions">
+              <button className="client-modal-cancel" onClick={() => setDeletionModal(null)} disabled={deletionModal.deleting}>
+                Cancelar
+              </button>
+              <button className="client-delete-confirm" onClick={confirmClientDeletion} disabled={deletionModal.loading || deletionModal.deleting || !deletionModal.preview}>
+                {deletionModal.deleting ? "Excluindo..." : "Excluir permanentemente"}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
 
       {showCreateModal && (
         <div className="client-modal-overlay">
@@ -6864,22 +6969,20 @@ function ClientsPage({ onOpenClient }) {
                 </div>
 
                 <div className="form-group">
-                  <label>Vencimento do plano</label>
-                  <input
-                    type="date"
-                    value={form.dueDate}
-                    onChange={(e) => setForm({ ...form, dueDate: e.target.value })}
-                  />
-                </div>
-
-                <div className="form-group">
-                  <label>Data de início</label>
+                  <label>Data de início do contrato</label>
                   <input
                     type="date"
                     value={form.startDate}
-                    onChange={(e) => setForm({ ...form, startDate: e.target.value })}
+                    onChange={(e) => editingClient && !isFinancialModelActive(editingClient) ? setForm({ ...form, startDate: e.target.value }) : handleFinancialStartDate(e.target.value)}
                   />
                 </div>
+
+                {(!editingClient || isFinancialModelActive(editingClient)) ? <>
+                  <div className="form-group"><label>Data de término do contrato</label><input type="date" value={form.contractEndDate} onChange={(e) => setForm({ ...form, contractEndDate: e.target.value })} /></div>
+                  {form.billing === "Mensal" && <div className="form-group"><label>Dia do vencimento mensal</label><input type="number" min="1" max="31" value={form.billingAnchorDay} onChange={(e) => setForm((current) => { const billingAnchorDay = e.target.value; const suggestions = buildClassificationSuggestions({ client: { plan: current.plan }, startDate: current.startDate, billingPeriod: current.billing === "Anual" ? "annual" : "monthly", billingAnchorDay: Number(billingAnchorDay) }); return { ...current, billingAnchorDay, dueDate: suggestions.firstDueDate }; })} /></div>}
+                  <div className="form-group"><label>Valor do plano</label><input inputMode="decimal" value={form.financialAmount} onChange={(e) => setForm({ ...form, financialAmount: e.target.value, financialAmountCustomized: true })} /></div>
+                  <div className="form-group full"><small>A vigência define a duração do contrato. As cobranças são geradas dentro desse período, sem competências retroativas.</small></div>
+                </> : <div className="form-group"><label>Vencimento legado</label><input type="date" value={form.dueDate} onChange={(e) => setForm({ ...form, dueDate: e.target.value })} /><small>O modelo legado permanece ativo até a classificação financeira confirmada.</small></div>}
 
                 <div className="form-group">
                   <label>Limite de telas</label>
@@ -6984,8 +7087,8 @@ function ClientsPage({ onOpenClient }) {
               </div>
             </div>
 
-            <div className="client-modal-section setup-section">
-              <h3>Adesão / Implantação</h3>
+            <details className="client-modal-section setup-section">
+              <summary>Adesão e implantação — Opcional</summary>
 
               <div className="form-grid">
                 <div className="form-group">
@@ -7045,7 +7148,7 @@ function ClientsPage({ onOpenClient }) {
                 </div>
 
                 <div className="form-group">
-                  <label>Data de início</label>
+                  <label>Data de início da implantação</label>
                   <input
                     type="date"
                     value={form.setupStartDate}
@@ -7080,7 +7183,7 @@ function ClientsPage({ onOpenClient }) {
                   />
                 </div>
               </div>
-            </div>
+            </details>
 
             <div className="client-modal-actions">
               <button
@@ -7810,11 +7913,16 @@ function ClientMediaPage({ client, access = getClientPlanAccess(client) }) {
   }
 
   async function handleSelectedFile(file) {
-    if (!file || !validateMediaFile(file)) return;
+    if (!file || !validateMediaFile(file)) return false;
 
     const isVideo = getUploadFileKind(file) === "video";
     const type = isVideo ? "Vídeo" : "Imagem";
-    const preview = URL.createObjectURL(file);
+    recordUploadStage("FILE_SELECTED", {
+      standalone: isStandalonePwa(),
+      sizeBytes: Number(file.size || 0),
+      contentType: file.type || "unknown",
+    });
+    const preview = uploadPreviewLifecycleRef.current.replace(file);
     let dimensions = buildMediaDimensions(0, 0, form.orientation || "Paisagem");
 
     try {
@@ -7855,6 +7963,8 @@ function ClientMediaPage({ client, access = getClientPlanAccess(client) }) {
   }
 
   function resetMediaForm() {
+    uploadPreviewLifecycleRef.current?.release();
+    if (mediaFileInputRef.current) mediaFileInputRef.current.value = "";
     setEditingMedia(null);
     setForm({
       title: "",
@@ -7898,7 +8008,7 @@ function ClientMediaPage({ client, access = getClientPlanAccess(client) }) {
     });
   }
 
-  async function updateMediaInPlaylists(mediaId, changes) {
+  async function updateMediaVersionsInPlaylists(updates) {
     const playlistsSnapshot = await getDocs(
       collection(db, "clients", client.id, "playlists")
     );
@@ -7908,16 +8018,12 @@ function ClientMediaPage({ client, access = getClientPlanAccess(client) }) {
         const playlist = playlistDoc.data();
         const items = Array.isArray(playlist.items) ? playlist.items : [];
         let changed = false;
+        let updatedItems = items;
 
-        const updatedItems = items.map((item) => {
-          const isTargetMedia =
-            item?.id === mediaId &&
-            !isTemplatePreviewItem(item);
-
-          if (!isTargetMedia) return item;
-
-          changed = true;
-          return { ...item, ...changes };
+        updates.forEach(({ media, changes }) => {
+          const result = applyMediaVersionToPlaylistItems(updatedItems, media, changes);
+          changed = changed || result.changed;
+          updatedItems = result.items;
         });
 
         if (!changed) return;
@@ -7928,6 +8034,53 @@ function ClientMediaPage({ client, access = getClientPlanAccess(client) }) {
         });
       })
     );
+  }
+
+  async function updateMediaInPlaylists(media, changes) {
+    return updateMediaVersionsInPlaylists([{ media, changes }]);
+  }
+
+  async function handleBackfillContentVersions() {
+    if (!requirePlanPermission(access, "canEdit", "atualizar versões das mídias")) return;
+    const pending = mediaList.filter((media) => !getCanonicalMediaContentVersion(media));
+    const action = pending.length > 0
+      ? `Atualizar a versão canônica de ${pending.length} mídia(s) usando somente metadata do Storage?`
+      : "Ressincronizar as versões canônicas já conhecidas com as playlists?";
+    if (!window.confirm(action)) return;
+
+    try {
+      setBackfillingVersions(true);
+      const discoveredVersions = new Map();
+      const result = await backfillMediaContentVersions({
+        items: mediaList,
+        readMetadata: (media) => getStorageAssetVersionMetadata({
+          storagePath: media.storagePath,
+          storageProvider: media.storageProvider || "firebase",
+        }),
+        persistVersion: async (media, versionFields) => {
+          await updateDoc(
+            doc(db, "clients", client.id, "media", media.id),
+            versionFields
+          );
+          discoveredVersions.set(media.id, versionFields);
+        },
+      });
+      const playlistUpdates = mediaList
+        .map((media) => ({
+          media,
+          changes: discoveredVersions.get(media.id) || getMediaVersionFields(media),
+        }))
+        .filter(({ changes }) => Boolean(changes.contentVersion));
+      await updateMediaVersionsInPlaylists(playlistUpdates);
+      alert(
+        `Backfill concluído: ${result.updated} atualizada(s), ${result.skipped} já versionada(s), ${result.failed} falha(s).`
+      );
+    } catch (error) {
+      console.log(error);
+      alert("Não foi possível concluir o backfill de versões.");
+    } finally {
+      setBackfillingVersions(false);
+    }
   }
 
   function isPlaylistMediaReference(item, media) {
@@ -7979,6 +8132,16 @@ function ClientMediaPage({ client, access = getClientPlanAccess(client) }) {
     return { affectedPlaylists, removedItems };
   }
 
+  async function getMediaPlaylistUsage(media) {
+    const playlistsSnapshot = await getDocs(
+      collection(db, "clients", client.id, "playlists")
+    );
+    return playlistsSnapshot.docs
+      .map((playlistDoc) => ({ id:playlistDoc.id, ...playlistDoc.data() }))
+      .filter((playlist) => (playlist.items || []).some((item) => isPlaylistMediaReference(item, media)))
+      .map((playlist) => ({ id:playlist.id, name:playlist.name || "Playlist sem nome" }));
+  }
+
   async function handleSaveMedia() {
     if (!form.title.trim()) {
       alert("Informe o nome da mídia.");
@@ -8008,7 +8171,7 @@ function ClientMediaPage({ client, access = getClientPlanAccess(client) }) {
           doc(db, "clients", client.id, "media", editingMedia.id),
           { ...changes, updatedAt: serverTimestamp() }
         );
-        await updateMediaInPlaylists(editingMedia.id, changes);
+        await updateMediaInPlaylists(editingMedia, changes);
 
         resetMediaForm();
         alert("Tempo da mídia atualizado em todas as playlists!");
@@ -8059,8 +8222,11 @@ function ClientMediaPage({ client, access = getClientPlanAccess(client) }) {
           storagePath: uploadResult.storagePath || storagePath,
           storageProvider: uploadResult.storageProvider || "firebase",
           storageKey: uploadResult.storageKey || uploadResult.storagePath || storagePath,
+          contentVersion: uploadResult.contentVersion,
           fileHash: uploadResult.fileHash || "",
+          md5Hash: uploadResult.md5Hash || "",
           etag: uploadResult.etag || "",
+          storageGeneration: uploadResult.storageGeneration || "",
           clientId: client.id,
           uploadedByUid: auth.currentUser?.uid || "",
           uploadedByEmail: normalizeEmail(auth.currentUser?.email || ""),
@@ -8078,7 +8244,7 @@ function ClientMediaPage({ client, access = getClientPlanAccess(client) }) {
       setProgress(100);
       await saveMediaDocument(uploadResult.publicUrl || uploadResult.url);
       resetMediaForm();
-      alert("Mídia enviada com sucesso!");
+      showMediaUploadSuccess("Mídia enviada com sucesso");
     } catch (error) {
       console.log(error);
       alert(getUploadErrorMessage(error));
@@ -8087,17 +8253,25 @@ function ClientMediaPage({ client, access = getClientPlanAccess(client) }) {
     }
   }
 
-  async function deleteMedia(media) {
+  async function requestMediaDeletion(media) {
     if (!requirePlanPermission(access, "canEdit", "excluir mídias")) return;
 
-    const confirmDelete = window.confirm(
-      `Excluir a mídia "${media.title}" do sistema?\n\nEla também será removida automaticamente das playlists onde estiver presente.`
-    );
+    try {
+      const usage = await getMediaPlaylistUsage(media);
+      setPendingMediaDeletion({ media, usage, deleting:false });
+    } catch (error) {
+      console.log(error);
+      alert("Não foi possível verificar o uso desta mídia.");
+    }
+  }
 
-    if (!confirmDelete) return;
+  async function confirmMediaDeletion() {
+    const media = pendingMediaDeletion?.media;
+    if (!media || pendingMediaDeletion.deleting) return;
 
     try {
-      const cleanup = await removeMediaFromPlaylists(media);
+      setPendingMediaDeletion((current) => ({ ...current, deleting:true }));
+      await removeMediaFromPlaylists(media);
 
       if (media.storagePath) {
         try {
@@ -8111,14 +8285,12 @@ function ClientMediaPage({ client, access = getClientPlanAccess(client) }) {
       }
 
       await deleteDoc(doc(db, "clients", client.id, "media", media.id));
-      alert(
-        cleanup.removedItems > 0
-          ? `Mídia excluída e removida de ${cleanup.affectedPlaylists} playlist(s).`
-          : "Mídia excluída."
-      );
+      setPendingMediaDeletion(null);
+      showMediaNotice("Mídia excluída com sucesso", "danger");
     } catch (error) {
       console.log(error);
       alert("Erro ao excluir mídia.");
+      setPendingMediaDeletion((current) => current ? { ...current, deleting:false } : current);
     }
   }
 
@@ -8127,6 +8299,23 @@ function ClientMediaPage({ client, access = getClientPlanAccess(client) }) {
   return (
     <>
       <UploadLimitDialog notice={uploadNotice} onClose={() => setUploadNotice(null)} />
+      {pendingMediaDeletion && (
+        <PortalModal
+          title="Tem certeza que deseja excluir esta mídia?"
+          message={pendingMediaDeletion.usage.length
+            ? `Esta mídia está sendo utilizada em ${pendingMediaDeletion.usage.length} playlist(s). Ao excluir esta mídia, ela também será removida dessas playlists. Esta ação não pode ser desfeita.`
+            : "Esta ação não pode ser desfeita."}
+          details={pendingMediaDeletion.usage.map((playlist) => playlist.name)}
+          confirmLabel="Excluir definitivamente"
+          confirmDisabled={pendingMediaDeletion.deleting}
+          danger
+          onConfirm={confirmMediaDeletion}
+          onClose={() => {
+            if (!pendingMediaDeletion.deleting) setPendingMediaDeletion(null);
+          }}
+        />
+      )}
+      <PortalSuccessToast message={mediaUploadSuccessNotice} tone={mediaNoticeTone} />
       <section className={`storage-usage-card ${storageUsage.severity}`}>
         <div className="storage-usage-header">
           <div>
@@ -8142,6 +8331,21 @@ function ClientMediaPage({ client, access = getClientPlanAccess(client) }) {
           {storageUsage.label} • Vídeos até {formatStorageSize(planLimits.maxVideoSizeBytes)} • Imagens até {formatStorageSize(planLimits.maxImageSizeBytes)}
         </p>
       </section>
+
+      {mediaList.length > 0 && (
+        <button
+          type="button"
+          className="client-action media-version-button"
+          onClick={handleBackfillContentVersions}
+          disabled={backfillingVersions}
+        >
+          {backfillingVersions
+            ? "Atualizando versões..."
+            : mediaList.some((media) => !getCanonicalMediaContentVersion(media))
+              ? "Atualizar versões das mídias existentes"
+              : "Ressincronizar versões com playlists"}
+        </button>
+      )}
 
       <section className="upload-panel" ref={mediaEditorRef}>
         <div className="upload-preview-box">
@@ -8358,7 +8562,7 @@ function ClientMediaPage({ client, access = getClientPlanAccess(client) }) {
                     Editar tempo
                   </button>
 
-                  <button className="delete-button" onClick={() => deleteMedia(media)}>
+                  <button className="delete-button" onClick={() => requestMediaDeletion(media)}>
                     <Trash2 size={16} />
                     Excluir
                   </button>
@@ -8378,6 +8582,7 @@ function ClientPlaylistsPage({ client, access = getClientPlanAccess(client), isA
   const [playlists, setPlaylists] = useState([]);
   const [screens, setScreens] = useState([]);
   const [editingPlaylist, setEditingPlaylist] = useState(null);
+  const [isPlaylistEditorOpen, setIsPlaylistEditorOpen] = useState(false);
   const [draggedMediaId, setDraggedMediaId] = useState(null);
   const [draftPlaylistItems, setDraftPlaylistItems] = useState([]);
   const [portalNotice, setPortalNotice] = useState(null);
@@ -8866,11 +9071,6 @@ function ClientPlaylistsPage({ client, access = getClientPlanAccess(client), isA
   }
 
   function removeItemFromEditingPlaylist(index) {
-    const item = getSelectedItemByKey(form.selectedMediaIds[index], index);
-    const itemName = item?.title || item?.name || `item ${index + 1}`;
-
-    if (!window.confirm(`Remover "${itemName}" da playlist?\n\nO template continuará disponível em Meus Templates V2 e poderá ser utilizado novamente.`)) return;
-
     setForm((current) => ({
       ...current,
       selectedMediaIds: current.selectedMediaIds.filter((_, itemIndex) => itemIndex !== index),
@@ -8878,14 +9078,17 @@ function ClientPlaylistsPage({ client, access = getClientPlanAccess(client), isA
     setDraftPlaylistItems((current) => current.filter((_, itemIndex) => itemIndex !== index));
   }
 
+  function getPlaylistRemovalMessage(item) {
+    return isTemplatePreviewItem(item) || item?.playerItemType === "template" || item?.templateId
+      ? "Template removida da playlist"
+      : "Mídia removida da playlist";
+  }
+
   async function removeItemFromSavedPlaylist(playlist, index) {
     if (!requirePlanPermission(access, "canEditPlaylists", "editar playlists")) return;
 
     const items = Array.isArray(playlist.items) ? playlist.items : [];
     const item = items[index];
-    const itemName = item?.title || item?.name || `item ${index + 1}`;
-
-    if (!window.confirm(`Remover "${itemName}" da playlist "${playlist.name}"?\n\nO template continuará disponível em Meus Templates V2 e poderá ser utilizado novamente.`)) return;
 
     try {
       const updatedItems = items.filter((_, itemIndex) => itemIndex !== index);
@@ -8911,7 +9114,7 @@ function ClientPlaylistsPage({ client, access = getClientPlanAccess(client), isA
           }))
       );
 
-      alert("Item removido da playlist.");
+      showPlaylistNotice(getPlaylistRemovalMessage(item), "warning");
     } catch (error) {
       console.log(error);
       alert("Erro ao remover item da playlist.");
@@ -8920,6 +9123,7 @@ function ClientPlaylistsPage({ client, access = getClientPlanAccess(client), isA
 
   function resetPlaylistForm() {
     setEditingPlaylist(null);
+    setIsPlaylistEditorOpen(false);
     setDraftPlaylistItems([]);
 
     setForm({
@@ -8941,6 +9145,7 @@ function ClientPlaylistsPage({ client, access = getClientPlanAccess(client), isA
     if (!requirePlanPermission(access, "canEditPlaylists", "editar playlists")) return;
 
     setEditingPlaylist(playlist);
+    setIsPlaylistEditorOpen(true);
     const normalizedItems = (playlist.items || []).map((item) =>
       normalizePlaylistItemForSave(item, playlist.orientation || "Paisagem")
     );
@@ -9010,16 +9215,6 @@ function ClientPlaylistsPage({ client, access = getClientPlanAccess(client), isA
         .map((key, index) => getSelectedItemByKey(key, index))
         .filter(Boolean)
         .map((item) => normalizePlaylistItemForSave(item, form.orientation));
-      const hasTemplateV2 = selectedItems.some(isTemplateV2);
-      const linkedScreens = screens.filter((screen) => (
-        (editingPlaylist && screen.playlistId === editingPlaylist.id)
-        || (form.scheduleEnabled && form.targetScreenIds.includes(screen.id))
-      ));
-      const playerCapability = getTemplatesV2ScreenCapability(linkedScreens);
-      if (hasTemplateV2 && !playerCapability.allowed) {
-        alert("Esta playlist possui telas que receberão suporte aos Templates V2 na próxima atualização do Totem Park Player. Sua playlist atual continuará funcionando normalmente.");
-        return;
-      }
       const incompatibleItems = selectedItems.filter((item) => !isOrientationCompatible(item, form.orientation));
 
       if (incompatibleItems.length > 0) {
@@ -9192,7 +9387,7 @@ function ClientPlaylistsPage({ client, access = getClientPlanAccess(client), isA
       <PortalSuccessToast message={playlistSuccessNotice} tone={playlistNoticeTone} />
       <section
         ref={playlistEditorRef}
-        className={editingPlaylist ? "playlist-builder playlist-builder-editing" : "playlist-builder"}
+        className={`playlist-builder${editingPlaylist ? " playlist-builder-editing" : ""}${isPlaylistEditorOpen ? "" : " is-collapsed"}`}
       >
         <div className="panel">
           {editingPlaylist && (
@@ -9223,6 +9418,17 @@ function ClientPlaylistsPage({ client, access = getClientPlanAccess(client), isA
               <div className="editing-badge">
                 Editando
               </div>
+            )}
+
+            {!editingPlaylist && (
+              <button
+                type="button"
+                className="client-action editor-toggle-button"
+                onClick={() => setIsPlaylistEditorOpen((open) => !open)}
+              >
+                <Plus size={18} />
+                {isPlaylistEditorOpen ? "Recolher" : "Criar playlist"}
+              </button>
             )}
           </div>
 
@@ -9784,6 +9990,7 @@ function ClientScreensPage({ client, access = getClientPlanAccess(client), isAdm
   const [playlists, setPlaylists] = useState([]);
   const [now, setNow] = useState(Date.now());
   const [editingScreen, setEditingScreen] = useState(null);
+  const [isScreenEditorOpen, setIsScreenEditorOpen] = useState(false);
   const [rebindDialog, setRebindDialog] = useState(null);
   const [screenSuccessNotice, setScreenSuccessNotice] = useState("");
   const screenEditorRef = useRef(null);
@@ -9978,6 +10185,7 @@ function ClientScreensPage({ client, access = getClientPlanAccess(client), isAdm
 
   function resetScreenForm() {
     setEditingScreen(null);
+    setIsScreenEditorOpen(false);
 
     setForm({
       name: "",
@@ -9991,6 +10199,7 @@ function ClientScreensPage({ client, access = getClientPlanAccess(client), isAdm
     if (!requirePlanPermission(access, "canEditScreens", "editar telas")) return;
 
     setEditingScreen(screen);
+    setIsScreenEditorOpen(true);
 
     setForm({
       name: screen.name || "",
@@ -10206,7 +10415,7 @@ function ClientScreensPage({ client, access = getClientPlanAccess(client), isAdm
   return (
     <>
       <PortalSuccessToast message={screenSuccessNotice} />
-      <section className="panel screen-editor-panel" ref={screenEditorRef}>
+      <section className={`panel screen-editor-panel${isScreenEditorOpen ? "" : " is-collapsed"}`} ref={screenEditorRef}>
         <div className="playlist-editor-header">
           <div>
             <h2>{editingScreen ? "Editar tela" : "Nova tela"}</h2>
@@ -10219,6 +10428,17 @@ function ClientScreensPage({ client, access = getClientPlanAccess(client), isAdm
             <div className="editing-badge">
               Editando
             </div>
+          )}
+
+          {!editingScreen && (
+            <button
+              type="button"
+              className="client-action editor-toggle-button"
+              onClick={() => setIsScreenEditorOpen((open) => !open)}
+            >
+              <Plus size={18} />
+              {isScreenEditorOpen ? "Recolher" : "Cadastrar nova tela"}
+            </button>
           )}
         </div>
 
@@ -13737,26 +13957,38 @@ function SparklineIcon() {
   );
 }
 
+function releaseRetiredTemplateAssetUrlsAfterPaint(localUrls) {
+  if (!IS_TEMPLATE_ASSET_CACHE_EXPERIMENT || !localUrls?.length) return;
+  globalThis.requestAnimationFrame?.(() => {
+    globalThis.requestAnimationFrame?.(() => releaseRetiredTemplateAssetUrls(localUrls));
+  });
+}
+
 function TemplateVisualPreview({ template, compact = false, tv = false, playbackExecutionId = null, onVisualEvent = null, offlineContext = null }) {
   const templateId = template.id || template.templateId || template.identity?.templateId || "";
   const [offlineTemplate, setOfflineTemplate] = useState(() => createOfflineSafeTemplate(template));
   const assetKey = JSON.stringify([...collectTemplateAssetUrls(template)]);
   useEffect(() => {
     let active = true;
-    prepareTemplateAssets(template).then((result) => {
+    prepareTemplateAssets(template, templateAssetCacheOptions).then((result) => {
       if (!active) return;
       logTemplateOffline(result.hits ? "TEMPLATE_ASSET_CACHE_HIT" : "TEMPLATE_ASSET_CACHE_MISS", { templateId, hits:result.hits, misses:result.misses });
       setOfflineTemplate(result.template);
+      releaseRetiredTemplateAssetUrlsAfterPaint(result.retiredLocalUrls);
       if (result.hits) logTemplateOffline("TEMPLATE_PRELOAD_LOCAL_READY", { templateId, assets:result.hits });
     }).catch(() => {});
     const refreshRemoteAssets = () => {
       if (navigator.onLine === false) return;
       logTemplateOffline("TEMPLATE_REMOTE_REFRESH_STARTED", { templateId, type:"assets" });
-      refreshTemplateAssets(template).then((results) => {
+      refreshTemplateAssets(template, templateAssetCacheOptions).then((results) => {
         const failed = results.filter((result) => result.status === "failed").length;
         logTemplateOffline(failed ? "TEMPLATE_REMOTE_REFRESH_FAILED" : "TEMPLATE_REMOTE_REFRESH_COMPLETED", { templateId, type:"assets", failed });
-        return prepareTemplateAssets(template);
-      }).then((result) => { if (active) setOfflineTemplate(result.template); }).catch(() => {});
+        return prepareTemplateAssets(template, templateAssetCacheOptions);
+      }).then((result) => {
+        if (!active) return;
+        setOfflineTemplate(result.template);
+        releaseRetiredTemplateAssetUrlsAfterPaint(result.retiredLocalUrls);
+      }).catch(() => {});
     };
     refreshRemoteAssets();
     window.addEventListener("online", refreshRemoteAssets);
@@ -13771,12 +14003,13 @@ function TemplateVisualPreview({ template, compact = false, tv = false, playback
   return <LegacyTemplateVisualPreview template={offlineTemplate} sourceTemplate={template} compact={compact} tv={tv} offlineContext={offlineContext} />;
 }
 
-function ScaledTemplatePortalPreview({ template }) {
+function ScaledTemplatePortalPreview({ template, playlistThumbnail = false }) {
   const orientation = template?.orientation || template?.published?.display?.defaultOrientation || "Paisagem";
+  const className = `universal-template-scaled-stage${playlistThumbnail ? " playlist-template-scaled-preview" : ""}`;
   if (isTemplateV2(template)) {
-    return <TemplateV2DynamicStage className="universal-template-scaled-stage" template={template} config={template.published} orientation={orientation} mode="thumbnail" loadWeather={loadTemplateV2Weather} loadNews={loadTemplateV2News} />;
+    return <TemplateV2DynamicStage className={className} template={template} config={template.published} orientation={orientation} mode="thumbnail" loadWeather={loadTemplateV2Weather} loadNews={loadTemplateV2News} />;
   }
-  return <TemplateScaledStage className="universal-template-scaled-stage" orientation={orientation}><LegacyTemplateVisualPreview template={template} compact={false} /></TemplateScaledStage>;
+  return <TemplateScaledStage className={className} orientation={orientation}><LegacyTemplateVisualPreview template={template} compact={false} /></TemplateScaledStage>;
 }
 
 async function loadTemplateV2Weather(city) {
@@ -13808,20 +14041,22 @@ function TemplateV2LivePreview({ template, sourceTemplate = template, compact = 
   const weatherConfig = originalConfig?.modules?.weather || {};
   const newsConfig = originalConfig?.modules?.news || {};
   const sportsConfig = originalConfig?.sports || null;
+  const weatherCacheConfig = IS_TEMPLATE_DATA_FRESHNESS_EXPERIMENT ? createWeatherDataFingerprintConfig(weatherConfig) : weatherConfig;
+  const newsCacheConfig = IS_TEMPLATE_DATA_FRESHNESS_EXPERIMENT ? createNewsDataFingerprintConfig(newsConfig) : newsConfig;
   const sportsCanonicalCacheKey = sportsConfig?.provider ? buildTemplateDataCacheKey(buildSportsDataCacheContext(scope, sportsConfig)) : "";
   const sportsLegacyCacheKey = sportsConfig?.provider ? buildTemplateDataCacheKey({ ...scope, module:"sports", config:sportsConfig }) : "";
   const restoredSportsRef = useRef("");
   const readModule = (module, moduleConfig) => readTemplateDataCache({ ...scope, module, config:moduleConfig });
   const initialDynamicData = () => {
-    const weather = weatherConfig.enabled ? readModule("weather", weatherConfig) : null;
-    const news = newsConfig.enabled ? readModule("news", newsConfig) : null;
+    const weather = weatherConfig.enabled ? readModule("weather", weatherCacheConfig) : null;
+    const news = newsConfig.enabled ? readModule("news", newsCacheConfig) : null;
     const sports = sportsConfig?.provider ? readSportsTemplateDataCache(scope, sportsConfig) : null;
     [["weather",weather],["news",news],["sports",sports]].forEach(([module,record]) => logTemplateOffline(record ? "TEMPLATE_DATA_CACHE_HIT" : "TEMPLATE_DATA_CACHE_MISS", { templateId, module }));
     return { ...(weather ? { weather:weather.payload } : {}), ...(news ? { news:news.payload } : {}), ...(sports ? sports.payload : {}) };
   };
   const config = template.published;
   const [dynamicData, setDynamicData] = useState(initialDynamicData);
-  const dynamicKey = JSON.stringify({ city:weatherConfig.city || "", enabledWeather:weatherConfig.enabled, enabledNews:newsConfig.enabled, feed:newsConfig.newsFeedUrl || "", sources:newsConfig.selectedNewsSources || [], sports:sportsConfig });
+  const dynamicKey = JSON.stringify({ weather:weatherCacheConfig, enabledWeather:weatherConfig.enabled, news:newsCacheConfig, enabledNews:newsConfig.enabled, sports:sportsConfig });
 
   useLayoutEffect(() => {
     logTemplatesV2Diagnostic("T1_RENDERER_MOUNTED", { templateId: template.id || template.templateId || "", templateType: template.identity?.templateType || template.templateType || template.type || "", playbackExecutionId });
@@ -13841,42 +14076,74 @@ function TemplateV2LivePreview({ template, sourceTemplate = template, compact = 
 
   useEffect(() => {
     let cancelled = false;
-    async function load() {
+    async function load(reason = "mount", modules = ["weather","news","sports"]) {
       if (navigator.onLine === false) return;
       logTemplateOffline("TEMPLATE_REMOTE_REFRESH_STARTED", { templateId, type:"data" });
       const tasks = [];
-      if (weatherConfig.enabled) tasks.push(loadTemplateV2Weather(weatherConfig.city || "Sua cidade").then((weather) => {
-        if (weather?.unavailable) return {};
-        writeTemplateDataCache({ ...scope, module:"weather", config:weatherConfig }, weather, { source:"open-meteo" });
-        return { weather };
-      }));
-      if (newsConfig.enabled) tasks.push(loadTemplateV2News(newsConfig).then((news) => {
-        const isDefaultFeed = JSON.stringify(news) === JSON.stringify(DEFAULT_NEWS_ITEMS.slice(0,8));
-        if (!news?.length || isDefaultFeed) return {};
-        writeTemplateDataCache({ ...scope, module:"news", config:newsConfig }, news, { source:"rss" });
-        return { news };
-      }));
-      if (sportsConfig?.provider) tasks.push((async () => {
+      if (weatherConfig.enabled && modules.includes("weather")) {
+        const fetchWeather = async () => {
+          playerTrafficDiagnostics.record("weatherFetchCount", { reason, templateId });
+          return loadTemplateV2Weather(weatherConfig.city || "Sua cidade");
+        };
+        tasks.push((IS_TEMPLATE_DATA_FRESHNESS_EXPERIMENT
+          ? refreshTemplateDataIfNeeded({ ...scope, module:"weather", config:weatherCacheConfig }, { ttlMs:10 * 60 * 1000, fetcher:fetchWeather, source:"open-meteo", isUsable:(weather) => Boolean(weather && !weather.unavailable) }).then(({ payload }) => payload ? { weather:payload } : {})
+          : fetchWeather().then((weather) => {
+              if (weather?.unavailable) return {};
+              writeTemplateDataCache({ ...scope, module:"weather", config:weatherConfig }, weather, { source:"open-meteo" });
+              return { weather };
+            })));
+      }
+      if (newsConfig.enabled && modules.includes("news")) {
+        const fetchNews = async () => {
+          playerTrafficDiagnostics.record("rssFetchCount", { reason, templateId });
+          return loadTemplateV2News(newsConfig);
+        };
+        const isUsableNews = (news) => Boolean(news?.length) && JSON.stringify(news) !== JSON.stringify(DEFAULT_NEWS_ITEMS.slice(0,8));
+        tasks.push((IS_TEMPLATE_DATA_FRESHNESS_EXPERIMENT
+          ? refreshTemplateDataIfNeeded({ ...scope, module:"news", config:newsCacheConfig }, { ttlMs:10 * 60 * 1000, fetcher:fetchNews, source:"rss", isUsable:isUsableNews }).then(({ payload }) => payload ? { news:payload } : {})
+          : fetchNews().then((news) => {
+              if (!isUsableNews(news)) return {};
+              writeTemplateDataCache({ ...scope, module:"news", config:newsConfig }, news, { source:"rss" });
+              return { news };
+            })));
+      }
+      if (sportsConfig?.provider && modules.includes("sports")) {
+        const fetchSports = async () => {
         const sports = normalizeSportsV2Config(sportsConfig);
         logTemplatesV2Diagnostic("SPORTS_PUBLISHED_CONFIG", { templateId:template.id||template.templateId||"", schemaVersion:template.schemaVersion||null, provider:sports.provider, mode:sports.mode, selectedSports:sports.selectedSports, selectedSport:sports.selectedSport, competitionId:sports.items?.[sports.selectedSport]?.competitionId||"", season:sports.items?.[sports.selectedSport]?.season||"", modules:sports.items?.[sports.selectedSport]?.modules||{} });
         const provider = resolveSportsDataProvider(sports, { diagnostic:(event,payload)=>logTemplatesV2Diagnostic(`SPORTS_${event}`,{templateId:template.id||template.templateId||"",...payload}) });
-        const settled = await withSportsV2ReadinessTimeout(Promise.allSettled(sports.selectedSports.map(async (sport) => [sport,await provider.getSnapshot(sport)])));
+        const settled = await withSportsV2ReadinessTimeout(Promise.allSettled(sports.selectedSports.map(async (sport) => {
+          playerTrafficDiagnostics.record("sportsFetchCount", { reason, templateId });
+          return [sport,await provider.getSnapshot(sport)];
+        })));
         const sportsData = Object.fromEntries(settled.filter((result)=>result.status === "fulfilled").map((result)=>result.value));
         const sportsErrors = sports.selectedSports.filter((_,index)=>settled[index].status === "rejected");
         const payload = { sports:sportsData, sportsErrors };
-        if (hasUsableSportsPayload(payload)) writeSportsTemplateDataCache(scope, sportsConfig, payload, { source:"sports-v2" });
         logTemplatesV2Diagnostic("SPORTS_RENDER_DATA_READY", { templateId, receivedSportsData:Object.keys(sportsData).length>0, sports:Object.fromEntries(Object.entries(sportsData).map(([sport,snapshot])=>[sport,{results:Number(snapshot?.data?.results?.length||0),upcoming:Number(snapshot?.data?.upcoming?.length||0),standings:Number(snapshot?.data?.standings?.length||0),events:Number(snapshot?.data?.events?.length||0)}])), errors:sportsErrors });
-        return hasUsableSportsPayload(payload) ? payload : {};
-      })());
+        return payload;
+        };
+        tasks.push((IS_TEMPLATE_DATA_FRESHNESS_EXPERIMENT
+          ? refreshTemplateDataIfNeeded(buildSportsDataCacheContext(scope, sportsConfig), { ttlMs:15 * 60 * 1000, fetcher:fetchSports, source:"sports-v2", isUsable:hasUsableSportsPayload }).then(({ payload }) => hasUsableSportsPayload(payload) ? payload : {})
+          : fetchSports().then((payload) => {
+              if (hasUsableSportsPayload(payload)) writeSportsTemplateDataCache(scope, sportsConfig, payload, { source:"sports-v2" });
+              return hasUsableSportsPayload(payload) ? payload : {};
+            })));
+      }
       const settledModules = await Promise.allSettled(tasks);
       const next = Object.assign({}, ...settledModules.filter((result) => result.status === "fulfilled").map((result) => result.value));
       if (!cancelled && Object.keys(next).length) setDynamicData((previous) => ({ ...(previous || {}), ...next }));
       logTemplateOffline(settledModules.some((result) => result.status === "rejected") ? "TEMPLATE_REMOTE_REFRESH_FAILED" : "TEMPLATE_REMOTE_REFRESH_COMPLETED", { templateId, type:"data" });
     }
-    load().catch(() => logTemplateOffline("TEMPLATE_REMOTE_REFRESH_FAILED", { templateId, type:"data" }));
-    const interval = setInterval(load, sportsConfig?.provider ? 15 * 60 * 1000 : 10 * 60 * 1000);
-    window.addEventListener("online", load);
-    return () => { cancelled = true; clearInterval(interval); window.removeEventListener("online", load); };
+    load("mount").catch(() => logTemplateOffline("TEMPLATE_REMOTE_REFRESH_FAILED", { templateId, type:"data" }));
+    const refreshOnline = () => load("online");
+    const intervals = IS_TEMPLATE_DATA_FRESHNESS_EXPERIMENT
+      ? [
+          setInterval(() => load("timer", ["weather","news"]), 10 * 60 * 1000),
+          setInterval(() => load("timer", ["sports"]), 15 * 60 * 1000),
+        ]
+      : [setInterval(() => load("timer"), sportsConfig?.provider ? 15 * 60 * 1000 : 10 * 60 * 1000)];
+    window.addEventListener("online", refreshOnline);
+    return () => { cancelled = true; intervals.forEach(clearInterval); window.removeEventListener("online", refreshOnline); };
   // The serialized configuration is the refresh boundary for existing live sources.
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [dynamicKey]);
@@ -18804,6 +19071,7 @@ function AdminPlanControls({ client, adminUser, operationalOnly = false }) {
     templatesV2Override: normalizeTemplatesV2Override(client.templatesV2Override),
   });
   const [saving, setSaving] = useState(false);
+  const [isExpanded, setIsExpanded] = useState(false);
   const access = getClientPlanAccess(client);
   const templatesV2Entitlement = resolveTemplatesV2Entitlement({ planKey: getPlanConfig(form.plan).key, override: form.templatesV2Override });
 
@@ -18893,10 +19161,23 @@ function AdminPlanControls({ client, adminUser, operationalOnly = false }) {
       <div className="admin-plan-controls-header">
         <div>
           <div className="kicker">Gestão do plano</div>
-            <h2>{operationalOnly ? "Liberação temporária" : "Liberação e renovação"}</h2>
+          <h2>{operationalOnly ? "Liberação temporária" : "Liberação e renovação"}</h2>
           <p>Status calculado: <strong>{access.statusLabel}</strong></p>
         </div>
-        <div className="admin-plan-quick-actions">
+
+        <button
+          type="button"
+          className="client-action admin-plan-toggle"
+          aria-expanded={isExpanded}
+          onClick={() => setIsExpanded((expanded) => !expanded)}
+        >
+          {isExpanded ? "Recolher" : operationalOnly ? "Gerenciar acesso" : "Gerenciar plano"}
+        </button>
+      </div>
+
+      {isExpanded && (
+        <div className="admin-plan-controls-body">
+          <div className="admin-plan-quick-actions">
           <button className="client-action primary" onClick={unlockForOneDay} disabled={saving}>
             Liberar por 1 dia
           </button>
@@ -18905,10 +19186,9 @@ function AdminPlanControls({ client, adminUser, operationalOnly = false }) {
               Remover liberação temporária
             </button>
           )}
-        </div>
-      </div>
+          </div>
 
-        {!operationalOnly && <div className="form-grid">
+          {!operationalOnly && <div className="form-grid">
         <div className="form-group">
           <label>Novo plano</label>
           <select
@@ -18970,14 +19250,16 @@ function AdminPlanControls({ client, adminUser, operationalOnly = false }) {
           </select>
           <small>Plano: {getPlanConfig(form.plan).name} · acesso efetivo: <strong>{templatesV2Entitlement.allowed ? "LIBERADO" : "BLOQUEADO"}</strong> {templatesV2Entitlement.source === "plan" ? "pelo plano" : "por override"}</small>
         </div>
-        </div>}
+          </div>}
 
-        {!operationalOnly && <div className="panel-actions">
-        <button className="upload-button" onClick={renewPlan} disabled={saving}>
-          <CreditCard size={18} />
-          {saving ? "Salvando..." : "Renovar plano"}
-        </button>
-      </div>}
+          {!operationalOnly && <div className="panel-actions">
+            <button className="upload-button" onClick={renewPlan} disabled={saving}>
+              <CreditCard size={18} />
+              {saving ? "Salvando..." : "Renovar plano"}
+            </button>
+          </div>}
+        </div>
+      )}
     </section>
   );
 }
