@@ -19023,7 +19023,7 @@ function PlanStatusBanner({ access }) {
   }
 
   const titles = {
-    warning: "Plano vencido",
+    warning: "Fatura do mês vencida",
     partial: "Restrição parcial ativa",
     strong: "Modo visualização",
     suspended: "Plano temporariamente suspenso",
