@@ -9,6 +9,13 @@ const SOURCE_GROUPS = Object.freeze({
 
 const numeric = (value) => value !== null && value !== undefined && Number.isFinite(Number(value));
 
+export function formatSessionStartedAt(value) {
+  if (!value) return "Não informado";
+  const date = new Date(value);
+  if (!Number.isFinite(date.getTime())) return "Não informado";
+  return date.toLocaleString("pt-BR", { day:"2-digit", month:"2-digit", year:"numeric", hour:"2-digit", minute:"2-digit", second:"2-digit" });
+}
+
 function nativeVersion(screen = {}) {
   screen = screen || {};
   const versionName = screen.playerVersionName || screen.versionName || screen.nativeAppVersion

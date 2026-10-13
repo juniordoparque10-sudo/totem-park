@@ -31,6 +31,8 @@ import { getNextTemplateToPrepare } from "./templates-v2/offline-preload";
 import { confirmTemplateImageForPaint, getTemplatePlaybackLayerKey, getTemplatePlaybackReadyKey, isCurrentPlaybackExecution, nextPlaybackExecutionId } from "./templates-v2/player-execution";
 import { deriveMediaCacheState, finalizeCompletedMediaCache } from "./player-cache-state";
 import { formatScheduledPlaylistSummary } from "./portal-schedule-presentation";
+import { getClientDashboardDestination, shouldShowClientDashboardCardsInitially } from "./client-dashboard-navigation";
+import { createUnavailableWeather, getWeatherConditionLabel, getWeatherIconSafe } from "./weather-presentation";
 import { findNextReadyMediaIndex, getCanonicalPlaylistMediaEntries, getNativeOfflineQueueUrls, getPlaylistMediaPreparation } from "./media-download-readiness";
 import { localizeOfflineAssetFields } from "./offline-asset-localization";
 import { linkedAtForScreen, telemetryStatus } from "./telemetry-v1";
@@ -1590,20 +1592,6 @@ function toRoundedWeatherValue(value, fallback = "--") {
   return Number.isFinite(number) ? Math.round(number) : fallback;
 }
 
-function buildFallbackWeatherDaily() {
-  const today = new Date();
-  return {
-    time: Array.from({ length: 5 }, (_, index) => {
-      const date = new Date(today);
-      date.setDate(today.getDate() + index);
-      return date.toISOString().slice(0, 10);
-    }),
-    weather_code: [2, 2, 3, 61, 2],
-    temperature_2m_max: [30, 31, 31, 29, 30],
-    temperature_2m_min: [23, 24, 24, 22, 23],
-  };
-}
-
 async function fetchWeatherByCityLegacy(cityName) {
   const city = (cityName || "João Câmara").trim();
 
@@ -1701,16 +1689,7 @@ async function fetchWeatherByCity(cityName) {
   } catch (error) {
     console.log("Erro ao buscar clima:", error);
 
-    return {
-      city: repairedCity,
-      temperature: "--",
-      sensation: "--",
-      humidity: "--",
-      wind: "--",
-      weatherCode: null,
-      daily: buildFallbackWeatherDaily(),
-      source: "Aguardando atualização",
-    };
+    return createUnavailableWeather(repairedCity);
   }
 }
 
@@ -2057,34 +2036,6 @@ function getWeatherReferenceDate(weather) {
   const parsed = updatedAt ? new Date(updatedAt) : null;
 
   return parsed && Number.isFinite(parsed.getTime()) ? parsed : new Date();
-}
-
-function isNightFromDate(date) {
-  const hour = date.getHours();
-  return hour < 5 || hour >= 18;
-}
-
-function getWeatherConditionLabel(code, referenceDate = new Date()) {
-  const value = Number(code);
-  if ([0, 1].includes(value)) return isNightFromDate(referenceDate) ? "Ceu limpo" : "Ensolarado";
-  if ([2, 3].includes(value)) return "Parcialmente nublado";
-  if ([45, 48].includes(value)) return "Neblina";
-  if ([51, 53, 55, 56, 57].includes(value)) return "Garoa";
-  if ([61, 63, 65, 66, 67, 80, 81, 82].includes(value)) return "Chuva";
-  if ([71, 73, 75, 77, 85, 86].includes(value)) return "Frio intenso";
-  if ([95, 96, 99].includes(value)) return "Temporal";
-  return "Tempo atualizado";
-}
-
-function getWeatherIconSafe(code, referenceDate = new Date()) {
-  const value = Number(code);
-  if ([0, 1].includes(value)) return isNightFromDate(referenceDate) ? "\ud83c\udf19" : "\u2600";
-  if ([2, 3].includes(value)) return "\u26c5";
-  if ([45, 48].includes(value)) return "\u2601";
-  if ([51, 53, 55, 56, 57, 61, 63, 65, 66, 67, 80, 81, 82].includes(value)) return "\ud83c\udf27";
-  if ([71, 73, 75, 77, 85, 86].includes(value)) return "\u2744";
-  if ([95, 96, 99].includes(value)) return "\u26c8";
-  return "\u2600";
 }
 
 function getWeatherForecastCards(weather) {
@@ -7384,7 +7335,7 @@ function ClientInternalPanel({ client, onBack, hideBackButton = false, isAdmin =
         </button>
       </div>
 
-      {tab === "dashboard" && <ClientDashboard client={currentClient} access={operationalAccess} />}
+      {tab === "dashboard" && <ClientDashboard client={currentClient} access={operationalAccess} isMasterAccess={isAdmin} onNavigate={setTab} />}
       {tab === "media" && <ClientMediaPage client={currentClient} access={operationalAccess} />}
       {tab === "playlists" && <ClientPlaylistsPage client={currentClient} access={operationalAccess} isAdmin={isAdmin} />}
       {tab === "screens" && <ClientScreensPage client={currentClient} access={operationalAccess} isAdmin={isAdmin} adminUser={adminUser} />}
@@ -7397,12 +7348,13 @@ function ClientInternalPanel({ client, onBack, hideBackButton = false, isAdmin =
   );
 }
 
-function ClientDashboard({ client, access = getClientPlanAccess(client) }) {
+function ClientDashboard({ client, access = getClientPlanAccess(client), isMasterAccess = false, onNavigate }) {
   const [media, setMedia] = useState([]);
   const [playlists, setPlaylists] = useState([]);
   const [screens, setScreens] = useState([]);
   const [financialInvoiceState, setFinancialInvoiceState] = useState({ clientId: null, items: [] });
   const [now, setNow] = useState(new Date());
+  const [showSummaryCards, setShowSummaryCards] = useState(() => shouldShowClientDashboardCardsInitially(isMasterAccess));
 
   useEffect(() => {
     const interval = setInterval(() => {
@@ -7572,12 +7524,24 @@ function ClientDashboard({ client, access = getClientPlanAccess(client) }) {
 
   return (
     <>
-      <section className="stats client-dashboard-stats">
+      {isMasterAccess && (
+        <button
+          type="button"
+          className="client-action admin-plan-toggle"
+          aria-expanded={showSummaryCards}
+          onClick={() => setShowSummaryCards((visible) => !visible)}
+        >
+          {showSummaryCards ? "Recolher informações do plano" : "Mostrar informações do plano"}
+        </button>
+      )}
+
+      {showSummaryCards && <section className="stats client-dashboard-stats">
         <StatCard
           title="Plano atual"
           value={planConfig.name}
           icon={<CreditCard />}
           status={client.billing || "Mensal"}
+          onClick={() => onNavigate?.(getClientDashboardDestination("plan"))}
         />
 
         <StatCard
@@ -7592,6 +7556,7 @@ function ClientDashboard({ client, access = getClientPlanAccess(client) }) {
           value={`${screens.length}/${screenLimit}`}
           icon={<Monitor />}
           status={`${onlineScreensCount} online agora`}
+          onClick={() => onNavigate?.(getClientDashboardDestination("screens"))}
         />
 
         <StatCard
@@ -7600,6 +7565,7 @@ function ClientDashboard({ client, access = getClientPlanAccess(client) }) {
           icon={<Upload />}
           status={`${storageUsage.percentage.toFixed(1)}% • ${storageUsage.label}`}
           severity={storageUsage.severity}
+          onClick={() => onNavigate?.(getClientDashboardDestination("storage"))}
         />
 
         <StatCard
@@ -7607,6 +7573,7 @@ function ClientDashboard({ client, access = getClientPlanAccess(client) }) {
           value={hasPremiumTemplates(client) ? "Ativo" : "Bloqueado"}
           icon={<Newspaper />}
           status={hasPremiumTemplates(client) ? "Recursos liberados" : "Disponível no Business"}
+          onClick={() => onNavigate?.(getClientDashboardDestination("templates"))}
         />
 
         <StatCard
@@ -7614,6 +7581,7 @@ function ClientDashboard({ client, access = getClientPlanAccess(client) }) {
           value={hasMarketingAccess(client) ? "Ativo" : "Bloqueado"}
           icon={<Palette />}
           status={hasMarketingAccess(client) ? "Criação de artes liberada" : "A partir do Professional"}
+          onClick={() => onNavigate?.(getClientDashboardDestination("marketing"))}
         />
 
         <StatCard
@@ -7648,8 +7616,9 @@ function ClientDashboard({ client, access = getClientPlanAccess(client) }) {
           value={playlists.length}
           icon={<ListVideo />}
           status="Campanhas criadas"
+          onClick={() => onNavigate?.(getClientDashboardDestination("playlists"))}
         />
-      </section>
+      </section>}
 
       {isFinancialModelActive(client) && <FinancialNotifications clientId={client.id} />}
 
@@ -19003,9 +18972,20 @@ function MenuItem({ icon, text, active, onClick }) {
   );
 }
 
-function StatCard({ title, value, icon, status, severity = "" }) {
+function StatCard({ title, value, icon, status, severity = "", onClick }) {
   return (
-    <div className={`stat-card ${severity ? `storage-${severity}` : ""}`}>
+    <div
+      className={`stat-card ${severity ? `storage-${severity}` : ""}`}
+      onClick={onClick}
+      onKeyDown={onClick ? (event) => {
+        if (event.key === "Enter" || event.key === " ") {
+          event.preventDefault();
+          onClick();
+        }
+      } : undefined}
+      role={onClick ? "button" : undefined}
+      tabIndex={onClick ? 0 : undefined}
+    >
       <div className="stat-top">
         <span>{title}</span>
         <div className="stat-icon">{icon}</div>
