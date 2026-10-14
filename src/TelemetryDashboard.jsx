@@ -1,8 +1,8 @@
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { Activity, AlertTriangle, Clock3, Database, Download, FileText, Monitor, RefreshCw, Search, Wifi, X } from "lucide-react";
 import { collection, doc, onSnapshot, serverTimestamp, setDoc } from "firebase/firestore";
 import { db } from "./firebase";
-import { compareTelemetryScreens, formatRelativeCommunication, getPortalLastSignalMs, getPortalScreenStatus, getTelemetryVisualState, sortClientsAlphabetically, timestampMs } from "./portal-status";
+import { compareTelemetryScreens, createPortalScreenOrderTracker, formatRelativeCommunication, getPortalLastSignalMs, getPortalScreenStatus, getTelemetryVisualState, sortClientsAlphabetically, timestampMs } from "./portal-status";
 import { bindingForScreen, linkedAtForScreen, measured } from "./telemetry-v1";
 import { aggregateCurrentPlaybackOrigins, aggregateSchema4Traffic, formatSessionStartedAt, getCurrentSourceGroup, getTelemetryCardData, reportedAppVersion } from "./telemetry-card-data";
 import { renderTelemetryPdfReport } from "./telemetry-pdf-report";
@@ -101,6 +101,10 @@ export default function TelemetryDashboard({ focusScreen }) {
   const [config, setConfig] = useState({ enabled: false, clientIds: [], screenIds: [], deviceIds: [], syncIntervalMs: 300000 });
   const [configDraft, setConfigDraft] = useState("");
   const [configSaving, setConfigSaving] = useState(false);
+  const screenOrderRef = useRef(null);
+  if (!screenOrderRef.current) {
+    screenOrderRef.current = createPortalScreenOrderTracker({ getKey: (screen) => `${screen.clientId}/${screen.id}` });
+  }
 
   useEffect(() => { const interval = setInterval(() => setNow(Date.now()), 5_000); return () => clearInterval(interval); }, []);
   useEffect(() => {
@@ -108,7 +112,8 @@ export default function TelemetryDashboard({ focusScreen }) {
     const unsubscribe = onSnapshot(collection(db, "clients"), (snapshot) => {
       screenUnsubs.splice(0).forEach((stop) => stop());
       const nextClients = sortClientsAlphabetically(snapshot.docs.map((item) => ({ id: item.id, ...item.data() })));
-      setClients(nextClients); setScreens([]); setError("");
+      const activeClientIds = new Set(nextClients.map((client) => client.id));
+      setClients(nextClients); setScreens((current) => current.filter((screen) => activeClientIds.has(screen.clientId))); setError("");
       nextClients.forEach((client) => screenUnsubs.push(onSnapshot(collection(db, "clients", client.id, "screens"), (screenSnapshot) => {
         const rows = screenSnapshot.docs.map((item) => ({ id: item.id, clientId: client.id, clientName: client.name, ...item.data() }));
         setScreens((current) => [...current.filter((row) => row.clientId !== client.id), ...rows]); setLoading(false);
@@ -136,7 +141,8 @@ export default function TelemetryDashboard({ focusScreen }) {
   const versions = useMemo(() => [...new Set(enriched.map(appVersion).filter((item) => item !== EMPTY))].sort(), [enriched]);
   const filtered = useMemo(() => {
     const term = search.trim().toLocaleLowerCase("pt-BR");
-    return enriched.filter((item) => (clientId === "all" || item.clientId === clientId) && (screenId === "all" || item.id === screenId) && (status === "all" || item.portalStatus === status) && (source === "all" || sourceMeta(item).key === source) && (version === "all" || appVersion(item) === version) && (!term || [item.name, item.code, item.clientName, item.location].some((value) => String(value || "").toLocaleLowerCase("pt-BR").includes(term)))).sort((left, right) => compareTelemetryScreens(left, right, now));
+    const ordered = screenOrderRef.current.sort(enriched, now);
+    return ordered.filter((item) => (clientId === "all" || item.clientId === clientId) && (screenId === "all" || item.id === screenId) && (status === "all" || item.portalStatus === status) && (source === "all" || sourceMeta(item).key === source) && (version === "all" || appVersion(item) === version) && (!term || [item.name, item.code, item.clientName, item.location].some((value) => String(value || "").toLocaleLowerCase("pt-BR").includes(term))));
   }, [enriched, clientId, screenId, status, source, version, search, now]);
   const metrics = useMemo(() => aggregateSchema4Traffic(filtered), [filtered]);
   const cacheTotal = metrics.cacheHits + metrics.cacheMisses;

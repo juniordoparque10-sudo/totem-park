@@ -11,6 +11,7 @@ const app = fs.readFileSync(new URL("../src/App.jsx", import.meta.url), "utf8");
 const appCss = fs.readFileSync(new URL("../src/App.css", import.meta.url), "utf8");
 const sportsRenderer = fs.readFileSync(new URL("../src/templates-v2/sports-v2/SportsPremiumRenderer.jsx", import.meta.url), "utf8");
 const sportsControlsCss = fs.readFileSync(new URL("../src/templates-v2/sports-v2/sports-v2-controls.css", import.meta.url), "utf8");
+const telemetryDashboard = fs.readFileSync(new URL("../src/TelemetryDashboard.jsx", import.meta.url), "utf8");
 
 test("Player Web resolves logo assets through the same resolver as backgrounds", () => {
   assert.match(modules, /const assetUrl = getTemplateV2ImageAssetUrl\(asset\)/);
@@ -37,6 +38,21 @@ test("V2 workspace and library tracks are width constrained without hiding overf
 test("initial V2 catalog constrains its own tracks and cards", () => {
   assert.match(css, /\.tpv2-catalog\s*\{[^}]*width:100%;[^}]*min-width:0;[^}]*grid-template-columns:repeat\(auto-fit,minmax\(min\(100%,180px\),1fr\)\)/);
   assert.match(css, /\.tpv2-catalog button\s*\{[^}]*width:100%;[^}]*min-width:0;[^}]*max-width:100%/);
+});
+
+test("published V2 template selector wraps as a responsive grid without horizontal scrolling", () => {
+  const tabsRule = css.match(/\.tpv2-template-tabs\s*\{[^}]*\}/g)?.at(-1) || "";
+  const buttonRule = css.match(/\.tpv2-template-tabs button\s*\{[^}]*\}/g)?.at(-1) || "";
+  assert.match(tabsRule, /display:grid/);
+  assert.match(tabsRule, /grid-template-columns:repeat\(auto-fit,minmax\(min\(100%,190px\),1fr\)\)/);
+  assert.match(tabsRule, /overflow:visible/);
+  assert.match(buttonRule, /width:100%;min-width:0;max-width:100%/);
+});
+
+test("telemetry table uses stable screen ordering instead of heartbeat timestamps", () => {
+  assert.match(telemetryDashboard, /createPortalScreenOrderTracker/);
+  assert.match(telemetryDashboard, /screenOrderRef\.current\.sort\(enriched, now\)/);
+  assert.doesNotMatch(telemetryDashboard, /return enriched\.filter\([\s\S]*?\.sort\(\(left, right\) => compareTelemetryScreens\(left, right, now\)\)/);
 });
 
 test("overlay affects the full image in landscape and portrait", () => {

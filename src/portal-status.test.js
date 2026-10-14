@@ -128,3 +128,19 @@ test("attention interval does not count as an offline transition for stable orde
   first.lastSeenAt = now + 3_000;
   assert.deepEqual(tracker.sort([first,second], now + 4_000).map(({ id }) => id), ["second","first"]);
 });
+
+test("telemetry tracker keeps same-id screens from different clients stable across heartbeats", () => {
+  const now = 1_000_000;
+  const tracker = createPortalScreenOrderTracker({
+    getKey: (screen) => `${screen.clientId}/${screen.id}`,
+  });
+  const eco = { id:"screen", clientId:"eco", name:"Zulu", connectedDeviceId:"eco-device", lastSeenAt:now - 5_000 };
+  const kimura = { id:"screen", clientId:"kimura", name:"Alpha", connectedDeviceId:"kimura-device", lastSeenAt:now - 200_000 };
+
+  assert.deepEqual(tracker.sort([kimura,eco], now).map(({ clientId }) => clientId), ["eco","kimura"]);
+  kimura.lastSeenAt = now - 10_000;
+  assert.deepEqual(tracker.sort([kimura,eco], now).map(({ clientId }) => clientId), ["eco","kimura"]);
+  kimura.lastSeenAt = now - 1_000;
+  eco.lastSeenAt = now - 2_000;
+  assert.deepEqual(tracker.sort([kimura,eco], now).map(({ clientId }) => clientId), ["eco","kimura"]);
+});

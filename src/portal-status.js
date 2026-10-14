@@ -85,33 +85,34 @@ export function comparePortalScreens(left = {}, right = {}) {
   return compareScreenNames(left, right);
 }
 
-export function createPortalScreenOrderTracker() {
+export function createPortalScreenOrderTracker({ getKey = (screen) => String(screen?.id || "") } = {}) {
   const records = new Map();
   let sequence = 0;
+  const keyFor = (screen) => String(getKey(screen) || "");
 
   return {
     sort(screens = [], now = Date.now()) {
-      const currentIds = new Set(screens.map((screen) => String(screen?.id || "")));
+      const currentIds = new Set(screens.map(keyFor));
       records.forEach((_, id) => { if (!currentIds.has(id)) records.delete(id); });
 
-      const untracked = screens.filter((screen) => !records.has(String(screen?.id || "")));
+      const untracked = screens.filter((screen) => !records.has(keyFor(screen)));
       untracked.sort((left, right) => compareScreenNames(left, right));
       untracked.forEach((screen) => {
-        const id = String(screen?.id || "");
+        const id = keyFor(screen);
         const online = getPortalScreenStatus(screen, now) !== "OFFLINE";
         records.set(id, { online, onlineOrder: online ? ++sequence : 0, stableOrder:++sequence });
       });
 
       screens.forEach((screen) => {
-        const record = records.get(String(screen?.id || ""));
+        const record = records.get(keyFor(screen));
         const online = getPortalScreenStatus(screen, now) !== "OFFLINE";
         if (online && !record.online) record.onlineOrder = ++sequence;
         record.online = online;
       });
 
       return [...screens].sort((left, right) => {
-        const leftRecord = records.get(String(left?.id || ""));
-        const rightRecord = records.get(String(right?.id || ""));
+        const leftRecord = records.get(keyFor(left));
+        const rightRecord = records.get(keyFor(right));
         if (leftRecord.online !== rightRecord.online) return leftRecord.online ? -1 : 1;
         const order = leftRecord.online
           ? leftRecord.onlineOrder - rightRecord.onlineOrder
