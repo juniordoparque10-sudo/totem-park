@@ -1,6 +1,6 @@
 import test from "node:test";
 import assert from "node:assert/strict";
-import { comparePortalScreens, compareTelemetryScreens, getPortalLastSignalMs, getPortalScreenStatus, getTelemetryVisualState } from "./portal-status.js";
+import { comparePortalScreens, compareTelemetryScreens, createPortalScreenOrderTracker, getPortalLastSignalMs, getPortalScreenStatus, getTelemetryVisualState } from "./portal-status.js";
 
 const v5Screen = (now, overrides = {}) => ({
   id: "screen", clientId: "client", connectedDeviceId: "device", lastSeenAt: now - 200_000,
@@ -11,7 +11,7 @@ const v5Screen = (now, overrides = {}) => ({
 
 test("stale telemetry cannot make a connected screen offline", () => {
   const now = 1_000_000;
-  const screen = { id: "screen", clientId: "client", lastSeenAt: now - 10_000, telemetryUpdatedAt: now - 29 * 60_000, telemetry: { schemaVersion: 3 } };
+  const screen = { id: "screen", clientId: "client", connectedDeviceId:"device", lastSeenAt: now - 10_000, telemetryUpdatedAt: now - 29 * 60_000, telemetry: { schemaVersion: 3 } };
   const config = { enabled: true, screenIds: ["screen"], clientIds: [], deviceIds: [] };
   assert.equal(getPortalScreenStatus(screen, now), "ONLINE");
   assert.equal(getTelemetryVisualState({ screen, config, now }), "STALE");
@@ -76,7 +76,7 @@ test("telemetry screens put online first and then sort by latest communication",
   );
 });
 
-test("offline screens follow online and sort by last communication", () => {
+test("legacy comparator remains deterministic while dashboard tracker owns presence order", () => {
   const now = 1_000_000;
   const screens = [
     { id: "old", clientName: "Árvore", name: "TV A", connectedDeviceId: "a", lastSeenAt: now - 300_000 },
@@ -87,12 +87,28 @@ test("offline screens follow online and sort by last communication", () => {
     { id: "online-a", clientName: "Árvore", name: "TV A", connectedDeviceId: "f", lastSeenAt: now - 10_000 },
   ];
   const order = () => [...screens].sort((left, right) => comparePortalScreens(left, right, now)).map((screen) => screen.id);
-  assert.deepEqual(order(), ["online-a", "online-b", "recent", "tie-a", "tie-b", "old"]);
+  assert.deepEqual(order(), ["old", "online-a", "tie-a", "online-b", "tie-b", "recent"]);
   screens[0].lastSeenAt += 5_000;
   screens[1].lastSeenAt += 4_000;
-  assert.deepEqual(order(), ["online-a", "online-b", "recent", "tie-a", "tie-b", "old"]);
+  assert.deepEqual(order(), ["old", "online-a", "tie-a", "online-b", "tie-b", "recent"]);
   screens[0].lastSeenAt = now - 180_000;
-  assert.deepEqual(order(), ["online-a", "online-b", "recent", "old", "tie-a", "tie-b"]);
+  assert.deepEqual(order(), ["old", "online-a", "tie-a", "online-b", "tie-b", "recent"]);
   screens[0].lastSeenAt = now - 1_000;
-  assert.deepEqual(order(), ["old", "online-a", "online-b", "recent", "tie-a", "tie-b"]);
+  assert.deepEqual(order(), ["old", "online-a", "tie-a", "online-b", "tie-b", "recent"]);
+});
+
+test("dashboard screen order remains stable across heartbeats and appends reconnecting screens", () => {
+  const now = 1_000_000;
+  const tracker = createPortalScreenOrderTracker();
+  const a = { id:"a", name:"A", connectedDeviceId:"a", lastSeenAt:now - 5_000 };
+  const b = { id:"b", name:"B", connectedDeviceId:"b", lastSeenAt:now - 10_000 };
+  const c = { id:"c", name:"C", connectedDeviceId:"c", lastSeenAt:now - 200_000 };
+  assert.deepEqual(tracker.sort([b,c,a], now).map(({ id }) => id), ["a","b","c"]);
+  a.lastSeenAt = now - 1_000;
+  b.lastSeenAt = now - 2_000;
+  assert.deepEqual(tracker.sort([b,a,c], now).map(({ id }) => id), ["a","b","c"]);
+  a.lastSeenAt = now - 200_000;
+  assert.deepEqual(tracker.sort([a,b,c], now).map(({ id }) => id), ["b","a","c"]);
+  a.lastSeenAt = now + 1_000;
+  assert.deepEqual(tracker.sort([a,b,c], now + 2_000).map(({ id }) => id), ["b","a","c"]);
 });

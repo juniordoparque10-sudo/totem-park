@@ -85,6 +85,43 @@ export function comparePortalScreens(left = {}, right = {}) {
   return compareScreenNames(left, right);
 }
 
+export function createPortalScreenOrderTracker() {
+  const records = new Map();
+  let sequence = 0;
+
+  return {
+    sort(screens = [], now = Date.now()) {
+      const currentIds = new Set(screens.map((screen) => String(screen?.id || "")));
+      records.forEach((_, id) => { if (!currentIds.has(id)) records.delete(id); });
+
+      const untracked = screens.filter((screen) => !records.has(String(screen?.id || "")));
+      untracked.sort((left, right) => compareScreenNames(left, right));
+      untracked.forEach((screen) => {
+        const id = String(screen?.id || "");
+        const online = getPortalScreenStatus(screen, now) === "ONLINE";
+        records.set(id, { online, onlineOrder: online ? ++sequence : 0, stableOrder:++sequence });
+      });
+
+      screens.forEach((screen) => {
+        const record = records.get(String(screen?.id || ""));
+        const online = getPortalScreenStatus(screen, now) === "ONLINE";
+        if (online && !record.online) record.onlineOrder = ++sequence;
+        record.online = online;
+      });
+
+      return [...screens].sort((left, right) => {
+        const leftRecord = records.get(String(left?.id || ""));
+        const rightRecord = records.get(String(right?.id || ""));
+        if (leftRecord.online !== rightRecord.online) return leftRecord.online ? -1 : 1;
+        const order = leftRecord.online
+          ? leftRecord.onlineOrder - rightRecord.onlineOrder
+          : leftRecord.stableOrder - rightRecord.stableOrder;
+        return order || compareScreenNames(left, right);
+      });
+    },
+  };
+}
+
 export function compareTelemetryScreens(left = {}, right = {}) {
   const statusOrder = { ONLINE: 0, ATTENTION: 1, OFFLINE: 2 };
   const statusComparison = (statusOrder[left?.portalStatus] ?? 3) - (statusOrder[right?.portalStatus] ?? 3);

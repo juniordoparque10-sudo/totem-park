@@ -75,7 +75,8 @@ export function TemplateMedia({ asset, fit = "cover", position = "center", mode 
 }
 
 export function TemplateLogo({ asset, name }) {
-  return <>{asset?.url ? <img src={asset.url} alt="" /> : <span className="tpv2-brand-mark">TP</span>}<strong>{name}</strong></>;
+  const assetUrl = getTemplateV2ImageAssetUrl(asset);
+  return <>{assetUrl ? <img src={assetUrl} alt="" /> : <span className="tpv2-brand-mark">TP</span>}<strong>{name}</strong></>;
 }
 
 export function TemplateCTA({ config = {} }) { return config.enabled ? <span className="tpv2-cta">{config.label || "Saiba mais"}</span> : null; }

@@ -169,7 +169,7 @@ import {
 import { createPlayerTelemetry, readPlayerTelemetryReport, TELEMETRY_DEFAULT_CONFIG } from "./player-telemetry";
 import { buildOperationalSnapshot, normalizeNativeAppInfo, normalizeOperationalMediaSource, OPERATIONAL_HEARTBEAT_INTERVAL_MS } from "./operational-telemetry";
 import { createTrafficTelemetry } from "./traffic-telemetry";
-import { comparePortalScreens, getPortalLastSignalMs, getPortalScreenPage, getPortalScreenStatus, sortClientsAlphabetically } from "./portal-status";
+import { createPortalScreenOrderTracker, getPortalLastSignalMs, getPortalScreenPage, getPortalScreenStatus, sortClientsAlphabetically } from "./portal-status";
 import { reportedAppVersion } from "./telemetry-card-data";
 import {
   authorizePlayerRebind,
@@ -5026,6 +5026,8 @@ function PendingAccountPanel({ onBack }) {
 }
 
 function Dashboard({ onNavigate, onOpenTelemetry }) {
+  const portalScreenOrderRef = useRef(null);
+  if (!portalScreenOrderRef.current) portalScreenOrderRef.current = createPortalScreenOrderTracker();
   const [clients, setClients] = useState([]);
   const [clientsError, setClientsError] = useState("");
   const [screensData, setScreensData] = useState([]);
@@ -5223,12 +5225,12 @@ function Dashboard({ onNavigate, onOpenTelemetry }) {
   const notLoggedScreens = screensData.filter(
     (screen) => getScreenConnectionStatus(screen, now).key === "not-logged"
   );
-  const filteredRealtimeScreens = screensData
+  const orderedRealtimeScreens = portalScreenOrderRef.current.sort(screensData, now);
+  const filteredRealtimeScreens = orderedRealtimeScreens
     .filter((screen) => {
       if (screenStatusFilter === "all") return true;
       return getScreenConnectionStatus(screen, now).key === screenStatusFilter;
-    })
-    .sort((left, right) => comparePortalScreens(left, right, now));
+    });
   const screensPerPage = 8;
   const screenPagination = getPortalScreenPage(filteredRealtimeScreens, screenPage, screensPerPage);
   const { page: safeScreenPage, pageCount: screenPageCount, items: visibleRealtimeScreens } = screenPagination;

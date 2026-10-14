@@ -4,6 +4,7 @@ import { TemplateClock, TemplateCTA, TemplateDate, TemplateLogo, TemplateMedia, 
 import { CLOCK_PRO_TYPE, HERO_BUSINESS_TYPE, KPI_INDICATORS_TYPE, SPORTS_PREMIUM_TYPE, WEATHER_PREMIUM_TYPE, getTemplateV2Name } from "./schema";
 import SportsPremiumRenderer from "./sports-v2/SportsPremiumRenderer";
 import { reportTemplateRenderDiagnostics } from "./render-diagnostics";
+import { getConfiguredTemplateWeatherCity } from "./weather-city";
 import "@fontsource-variable/inter/wght.css";
 import "./template-v2.css";
 
@@ -39,7 +40,7 @@ function HeroBusiness({ config, orientation, name, compact, tv, type, dynamicDat
         "--tpv2-bg": style.backgroundColor || "#07111f",
         "--tpv2-text": style.textColor || "#fff",
         "--tpv2-muted": style.mutedTextColor || "#c5d2e3",
-        "--tpv2-overlay": `${Math.max(0, Math.min(90, Number(style.overlayOpacity ?? 52)))}%`,
+        "--tpv2-overlay": Math.max(0, Math.min(90, Number(style.overlayOpacity ?? 52))) / 100,
         "--tpv2-panel-opacity": `${100 - Math.max(0, Math.min(100, Number(style.panelTransparency ?? 0)))}%`,
         "--tpv2-headline-size": toContainerWidth(typography.headline?.fontSize, 78),
         "--tpv2-headline-line": Math.max(0.82, Math.min(1.5, Number(typography.headline?.lineHeight) || 0.96)),
@@ -98,7 +99,7 @@ function HeroBusiness({ config, orientation, name, compact, tv, type, dynamicDat
 
 function dynamicStyle(config) {
   const style = config.style || {};
-  return {"--tpv2-primary":style.primaryColor || "#38bdf8","--tpv2-secondary":style.secondaryColor || "#fbbf24","--tpv2-bg":style.backgroundColor || "#071426","--tpv2-text":style.textColor || "#fff","--tpv2-muted":style.mutedTextColor || "#cbd5e1","--tpv2-overlay":`${Math.max(0,Math.min(90,Number(style.overlayOpacity ?? 52)))}%`,"--tpv2-panel-opacity":`${100-Math.max(0,Math.min(100,Number(style.panelTransparency ?? 0)))}%`};
+  return {"--tpv2-primary":style.primaryColor || "#38bdf8","--tpv2-secondary":style.secondaryColor || "#fbbf24","--tpv2-bg":style.backgroundColor || "#071426","--tpv2-text":style.textColor || "#fff","--tpv2-muted":style.mutedTextColor || "#cbd5e1","--tpv2-overlay":Math.max(0,Math.min(90,Number(style.overlayOpacity ?? 52)))/100,"--tpv2-panel-opacity":`${100-Math.max(0,Math.min(100,Number(style.panelTransparency ?? 0)))}%`};
 }
 
 function DynamicBackdrop({ config, mode }) { return <div className="tpv2-dynamic-backdrop"><TemplateMedia asset={config.media?.primary} fit={config.style?.mediaFit || "cover"} position={config.style?.mediaPosition || "center"} mode={mode}/><div className="tpv2-media-shade"/></div>; }
@@ -114,9 +115,12 @@ function WeatherPremium({ config, orientation, name, dynamicData, mode }) {
   const weatherConfig = config.modules?.weather || {};
   const weather = dynamicData?.weather;
   const loading = dynamicData?.loading;
-  const forecast = (weather?.forecast || []).slice(0,Math.max(3,Math.min(5,Number(weatherConfig.forecastDays)||5)));
+  const configuredCity = getConfiguredTemplateWeatherCity(weatherConfig.city);
+  const missingCity = mode !== "player" && dynamicData?.weatherError === "missing-city";
+  const cityLabel = weather?.city || configuredCity || (mode !== "player" ? "Cidade não configurada" : weatherConfig.city);
+  const forecast = (weather?.forecast || []).slice(1,5);
   const visibility = config.visibility || {};
-  return <section className={`tpv2-root tpv2-weather-premium ${orientation === "Retrato" ? "is-portrait" : "is-landscape"} ${mode === "thumbnail" ? "is-thumbnail" : ""} ${config.modules?.news?.enabled ? `has-news-ticker ticker-${config.modules.news.tickerSize || "normal"}` : ""}`} style={dynamicStyle(config)}><DynamicBackdrop config={config} mode={mode}/>{visibility.showContent !== false && <div className="tpv2-weather-shell"><header>{visibility.showLogo !== false && <TemplateLogo asset={config.content?.logo} name={name}/>} {weatherConfig.showCity && <span>{weather?.city || weatherConfig.city}</span>}</header>{loading ? <div className="tpv2-weather-loading"><i/><i/><i/></div> : weather?.unavailable || !weather ? <div className="tpv2-weather-unavailable">Previsão temporariamente indisponível</div> : <><main>{weatherConfig.showCurrent && <><span className="tpv2-weather-icon"><WeatherVectorIcon glyph={weather.icon}/></span><strong>{weather.temperature}°C</strong><div><b>{weather.condition}</b>{weatherConfig.showFeelsLike && <small>Sensação térmica {weather.sensation}°C</small>}</div></>}</main>{weatherConfig.showForecast && <div className="tpv2-forecast-grid">{forecast.map((day) => <article key={day.date}><span>{day.day}</span><b><WeatherVectorIcon glyph={day.icon}/></b><strong>{day.max}°</strong><small>{day.min}°</small></article>)}</div>}</>}</div>}{config.modules?.news?.enabled && <TemplateNewsTicker items={dynamicData?.news} config={config.modules.news} orientation={orientation}/>}</section>;
+  return <section className={`tpv2-root tpv2-weather-premium ${orientation === "Retrato" ? "is-portrait" : "is-landscape"} ${mode === "thumbnail" ? "is-thumbnail" : ""} ${config.modules?.news?.enabled ? `has-news-ticker ticker-${config.modules.news.tickerSize || "normal"}` : ""}`} style={dynamicStyle(config)}><DynamicBackdrop config={config} mode={mode}/>{visibility.showContent !== false && <div className="tpv2-weather-shell"><header>{visibility.showLogo !== false && <TemplateLogo asset={config.content?.logo} name={name}/>} {weatherConfig.showCity && <span>{cityLabel}</span>}</header>{loading ? <div className="tpv2-weather-loading"><i/><i/><i/></div> : missingCity ? <div className="tpv2-weather-unavailable">Selecione uma cidade no editor</div> : weather?.unavailable || !weather ? <div className="tpv2-weather-unavailable">Previsão temporariamente indisponível</div> : <><main>{weatherConfig.showCurrent && <><span className="tpv2-weather-icon"><WeatherVectorIcon glyph={weather.icon}/></span><strong>{weather.temperature}°C</strong><div><b>{weather.condition}</b>{weatherConfig.showFeelsLike && <small>Sensação térmica {weather.sensation}°C</small>}</div></>}</main>{weatherConfig.showForecast && <div className="tpv2-forecast-grid">{forecast.map((day) => <article key={day.date}><span>{day.day}</span><b><WeatherVectorIcon glyph={day.icon}/></b><strong>{day.max}°</strong><small>{day.min}°</small></article>)}</div>}</>}</div>}{config.modules?.news?.enabled && <TemplateNewsTicker items={dynamicData?.news} config={config.modules.news} orientation={orientation}/>}</section>;
 }
 
 export default function TemplateV2Renderer({ template, config, orientation, compact = false, tv = false, dynamicData = null, mode = "player", playbackExecutionId = null, onVisualEvent = null }) {

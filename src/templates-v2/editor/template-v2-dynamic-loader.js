@@ -1,4 +1,5 @@
 import { getTemplateV2DynamicDataKey } from "../dynamic-data.js";
+import { getConfiguredTemplateWeatherCity } from "../weather-city.js";
 
 const CACHE_TTL_MS = 10 * 60 * 1000;
 const dynamicCache = new Map();
@@ -19,7 +20,9 @@ export async function loadTemplateV2DynamicData(config, { loadWeather, loadNews 
     const data = {};
     const weather = config.modules?.weather || {};
     const news = config.modules?.news || {};
-    if (weather.enabled && loadWeather) data.weather = await loadWeather(weather.city);
+    const weatherCity = getConfiguredTemplateWeatherCity(weather.city);
+    if (weather.enabled && !weatherCity) data.weatherError = "missing-city";
+    else if (weather.enabled && loadWeather) data.weather = await loadWeather(weatherCity);
     if (news.enabled && loadNews) data.news = await loadNews(news);
     if (config.sports?.provider) {
       const [{ normalizeSportsV2Config }, { resolveSportsDataProvider }] = await Promise.all([

@@ -16,6 +16,7 @@ import {
   clearTemplateV2DynamicDataCache,
   loadTemplateV2DynamicData,
 } from "../src/templates-v2/editor/template-v2-dynamic-loader.js";
+import { getConfiguredTemplateWeatherCity } from "../src/templates-v2/weather-city.js";
 
 test("persiste e reabre uma Template V2 em Retrato", () => {
   const document = createTemplateV2Document({
@@ -93,6 +94,19 @@ test("falha meteorológica não fica presa no cache do preview", async () => {
   assert.equal(attempts, 2);
 });
 
+test("placeholder não é tratado como cidade configurada", async () => {
+  clearTemplateV2DynamicDataCache();
+  let calls = 0;
+  const config = createTemplateV2Document({ type: WEATHER_PREMIUM_TYPE }).draft;
+  const data = await loadTemplateV2DynamicData(config, {
+    loadWeather: async () => { calls += 1; return {}; },
+  });
+
+  assert.equal(getConfiguredTemplateWeatherCity("Sua cidade"), "");
+  assert.equal(calls, 0);
+  assert.equal(data.weatherError, "missing-city");
+});
+
 test("editor usa a orientação publicada como única fonte do preview", () => {
   const source = readFileSync(new URL("../src/templates-v2/editor/TemplateV2Editor.jsx", import.meta.url), "utf8");
   assert.match(source, /const orientation = normalizeTemplateV2Orientation\(draftState\.editorDraft\.display\?\.defaultOrientation\)/);
@@ -106,4 +120,13 @@ test("biblioteca separa Paisagem e Retrato e playlist resolve orientação V2 pu
   assert.match(editor, /Paisagem — 16:9/);
   assert.match(editor, /Retrato — 9:16/);
   assert.match(app, /if \(isTemplateV2\(item\)\) return getTemplateV2Orientation\(item\)/);
+});
+
+test("editor e biblioteca distinguem cidade ausente de falha real da API", () => {
+  const editor = readFileSync(new URL("../src/templates-v2/editor/TemplateV2Editor.jsx", import.meta.url), "utf8");
+  const renderer = readFileSync(new URL("../src/templates-v2/TemplateV2Renderer.jsx", import.meta.url), "utf8");
+  assert.match(editor, /Selecione uma cidade para carregar a previsão no preview\./);
+  assert.match(renderer, /dynamicData\?\.weatherError === "missing-city"/);
+  assert.match(renderer, /Selecione uma cidade no editor/);
+  assert.match(renderer, /\(weather\?\.forecast \|\| \[\]\)\.slice\(1,5\)/);
 });

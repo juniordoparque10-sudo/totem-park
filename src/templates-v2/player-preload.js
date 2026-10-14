@@ -19,7 +19,7 @@ export function clearTemplateV2BackgroundOnlineRetry(retryKeys, key) {
 
 export function getTemplateV2ImageAssetUrl(asset) {
   if (!asset) return "";
-  return String(asset.url || asset.preview || asset.publicUrl || "").trim();
+  return String(asset.url || asset.preview || asset.publicUrl || asset.remotePreview || asset.imageUrl || "").trim();
 }
 
 export function getTemplateV2CriticalImageUrl(item) {
