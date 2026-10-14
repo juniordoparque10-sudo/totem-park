@@ -85,7 +85,10 @@ export function comparePortalScreens(left = {}, right = {}) {
   return compareScreenNames(left, right);
 }
 
-export function createPortalScreenOrderTracker({ getKey = (screen) => String(screen?.id || "") } = {}) {
+export function createPortalScreenOrderTracker({
+  getKey = (screen) => String(screen?.id || ""),
+  sortOfflineByLastSignal = false,
+} = {}) {
   const records = new Map();
   let sequence = 0;
   const keyFor = (screen) => String(getKey(screen) || "");
@@ -114,6 +117,12 @@ export function createPortalScreenOrderTracker({ getKey = (screen) => String(scr
         const leftRecord = records.get(keyFor(left));
         const rightRecord = records.get(keyFor(right));
         if (leftRecord.online !== rightRecord.online) return leftRecord.online ? -1 : 1;
+
+        if (!leftRecord.online && sortOfflineByLastSignal) {
+          const communicationOrder = getPortalLastSignalMs(right) - getPortalLastSignalMs(left);
+          if (communicationOrder) return communicationOrder;
+        }
+
         const order = leftRecord.online
           ? leftRecord.onlineOrder - rightRecord.onlineOrder
           : leftRecord.stableOrder - rightRecord.stableOrder;

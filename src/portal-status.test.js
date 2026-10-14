@@ -144,3 +144,15 @@ test("telemetry tracker keeps same-id screens from different clients stable acro
   eco.lastSeenAt = now - 2_000;
   assert.deepEqual(tracker.sort([kimura,eco], now).map(({ clientId }) => clientId), ["eco","kimura"]);
 });
+
+test("telemetry tracker orders offline screens by their latest communication", () => {
+  const now = 1_000_000;
+  const tracker = createPortalScreenOrderTracker({ sortOfflineByLastSignal: true });
+  const recent = { id:"recent", name:"Recente", connectedDeviceId:"recent-device", lastSeenAt:now - 100_000 };
+  const old = { id:"old", name:"Antiga", connectedDeviceId:"old-device", lastSeenAt:now - 300_000 };
+  const online = { id:"online", name:"Online", connectedDeviceId:"online-device", lastSeenAt:now - 5_000 };
+
+  assert.deepEqual(tracker.sort([old,recent,online], now).map(({ id }) => id), ["online","recent","old"]);
+  old.lastSeenAt = now - 95_000;
+  assert.deepEqual(tracker.sort([recent,online,old], now).map(({ id }) => id), ["online","old","recent"]);
+});

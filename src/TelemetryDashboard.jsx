@@ -103,7 +103,10 @@ export default function TelemetryDashboard({ focusScreen }) {
   const [configSaving, setConfigSaving] = useState(false);
   const screenOrderRef = useRef(null);
   if (!screenOrderRef.current) {
-    screenOrderRef.current = createPortalScreenOrderTracker({ getKey: (screen) => `${screen.clientId}/${screen.id}` });
+    screenOrderRef.current = createPortalScreenOrderTracker({
+      getKey: (screen) => `${screen.clientId}/${screen.id}`,
+      sortOfflineByLastSignal: true,
+    });
   }
 
   useEffect(() => { const interval = setInterval(() => setNow(Date.now()), 5_000); return () => clearInterval(interval); }, []);
