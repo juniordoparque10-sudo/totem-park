@@ -1,3 +1,5 @@
+import { normalizeTemplateV2Orientation } from "./orientation.js";
+
 export const TEMPLATE_V2_SCHEMA_VERSION = 2;
 export const TEMPLATE_V2_RENDERER = "template-v2";
 
@@ -129,6 +131,7 @@ export function createTemplateV2Draft(type = HERO_BUSINESS_TYPE, overrides = {})
 
 export function createTemplateV2Document({ name = "Hero Business", type = HERO_BUSINESS_TYPE, draft } = {}) {
   const safeDraft = createTemplateV2Draft(type, draft);
+  const orientation = normalizeTemplateV2Orientation(safeDraft.display?.defaultOrientation);
 
   return {
     schemaVersion: TEMPLATE_V2_SCHEMA_VERSION,
@@ -137,6 +140,8 @@ export function createTemplateV2Document({ name = "Hero Business", type = HERO_B
     type,
     name,
     title: name,
+    orientation,
+    aspectRatio: orientation === "Retrato" ? "9:16" : "16:9",
     identity: {
       name,
       templateType: type,
@@ -167,7 +172,15 @@ export function getTemplateV2PublishedConfig(template = {}) {
 
 export function getTemplateV2DraftConfig(template = {}) {
   if (!isTemplateV2(template)) return createHeroBusinessDraft();
-  return createTemplateV2Draft(template.identity?.templateType || template.templateType, template.draft || template.published || {});
+  const source = template.draft || template.published || {};
+  const orientation = normalizeTemplateV2Orientation(
+    source.display?.defaultOrientation,
+    normalizeTemplateV2Orientation(template.orientation || template.aspectRatio)
+  );
+  return createTemplateV2Draft(template.identity?.templateType || template.templateType, {
+    ...source,
+    display: { ...(source.display || {}), defaultOrientation: orientation },
+  });
 }
 
 export function getTemplateV2Assets(config = {}) {
@@ -216,6 +229,10 @@ export function isTemplateV2Dirty(editorDraft, persistedDraft) {
 export function getPublishedTemplateV2View(template = {}) {
   const published = getTemplateV2PublishedConfig(template);
   if (!published) return null;
+  const orientation = normalizeTemplateV2Orientation(
+    published.display?.defaultOrientation,
+    normalizeTemplateV2Orientation(template.orientation || template.aspectRatio)
+  );
 
   return {
     ...template,
@@ -224,7 +241,8 @@ export function getPublishedTemplateV2View(template = {}) {
     type: template.identity?.templateType || template.templateType || HERO_BUSINESS_TYPE,
     templateType: template.identity?.templateType || template.templateType || HERO_BUSINESS_TYPE,
     duration: Number(published.display?.duration || 15),
-    orientation: published.display?.defaultOrientation || "Paisagem",
+    orientation,
+    aspectRatio: orientation === "Retrato" ? "9:16" : "16:9",
     published,
   };
 }

@@ -32,6 +32,7 @@ import { getTemplatePlaylistUsage, removeTemplateReferences } from "../../templa
 import "./template-v2-editor.css";
 import SportsV2EditorFields from "../sports-v2/SportsV2EditorFields";
 import { getSportsV2Timing, normalizeSportsV2Config, SPORTS_V2_MODES } from "../sports-v2/config";
+import { normalizeTemplateV2Orientation } from "../orientation";
 
 function safeFileName(name = "asset") { return name.normalize("NFD").replace(/[\u0300-\u036f]/g, "").replace(/[^a-zA-Z0-9._-]+/g, "-"); }
 function revision(prefix) { return `${prefix}-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`; }
@@ -75,7 +76,6 @@ export default function TemplateV2Editor({ client, access, entitlement = { allow
   const [catalogCategory, setCatalogCategory] = useState("Todos");
   const [catalogOrientation, setCatalogOrientation] = useState("Todos");
   const [name, setName] = useState("Hero Business");
-  const [orientation, setOrientation] = useState("Paisagem");
   const [scale, setScale] = useState("fit");
   const [saving, setSaving] = useState(false);
   const [uploading, setUploading] = useState(false);
@@ -89,6 +89,7 @@ export default function TemplateV2Editor({ client, access, entitlement = { allow
   const definition = getTemplateV2Definition(activeType);
   const catalogItems = listTemplateV2Definitions().filter((item) => (catalogCategory === "Todos" || item.category === catalogCategory) && (catalogOrientation === "Todos" || item.orientations.includes(catalogOrientation)));
   const draftState = useTemplateV2Draft(selected, activeType);
+  const orientation = normalizeTemplateV2Orientation(draftState.editorDraft.display?.defaultOrientation);
   const sportsDraft = activeType === SPORTS_PREMIUM_TYPE ? normalizeSportsV2Config(draftState.editorDraft.sports) : null;
   const previewTemplate = selected || createTemplateV2Document({ name, type: activeType });
   const previewDynamicData = useTemplateV2DynamicData(draftState.editorDraft, { loadWeather, loadNews });
@@ -118,6 +119,10 @@ export default function TemplateV2Editor({ client, access, entitlement = { allow
         await updateDoc(doc(db, "clients", client.id, "templates", selected.id), {
           "identity.name": name.trim() || definition?.label || "Template V2",
           draft: cloneTemplateV2Config(draftState.editorDraft),
+          ...(!selected.published ? {
+            orientation,
+            aspectRatio: orientation === "Retrato" ? "9:16" : "16:9",
+          } : {}),
           "status.draftRevision": draftRevision,
           updatedAt: serverTimestamp(),
         });
@@ -143,6 +148,7 @@ export default function TemplateV2Editor({ client, access, entitlement = { allow
       templateType,
       duration: Number(published.display.duration || 15),
       orientation: published.display.defaultOrientation || "Paisagem",
+      aspectRatio: published.display.defaultOrientation === "Retrato" ? "9:16" : "16:9",
       enabled: true,
       "identity.name": templateName,
       "status.enabled": true,
@@ -250,6 +256,7 @@ export default function TemplateV2Editor({ client, access, entitlement = { allow
     draftState.update("content.services", services);
   };
   const updateTypography = (field, property, value) => draftState.update(`style.typography.${field}.${property}`, value);
+  const updateOrientation = (value) => draftState.update("display.defaultOrientation", normalizeTemplateV2Orientation(value));
   const toggleSection = (sectionId) => setOpenSections((current) => ({ ...current, [sectionId]: !current[sectionId] }));
   const toggleNewsSourceV2 = (source) => {
     const current = draftState.editorDraft.modules.news?.selectedNewsSources || [];
@@ -326,10 +333,21 @@ export default function TemplateV2Editor({ client, access, entitlement = { allow
           {message && <div className="tpv2-message-bar">{message}</div>}
           <div className="tpv2-editor-actions"><button type="button" onClick={draftState.discard} disabled={!draftState.isDirty || saving}><RotateCcw /> Descartar</button><button type="button" onClick={saveDraft} disabled={saving}><Save /> Salvar alterações</button><button type="button" className="publish" onClick={publish} disabled={!selected || draftState.isDirty || saving}><Send /> {selected?.published ? "Atualizar publicação" : "Publicar"}</button></div>
         </main>
-        <TemplateV2PreviewPanel template={previewTemplate} config={draftState.editorDraft} orientation={orientation} onOrientationChange={setOrientation} scale={scale} onScaleChange={setScale} onOpen={() => setPreviewOpen(true)} dynamicData={previewDynamicData} />
+        <TemplateV2PreviewPanel template={previewTemplate} config={draftState.editorDraft} orientation={orientation} onOrientationChange={updateOrientation} scale={scale} onScaleChange={setScale} onOpen={() => setPreviewOpen(true)} dynamicData={previewDynamicData} />
       </div>
       {previewOpen && <PopupPreview template={previewTemplate} config={draftState.editorDraft} orientation={orientation} onClose={() => setPreviewOpen(false)} dynamicData={previewDynamicData} />}
-      {templates.length > 0 && <div className="tpv2-published-strip"><h3>Meus Templates V2</h3>{templates.map((item) => { const view = getPublishedTemplateV2View(item); const draft = getTemplateV2DraftConfig(item); const hasChanges = Boolean(view && isTemplateV2Dirty(draft,view.published)); const preview = hasChanges ? draft : view?.published || draft; const previewOrientation = preview.display?.defaultOrientation || "Paisagem"; return <article role="button" tabIndex="0" className={previewOrientation === "Retrato" ? "portrait" : "landscape"} key={item.id} onClick={() => openTemplate(item)} onKeyDown={(event) => { if (event.key === "Enter" || event.key === " ") openTemplate(item); }}><TemplateV2DynamicStage className="tpv2-created-thumbnail" template={item} config={preview} orientation={previewOrientation} mode="thumbnail" loadWeather={loadWeather} loadNews={loadNews}/><div className="tpv2-created-meta"><strong>{getTemplateV2Name(item)}</strong><span>{item.identity?.templateType || item.templateType} · {previewOrientation}</span><em className={view ? "published" : "draft"}>{hasChanges ? "Alterações não publicadas" : view ? "Publicado" : "Rascunho"}</em></div><div className="tpv2-created-actions"><button type="button" onClick={(event) => { event.stopPropagation(); openTemplate(item); }}>Editar</button>{view && !hasChanges ? <button type="button" className="primary" onClick={(event) => { event.stopPropagation(); onUseInPlaylist?.(); }}>Usar em playlist</button> : <button type="button" className="primary" disabled={saving} onClick={(event) => { event.stopPropagation(); publishFromCard(item); }}>{view ? "Atualizar publicação" : "Publicar"}</button>}<button type="button" className="danger" onClick={(event) => { event.stopPropagation(); requestDelete(item); }}>Excluir</button></div></article>; })}</div>}
+      {templates.length > 0 && <div className="tpv2-library-by-orientation">
+        <h3>Meus Templates V2</h3>
+        {[{ title: "Paisagem — 16:9", orientation: "Paisagem" }, { title: "Retrato — 9:16", orientation: "Retrato" }].map((group) => {
+          const items = templates.filter((item) => {
+            const view = getPublishedTemplateV2View(item);
+            const draft = getTemplateV2DraftConfig(item);
+            const preview = view && !isTemplateV2Dirty(draft, view.published) ? view.published : draft;
+            return normalizeTemplateV2Orientation(preview.display?.defaultOrientation) === group.orientation;
+          });
+          return <section className="tpv2-orientation-group" key={group.orientation}><h4>{group.title}</h4><div className="tpv2-published-strip">{items.length ? items.map((item) => { const view = getPublishedTemplateV2View(item); const draft = getTemplateV2DraftConfig(item); const hasChanges = Boolean(view && isTemplateV2Dirty(draft,view.published)); const preview = hasChanges ? draft : view?.published || draft; const previewOrientation = normalizeTemplateV2Orientation(preview.display?.defaultOrientation); return <article role="button" tabIndex="0" className={previewOrientation === "Retrato" ? "portrait" : "landscape"} key={item.id} onClick={() => openTemplate(item)} onKeyDown={(event) => { if (event.key === "Enter" || event.key === " ") openTemplate(item); }}><TemplateV2DynamicStage className="tpv2-created-thumbnail" template={item} config={preview} orientation={previewOrientation} mode="thumbnail" loadWeather={loadWeather} loadNews={loadNews}/><div className="tpv2-created-meta"><strong>{getTemplateV2Name(item)}</strong><span>{item.identity?.templateType || item.templateType} · {previewOrientation}</span><em className={view ? "published" : "draft"}>{hasChanges ? "Alterações não publicadas" : view ? "Publicado" : "Rascunho"}</em></div><div className="tpv2-created-actions"><button type="button" onClick={(event) => { event.stopPropagation(); openTemplate(item); }}>Editar</button>{view && !hasChanges ? <button type="button" className="primary" onClick={(event) => { event.stopPropagation(); onUseInPlaylist?.(); }}>Usar em playlist</button> : <button type="button" className="primary" disabled={saving} onClick={(event) => { event.stopPropagation(); publishFromCard(item); }}>{view ? "Atualizar publicação" : "Publicar"}</button>}<button type="button" className="danger" onClick={(event) => { event.stopPropagation(); requestDelete(item); }}>Excluir</button></div></article>; }) : <div className="tpv2-library-empty">Nenhum template nesta orientação.</div>}</div></section>;
+        })}
+      </div>}
     </div>
   );
 }

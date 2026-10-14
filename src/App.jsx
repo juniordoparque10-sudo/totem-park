@@ -199,6 +199,7 @@ import TemplateScaledStage from "./TemplateScaledStage";
 import PortalModal from "./PortalModal";
 import PreviewModal from "./PreviewModal";
 import { getPublishedTemplateV2View, isTemplateV2 } from "./templates-v2/schema";
+import { getTemplateV2Orientation } from "./templates-v2/orientation";
 import { getTemplatesV2ScreenCapability } from "./templates-v2/player-capability";
 import logo from "./assets/logo.png";
 import isotipo from "./assets/isotipo.png";
@@ -729,6 +730,7 @@ function getPlaylistPreviewIndex(playlist, nowValue = Date.now(), screen = {}) {
 }
 
 function getPreviewOrientation(item = {}) {
+  if (isTemplateV2(item)) return getTemplateV2Orientation(item);
   if (item.detectedOrientation === "Retrato") return "Retrato";
   if (item.detectedOrientation === "Paisagem") return "Paisagem";
   if (item.orientation === "Retrato") return "Retrato";
