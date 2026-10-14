@@ -15,3 +15,15 @@ export function createSportsV2Config(){return{provider:"thesportsdb",mode:SPORTS
 export function normalizeSportsV2Config(value={}){const base=createSportsV2Config();const items=Object.fromEntries(Object.keys(base.items).map((type)=>{const saved=value.items?.[type]||{};return[type,{...base.items[type],duration:Math.max(1,Number(saved.duration)||base.items[type].duration),region:String(saved.region||base.items[type].region),competitionId:String(saved.competitionId||base.items[type].competitionId),season:String(saved.season||base.items[type].season),modules:{...base.items[type].modules,...(saved.modules||{})},type,id:type}];}));const available=new Set(SPORTS_V2_TYPES.map(([type])=>type).filter((type)=>SPORTS_V2_COVERAGE[type]?.available));const selectedSports=[...new Set((value.selectedSports||[]).filter((type)=>available.has(type)))].slice(0,4);const requested=available.has(value.selectedSport)?value.selectedSport:selectedSports[0]||"football";return{...base,...value,provider:"thesportsdb",items,selectedSport:requested,selectedSports:selectedSports.length?selectedSports:[requested],primarySport:available.has(value.primarySport)?value.primarySport:requested};}
 export function getSportsV2Timing(sports,totalDuration){const config=normalizeSportsV2Config(sports);const total=Math.max(5,Number(totalDuration)||15);const used=config.selectedSports.reduce((sum,type)=>sum+Math.max(1,Number(config.items[type]?.duration)||1),0);return{total,used,remaining:total-used,valid:used===total};}
 export function distributeSportsV2Timing(sports,totalDuration){const config=normalizeSportsV2Config(sports);const total=Math.max(5,Number(totalDuration)||15);const count=config.selectedSports.length||1;const base=Math.floor(total/count);let remainder=total-base*count;config.selectedSports.forEach((type)=>{config.items[type].duration=base+(remainder-->0?1:0);});return config;}
+
+export function getSportsV2Appearance(config = {}) {
+  const overlayAlpha = Math.max(0, Math.min(90, Number(config.style?.overlayOpacity ?? 55))) / 100;
+  const panelAlpha = (100 - Math.max(0, Math.min(100, Number(config.style?.panelTransparency ?? 0)))) / 100;
+  const preset = config.sports?.visualPreset || "broadcast-dark";
+  const panelBackground = preset === "clean-sports"
+    ? `rgba(248, 250, 252, ${panelAlpha})`
+    : preset === "stadium"
+      ? `linear-gradient(145deg, rgba(3, 46, 31, ${panelAlpha}), rgba(2, 20, 14, ${panelAlpha}))`
+      : `linear-gradient(145deg, rgba(5, 12, 25, ${panelAlpha}), rgba(15, 23, 42, ${panelAlpha}))`;
+  return { overlayAlpha, panelAlpha, panelBackground };
+}

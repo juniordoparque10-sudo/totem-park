@@ -10,7 +10,6 @@ const rendererCss = fs.readFileSync(new URL("../src/templates-v2/template-v2.css
 const app = fs.readFileSync(new URL("../src/App.jsx", import.meta.url), "utf8");
 const appCss = fs.readFileSync(new URL("../src/App.css", import.meta.url), "utf8");
 const sportsRenderer = fs.readFileSync(new URL("../src/templates-v2/sports-v2/SportsPremiumRenderer.jsx", import.meta.url), "utf8");
-const sportsControlsCss = fs.readFileSync(new URL("../src/templates-v2/sports-v2/sports-v2-controls.css", import.meta.url), "utf8");
 const telemetryDashboard = fs.readFileSync(new URL("../src/TelemetryDashboard.jsx", import.meta.url), "utf8");
 
 test("Player Web resolves logo assets through the same resolver as backgrounds", () => {
@@ -72,8 +71,8 @@ test("V2 content can shrink without changing the portal sidebar width", () => {
 });
 
 test("sports renderer maps overlay and panel transparency to valid alpha values", () => {
-  assert.match(sportsRenderer, /overlayAlpha[\s\S]*?\/\s*100/);
-  assert.match(sportsRenderer, /panelAlpha[\s\S]*?\/\s*100/);
-  assert.match(sportsControlsCss, /opacity:\s*var\(--sports-v2-overlay\)/);
-  assert.match(sportsControlsCss, /rgba\(5, 12, 25, var\(--sports-v2-panel-alpha\)\)/);
+  assert.match(sportsRenderer, /getSportsV2Appearance\(config/);
+  assert.match(sportsRenderer, /style=\{\{ opacity: appearance\.overlayAlpha \}\}/);
+  assert.match(sportsRenderer, /appearance=\{appearance\}/);
+  assert.doesNotMatch(sportsRenderer, /sports-v2-controls\.css/);
 });

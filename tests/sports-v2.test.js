@@ -2,6 +2,7 @@ import test from "node:test";
 import assert from "node:assert/strict";
 import { readFileSync } from "node:fs";
 import { createSportsV2Config, distributeSportsV2Timing, getSportsV2Timing, normalizeSportsV2Config, SPORTS_V2_TYPES } from "../src/templates-v2/sports-v2/config.js";
+import * as sportsConfig from "../src/templates-v2/sports-v2/config.js";
 import { createTemplateV2Draft, SPORTS_PREMIUM_TYPE } from "../src/templates-v2/schema.js";
 
 test("sports V2 provides six isolated expandable sport objects", () => {
@@ -34,4 +35,18 @@ test("sports V2 is registered in schema, registry, renderer and editor", () => {
   assert.match(registry,/Resultados Esportivos Premium V2/);
   assert.match(renderer,/SportsPremiumRenderer/);
   assert.match(editor,/SportsV2EditorFields/);
+});
+
+test("sports appearance resolves one published visual contract for editor library and player", () => {
+  assert.equal(typeof sportsConfig.getSportsV2Appearance, "function");
+  const config = {
+    style: { overlayOpacity: 24, panelTransparency: 68 },
+    sports: { visualPreset: "stadium" },
+  };
+  const portrait = sportsConfig.getSportsV2Appearance?.(config, "Retrato");
+  const landscape = sportsConfig.getSportsV2Appearance?.(config, "Paisagem");
+  assert.deepEqual(portrait, landscape);
+  assert.equal(portrait?.overlayAlpha, 0.24);
+  assert.equal(portrait?.panelAlpha, 0.32);
+  assert.match(portrait?.panelBackground || "", /rgba\(3, 46, 31, 0\.32\)/);
 });
