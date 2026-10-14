@@ -97,14 +97,14 @@
 .tpv2-locked>strong { color:#67e8f9; text-transform:uppercase; letter-spacing:.1em; }
 .tpv2-locked h2 { margin:12px 0 8px; }
 .tpv2-locked p { margin:0 auto; max-width:680px; color:#94a3b8; }
-.tpv2-catalog { display:grid; grid-template-columns:repeat(auto-fit,minmax(190px,1fr)); gap:10px; margin:0 0 18px; }
-.tpv2-catalog button { min-height:138px; padding:14px; border:1px solid rgba(148,163,184,.14); border-radius:15px; color:#fff; background:linear-gradient(145deg,#0d1a2b,#091321); text-align:left; display:flex; flex-direction:column; align-items:flex-start; cursor:pointer; }
+.tpv2-catalog { width:100%; min-width:0; max-width:100%; box-sizing:border-box; display:grid; grid-template-columns:repeat(auto-fit,minmax(min(100%,180px),1fr)); gap:10px; margin:0 0 18px; }
+.tpv2-catalog button { width:100%; min-width:0; max-width:100%; min-height:138px; box-sizing:border-box; padding:14px; border:1px solid rgba(148,163,184,.14); border-radius:15px; color:#fff; background:linear-gradient(145deg,#0d1a2b,#091321); text-align:left; display:flex; flex-direction:column; align-items:flex-start; cursor:pointer; overflow-wrap:anywhere; }
 .tpv2-catalog button.active { border-color:#67e8f9; box-shadow:0 0 0 2px rgba(103,232,249,.12); }
 .tpv2-catalog span { color:#67e8f9; font-size:10px; font-weight:900; text-transform:uppercase; }
 .tpv2-catalog strong { margin:8px 0 5px; font-size:15px; }
 .tpv2-catalog small { color:#94a3b8; line-height:1.35; }
 .tpv2-catalog em { margin-top:auto; padding-top:9px; color:#64748b; font-size:10px; font-style:normal; }
-.tpv2-catalog-filters { display:flex; justify-content:flex-end; gap:8px; margin-bottom:10px; }
+.tpv2-catalog-filters { min-width:0; max-width:100%; display:flex; flex-wrap:wrap; justify-content:flex-end; gap:8px; margin-bottom:10px; }
 .tpv2-catalog-filters select { min-height:38px; padding:0 12px; border:1px solid rgba(148,163,184,.18); border-radius:10px; color:#cbd5e1; background:#0a1525; }
 .tpv2-catalog-thumbnail { width:100%; height:76px; margin-bottom:11px; overflow:hidden; border-radius:9px; display:grid; grid-template-columns:42% 58%; background:linear-gradient(135deg,#07111f,#172554); }
 .tpv2-catalog-thumbnail i:first-child { grid-row:1/4; background:linear-gradient(145deg,rgba(14,165,233,.5),rgba(124,58,237,.35)); }

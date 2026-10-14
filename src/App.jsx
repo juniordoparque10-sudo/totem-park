@@ -5068,8 +5068,9 @@ function Dashboard({ onNavigate, onOpenTelemetry }) {
 
       setClientsError("");
       setClients(sortClientsAlphabetically(clientsList));
-      setScreensData([]);
-      setPlaylistsData([]);
+      const activeClientIds = new Set(clientsList.map((client) => client.id));
+      setScreensData((previous) => previous.filter((screen) => activeClientIds.has(screen.clientId)));
+      setPlaylistsData((previous) => previous.filter((playlist) => activeClientIds.has(playlist.clientId)));
 
       unsubScreens.forEach((unsub) => unsub());
       unsubPlaylists.forEach((unsub) => unsub());
