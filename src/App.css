@@ -4,6 +4,56 @@
   color: #ffffff;
 }
 
+.media-library-toolbar {
+  margin: 20px 0 14px;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  flex-wrap: wrap;
+}
+
+.media-library-tabs {
+  display: flex;
+  gap: 8px;
+  flex-wrap: wrap;
+}
+
+.media-library-tabs button,
+.media-library-toolbar select {
+  min-height: 40px;
+  padding: 0 14px;
+  border: 1px solid rgba(148, 163, 184, 0.22);
+  border-radius: 11px;
+  color: #cbd5e1;
+  background: rgba(15, 23, 42, 0.72);
+  font-weight: 800;
+}
+
+.media-library-tabs button.active {
+  border-color: #22d3ee;
+  color: #ecfeff;
+  background: rgba(34, 211, 238, 0.12);
+}
+
+@media (max-width: 640px) {
+  .media-library-toolbar,
+  .media-library-toolbar select {
+    width: 100%;
+  }
+
+  .media-library-tabs {
+    width: 100%;
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+  }
+
+  .media-library-tabs button {
+    padding: 0 9px;
+    font-size: 12px;
+  }
+}
+
 .layout {
   min-height: 100vh;
   display: flex;

@@ -32,6 +32,8 @@ import { confirmTemplateImageForPaint, getTemplatePlaybackLayerKey, getTemplateP
 import { deriveMediaCacheState, finalizeCompletedMediaCache } from "./player-cache-state";
 import { formatScheduledPlaylistSummary } from "./portal-schedule-presentation";
 import { getClientDashboardDestination, shouldShowClientDashboardCardsInitially } from "./client-dashboard-navigation";
+import { filterTemplateResources, isPlaybackMedia } from "./media-library-purpose";
+import { getTemplateResourceUsage } from "./template-resource-usage";
 import { createUnavailableWeather, getWeatherConditionLabel, getWeatherIconSafe } from "./weather-presentation";
 import { findNextReadyMediaIndex, getCanonicalPlaylistMediaEntries, getNativeOfflineQueueUrls, getPlaylistMediaPreparation } from "./media-download-readiness";
 import { localizeOfflineAssetFields } from "./offline-asset-localization";
@@ -7849,6 +7851,8 @@ function ClientMediaPage({ client, access = getClientPlanAccess(client) }) {
   const [mediaNoticeTone, setMediaNoticeTone] = useState("success");
   const [pendingMediaDeletion, setPendingMediaDeletion] = useState(null);
   const [mediaList, setMediaList] = useState([]);
+  const [libraryTab, setLibraryTab] = useState("playback");
+  const [resourceTypeFilter, setResourceTypeFilter] = useState("all");
   const [uploading, setUploading] = useState(false);
   const [backfillingVersions, setBackfillingVersions] = useState(false);
   const [progress, setProgress] = useState(0);
@@ -8260,6 +8264,8 @@ function ClientMediaPage({ client, access = getClientPlanAccess(client) }) {
           clientId: client.id,
           uploadedByUid: auth.currentUser?.uid || "",
           uploadedByEmail: normalizeEmail(auth.currentUser?.email || ""),
+          libraryPurpose: "playback",
+          sourceContext: "media-page",
           createdAt: serverTimestamp(),
         });
       }
@@ -8287,8 +8293,13 @@ function ClientMediaPage({ client, access = getClientPlanAccess(client) }) {
     if (!requirePlanPermission(access, "canEdit", "excluir mídias")) return;
 
     try {
-      const usage = await getMediaPlaylistUsage(media);
-      setPendingMediaDeletion({ media, usage, deleting:false });
+      const [usage, templatesSnapshot] = await Promise.all([
+        getMediaPlaylistUsage(media),
+        getDocs(collection(db, "clients", client.id, "templates")),
+      ]);
+      const templates = templatesSnapshot.docs.map((item) => ({ id:item.id, ...item.data() }));
+      const resourceUsage = getTemplateResourceUsage(templates, media);
+      setPendingMediaDeletion({ media, usage, resourceUsage, deleting:false });
     } catch (error) {
       console.log(error);
       alert("Não foi possível verificar o uso desta mídia.");
@@ -8325,21 +8336,26 @@ function ClientMediaPage({ client, access = getClientPlanAccess(client) }) {
   }
 
   const fileInputId = `media-file-${client.id}`;
+  const visibleMediaList = libraryTab === "resources"
+    ? filterTemplateResources(mediaList, resourceTypeFilter)
+    : mediaList.filter(isPlaybackMedia);
 
   return (
     <>
       <UploadLimitDialog notice={uploadNotice} onClose={() => setUploadNotice(null)} />
       {pendingMediaDeletion && (
         <PortalModal
-          title="Tem certeza que deseja excluir esta mídia?"
-          message={pendingMediaDeletion.usage.length
+          title={pendingMediaDeletion.resourceUsage?.length ? "Recurso utilizado por templates" : "Tem certeza que deseja excluir esta mídia?"}
+          message={pendingMediaDeletion.resourceUsage?.length
+            ? "Este recurso está em uso e não pode ser excluído. Desvincule-o das templates indicadas antes de tentar novamente."
+            : pendingMediaDeletion.usage.length
             ? `Esta mídia está sendo utilizada em ${pendingMediaDeletion.usage.length} playlist(s). Ao excluir esta mídia, ela também será removida dessas playlists. Esta ação não pode ser desfeita.`
             : "Esta ação não pode ser desfeita."}
-          details={pendingMediaDeletion.usage.map((playlist) => playlist.name)}
-          confirmLabel="Excluir definitivamente"
+          details={(pendingMediaDeletion.resourceUsage?.length ? pendingMediaDeletion.resourceUsage : pendingMediaDeletion.usage).map((item) => item.name)}
+          confirmLabel={pendingMediaDeletion.resourceUsage?.length ? "Entendi" : "Excluir definitivamente"}
           confirmDisabled={pendingMediaDeletion.deleting}
-          danger
-          onConfirm={confirmMediaDeletion}
+          danger={!pendingMediaDeletion.resourceUsage?.length}
+          onConfirm={pendingMediaDeletion.resourceUsage?.length ? undefined : confirmMediaDeletion}
           onClose={() => {
             if (!pendingMediaDeletion.deleting) setPendingMediaDeletion(null);
           }}
@@ -8377,7 +8393,23 @@ function ClientMediaPage({ client, access = getClientPlanAccess(client) }) {
         </button>
       )}
 
-      <section className="upload-panel" ref={mediaEditorRef}>
+      <div className="media-library-toolbar">
+        <div className="media-library-tabs" role="tablist" aria-label="Finalidade da biblioteca">
+          <button type="button" role="tab" aria-selected={libraryTab === "playback"} className={libraryTab === "playback" ? "active" : ""} onClick={() => setLibraryTab("playback")}>Reprodução</button>
+          <button type="button" role="tab" aria-selected={libraryTab === "resources"} className={libraryTab === "resources" ? "active" : ""} onClick={() => setLibraryTab("resources")}>Recursos das Templates</button>
+        </div>
+        {libraryTab === "resources" && <select aria-label="Filtrar recursos por tipo" value={resourceTypeFilter} onChange={(event) => setResourceTypeFilter(event.target.value)}>
+          <option value="all">Todos os tipos</option>
+          <option value="image">Imagens</option>
+          <option value="video">Vídeos</option>
+          <option value="logo">Logos</option>
+          <option value="background">Fundos</option>
+          <option value="product-image">Produtos</option>
+          <option value="other">Outros</option>
+        </select>}
+      </div>
+
+      {libraryTab === "playback" && <section className="upload-panel" ref={mediaEditorRef}>
         <div className="upload-preview-box">
           {form.preview ? (
             <>
@@ -8567,13 +8599,13 @@ function ClientMediaPage({ client, access = getClientPlanAccess(client) }) {
             </button>
           </div>
         </div>
-      </section>
+      </section>}
 
       <section className="cards-grid media-list">
-        {mediaList.length === 0 ? (
-          <div className="empty-library">Nenhuma mídia cadastrada ainda.</div>
+        {visibleMediaList.length === 0 ? (
+          <div className="empty-library">{libraryTab === "resources" ? "Nenhum recurso de template cadastrado." : "Nenhuma mídia de reprodução cadastrada."}</div>
         ) : (
-          mediaList.map((media) => (
+          visibleMediaList.map((media) => (
             <div className="media-card" key={media.id}>
               <div className="media-preview">
                 <UniversalPreview item={media} compact={false} />
@@ -9341,8 +9373,9 @@ function ClientPlaylistsPage({ client, access = getClientPlanAccess(client), isA
   );
   const availableLegacyTemplates = availableTemplates.filter((template) => !isTemplateV2(template));
   const availableV2Templates = availableTemplates.filter(isTemplateV2);
-  const landscapeMedia = mediaList.filter((media) => getPreviewAspectClass(media) !== "portrait");
-  const portraitMedia = mediaList.filter((media) => getPreviewAspectClass(media) === "portrait");
+  const playbackMedia = mediaList.filter(isPlaybackMedia);
+  const landscapeMedia = playbackMedia.filter((media) => getPreviewAspectClass(media) !== "portrait");
+  const portraitMedia = playbackMedia.filter((media) => getPreviewAspectClass(media) === "portrait");
   const landscapeTemplates = availableLegacyTemplates.filter((template) => getPreviewAspectClass(template) !== "portrait");
   const portraitTemplates = availableLegacyTemplates.filter((template) => getPreviewAspectClass(template) === "portrait");
   const landscapeV2Templates = availableV2Templates.filter((template) => getPreviewAspectClass(template) !== "portrait");
@@ -9693,7 +9726,7 @@ function ClientPlaylistsPage({ client, access = getClientPlanAccess(client), isA
           </div>
 
           <div className="media-selector grouped">
-            {mediaList.length === 0 ? (
+            {playbackMedia.length === 0 ? (
               <div className="empty-library">
                 Cadastre mídias primeiro.
               </div>

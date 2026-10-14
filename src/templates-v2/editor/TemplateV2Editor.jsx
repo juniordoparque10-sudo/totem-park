@@ -34,6 +34,7 @@ import SportsV2EditorFields from "../sports-v2/SportsV2EditorFields";
 import { getSportsV2Timing, normalizeSportsV2Config, SPORTS_V2_MODES } from "../sports-v2/config";
 import { normalizeTemplateV2Orientation } from "../orientation";
 import { getConfiguredTemplateWeatherCity } from "../weather-city";
+import { classifyTemplateUpload, isTemplateResource } from "../../media-library-purpose";
 
 function safeFileName(name = "asset") { return name.normalize("NFD").replace(/[\u0300-\u036f]/g, "").replace(/[^a-zA-Z0-9._-]+/g, "-"); }
 function revision(prefix) { return `${prefix}-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`; }
@@ -95,6 +96,7 @@ export default function TemplateV2Editor({ client, access, entitlement = { allow
   const sportsDraft = activeType === SPORTS_PREMIUM_TYPE ? normalizeSportsV2Config(draftState.editorDraft.sports) : null;
   const previewTemplate = selected || createTemplateV2Document({ name, type: activeType });
   const previewDynamicData = useTemplateV2DynamicData(draftState.editorDraft, { loadWeather, loadNews });
+  const reusableMediaList = useMemo(() => [...mediaList].sort((left, right) => Number(isTemplateResource(right)) - Number(isTemplateResource(left))), [mediaList]);
 
   useEffect(() => {
     const stopTemplates = onSnapshot(collection(db, "clients", client.id, "templates"), (snapshot) => {
@@ -244,7 +246,9 @@ export default function TemplateV2Editor({ client, access, entitlement = { allow
         title: file.name.replace(/\.[^.]+$/, ""), type: kind === "video" ? "Vídeo" : "Imagem", contentType: file.type,
         preview: result.publicUrl || result.url, publicUrl: result.publicUrl || result.url, url: result.publicUrl || result.url,
         storagePath: result.storagePath || storagePath, storageProvider: result.storageProvider || "firebase", storageKey: result.storageKey || result.storagePath || storagePath,
-        fileHash: result.fileHash || "", etag: result.etag || "", sizeBytes: file.size, duration: 15, sound: kind === "video", createdAt: serverTimestamp(), updatedAt: serverTimestamp(),
+        fileHash: result.fileHash || "", etag: result.etag || "", sizeBytes: file.size, duration: 15, sound: kind === "video",
+        ...classifyTemplateUpload({ targetPath, contentType: file.type }),
+        createdAt: serverTimestamp(), updatedAt: serverTimestamp(),
       };
       const created = await addDoc(collection(db, "clients", client.id, "media"), mediaDoc);
       draftState.update(targetPath, mediaDocumentToTemplateAsset({ id: created.id, ...mediaDoc }));
@@ -309,10 +313,10 @@ export default function TemplateV2Editor({ client, access, entitlement = { allow
             </div>
           </Section>}
           <Section sectionId="media" icon={<Image />} title="Mídia" open={openSections.media} onToggle={toggleSection}>
-            <TemplateV2MediaField label="Logo" value={draftState.editorDraft.content.logo} mediaList={mediaList.filter((item) => !String(item.type || item.contentType).toLowerCase().includes("video"))} onChange={(value) => draftState.update("content.logo", value)} onUpload={(file, event) => uploadMedia(file, event, "content.logo")} uploading={uploading} accept="image/*" />
-            <TemplateV2MediaField label="Mídia principal" value={draftState.editorDraft.media.primary} mediaList={mediaList} onChange={(value) => draftState.update("media.primary", value)} onUpload={(file, event) => uploadMedia(file, event, "media.primary")} uploading={uploading} imagesOnly accept="image/*" />
-            {sportsDraft && !["motorsport","combat"].includes(sportsDraft.selectedSport) && <><TemplateV2MediaField label="Escudo / logo mandante" value={sportsDraft.items[sportsDraft.selectedSport].homeLogo} mediaList={mediaList} onChange={(value) => draftState.update(`sports.items.${sportsDraft.selectedSport}.homeLogo`, value)} onUpload={(file,event)=>uploadMedia(file,event,`sports.items.${sportsDraft.selectedSport}.homeLogo`)} uploading={uploading} imagesOnly accept="image/*"/><TemplateV2MediaField label="Escudo / logo visitante" value={sportsDraft.items[sportsDraft.selectedSport].awayLogo} mediaList={mediaList} onChange={(value) => draftState.update(`sports.items.${sportsDraft.selectedSport}.awayLogo`, value)} onUpload={(file,event)=>uploadMedia(file,event,`sports.items.${sportsDraft.selectedSport}.awayLogo`)} uploading={uploading} imagesOnly accept="image/*"/></>}
-            {sportsDraft?.selectedSport === "combat" && <><TemplateV2MediaField label="Imagem do atleta A" value={sportsDraft.items.combat.fighterAImage} mediaList={mediaList} onChange={(value)=>draftState.update("sports.items.combat.fighterAImage",value)} onUpload={(file,event)=>uploadMedia(file,event,"sports.items.combat.fighterAImage")} uploading={uploading} imagesOnly accept="image/*"/><TemplateV2MediaField label="Imagem do atleta B" value={sportsDraft.items.combat.fighterBImage} mediaList={mediaList} onChange={(value)=>draftState.update("sports.items.combat.fighterBImage",value)} onUpload={(file,event)=>uploadMedia(file,event,"sports.items.combat.fighterBImage")} uploading={uploading} imagesOnly accept="image/*"/></>}
+            <TemplateV2MediaField label="Logo" value={draftState.editorDraft.content.logo} mediaList={reusableMediaList.filter((item) => !String(item.type || item.contentType).toLowerCase().includes("video"))} onChange={(value) => draftState.update("content.logo", value)} onUpload={(file, event) => uploadMedia(file, event, "content.logo")} uploading={uploading} accept="image/*" />
+            <TemplateV2MediaField label="Mídia principal" value={draftState.editorDraft.media.primary} mediaList={reusableMediaList} onChange={(value) => draftState.update("media.primary", value)} onUpload={(file, event) => uploadMedia(file, event, "media.primary")} uploading={uploading} imagesOnly accept="image/*" />
+            {sportsDraft && !["motorsport","combat"].includes(sportsDraft.selectedSport) && <><TemplateV2MediaField label="Escudo / logo mandante" value={sportsDraft.items[sportsDraft.selectedSport].homeLogo} mediaList={reusableMediaList} onChange={(value) => draftState.update(`sports.items.${sportsDraft.selectedSport}.homeLogo`, value)} onUpload={(file,event)=>uploadMedia(file,event,`sports.items.${sportsDraft.selectedSport}.homeLogo`)} uploading={uploading} imagesOnly accept="image/*"/><TemplateV2MediaField label="Escudo / logo visitante" value={sportsDraft.items[sportsDraft.selectedSport].awayLogo} mediaList={reusableMediaList} onChange={(value) => draftState.update(`sports.items.${sportsDraft.selectedSport}.awayLogo`, value)} onUpload={(file,event)=>uploadMedia(file,event,`sports.items.${sportsDraft.selectedSport}.awayLogo`)} uploading={uploading} imagesOnly accept="image/*"/></>}
+            {sportsDraft?.selectedSport === "combat" && <><TemplateV2MediaField label="Imagem do atleta A" value={sportsDraft.items.combat.fighterAImage} mediaList={reusableMediaList} onChange={(value)=>draftState.update("sports.items.combat.fighterAImage",value)} onUpload={(file,event)=>uploadMedia(file,event,"sports.items.combat.fighterAImage")} uploading={uploading} imagesOnly accept="image/*"/><TemplateV2MediaField label="Imagem do atleta B" value={sportsDraft.items.combat.fighterBImage} mediaList={reusableMediaList} onChange={(value)=>draftState.update("sports.items.combat.fighterBImage",value)} onUpload={(file,event)=>uploadMedia(file,event,"sports.items.combat.fighterBImage")} uploading={uploading} imagesOnly accept="image/*"/></>}
             <div className="tpv2-inline-fields"><label>Ajuste<select value={draftState.editorDraft.style.mediaFit} onChange={(event) => draftState.update("style.mediaFit", event.target.value)}><option value="cover">Preencher</option><option value="contain">Ajustar</option></select></label><label>Posição<select value={draftState.editorDraft.style.mediaPosition} onChange={(event) => draftState.update("style.mediaPosition", event.target.value)}><option value="center">Centro</option><option value="top">Topo</option><option value="bottom">Base</option><option value="left">Esquerda</option><option value="right">Direita</option></select></label></div>
           </Section>
           <Section sectionId="appearance" icon={<Palette />} title="Aparência" open={openSections.appearance} onToggle={toggleSection}>
