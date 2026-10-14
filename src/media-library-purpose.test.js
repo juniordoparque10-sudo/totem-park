@@ -4,6 +4,7 @@ import assert from "node:assert/strict";
 import {
   classifyTemplateUpload,
   getMediaLibraryPurpose,
+  getTemplateEditorResources,
   getTemplateResourceType,
   filterTemplateResources,
   isPlaybackMedia,
@@ -16,6 +17,20 @@ test("legacy media remains playable while explicit resources stay out of playbac
   assert.equal(isPlaybackMedia({ libraryPurpose: "playback" }), true);
   assert.equal(isTemplateResource({ libraryPurpose: "template-resource" }), true);
   assert.equal(isPlaybackMedia({ libraryPurpose: "template-resource" }), false);
+});
+
+test("V2 editor selectors expose only suitable template resources", () => {
+  const items = [
+    { id: "legacy", contentType: "image/png" },
+    { id: "logo", libraryPurpose: "template-resource", resourceType: "logo" },
+    { id: "background", libraryPurpose: "template-resource", resourceType: "background" },
+    { id: "image", libraryPurpose: "template-resource", resourceType: "image" },
+    { id: "video", libraryPurpose: "template-resource", resourceType: "video" },
+  ];
+
+  assert.deepEqual(getTemplateEditorResources(items, "logo").map(({ id }) => id), ["logo", "background", "image"]);
+  assert.deepEqual(getTemplateEditorResources(items, "primary").map(({ id }) => id), ["background", "image"]);
+  assert.deepEqual(getTemplateEditorResources(items, "image").map(({ id }) => id), ["logo", "background", "image"]);
 });
 
 test("resource filters keep only template assets of the requested kind", () => {

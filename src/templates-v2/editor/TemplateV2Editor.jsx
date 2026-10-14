@@ -34,7 +34,7 @@ import SportsV2EditorFields from "../sports-v2/SportsV2EditorFields";
 import { getSportsV2Timing, normalizeSportsV2Config, SPORTS_V2_MODES } from "../sports-v2/config";
 import { normalizeTemplateV2Orientation } from "../orientation";
 import { getConfiguredTemplateWeatherCity } from "../weather-city";
-import { classifyTemplateUpload, isTemplateResource } from "../../media-library-purpose";
+import { classifyTemplateUpload, getTemplateEditorResources, isTemplateResource } from "../../media-library-purpose";
 
 function safeFileName(name = "asset") { return name.normalize("NFD").replace(/[\u0300-\u036f]/g, "").replace(/[^a-zA-Z0-9._-]+/g, "-"); }
 function revision(prefix) { return `${prefix}-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`; }
@@ -96,7 +96,9 @@ export default function TemplateV2Editor({ client, access, entitlement = { allow
   const sportsDraft = activeType === SPORTS_PREMIUM_TYPE ? normalizeSportsV2Config(draftState.editorDraft.sports) : null;
   const previewTemplate = selected || createTemplateV2Document({ name, type: activeType });
   const previewDynamicData = useTemplateV2DynamicData(draftState.editorDraft, { loadWeather, loadNews });
-  const reusableMediaList = useMemo(() => [...mediaList].sort((left, right) => Number(isTemplateResource(right)) - Number(isTemplateResource(left))), [mediaList]);
+  const logoResources = useMemo(() => getTemplateEditorResources(mediaList, "logo"), [mediaList]);
+  const primaryResources = useMemo(() => getTemplateEditorResources(mediaList, "primary"), [mediaList]);
+  const imageResources = useMemo(() => getTemplateEditorResources(mediaList, "image"), [mediaList]);
 
   useEffect(() => {
     const stopTemplates = onSnapshot(collection(db, "clients", client.id, "templates"), (snapshot) => {
@@ -256,6 +258,26 @@ export default function TemplateV2Editor({ client, access, entitlement = { allow
     } catch (error) { console.error(error); setMessage("Falha ao enviar a mídia."); } finally { setUploading(false); }
   }
 
+  async function classifyExistingMedia(mediaId, targetPath) {
+    if (!mediaId) return;
+    const existing = mediaList.find((item) => item.id === mediaId);
+    if (!existing || isTemplateResource(existing)) return;
+    if (access?.canEditTemplates === false) { setMessage("Seu plano não permite editar templates."); return; }
+    setSaving(true); setMessage("");
+    try {
+      await updateDoc(doc(db, "clients", client.id, "media", mediaId), {
+        ...classifyTemplateUpload({ targetPath, contentType: existing.contentType || "" }),
+        updatedAt: serverTimestamp(),
+      });
+      setMessage("Arquivo classificado como Recurso das Templates.");
+    } catch (error) { console.error(error); setMessage("Não foi possível classificar o arquivo."); } finally { setSaving(false); }
+  }
+
+  const isLegacySelectedMedia = (value) => {
+    const selectedMedia = value?.mediaId ? mediaList.find((item) => item.id === value.mediaId) : null;
+    return Boolean(selectedMedia && !isTemplateResource(selectedMedia));
+  };
+
   const updateService = (index, field, value) => {
     const services = structuredClone(draftState.editorDraft.content.services || []);
     services[index] = { ...(services[index] || {}), [field]: value };
@@ -313,10 +335,10 @@ export default function TemplateV2Editor({ client, access, entitlement = { allow
             </div>
           </Section>}
           <Section sectionId="media" icon={<Image />} title="Mídia" open={openSections.media} onToggle={toggleSection}>
-            <TemplateV2MediaField label="Logo" value={draftState.editorDraft.content.logo} mediaList={reusableMediaList.filter((item) => !String(item.type || item.contentType).toLowerCase().includes("video"))} onChange={(value) => draftState.update("content.logo", value)} onUpload={(file, event) => uploadMedia(file, event, "content.logo")} uploading={uploading} accept="image/*" />
-            <TemplateV2MediaField label="Mídia principal" value={draftState.editorDraft.media.primary} mediaList={reusableMediaList} onChange={(value) => draftState.update("media.primary", value)} onUpload={(file, event) => uploadMedia(file, event, "media.primary")} uploading={uploading} imagesOnly accept="image/*" />
-            {sportsDraft && !["motorsport","combat"].includes(sportsDraft.selectedSport) && <><TemplateV2MediaField label="Escudo / logo mandante" value={sportsDraft.items[sportsDraft.selectedSport].homeLogo} mediaList={reusableMediaList} onChange={(value) => draftState.update(`sports.items.${sportsDraft.selectedSport}.homeLogo`, value)} onUpload={(file,event)=>uploadMedia(file,event,`sports.items.${sportsDraft.selectedSport}.homeLogo`)} uploading={uploading} imagesOnly accept="image/*"/><TemplateV2MediaField label="Escudo / logo visitante" value={sportsDraft.items[sportsDraft.selectedSport].awayLogo} mediaList={reusableMediaList} onChange={(value) => draftState.update(`sports.items.${sportsDraft.selectedSport}.awayLogo`, value)} onUpload={(file,event)=>uploadMedia(file,event,`sports.items.${sportsDraft.selectedSport}.awayLogo`)} uploading={uploading} imagesOnly accept="image/*"/></>}
-            {sportsDraft?.selectedSport === "combat" && <><TemplateV2MediaField label="Imagem do atleta A" value={sportsDraft.items.combat.fighterAImage} mediaList={reusableMediaList} onChange={(value)=>draftState.update("sports.items.combat.fighterAImage",value)} onUpload={(file,event)=>uploadMedia(file,event,"sports.items.combat.fighterAImage")} uploading={uploading} imagesOnly accept="image/*"/><TemplateV2MediaField label="Imagem do atleta B" value={sportsDraft.items.combat.fighterBImage} mediaList={reusableMediaList} onChange={(value)=>draftState.update("sports.items.combat.fighterBImage",value)} onUpload={(file,event)=>uploadMedia(file,event,"sports.items.combat.fighterBImage")} uploading={uploading} imagesOnly accept="image/*"/></>}
+            <TemplateV2MediaField label="Logo" value={draftState.editorDraft.content.logo} mediaList={logoResources} onChange={(value) => draftState.update("content.logo", value)} onUpload={(file, event) => uploadMedia(file, event, "content.logo")} uploading={uploading} accept="image/*" canClassifyLegacy={isLegacySelectedMedia(draftState.editorDraft.content.logo)} onClassifyLegacy={() => classifyExistingMedia(draftState.editorDraft.content.logo?.mediaId, "content.logo")} />
+            <TemplateV2MediaField label="Mídia principal" value={draftState.editorDraft.media.primary} mediaList={primaryResources} onChange={(value) => draftState.update("media.primary", value)} onUpload={(file, event) => uploadMedia(file, event, "media.primary")} uploading={uploading} imagesOnly accept="image/*" canClassifyLegacy={isLegacySelectedMedia(draftState.editorDraft.media.primary)} onClassifyLegacy={() => classifyExistingMedia(draftState.editorDraft.media.primary?.mediaId, "media.primary")} />
+            {sportsDraft && !["motorsport","combat"].includes(sportsDraft.selectedSport) && <><TemplateV2MediaField label="Escudo / logo mandante" value={sportsDraft.items[sportsDraft.selectedSport].homeLogo} mediaList={imageResources} onChange={(value) => draftState.update(`sports.items.${sportsDraft.selectedSport}.homeLogo`, value)} onUpload={(file,event)=>uploadMedia(file,event,`sports.items.${sportsDraft.selectedSport}.homeLogo`)} uploading={uploading} imagesOnly accept="image/*"/><TemplateV2MediaField label="Escudo / logo visitante" value={sportsDraft.items[sportsDraft.selectedSport].awayLogo} mediaList={imageResources} onChange={(value) => draftState.update(`sports.items.${sportsDraft.selectedSport}.awayLogo`, value)} onUpload={(file,event)=>uploadMedia(file,event,`sports.items.${sportsDraft.selectedSport}.awayLogo`)} uploading={uploading} imagesOnly accept="image/*"/></>}
+            {sportsDraft?.selectedSport === "combat" && <><TemplateV2MediaField label="Imagem do atleta A" value={sportsDraft.items.combat.fighterAImage} mediaList={imageResources} onChange={(value)=>draftState.update("sports.items.combat.fighterAImage",value)} onUpload={(file,event)=>uploadMedia(file,event,"sports.items.combat.fighterAImage")} uploading={uploading} imagesOnly accept="image/*"/><TemplateV2MediaField label="Imagem do atleta B" value={sportsDraft.items.combat.fighterBImage} mediaList={imageResources} onChange={(value)=>draftState.update("sports.items.combat.fighterBImage",value)} onUpload={(file,event)=>uploadMedia(file,event,"sports.items.combat.fighterBImage")} uploading={uploading} imagesOnly accept="image/*"/></>}
             <div className="tpv2-inline-fields"><label>Ajuste<select value={draftState.editorDraft.style.mediaFit} onChange={(event) => draftState.update("style.mediaFit", event.target.value)}><option value="cover">Preencher</option><option value="contain">Ajustar</option></select></label><label>Posição<select value={draftState.editorDraft.style.mediaPosition} onChange={(event) => draftState.update("style.mediaPosition", event.target.value)}><option value="center">Centro</option><option value="top">Topo</option><option value="bottom">Base</option><option value="left">Esquerda</option><option value="right">Direita</option></select></label></div>
           </Section>
           <Section sectionId="appearance" icon={<Palette />} title="Aparência" open={openSections.appearance} onToggle={toggleSection}>

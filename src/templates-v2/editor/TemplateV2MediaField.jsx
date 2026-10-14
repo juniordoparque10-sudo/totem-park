@@ -1,10 +1,10 @@
 import { Image, Upload, Video, X } from "lucide-react";
 import { mediaDocumentToTemplateAsset } from "./media-utils";
 
-export default function TemplateV2MediaField({ label, value, mediaList, onChange, onUpload, uploading, accept = "image/*", imagesOnly = false }) {
+export default function TemplateV2MediaField({ label, value, mediaList, onChange, onUpload, uploading, accept = "image/*", imagesOnly = false, canClassifyLegacy = false, onClassifyLegacy }) {
   return (
     <div className="tpv2-media-field">
-      <div className="tpv2-field-heading"><strong>{label}</strong><span>Biblioteca oficial de mídias</span></div>
+      <div className="tpv2-field-heading"><strong>{label}</strong><span>Recursos das Templates</span></div>
       {value?.url ? (
         <div className="tpv2-selected-media">
           {value.type === "video" ? <video src={value.url} muted /> : <img src={value.url} alt="" />}
@@ -12,6 +12,8 @@ export default function TemplateV2MediaField({ label, value, mediaList, onChange
           <button type="button" onClick={() => onChange(null)} title="Desvincular mídia"><X /></button>
         </div>
       ) : <div className="tpv2-media-empty"><Image /><span>Nenhuma mídia vinculada</span></div>}
+
+      {canClassifyLegacy && <button type="button" className="tpv2-classify-resource" onClick={onClassifyLegacy}>Classificar arquivo atual como recurso</button>}
 
       <div className="tpv2-media-library">
         {mediaList.map((media) => {

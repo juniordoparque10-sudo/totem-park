@@ -51,3 +51,19 @@ export function filterTemplateResources(items = [], resourceType = "all") {
     && (resourceType === "all" || getTemplateResourceType(item) === resourceType)
   ));
 }
+
+export function getTemplateEditorResources(items = [], field = "image") {
+  const allowedTypes = field === "primary"
+    ? new Set(["background", "image", "product-image"])
+    : new Set(["logo", "background", "image", "product-image"]);
+  const priorities = field === "logo"
+    ? { logo: 0, background: 1, image: 2, "product-image": 3 }
+    : field === "primary"
+      ? { background: 0, image: 1, "product-image": 2 }
+      : { logo: 0, background: 1, image: 2, "product-image": 3 };
+
+  return items
+    .filter(isTemplateResource)
+    .filter((item) => allowedTypes.has(getTemplateResourceType(item)))
+    .sort((left, right) => priorities[getTemplateResourceType(left)] - priorities[getTemplateResourceType(right)]);
+}

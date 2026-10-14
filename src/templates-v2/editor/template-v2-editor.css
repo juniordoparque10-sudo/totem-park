@@ -147,3 +147,4 @@
 /* Keep published template choices inside the workspace at every viewport width. */
 .tpv2-template-tabs{display:grid;grid-template-columns:repeat(auto-fit,minmax(min(100%,190px),1fr));gap:10px;width:100%;min-width:0;max-width:100%;overflow:visible}
 .tpv2-template-tabs button{width:100%;min-width:0;max-width:100%;box-sizing:border-box;overflow-wrap:anywhere}
+.tpv2-classify-resource{min-height:36px;border:1px solid rgba(103,232,249,.25);border-radius:10px;color:#67e8f9;background:transparent;cursor:pointer}
