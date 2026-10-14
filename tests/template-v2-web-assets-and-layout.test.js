@@ -8,6 +8,9 @@ const editor = fs.readFileSync(new URL("../src/templates-v2/editor/TemplateV2Edi
 const css = fs.readFileSync(new URL("../src/templates-v2/editor/template-v2-editor.css", import.meta.url), "utf8");
 const rendererCss = fs.readFileSync(new URL("../src/templates-v2/template-v2.css", import.meta.url), "utf8");
 const app = fs.readFileSync(new URL("../src/App.jsx", import.meta.url), "utf8");
+const appCss = fs.readFileSync(new URL("../src/App.css", import.meta.url), "utf8");
+const sportsRenderer = fs.readFileSync(new URL("../src/templates-v2/sports-v2/SportsPremiumRenderer.jsx", import.meta.url), "utf8");
+const sportsControlsCss = fs.readFileSync(new URL("../src/templates-v2/sports-v2/sports-v2-controls.css", import.meta.url), "utf8");
 
 test("Player Web resolves logo assets through the same resolver as backgrounds", () => {
   assert.match(modules, /const assetUrl = getTemplateV2ImageAssetUrl\(asset\)/);
@@ -44,4 +47,17 @@ test("overlay affects the full image in landscape and portrait", () => {
 test("client snapshot refresh preserves screen rows instead of rebuilding the list", () => {
   assert.doesNotMatch(app, /setScreensData\(\[\]\);\s*setPlaylistsData\(\[\]\)/);
   assert.match(app, /setScreensData\(\(previous\) => previous\.filter\(\(screen\) => activeClientIds\.has\(screen\.clientId\)\)\)/);
+});
+
+test("V2 content can shrink without changing the portal sidebar width", () => {
+  assert.match(appCss, /\.content:has\(\.templates-library-tabs\)\s*\{[^}]*min-width:\s*0/);
+  assert.match(appCss, /\.layout:has\(\.templates-library-tabs\)\s*>\s*\.sidebar\s*\{[^}]*flex-shrink:\s*0/);
+  assert.doesNotMatch(appCss, /\.content:has\(\.templates-library-tabs\)\s*\{[^}]*overflow-x:\s*(?:hidden|clip)/);
+});
+
+test("sports renderer maps overlay and panel transparency to valid alpha values", () => {
+  assert.match(sportsRenderer, /overlayAlpha[\s\S]*?\/\s*100/);
+  assert.match(sportsRenderer, /panelAlpha[\s\S]*?\/\s*100/);
+  assert.match(sportsControlsCss, /opacity:\s*var\(--sports-v2-overlay\)/);
+  assert.match(sportsControlsCss, /rgba\(5, 12, 25, var\(--sports-v2-panel-alpha\)\)/);
 });

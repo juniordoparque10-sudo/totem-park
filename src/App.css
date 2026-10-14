@@ -14171,8 +14171,13 @@ button.premium-stat-card{width:100%;font:inherit;text-align:left;color:inherit;c
 
 /* Hotfix de homologacao: editor com preview sempre visivel e sem overflow. */
 .content:has(.templates-library-tabs) {
-  overflow-x: clip;
+  min-width: 0;
+  max-width: 100%;
   overflow-y: visible;
+}
+
+.layout:has(.templates-library-tabs) > .sidebar {
+  flex-shrink: 0;
 }
 
 .content:has(.templates-library-tabs) .tpv2-workspace,

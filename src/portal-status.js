@@ -98,13 +98,13 @@ export function createPortalScreenOrderTracker() {
       untracked.sort((left, right) => compareScreenNames(left, right));
       untracked.forEach((screen) => {
         const id = String(screen?.id || "");
-        const online = getPortalScreenStatus(screen, now) === "ONLINE";
+        const online = getPortalScreenStatus(screen, now) !== "OFFLINE";
         records.set(id, { online, onlineOrder: online ? ++sequence : 0, stableOrder:++sequence });
       });
 
       screens.forEach((screen) => {
         const record = records.get(String(screen?.id || ""));
-        const online = getPortalScreenStatus(screen, now) === "ONLINE";
+        const online = getPortalScreenStatus(screen, now) !== "OFFLINE";
         if (online && !record.online) record.onlineOrder = ++sequence;
         record.online = online;
       });

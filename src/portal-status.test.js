@@ -112,3 +112,19 @@ test("dashboard screen order remains stable across heartbeats and appends reconn
   a.lastSeenAt = now + 1_000;
   assert.deepEqual(tracker.sort([a,b,c], now + 2_000).map(({ id }) => id), ["b","a","c"]);
 });
+
+test("attention interval does not count as an offline transition for stable ordering", () => {
+  const now = 1_000_000;
+  const tracker = createPortalScreenOrderTracker();
+  const first = { id:"first", connectedDeviceId:"a", lastSeenAt:now - 5_000 };
+  const second = { id:"second", connectedDeviceId:"b", lastSeenAt:now - 10_000 };
+  assert.deepEqual(tracker.sort([first,second], now).map(({ id }) => id), ["first","second"]);
+  first.lastSeenAt = now - 60_000;
+  assert.deepEqual(tracker.sort([second,first], now).map(({ id }) => id), ["first","second"]);
+  first.lastSeenAt = now + 1_000;
+  assert.deepEqual(tracker.sort([second,first], now + 2_000).map(({ id }) => id), ["first","second"]);
+  first.lastSeenAt = now - 100_000;
+  assert.deepEqual(tracker.sort([first,second], now).map(({ id }) => id), ["second","first"]);
+  first.lastSeenAt = now + 3_000;
+  assert.deepEqual(tracker.sort([first,second], now + 4_000).map(({ id }) => id), ["second","first"]);
+});
