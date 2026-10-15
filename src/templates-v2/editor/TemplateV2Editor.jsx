@@ -138,7 +138,7 @@ export default function TemplateV2Editor({ client, access, entitlement = { allow
     const linkedIds = new Set(linkedPlaylists.map((playlist) => playlist.id));
     const scheduledIds = new Set(linkedPlaylists.flatMap((playlist) => playlist.targetScreenIds || []));
     const linkedScreens = screens.filter((screen) => linkedIds.has(screen.playlistId) || scheduledIds.has(screen.id));
-    return getDynamicPlaylistCapability([{ templateType:type }], linkedScreens);
+    return getDynamicPlaylistCapability([{ templateType:type,dynamicTemplate:item?.draft?.dynamicTemplate === true || item?.published?.dynamicTemplate === true || draftState.editorDraft?.dynamicTemplate === true }], linkedScreens);
   }
 
   async function saveDraft() {

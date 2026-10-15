@@ -215,6 +215,9 @@ export function getTemplateV2Assets(config = {}) {
   (config.market?.catalog || []).forEach((product) => {
     if (product?.image) candidates.push([`market.product.${product.id || "item"}`, product.image]);
   });
+  [["smartLobby",config.smartLobby?.items],["agenda",config.agenda?.items],["campaign",config.campaign?.items],["digitalMenu",config.digitalMenu?.products],["kpi",config.kpi?.items],["interaction",config.interaction?.items]].forEach(([group,items]) => {
+    (items || []).forEach((item) => { if (item?.image) candidates.push([`${group}.item.${item.id || "item"}`,item.image]); });
+  });
 
   const seen = new Set();
   candidates.forEach(([role, asset]) => {

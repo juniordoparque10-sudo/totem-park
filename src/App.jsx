@@ -205,7 +205,7 @@ import { getTemplateV2Orientation } from "./templates-v2/orientation";
 import { getTemplateV2ForecastRequestDays, normalizeTemplateV2ForecastDays } from "./templates-v2/dynamic-data";
 import { normalizeDynamicNewsItems } from "./templates-v2/news-editorial-dynamic/data";
 import { getTemplatesV2ScreenCapability } from "./templates-v2/player-capability";
-import { getDynamicPlaylistCapability, isDynamicTemplateV2Type } from "./templates-v2/playlist-capability";
+import { getDynamicPlaylistCapability } from "./templates-v2/playlist-capability";
 import logo from "./assets/logo.png";
 import isotipo from "./assets/isotipo.png";
 import "./App.css";
@@ -9430,8 +9430,8 @@ function ClientPlaylistsPage({ client, access = getClientPlanAccess(client), isA
   function renderSelectableTemplateCard(template) {
     const templateV2 = isTemplateV2(template);
     const templateType = template.identity?.templateType || template.templateType || template.type;
-    const dynamicCapability = getDynamicPlaylistCapability([{ templateType }], playlistLinkedScreens);
-    const awaitingPlayerUpdate = templateV2 && (isDynamicTemplateV2Type(templateType) ? !dynamicCapability.allowed : !templatesV2PlayerCapability.allowed);
+    const dynamicCapability = getDynamicPlaylistCapability([{ templateType,published:template.published,draft:template.draft,dynamicTemplate:template.dynamicTemplate }], playlistLinkedScreens);
+    const awaitingPlayerUpdate = templateV2 && (dynamicCapability.required ? !dynamicCapability.allowed : !templatesV2PlayerCapability.allowed);
     return (
       <button
         key={template.id}
