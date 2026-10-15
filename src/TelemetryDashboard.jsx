@@ -9,6 +9,7 @@ import { renderTelemetryPdfReport } from "./telemetry-pdf-report";
 import { buildTelemetryActivityPeriods, normalizeTelemetryActivityEvents, summarizeTelemetryActivity } from "./telemetry-activity-history";
 import { formatBytes } from "./format-bytes";
 import totemLogo from "./assets/logo.png";
+import "./telemetry-v2.css";
 
 const EMPTY = "—";
 const fmtBytes = formatBytes;
