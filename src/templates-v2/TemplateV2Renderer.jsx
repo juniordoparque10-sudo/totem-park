@@ -1,7 +1,7 @@
 import { useLayoutEffect, useRef } from "react";
 import { Cloud, CloudLightning, CloudRain, CloudSun, Moon, Snowflake, Sun } from "lucide-react";
 import { TemplateClock, TemplateCTA, TemplateDate, TemplateLogo, TemplateMedia, TemplateNewsTicker, TemplateQRCode, TemplateV2VisualReadyProvider, TemplateWeather } from "./TemplateV2Modules";
-import { CLOCK_PRO_TYPE, HERO_BUSINESS_TYPE, KPI_INDICATORS_TYPE, SPORTS_PREMIUM_TYPE, WEATHER_PREMIUM_TYPE, NEWS_EDITORIAL_DYNAMIC_TYPE, MARKET_PREMIUM_TYPE, SMART_LOBBY_TYPE, AGENDA_INFO_TYPE, PROMOTION_CAMPAIGN_TYPE, DIGITAL_MENU_TYPE, getTemplateV2Name } from "./schema";
+import { CLOCK_PRO_TYPE, HERO_BUSINESS_TYPE, KPI_INDICATORS_TYPE, QR_INTERACTION_TYPE, SPORTS_PREMIUM_TYPE, WEATHER_PREMIUM_TYPE, NEWS_EDITORIAL_DYNAMIC_TYPE, MARKET_PREMIUM_TYPE, SMART_LOBBY_TYPE, AGENDA_INFO_TYPE, PROMOTION_CAMPAIGN_TYPE, DIGITAL_MENU_TYPE, getTemplateV2Name } from "./schema";
 import SportsPremiumRenderer from "./sports-v2/SportsPremiumRenderer";
 import NewsEditorialDynamicRenderer from "./news-editorial-dynamic/NewsEditorialDynamicRenderer";
 import MarketPremiumRenderer from "./market-premium/MarketPremiumRenderer";
@@ -9,6 +9,8 @@ import SmartLobbyRenderer from "./smart-lobby/SmartLobbyRenderer";
 import AgendaInfoRenderer from "./agenda-info/AgendaInfoRenderer";
 import PromotionCampaignRenderer from "./promotion-campaign/PromotionCampaignRenderer";
 import DigitalMenuRenderer from "./digital-menu/DigitalMenuRenderer";
+import KpiIndicatorsRenderer from "./kpi-indicators/KpiIndicatorsRenderer";
+import QrInteractionRenderer from "./qr-interaction/QrInteractionRenderer";
 import { reportTemplateRenderDiagnostics } from "./render-diagnostics";
 import { getConfiguredTemplateWeatherCity } from "./weather-city";
 import { selectTemplateV2ForecastDays } from "./dynamic-data";
@@ -167,6 +169,8 @@ export default function TemplateV2Renderer({ template, config, orientation, comp
   else if (type === AGENDA_INFO_TYPE) content = <AgendaInfoRenderer config={resolvedConfig} orientation={resolvedOrientation} name={getTemplateV2Name(template)} mode={mode} playbackExecutionId={playbackExecutionId} effectiveDurationSeconds={effectiveDurationSeconds}/>;
   else if (type === PROMOTION_CAMPAIGN_TYPE) content = <PromotionCampaignRenderer config={resolvedConfig} orientation={resolvedOrientation} name={getTemplateV2Name(template)} mode={mode} playbackExecutionId={playbackExecutionId} effectiveDurationSeconds={effectiveDurationSeconds}/>;
   else if (type === DIGITAL_MENU_TYPE) content = <DigitalMenuRenderer config={resolvedConfig} orientation={resolvedOrientation} name={getTemplateV2Name(template)} mode={mode} playbackExecutionId={playbackExecutionId} effectiveDurationSeconds={effectiveDurationSeconds}/>;
+  else if (type === KPI_INDICATORS_TYPE) content = <KpiIndicatorsRenderer config={resolvedConfig} orientation={resolvedOrientation} name={getTemplateV2Name(template)} mode={mode} playbackExecutionId={playbackExecutionId} effectiveDurationSeconds={effectiveDurationSeconds}/>;
+  else if (type === QR_INTERACTION_TYPE) content = <QrInteractionRenderer config={resolvedConfig} orientation={resolvedOrientation} name={getTemplateV2Name(template)} mode={mode} playbackExecutionId={playbackExecutionId} effectiveDurationSeconds={effectiveDurationSeconds}/>;
   else content = <HeroBusiness config={resolvedConfig} orientation={resolvedOrientation} name={getTemplateV2Name(template)} compact={compact} tv={tv} type={type} dynamicData={dynamicData} mode={mode} isKpi={type === KPI_INDICATORS_TYPE} />;
   return <TemplateV2VisualReadyProvider value={{ playbackExecutionId, onVisualEvent }}><div className="tpv2-diagnostic-root" ref={diagnosticRootRef}>{content}</div></TemplateV2VisualReadyProvider>;
 }

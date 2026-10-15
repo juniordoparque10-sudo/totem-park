@@ -1,0 +1,3 @@
+import { buildQRCodeValue, getQRCodeValidationError, normalizeQRCodeConfig } from "../../qr-code.js";
+import { normalizeDynamicCollection } from "../dynamic-collections/config.js";
+export function normalizeQrInteractionConfig(value={}) { const normalized=normalizeDynamicCollection({layout:"A",secondarySlots:3,rotation:{featuredSeconds:8,secondarySeconds:5,transition:"fade"},...value},{maxItems:12}); return {...normalized,items:normalized.items.map((item)=>{const qr=normalizeQRCodeConfig(item.qr||item.destination||{}); qr.value=buildQRCodeValue(qr); return {...item,qr};}).filter((item)=>!getQRCodeValidationError(item.qr)&&item.qr.value&&(item.qr.type!=="link"||/^https?:\/\//i.test(item.qr.value)))}; }
