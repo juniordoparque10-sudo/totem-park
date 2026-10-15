@@ -16,13 +16,23 @@ test("quadro estático compacto seleciona destaque e conteúdo secundário", () 
 
 test("Mercado Premium identifica o modo thumbnail e preserva as linhas secundárias", () => {
   assert.match(marketRenderer, /mode\s*===\s*"thumbnail"\s*\?\s*"is-thumbnail"/);
-  assert.match(marketCss, /\.tpv2-market-premium\.is-thumbnail \.market-list\{[^}]*grid-auto-rows:minmax\(0,1fr\)/);
-  assert.match(marketCss, /\.tpv2-market-premium\.is-thumbnail \.market-list article\{[^}]*min-height:0/);
+  assert.match(marketRenderer, /enabled:mode\s*===\s*"player"/);
+  assert.match(marketRenderer, /--secondary-count/);
+  assert.match(marketRenderer, /has-no-secondary/);
+  assert.match(marketCss, /\.market-list\{[^}]*grid-template-rows:repeat\(var\(--secondary-count\),minmax\(0,1fr\)\)/);
+  assert.match(marketCss, /\.market-list article\{[^}]*grid-template-columns:minmax\(7cqw,32%\)/);
+  assert.match(marketCss, /\.market-list img,\.market-image-empty\{[^}]*width:100%[^}]*height:100%/);
+  assert.match(marketCss, /\.tpv2-market-premium\.has-no-secondary main\{[^}]*grid-template-columns:1fr/);
 });
 
 test("Notícias Editorial identifica o modo thumbnail e preserva os cards secundários", () => {
   assert.match(newsRenderer, /mode\s*===\s*"thumbnail"\s*\?\s*"is-thumbnail"/);
+  assert.match(newsRenderer, /enabled:\s*mode\s*===\s*"player"/);
+  assert.match(newsRenderer, /--secondary-count/);
+  assert.match(newsRenderer, /has-no-secondary/);
   assert.match(newsRenderer, /item\.image\s*&&\s*<img/);
-  assert.match(newsCss, /\.tpv2-news-dynamic\.is-thumbnail \.secondary\{[^}]*grid-auto-rows:minmax\(0,1fr\)/);
-  assert.match(newsCss, /\.tpv2-news-dynamic\.is-thumbnail \.secondary article\{[^}]*min-height:0/);
+  assert.match(newsCss, /\.tpv2-news-dynamic \.secondary\{[^}]*grid-template-rows:repeat\(var\(--secondary-count\),minmax\(0,1fr\)\)/);
+  assert.match(newsCss, /\.tpv2-news-dynamic\.layout-C \.secondary\{[^}]*grid-template-columns:repeat\(var\(--secondary-count\),minmax\(0,1fr\)\)/);
+  assert.match(newsCss, /\.tpv2-news-dynamic \.secondary article:has\(>img\)\{[^}]*grid-template-columns:minmax\(8cqw,34%\)/);
+  assert.match(newsCss, /\.tpv2-news-dynamic\.has-no-secondary main\{[^}]*grid-template-columns:1fr/);
 });
