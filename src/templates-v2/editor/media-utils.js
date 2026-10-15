@@ -3,11 +3,29 @@ export function getTemplateV2MediaType(media = {}) {
   return value.includes("video") ? "video" : "image";
 }
 
+export function resolveTemplateV2MediaDocumentUrl(media = {}) {
+  return [
+    media.publicUrl,
+    media.url,
+    media.preview,
+    media.previewUrl,
+    media.thumbnailUrl,
+    media.remotePreview,
+    media.imageUrl,
+    media.downloadURL,
+    media.fileUrl,
+    media.logoUrl,
+    media.marketingArt?.imageUrl,
+    media.marketingArt?.imagePreview,
+    media.templateData?.imageUrl,
+  ].map((value) => String(value || "").trim()).find(Boolean) || "";
+}
+
 export function mediaDocumentToTemplateAsset(media = {}) {
   return {
     mediaId: media.id || "",
     type: getTemplateV2MediaType(media),
-    url: media.publicUrl || media.url || media.preview || media.remotePreview || media.imageUrl || media.downloadURL || media.previewUrl || media.thumbnailUrl || "",
+    url: resolveTemplateV2MediaDocumentUrl(media),
     storagePath: media.storagePath || "",
     storageProvider: media.storageProvider || media.provider || "",
     fileHash: media.fileHash || media.hash || "",
