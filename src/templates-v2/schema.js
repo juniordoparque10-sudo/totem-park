@@ -1,5 +1,7 @@
 import { normalizeTemplateV2Orientation } from "./orientation.js";
 import { normalizeNewsEditorialDynamicConfig } from "./news-editorial-dynamic/config.js";
+import { normalizeSmartLobbyConfig } from "./smart-lobby/config.js";
+import { normalizeAgendaInfoConfig } from "./agenda-info/config.js";
 
 export const TEMPLATE_V2_SCHEMA_VERSION = 2;
 export const TEMPLATE_V2_RENDERER = "template-v2";
@@ -73,13 +75,13 @@ const HERO_DEFAULTS = {
 
 const TEMPLATE_PRESETS = {
   [HERO_BUSINESS_TYPE]: {},
-  [SMART_LOBBY_TYPE]: { content: { headline: "Seja bem-vindo!", subtitle: "Informações e serviços para você.", services: [{ id:"1",title:"Atendimento",description:"Apoio ao visitante"},{id:"2",title:"Serviços",description:"Acesso rápido"},{id:"3",title:"Informações",description:"Comunicados úteis"}] }, style: { preset:"institutional",primaryColor:"#1458c7",secondaryColor:"#38bdf8",backgroundColor:"#eef5ff",textColor:"#102a56",mutedTextColor:"#39577e" } },
+  [SMART_LOBBY_TYPE]: { dynamicTemplate:true,content: { headline: "Seja bem-vindo!", subtitle: "Informações e serviços para você.", services: [] }, style: { preset:"institutional",primaryColor:"#1458c7",secondaryColor:"#38bdf8",backgroundColor:"#eef5ff",textColor:"#102a56",mutedTextColor:"#39577e" },smartLobby:{layout:"A",secondarySlots:3,items:[],rotation:{featuredSeconds:8,secondarySeconds:5,transition:"fade"}} },
   [CLOCK_PRO_TYPE]: { content: { headline:"10:24",subtitle:"Segunda-feira, 22 de Setembro",services:[] }, style: { preset:"ambient",primaryColor:"#fbbf24",secondaryColor:"#fb7185",backgroundColor:"#071426" }, modules:{clock:{enabled:true,format:"24h"},weather:{enabled:true,city:"Sua cidade"},news:{enabled:true,newsSource:"Fonte configurada",newsFeedUrl:"",selectedNewsSources:[]}} },
   [WEATHER_PREMIUM_TYPE]: { content:{headline:"Previsão do tempo",subtitle:"Condições atuais e próximos dias",services:[]},style:{preset:"glass",primaryColor:"#38bdf8",secondaryColor:"#fbbf24",backgroundColor:"#082f49"},modules:{weather:{enabled:true,city:"Sua cidade"}} },
   [NEWS_EDITORIAL_TYPE]: { content:{headline:"Notícia principal",subtitle:"Resumo da informação em destaque.",services:[{id:"1",title:"Notícia secundária",description:"Resumo breve"},{id:"2",title:"Mais informações",description:"Atualização editorial"}]},style:{preset:"editorial",primaryColor:"#dc2626",secondaryColor:"#2563eb",backgroundColor:"#f8fafc",textColor:"#111827",mutedTextColor:"#475569"},modules:{news:{enabled:true,newsSource:"Fonte configurada",newsFeedUrl:"",selectedNewsSources:[]}} },
   [NEWS_EDITORIAL_DYNAMIC_TYPE]: { dynamicTemplate:true,content:{headline:"Notícias em destaque",subtitle:"Atualização editorial dinâmica",services:[]},style:{preset:"editorial-dynamic",primaryColor:"#22d3ee",secondaryColor:"#8b5cf6",backgroundColor:"#07111f",textColor:"#ffffff",mutedTextColor:"#cbd5e1"},modules:{news:{enabled:true,dynamicStrict:true,newsSource:"",newsFeedUrl:"",selectedNewsSources:[]}},dynamicNews:{layout:"A",showImage:true,showSummary:true,showSource:true,showDate:true,secondarySlots:3,rotation:{featuredSeconds:8,secondarySeconds:5,transition:"fade"}} },
   [MARKET_PREMIUM_TYPE]: { dynamicTemplate:true,content:{headline:"Ofertas da semana",subtitle:"Qualidade e economia",services:[]},style:{preset:"market-premium",primaryColor:"#22d3ee",secondaryColor:"#8b5cf6",backgroundColor:"#061426",textColor:"#ffffff",mutedTextColor:"#b8c8df"},market:{layout:"A",segment:"Supermercado",catalog:[],rotation:{featuredSeconds:8,secondarySeconds:5,transition:"fade"}} },
-  [AGENDA_INFO_TYPE]: { content:{headline:"Agenda do dia",subtitle:"Reuniões, eventos e comunicados",services:[{id:"1",title:"09:00",description:"Primeiro compromisso"},{id:"2",title:"14:00",description:"Segundo compromisso"},{id:"3",title:"16:00",description:"Comunicado"}]},style:{preset:"agenda",primaryColor:"#2563eb",secondaryColor:"#06b6d4",backgroundColor:"#f8fafc",textColor:"#172554",mutedTextColor:"#475569"} },
+  [AGENDA_INFO_TYPE]: { dynamicTemplate:true,content:{headline:"Agenda do dia",subtitle:"Reuniões, eventos e comunicados",services:[]},style:{preset:"agenda",primaryColor:"#2563eb",secondaryColor:"#06b6d4",backgroundColor:"#f8fafc",textColor:"#172554",mutedTextColor:"#475569"},agenda:{layout:"A",secondarySlots:3,items:[],rotation:{featuredSeconds:8,secondarySeconds:5,transition:"fade"}} },
   [PROMOTION_CAMPAIGN_TYPE]: { content:{headline:"Sua ideia ganha vida aqui.",subtitle:"Uma campanha com presença e impacto.",services:[{id:"1",title:"Benefício",description:"Destaque da campanha"}],cta:{enabled:true,label:"Saiba mais",url:""}},style:{preset:"cinematic",primaryColor:"#a855f7",secondaryColor:"#ec4899",backgroundColor:"#10051f"} },
   [DIGITAL_MENU_TYPE]: { content:{headline:"Menu especial",subtitle:"Produtos preparados para bons momentos",services:[{id:"1",title:"Produto destaque",description:"R$ 0,00"},{id:"2",title:"Produto",description:"R$ 0,00"},{id:"3",title:"Produto",description:"R$ 0,00"},{id:"4",title:"Produto",description:"R$ 0,00"}]},style:{preset:"cafe",primaryColor:"#d97706",secondaryColor:"#f59e0b",backgroundColor:"#1c1009"} },
   [KPI_INDICATORS_TYPE]: { content:{headline:"Indicadores",subtitle:"Visão geral do período",services:[{id:"1",title:"Indicador 01",description:"0"},{id:"2",title:"Indicador 02",description:"0"},{id:"3",title:"Meta",description:"0%"},{id:"4",title:"Variação",description:"0%"}]},style:{preset:"data",primaryColor:"#8b5cf6",secondaryColor:"#22d3ee",backgroundColor:"#07111f"} },
@@ -133,6 +135,8 @@ export function createTemplateV2Draft(type = HERO_BUSINESS_TYPE, overrides = {})
   const seeded = createHeroBusinessDraft(preset);
   const draft = createHeroBusinessDraft({ ...seeded, ...overrides, layout:{...seeded.layout,...(overrides.layout||{})}, content:{...seeded.content,...(overrides.content||{})}, media:{...seeded.media,...(overrides.media||{})}, style:{...seeded.style,...(overrides.style||{})}, modules:{...seeded.modules,...(overrides.modules||{})} });
   if (type === NEWS_EDITORIAL_DYNAMIC_TYPE) draft.dynamicNews = normalizeNewsEditorialDynamicConfig(draft.dynamicNews, draft.modules.news);
+  if (type === SMART_LOBBY_TYPE) draft.smartLobby = normalizeSmartLobbyConfig(draft.smartLobby);
+  if (type === AGENDA_INFO_TYPE) draft.agenda = normalizeAgendaInfoConfig(draft.agenda);
   return draft;
 }
 
