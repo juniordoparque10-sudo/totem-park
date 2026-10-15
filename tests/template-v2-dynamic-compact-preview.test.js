@@ -19,6 +19,7 @@ test("Mercado Premium identifica o modo thumbnail e preserva as linhas secundár
   assert.match(marketRenderer, /enabled:mode\s*===\s*"player"/);
   assert.match(marketRenderer, /--secondary-count/);
   assert.match(marketRenderer, /has-no-secondary/);
+  assert.match(marketCss, /\.tpv2-market-premium\{[^}]*box-sizing:border-box/);
   assert.match(marketCss, /\.market-list\{[^}]*grid-template-rows:repeat\(var\(--secondary-count\),minmax\(0,1fr\)\)/);
   assert.match(marketCss, /\.market-list article\{[^}]*grid-template-columns:minmax\(7cqw,32%\)/);
   assert.match(marketCss, /\.market-list img,\.market-image-empty\{[^}]*width:100%[^}]*height:100%/);
@@ -31,6 +32,8 @@ test("Notícias Editorial identifica o modo thumbnail e preserva os cards secund
   assert.match(newsRenderer, /--secondary-count/);
   assert.match(newsRenderer, /has-no-secondary/);
   assert.match(newsRenderer, /item\.image\s*&&\s*<img/);
+  assert.match(newsCss, /\.tpv2-news-dynamic\{[^}]*box-sizing:border-box/);
+  assert.match(newsCss, /\.tpv2-news-dynamic \.secondary article\{[^}]*box-sizing:border-box/);
   assert.match(newsCss, /\.tpv2-news-dynamic \.secondary\{[^}]*grid-template-rows:repeat\(var\(--secondary-count\),minmax\(0,1fr\)\)/);
   assert.match(newsCss, /\.tpv2-news-dynamic\.layout-C \.secondary\{[^}]*grid-template-columns:repeat\(var\(--secondary-count\),minmax\(0,1fr\)\)/);
   assert.match(newsCss, /\.tpv2-news-dynamic \.secondary article:has\(>img\)\{[^}]*grid-template-columns:minmax\(8cqw,34%\)/);
