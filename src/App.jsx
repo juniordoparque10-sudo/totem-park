@@ -203,7 +203,9 @@ import PreviewModal from "./PreviewModal";
 import { getPublishedTemplateV2View, isTemplateV2 } from "./templates-v2/schema";
 import { getTemplateV2Orientation } from "./templates-v2/orientation";
 import { getTemplateV2ForecastRequestDays, normalizeTemplateV2ForecastDays } from "./templates-v2/dynamic-data";
+import { normalizeDynamicNewsItems } from "./templates-v2/news-editorial-dynamic/data";
 import { getTemplatesV2ScreenCapability } from "./templates-v2/player-capability";
+import { getDynamicPlaylistCapability, isDynamicTemplateV2Type } from "./templates-v2/playlist-capability";
 import logo from "./assets/logo.png";
 import isotipo from "./assets/isotipo.png";
 import "./App.css";
@@ -9288,6 +9290,20 @@ function ClientPlaylistsPage({ client, access = getClientPlanAccess(client), isA
         return;
       }
 
+      const capabilityScreens = screens.filter((screen) => (
+        (editingPlaylist && screen.playlistId === editingPlaylist.id)
+        || (form.scheduleEnabled && form.targetScreenIds.includes(screen.id))
+        || (editingPlaylist?.scheduleEnabled && editingPlaylist.targetScreenIds?.includes(screen.id))
+      ));
+      const dynamicCapability = getDynamicPlaylistCapability(selectedItems, capabilityScreens);
+      if (!dynamicCapability.allowed) {
+        setPortalNotice({
+          title: "Atualização do Player necessária",
+          message: `A playlist contém Templates V2 Dinâmicas ainda não suportadas por: ${dynamicCapability.blockedScreens.map((screen) => screen.name || screen.title || screen.id).join(", ")}. Nenhuma alteração foi salva.`,
+        });
+        return;
+      }
+
       const playlistData = {
         name: form.name,
         transition: form.transition,
@@ -9413,7 +9429,9 @@ function ClientPlaylistsPage({ client, access = getClientPlanAccess(client), isA
 
   function renderSelectableTemplateCard(template) {
     const templateV2 = isTemplateV2(template);
-    const awaitingPlayerUpdate = templateV2 && !templatesV2PlayerCapability.allowed;
+    const templateType = template.identity?.templateType || template.templateType || template.type;
+    const dynamicCapability = getDynamicPlaylistCapability([{ templateType }], playlistLinkedScreens);
+    const awaitingPlayerUpdate = templateV2 && (isDynamicTemplateV2Type(templateType) ? !dynamicCapability.allowed : !templatesV2PlayerCapability.allowed);
     return (
       <button
         key={template.id}
@@ -12571,7 +12589,7 @@ function ClientTemplatesPage({ client, access = getClientPlanAccess(client), isA
 
       <nav className="templates-library-tabs" aria-label="Bibliotecas de templates"><button type="button" className={libraryTab === "legacy" ? "active" : ""} onClick={() => setLibraryTab("legacy")}>Templates</button><button type="button" className={libraryTab === "v2" ? "active" : ""} onClick={() => setLibraryTab("v2")}>Templates V2 <span>Professional</span></button></nav>
 
-      {libraryTab === "v2" ? <TemplateV2Editor client={client} access={access} entitlement={templatesV2Entitlement} weatherCities={WEATHER_CITY_PRESETS} newsSources={[...Object.entries(NEWS_SOURCE_PRESETS).map(([name,url]) => ({name,url})), ...customNewsSources]} loadWeather={loadTemplateV2Weather} loadNews={loadTemplateV2News} onUseInPlaylist={onUseInPlaylist} /> : <>
+      {libraryTab === "v2" ? <TemplateV2Editor client={client} access={access} entitlement={templatesV2Entitlement} weatherCities={WEATHER_CITY_PRESETS} newsSources={[...Object.entries(NEWS_SOURCE_PRESETS).map(([name,url]) => ({name,url})), ...customNewsSources]} loadWeather={loadTemplateV2Weather} loadNews={loadTemplateV2News} onUseInPlaylist={onUseInPlaylist} screens={screens} /> : <>
 
       {upgradeMessage && (
         <UpgradeAccessCard
@@ -14094,7 +14112,9 @@ async function loadTemplateV2Weather(city, forecastDays = 5) {
 async function loadTemplateV2News(config = {}) {
   const sourceTemplate = { newsSource:config.newsSource, newsFeedUrl:config.newsFeedUrl, selectedNewsSources:config.selectedNewsSources };
   const lists = await Promise.all(getTemplateNewsFeedUrls(sourceTemplate).map((url) => fetchNewsFromRss(url)));
-  return lists.flat().filter((item) => item?.title).slice(0,8);
+  const items = lists.flat().filter((item) => item?.title);
+  if (config.dynamicStrict) return normalizeDynamicNewsItems(items.filter((item) => !isDefaultNewsItem(item)));
+  return items.slice(0,8);
 }
 
 function logTemplateOffline(event, payload = {}) {
@@ -14214,7 +14234,7 @@ function TemplateV2LivePreview({ template, sourceTemplate = template, compact = 
 
   const reportVisualEvent = (event, details = {}) => onVisualEvent?.(event, details);
 
-  return <TemplateV2Renderer template={template} config={config} orientation={config?.display?.defaultOrientation || template.orientation || "Paisagem"} compact={compact} tv={tv} dynamicData={dynamicData} playbackExecutionId={playbackExecutionId} onVisualEvent={reportVisualEvent} />;
+  return <TemplateV2Renderer template={template} config={config} orientation={config?.display?.defaultOrientation || template.orientation || "Paisagem"} compact={compact} tv={tv} dynamicData={dynamicData} playbackExecutionId={playbackExecutionId} effectiveDurationSeconds={Number(template.duration || config?.display?.duration || 15)} onVisualEvent={reportVisualEvent} />;
 }
 
 function LegacyTemplateVisualPreview({ template, sourceTemplate = template, compact = false, tv = false, offlineContext = null }) {

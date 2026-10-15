@@ -9,6 +9,8 @@ import {
   CLOCK_PRO_TYPE,
   WEATHER_PREMIUM_TYPE,
   SPORTS_PREMIUM_TYPE,
+  NEWS_EDITORIAL_DYNAMIC_TYPE,
+  MARKET_PREMIUM_TYPE,
   cloneTemplateV2Config,
   createTemplateV2Document,
   getPublishedTemplateV2View,
@@ -35,6 +37,9 @@ import { getSportsV2Timing, normalizeSportsV2Config, SPORTS_V2_MODES } from "../
 import { normalizeTemplateV2Orientation } from "../orientation";
 import { getConfiguredTemplateWeatherCity } from "../weather-city";
 import { classifyTemplateUpload, getTemplateEditorResources, isTemplateResource } from "../../media-library-purpose";
+import NewsEditorialDynamicEditorFields from "../news-editorial-dynamic/NewsEditorialDynamicEditorFields";
+import MarketPremiumEditorFields from "../market-premium/MarketPremiumEditorFields";
+import { getDynamicPlaylistCapability } from "../playlist-capability";
 
 function safeFileName(name = "asset") { return name.normalize("NFD").replace(/[\u0300-\u036f]/g, "").replace(/[^a-zA-Z0-9._-]+/g, "-"); }
 function revision(prefix) { return `${prefix}-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`; }
@@ -68,7 +73,7 @@ const VISIBILITY_LABELS = {
   showServices: "Exibir cards / serviços",
 };
 
-export default function TemplateV2Editor({ client, access, entitlement = { allowed: true }, weatherCities = [], newsSources = [], loadWeather, loadNews, onUseInPlaylist }) {
+export default function TemplateV2Editor({ client, access, entitlement = { allowed: true }, weatherCities = [], newsSources = [], loadWeather, loadNews, onUseInPlaylist, screens = [] }) {
   const workspaceRef = useRef(null);
   const [templates, setTemplates] = useState([]);
   const [playlists, setPlaylists] = useState([]);
@@ -113,6 +118,16 @@ export default function TemplateV2Editor({ client, access, entitlement = { allow
   /* The selected Firestore document is an external editor session boundary. */
   /* eslint-disable-next-line react-hooks/set-state-in-effect, react-hooks/exhaustive-deps */
   useEffect(() => { setName(selected ? getTemplateV2Name(selected) : (definition?.label || "Hero Business")); }, [selected?.id, selected?.status?.draftRevision, definition?.label]);
+
+  function getDynamicPublicationCapability(item) {
+    const templateId = item?.id || "";
+    const type = item?.identity?.templateType || item?.templateType || activeType;
+    const linkedPlaylists = getTemplatePlaylistUsage(playlists, templateId);
+    const linkedIds = new Set(linkedPlaylists.map((playlist) => playlist.id));
+    const scheduledIds = new Set(linkedPlaylists.flatMap((playlist) => playlist.targetScreenIds || []));
+    const linkedScreens = screens.filter((screen) => linkedIds.has(screen.playlistId) || scheduledIds.has(screen.id));
+    return getDynamicPlaylistCapability([{ templateType:type }], linkedScreens);
+  }
 
   async function saveDraft() {
     if (!entitlement.allowed) { setMessage("Templates V2 não estão disponíveis no seu plano."); return; }
@@ -171,6 +186,8 @@ export default function TemplateV2Editor({ client, access, entitlement = { allow
     if (draftState.isDirty) { setMessage("Salve as alterações do rascunho antes de publicar."); return; }
     if (activeType === SPORTS_PREMIUM_TYPE) { const sports = normalizeSportsV2Config(draftState.persistedDraft.sports); if (sports.mode === SPORTS_V2_MODES.ROTATION && !getSportsV2Timing(sports,draftState.persistedDraft.display.duration).valid) { setMessage("A soma dos tempos por esporte deve ser igual à duração total do template."); return; } }
     if (access?.canEditTemplates === false) { setMessage("Seu plano não permite publicar templates."); return; }
+    const capability = getDynamicPublicationCapability(selected);
+    if (!capability.allowed) { setMessage(`Atualize o Player das telas incompatíveis antes de publicar: ${capability.blockedScreens.map((screen)=>screen.name||screen.title||screen.id).join(", ")}. Nenhuma publicação foi alterada.`); return; }
     if (draftState.persistedDraft.media?.primary?.type === "video") { setMessage("Substitua o vídeo interno por uma imagem antes de publicar. Vídeo em Template V2 ainda está em homologação."); return; }
     setSaving(true); setMessage("");
     try {
@@ -190,6 +207,8 @@ export default function TemplateV2Editor({ client, access, entitlement = { allow
   async function publishFromCard(item) {
     if (!entitlement.allowed || access?.canEditTemplates === false) { setMessage("Seu plano não permite publicar templates."); return; }
     const persistedDraft = getTemplateV2DraftConfig(item);
+    const capability = getDynamicPublicationCapability(item);
+    if (!capability.allowed) { setMessage(`Atualize o Player das telas incompatíveis antes de publicar: ${capability.blockedScreens.map((screen)=>screen.name||screen.title||screen.id).join(", ")}. Nenhuma publicação foi alterada.`); return; }
     if (persistedDraft.media?.primary?.type === "video") { openTemplate(item); setMessage("Substitua o vídeo interno por uma imagem antes de publicar."); return; }
     setSaving(true); setMessage("");
     try {
@@ -316,7 +335,7 @@ export default function TemplateV2Editor({ client, access, entitlement = { allow
         <main className="tpv2-editor-form">
           <div className={`tpv2-save-state ${draftState.isDirty ? "dirty" : "saved"}`}><span>{draftState.isDirty ? "Alterações não salvas" : "Rascunho sincronizado"}</span><small>{draftState.publishedSnapshot ? "Existe uma publicação ativa" : "Ainda não publicado"}</small></div>
           <div className="tpv2-visibility-controls"><strong>Elementos visíveis</strong>{definition?.visibilityControls?.map((key) => <label className="tpv2-check" key={key}><input type="checkbox" checked={draftState.editorDraft.visibility?.[key] !== false} onChange={(event) => draftState.update(`visibility.${key}`, event.target.checked)} /> {VISIBILITY_LABELS[key]}</label>)}</div>
-          {activeType === SPORTS_PREMIUM_TYPE ? <Section sectionId="content" icon={<Type />} title="Conteúdo esportivo" open={openSections.content} onToggle={toggleSection}><label>Nome do template<input value={name} onChange={(event) => setName(event.target.value)} /></label><SportsV2EditorFields value={draftState.editorDraft.sports} totalDuration={draftState.editorDraft.display.duration} onChange={(value) => draftState.update("sports", value)} /></Section> : [CLOCK_PRO_TYPE, WEATHER_PREMIUM_TYPE].includes(activeType) ? <Section sectionId="content" icon={<Type />} title={activeType === CLOCK_PRO_TYPE ? "Configuração da hora" : "Dados do clima"} open={openSections.content} onToggle={toggleSection}>
+          {activeType === SPORTS_PREMIUM_TYPE ? <Section sectionId="content" icon={<Type />} title="Conteúdo esportivo" open={openSections.content} onToggle={toggleSection}><label>Nome do template<input value={name} onChange={(event) => setName(event.target.value)} /></label><SportsV2EditorFields value={draftState.editorDraft.sports} totalDuration={draftState.editorDraft.display.duration} onChange={(value) => draftState.update("sports", value)} /></Section> : activeType === NEWS_EDITORIAL_DYNAMIC_TYPE ? <Section sectionId="content" icon={<Type />} title="Notícias Editorial Dinâmica" open={openSections.content} onToggle={toggleSection}><label>Nome do template<input value={name} onChange={(event)=>setName(event.target.value)}/></label><NewsEditorialDynamicEditorFields value={draftState.editorDraft.dynamicNews} orientation={orientation} onChange={(value)=>draftState.update("dynamicNews",value)}/></Section> : activeType === MARKET_PREMIUM_TYPE ? <Section sectionId="content" icon={<Type />} title="Mercado Premium" open={openSections.content} onToggle={toggleSection}><label>Nome do template<input value={name} onChange={(event)=>setName(event.target.value)}/></label><MarketPremiumEditorFields value={draftState.editorDraft.market} orientation={orientation} mediaList={imageResources} onChange={(value)=>draftState.update("market",value)} onUpload={uploadMedia} uploading={uploading}/></Section> : [CLOCK_PRO_TYPE, WEATHER_PREMIUM_TYPE].includes(activeType) ? <Section sectionId="content" icon={<Type />} title={activeType === CLOCK_PRO_TYPE ? "Configuração da hora" : "Dados do clima"} open={openSections.content} onToggle={toggleSection}>
             <label>Nome do template<input value={name} onChange={(event) => setName(event.target.value)} /></label>
             {activeType === CLOCK_PRO_TYPE && <><label className="tpv2-check"><input type="checkbox" checked={draftState.editorDraft.modules.clock.showDate} onChange={(event) => draftState.update("modules.clock.showDate", event.target.checked)} /> Exibir data</label><label className="tpv2-check"><input type="checkbox" checked={draftState.editorDraft.modules.clock.showLocal} onChange={(event) => draftState.update("modules.clock.showLocal", event.target.checked)} /> Exibir local</label></>}
             {activeType === WEATHER_PREMIUM_TYPE && <><label className="tpv2-check"><input type="checkbox" checked={draftState.editorDraft.modules.weather.showCity} onChange={(event) => draftState.update("modules.weather.showCity", event.target.checked)} /> Exibir nome da cidade</label><label className="tpv2-check"><input type="checkbox" checked={draftState.editorDraft.modules.weather.showCurrent} onChange={(event) => draftState.update("modules.weather.showCurrent", event.target.checked)} /> Exibir condição atual</label><label className="tpv2-check"><input type="checkbox" checked={draftState.editorDraft.modules.weather.showFeelsLike} onChange={(event) => draftState.update("modules.weather.showFeelsLike", event.target.checked)} /> Exibir sensação térmica</label><label className="tpv2-check"><input type="checkbox" checked={draftState.editorDraft.modules.weather.showForecast} onChange={(event) => draftState.update("modules.weather.showForecast", event.target.checked)} /> Exibir próximos dias</label>{draftState.editorDraft.modules.weather.showForecast && <label>Quantidade<select value={draftState.editorDraft.modules.weather.forecastDays} onChange={(event) => draftState.update("modules.weather.forecastDays", Number(event.target.value))}><option value="3">3 dias</option><option value="4">4 dias</option><option value="5">5 dias</option></select></label>}</>}

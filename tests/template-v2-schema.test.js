@@ -67,8 +67,10 @@ test("asset resolver enumerates stable official media references", () => {
 
 test("registry exposes the complete commercial V2 library", () => {
   const definitions = listTemplateV2Definitions();
-  assert.equal(definitions.length, 10);
-  assert.equal(new Set(definitions.map((item) => item.type)).size, 10);
+  assert.equal(definitions.length, 13);
+  assert.equal(new Set(definitions.map((item) => item.type)).size, 13);
+  assert.ok(definitions.some((item) => item.type === "news-editorial-dynamic"));
+  assert.ok(definitions.some((item) => item.type === "market-premium"));
   definitions.forEach((definition) => assert.deepEqual(definition.orientations, ["Paisagem", "Retrato"]));
 });
 

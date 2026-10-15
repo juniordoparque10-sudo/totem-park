@@ -35,6 +35,7 @@ export function classifyTemplateUpload({ targetPath = "", contentType = "" } = {
 
   if (normalizedTarget === "content.logo") resourceType = "logo";
   else if (String(contentType).toLowerCase().startsWith("video/")) resourceType = "video";
+  else if (normalizedTarget.startsWith("market.catalog.")) resourceType = "product-image";
   else if (normalizedTarget === "media.primary") resourceType = "background";
   else if (String(contentType).toLowerCase().startsWith("image/")) resourceType = "image";
 

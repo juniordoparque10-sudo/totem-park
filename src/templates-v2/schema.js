@@ -8,6 +8,8 @@ export const SMART_LOBBY_TYPE = "smart-lobby";
 export const CLOCK_PRO_TYPE = "clock-pro";
 export const WEATHER_PREMIUM_TYPE = "weather-premium";
 export const NEWS_EDITORIAL_TYPE = "news-editorial";
+export const NEWS_EDITORIAL_DYNAMIC_TYPE = "news-editorial-dynamic";
+export const MARKET_PREMIUM_TYPE = "market-premium";
 export const AGENDA_INFO_TYPE = "agenda-info";
 export const PROMOTION_CAMPAIGN_TYPE = "promotion-campaign";
 export const DIGITAL_MENU_TYPE = "digital-menu";
@@ -74,6 +76,8 @@ const TEMPLATE_PRESETS = {
   [CLOCK_PRO_TYPE]: { content: { headline:"10:24",subtitle:"Segunda-feira, 22 de Setembro",services:[] }, style: { preset:"ambient",primaryColor:"#fbbf24",secondaryColor:"#fb7185",backgroundColor:"#071426" }, modules:{clock:{enabled:true,format:"24h"},weather:{enabled:true,city:"Sua cidade"},news:{enabled:true,newsSource:"Fonte configurada",newsFeedUrl:"",selectedNewsSources:[]}} },
   [WEATHER_PREMIUM_TYPE]: { content:{headline:"Previsão do tempo",subtitle:"Condições atuais e próximos dias",services:[]},style:{preset:"glass",primaryColor:"#38bdf8",secondaryColor:"#fbbf24",backgroundColor:"#082f49"},modules:{weather:{enabled:true,city:"Sua cidade"}} },
   [NEWS_EDITORIAL_TYPE]: { content:{headline:"Notícia principal",subtitle:"Resumo da informação em destaque.",services:[{id:"1",title:"Notícia secundária",description:"Resumo breve"},{id:"2",title:"Mais informações",description:"Atualização editorial"}]},style:{preset:"editorial",primaryColor:"#dc2626",secondaryColor:"#2563eb",backgroundColor:"#f8fafc",textColor:"#111827",mutedTextColor:"#475569"},modules:{news:{enabled:true,newsSource:"Fonte configurada",newsFeedUrl:"",selectedNewsSources:[]}} },
+  [NEWS_EDITORIAL_DYNAMIC_TYPE]: { dynamicTemplate:true,content:{headline:"Notícias em destaque",subtitle:"Atualização editorial dinâmica",services:[]},style:{preset:"editorial-dynamic",primaryColor:"#22d3ee",secondaryColor:"#8b5cf6",backgroundColor:"#07111f",textColor:"#ffffff",mutedTextColor:"#cbd5e1"},modules:{news:{enabled:true,dynamicStrict:true,newsSource:"",newsFeedUrl:"",selectedNewsSources:[]}},dynamicNews:{layout:"A",showImage:true,showSummary:true,showSource:true,showDate:true,secondarySlots:3,rotation:{featuredSeconds:8,secondarySeconds:5,transition:"fade"}} },
+  [MARKET_PREMIUM_TYPE]: { dynamicTemplate:true,content:{headline:"Ofertas da semana",subtitle:"Qualidade e economia",services:[]},style:{preset:"market-premium",primaryColor:"#22d3ee",secondaryColor:"#8b5cf6",backgroundColor:"#061426",textColor:"#ffffff",mutedTextColor:"#b8c8df"},market:{layout:"A",segment:"Supermercado",catalog:[],rotation:{featuredSeconds:8,secondarySeconds:5,transition:"fade"}} },
   [AGENDA_INFO_TYPE]: { content:{headline:"Agenda do dia",subtitle:"Reuniões, eventos e comunicados",services:[{id:"1",title:"09:00",description:"Primeiro compromisso"},{id:"2",title:"14:00",description:"Segundo compromisso"},{id:"3",title:"16:00",description:"Comunicado"}]},style:{preset:"agenda",primaryColor:"#2563eb",secondaryColor:"#06b6d4",backgroundColor:"#f8fafc",textColor:"#172554",mutedTextColor:"#475569"} },
   [PROMOTION_CAMPAIGN_TYPE]: { content:{headline:"Sua ideia ganha vida aqui.",subtitle:"Uma campanha com presença e impacto.",services:[{id:"1",title:"Benefício",description:"Destaque da campanha"}],cta:{enabled:true,label:"Saiba mais",url:""}},style:{preset:"cinematic",primaryColor:"#a855f7",secondaryColor:"#ec4899",backgroundColor:"#10051f"} },
   [DIGITAL_MENU_TYPE]: { content:{headline:"Menu especial",subtitle:"Produtos preparados para bons momentos",services:[{id:"1",title:"Produto destaque",description:"R$ 0,00"},{id:"2",title:"Produto",description:"R$ 0,00"},{id:"3",title:"Produto",description:"R$ 0,00"},{id:"4",title:"Produto",description:"R$ 0,00"}]},style:{preset:"cafe",primaryColor:"#d97706",secondaryColor:"#f59e0b",backgroundColor:"#1c1009"} },
@@ -193,9 +197,16 @@ export function getTemplateV2Assets(config = {}) {
   Object.entries(config.sports?.items || {}).forEach(([sport,item]) => {
     [["homeLogo",item.homeLogo],["awayLogo",item.awayLogo],["fighterAImage",item.fighterAImage],["fighterBImage",item.fighterBImage]].forEach(([role,asset]) => candidates.push([`sports.${sport}.${role}`,asset]));
   });
+  (config.market?.catalog || []).forEach((product) => {
+    if (product?.image) candidates.push([`market.product.${product.id || "item"}`, product.image]);
+  });
 
+  const seen = new Set();
   candidates.forEach(([role, asset]) => {
     if (!asset || (!asset.mediaId && !asset.url)) return;
+    const assetKey = asset.mediaId || asset.url || asset.publicUrl;
+    if (seen.has(assetKey)) return;
+    seen.add(assetKey);
     assets.push({
       role,
       mediaId: asset.mediaId || "",

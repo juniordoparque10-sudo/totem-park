@@ -3,6 +3,7 @@ import {
   KPI_INDICATORS_TYPE, NEWS_EDITORIAL_TYPE, PROMOTION_CAMPAIGN_TYPE,
   QR_INTERACTION_TYPE, SMART_LOBBY_TYPE, WEATHER_PREMIUM_TYPE, createTemplateV2Draft,
   SPORTS_PREMIUM_TYPE,
+  NEWS_EDITORIAL_DYNAMIC_TYPE, MARKET_PREMIUM_TYPE,
 } from "./schema.js";
 
 const entries = [
@@ -11,6 +12,8 @@ const entries = [
   [CLOCK_PRO_TYPE,"Hora Certa Pro","Informações","Hora, data, clima e notícias em destaque.","ambient",["clock","weather","news","ticker"]],
   [WEATHER_PREMIUM_TYPE,"Previsão do Tempo Premium","Informações","Condições atuais e previsão resumida.","glass",["weather","clock"]],
   [NEWS_EDITORIAL_TYPE,"Notícias Editorial","Notícias","Notícia principal e destaques secundários.","editorial",["news","clock"]],
+  [NEWS_EDITORIAL_DYNAMIC_TYPE,"Notícias Editorial Dinâmica","Notícias","Destaque e notícias secundárias com rotação automática.","editorial-dynamic",["news","clock"]],
+  [MARKET_PREMIUM_TYPE,"Mercado Premium","Promoções","Ofertas dinâmicas para mercados e segmentos comerciais.","market-premium",["clock"]],
   [AGENDA_INFO_TYPE,"Agenda & Informações","Informações","Horários, eventos, reuniões e comunicados.","agenda",["qrCode","clock"]],
   [PROMOTION_CAMPAIGN_TYPE,"Promoção / Campanha","Promoções","Campanhas visuais com CTA e benefícios.","cinematic",["qrCode","clock","weather"]],
   [DIGITAL_MENU_TYPE,"Menu Digital","Restaurantes","Produtos, preços e destaque comercial.","cafe",[]],
