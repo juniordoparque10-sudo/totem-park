@@ -6,6 +6,7 @@ import { compareTelemetryScreens, createPortalScreenOrderTracker, formatRelative
 import { bindingForScreen, linkedAtForScreen, measured } from "./telemetry-v1";
 import { aggregateCurrentPlaybackOrigins, aggregateSchema4Traffic, formatSessionStartedAt, getCurrentSourceGroup, getTelemetryCardData, reportedAppVersion } from "./telemetry-card-data";
 import { renderTelemetryPdfReport } from "./telemetry-pdf-report";
+import { buildTelemetryActivityPeriods, normalizeTelemetryActivityEvents, summarizeTelemetryActivity } from "./telemetry-activity-history";
 import { formatBytes } from "./format-bytes";
 import totemLogo from "./assets/logo.png";
 
@@ -54,6 +55,21 @@ const trafficValue = (screen, key) => {
 };
 const lastCommunication = (screen) => getPortalLastSignalMs(screen);
 const scrollToTelemetry = (id) => document.getElementById(id)?.scrollIntoView({ behavior: "smooth", block: "start" });
+const isoDate = (value) => new Date(value).toISOString().slice(0, 10);
+const activityRangeFor = (dateValue, periodValue) => {
+  const selected = new Date(`${dateValue}T00:00:00`);
+  if (!Number.isFinite(selected.getTime())) return { startMs: 0, endMs: 0 };
+  const start = new Date(selected);
+  if (periodValue === "week") start.setDate(start.getDate() - start.getDay());
+  if (periodValue === "month") start.setDate(1);
+  const end = new Date(start);
+  if (periodValue === "day") end.setDate(end.getDate() + 1);
+  if (periodValue === "week") end.setDate(end.getDate() + 7);
+  if (periodValue === "month") end.setMonth(end.getMonth() + 1);
+  return { startMs: start.getTime(), endMs: end.getTime() };
+};
+const activityStateLabel = (state) => ({ ACTIVE:"Ativa", RECOVERED:"Ativa", OFFLINE:"Desligada", INTERRUPTED:"Desligada", ATTENTION:"Atenção", IDLE:"Atenção" }[state] || state);
+const activityTone = (state) => ["ACTIVE", "RECOVERED"].includes(state) ? "active" : ["OFFLINE", "INTERRUPTED"].includes(state) ? "offline" : "attention";
 
 function MetricCard({ icon, title, value, detail, tone = "blue" }) {
   return <article className={`telemetry-metric-card tone-${tone}`}><div className="telemetry-metric-icon">{icon}</div><div><span>{title}</span><strong>{value}</strong><small>{detail}</small></div></article>;
@@ -101,6 +117,11 @@ export default function TelemetryDashboard({ focusScreen }) {
   const [config, setConfig] = useState({ enabled: false, clientIds: [], screenIds: [], deviceIds: [], syncIntervalMs: 300000 });
   const [configDraft, setConfigDraft] = useState("");
   const [configSaving, setConfigSaving] = useState(false);
+  const [activityExpanded, setActivityExpanded] = useState(false);
+  const [activityClientId, setActivityClientId] = useState("all");
+  const [activityScreenId, setActivityScreenId] = useState("all");
+  const [activityPeriod, setActivityPeriod] = useState("day");
+  const [activityDate, setActivityDate] = useState(() => isoDate(Date.now()));
   const screenOrderRef = useRef(null);
   if (!screenOrderRef.current) {
     screenOrderRef.current = createPortalScreenOrderTracker({
@@ -140,6 +161,16 @@ export default function TelemetryDashboard({ focusScreen }) {
   }
 
   const enriched = useMemo(() => screens.map((screen) => ({ ...screen, portalStatus: getPortalScreenStatus(screen, now), telemetryState: getTelemetryVisualState({ config, screen, now, readError: Boolean(error) }) })), [screens, now, config, error]);
+  const activityClients = useMemo(() => sortClientsAlphabetically(clients), [clients]);
+  const activityScreens = useMemo(() => enriched
+    .filter((item) => activityClientId === "all" || item.clientId === activityClientId)
+    .sort((left, right) => String(left.name || left.code || left.id).localeCompare(String(right.name || right.code || right.id), "pt-BR")), [enriched, activityClientId]);
+  const activityRange = useMemo(() => activityRangeFor(activityDate, activityPeriod), [activityDate, activityPeriod]);
+  const activityPeriods = useMemo(() => activityScreens
+    .filter((item) => activityScreenId === "all" || item.id === activityScreenId)
+    .flatMap((item) => buildTelemetryActivityPeriods(normalizeTelemetryActivityEvents(item, activityRange), activityRange))
+    .sort((left, right) => left.startMs - right.startMs || left.id.localeCompare(right.id)), [activityScreens, activityScreenId, activityRange]);
+  const activitySummary = useMemo(() => summarizeTelemetryActivity(activityPeriods), [activityPeriods]);
   const selected = enriched.find((item) => `${item.clientId}/${item.id}` === selectedKey);
   const versions = useMemo(() => [...new Set(enriched.map(appVersion).filter((item) => item !== EMPTY))].sort(), [enriched]);
   const filtered = useMemo(() => {
@@ -217,6 +248,23 @@ export default function TelemetryDashboard({ focusScreen }) {
     <nav className="telemetry-section-nav"><button onClick={() => scrollToTelemetry("telemetry-overview")}>Visão Geral</button><button onClick={() => scrollToTelemetry("telemetry-screens")}>Telas</button><button onClick={() => scrollToTelemetry("telemetry-traffic")}>Consumo de Mídia</button><button onClick={() => scrollToTelemetry("telemetry-cache")}>Cache</button><button onClick={() => scrollToTelemetry("telemetry-status")}>Rede e Conexão</button><button onClick={() => scrollToTelemetry("telemetry-events")}>Eventos e Logs</button></nav>
     <div className="telemetry-overview-grid" id="telemetry-overview"><article className="telemetry-visual-card"><h2>Origem atual reportada pelas telas</h2>{originSample.total ? <Donut segments={originSegments} centerValue={originReported.toLocaleString("pt-BR")} caption="Com origem atual" /> : <div className="telemetry-chart-empty"><Activity /><strong>Nenhuma tela online</strong><span>A origem aparecerá quando uma tela estiver reproduzindo.</span></div>}</article><article className="telemetry-visual-card traffic-chart-card" id="telemetry-traffic"><h2>Resumo de tráfego — schema 4 atual</h2>{metrics.currentSchema4Screens ? <TrafficComparison metrics={metrics} /> : <div className="telemetry-chart-empty"><Activity /><strong>Não instrumentado</strong><span>Nenhuma tela online possui snapshot schema 4 válido.</span></div>}</article><article className="telemetry-visual-card" id="telemetry-status"><h2>Status das telas</h2><Donut segments={statusSegments} centerValue={filtered.length} caption="Telas monitoradas" /></article></div>
     <div className="telemetry-secondary-kpis"><MetricCard icon={<Clock3 />} title="Tempo ativo do Player" value={cardData.activeScreens ? fmtDuration(cardData.activeTimeMs) : EMPTY} detail={cardData.activeScreens ? `${cardData.activeScreens} tela(s) com tempo ativo reportado` : "Não instrumentado"} /><MetricCard icon={<Download />} title="Downloads de mídia acumulados" value={metrics.downloadedScreens ? formatBytes(metrics.mediaDownloadedBytes) : EMPTY} detail={metrics.downloadedScreens ? `${metrics.downloadedScreens} tela(s) schema 4 online · timestamp individual não disponível` : "Último download de mídia: não disponível"} tone="cyan" /><MetricCard icon={<Database />} title="Itens em cache" value={cardData.cacheScreens ? cardData.cacheItems.toLocaleString("pt-BR") : EMPTY} detail={cardData.cacheScreens ? `Último estado conhecido de ${cardData.cacheScreens} tela(s)${cardData.cacheOfflineScreens ? ` · ${cardData.cacheOfflineScreens} offline` : ""}` : "Nenhum dado de cache disponível"} tone="green" /><MetricCard icon={<RefreshCw />} title="Versão mais recente reportada" value={cardData.latestVersionScreen ? appVersion(cardData.latestVersionScreen) : EMPTY} detail={cardData.latestVersionScreen ? `${cardData.versionCount} tela(s) nesta versão · mais instalada: ${cardData.mostInstalledVersion} (${cardData.mostInstalledCount})` : "Versão ainda não informada"} /></div>
+    <section className={`telemetry-v2-activity${activityExpanded ? " is-expanded" : ""}`} aria-labelledby="telemetry-activity-title">
+      <div className="telemetry-v2-activity-heading"><div><h2 id="telemetry-activity-title"><Activity size={20} />Histórico de atividade das telas</h2><p>Visualize somente os períodos comprovados por eventos enviados pela Telemetria V2-A.</p></div><button type="button" onClick={() => setActivityExpanded((value) => !value)}>{activityExpanded ? "Recolher timeline detalhada" : "Ver timeline detalhada"}</button></div>
+      <div className="telemetry-v2-activity-filters">
+        <label><span>Cliente</span><select value={activityClientId} onChange={(event) => { setActivityClientId(event.target.value); setActivityScreenId("all"); }}><option value="all">Todos os clientes</option>{activityClients.map((item) => <option key={item.id} value={item.id}>{item.name}</option>)}</select></label>
+        <label><span>Tela</span><select value={activityScreenId} onChange={(event) => setActivityScreenId(event.target.value)}><option value="all">Todas as telas</option>{activityScreens.map((item) => <option key={`${item.clientId}-${item.id}`} value={item.id}>{item.name || item.code || item.id}</option>)}</select></label>
+        <label><span>Período</span><select value={activityPeriod} onChange={(event) => setActivityPeriod(event.target.value)}><option value="day">Dia</option><option value="week">Semana</option><option value="month">Mês</option></select></label>
+        <label><span>Data</span><input type="date" value={activityDate} onChange={(event) => setActivityDate(event.target.value)} /></label>
+      </div>
+      <div className="telemetry-v2-activity-summary"><article><span>Telas com atividade</span><strong>{activityPeriods.length ? new Set(activityPeriods.map((item) => item.screenId)).size : EMPTY}</strong></article><article><span>Tempo ligado comprovado</span><strong>{activityPeriods.length ? fmtDuration(activitySummary.totalActiveMs) : EMPTY}</strong></article><article><span>Tempo desligado comprovado</span><strong>{activityPeriods.length ? fmtDuration(activitySummary.totalOfflineMs) : EMPTY}</strong></article><article><span>Última desativação</span><strong>{activitySummary.lastDeactivationAtMs ? new Date(activitySummary.lastDeactivationAtMs).toLocaleTimeString("pt-BR", { hour:"2-digit", minute:"2-digit" }) : EMPTY}</strong></article></div>
+      {!activityPeriods.length ? <div className="telemetry-v2-activity-empty"><Activity /><strong>Aguardando dados da Telemetria V2-A</strong><span>O histórico será exibido quando existirem eventos reais e fechados no período selecionado.</span></div> : activityExpanded && <div className="telemetry-v2-activity-details">
+        <div className="telemetry-v2-activity-legend"><span><i className="active" />Ativa</span><span><i className="offline" />Desligada</span><span><i className="attention" />Atenção</span></div>
+        <div className="telemetry-v2-activity-timeline-scroll"><div className="telemetry-v2-activity-timeline">{activityPeriods.map((item) => <i key={item.id} className={activityTone(item.state)} style={{ width:`${Math.max(1.5, item.durationMs * 100 / Math.max(1, activityRange.endMs - activityRange.startMs))}%` }} title={`${activityStateLabel(item.state)} · ${fmtDuration(item.durationMs)}`} />)}</div></div>
+        <div className="telemetry-v2-activity-detail-grid"><article><span>Tempo ligado</span><strong>{fmtDuration(activitySummary.totalActiveMs)}</strong><small>{activitySummary.activePeriods} período(s)</small></article><article><span>Tempo desligado</span><strong>{fmtDuration(activitySummary.totalOfflineMs)}</strong><small>{activitySummary.offlinePeriods} período(s)</small></article><article><span>Primeira ativação</span><strong>{activitySummary.firstActivationAtMs ? new Date(activitySummary.firstActivationAtMs).toLocaleTimeString("pt-BR", { hour:"2-digit", minute:"2-digit" }) : EMPTY}</strong></article><article><span>Última desativação</span><strong>{activitySummary.lastDeactivationAtMs ? new Date(activitySummary.lastDeactivationAtMs).toLocaleTimeString("pt-BR", { hour:"2-digit", minute:"2-digit" }) : EMPTY}</strong></article></div>
+        <div className="telemetry-v2-activity-table"><div className="head"><span>Início</span><span>Fim</span><span>Duração</span><span>Status</span></div>{activityPeriods.map((item) => <div key={item.id}><span>{new Date(item.startMs).toLocaleString("pt-BR")}</span><span>{new Date(item.endMs).toLocaleString("pt-BR")}</span><span>{fmtDuration(item.durationMs)}</span><span><i className={activityTone(item.state)} />{activityStateLabel(item.state)}</span></div>)}</div>
+        <p className="telemetry-v2-activity-copy">Os totais incluem exclusivamente intervalos encerrados por eventos reais. Lacunas e o último evento sem sucessor não são contabilizados.</p>
+      </div>}
+    </section>
     <section className="telemetry-screens-section" id="telemetry-screens"><div className="telemetry-table-toolbar"><div><h2>Telas</h2><p>Status, reprodução, cache e comunicação em uma visão operacional.</p></div><label><Search size={18} /><input value={search} onChange={(event) => setSearch(event.target.value)} placeholder="Buscar por nome, cliente ou local…" /></label><select value={status} onChange={(event) => setStatus(event.target.value)}><option value="all">Todos os status</option><option value="ONLINE">Online</option><option value="ATTENTION">Atenção</option><option value="OFFLINE">Offline</option></select><button className="telemetry-clear" onClick={clearFilters}><X size={16} />Limpar filtros</button></div>
       {!filtered.length ? <div className="telemetry-state"><strong>Sem telas para os filtros selecionados</strong><span>Ajuste ou limpe os filtros para visualizar outros dispositivos.</span></div> : <div className="telemetry-table-v2"><div className="head"><span>Status</span><span>Nome da tela</span><span>Cliente / local</span><span>Reprodução atual</span><span>Origem</span><span>Tráfego reportado</span><span>Última comunicação</span><span>Telemetria</span><span>Versão do app</span></div>{filtered.map((item) => { const meta = sourceMeta(item, now); return <button key={`${item.clientId}-${item.id}`} onClick={() => setSelectedKey(`${item.clientId}/${item.id}`)}><span><i className={`screen-state-dot ${item.portalStatus.toLowerCase()}`} />{STATUS_LABELS[item.portalStatus]}</span><span><strong>{item.name || item.code || item.id}</strong><small>{item.currentPlaylistName || item.telemetry?.current?.playlistId || "Playlist não informada"}</small></span><span><strong>{item.clientName}</strong><small>{item.location || "Local não informado"} · Vinculada desde: {linkedAtForScreen(item, bindings) ? new Date(timestampMs(linkedAtForScreen(item, bindings))).toLocaleDateString("pt-BR") : EMPTY}</small></span><span><strong>{item.nowPlayingTitle || item.telemetry?.current?.currentItemId || "Não informado"}</strong><small>{item.telemetry?.schemaVersion >= 3 && item.nowPlayingTitle ? "Último registro do Player · " : ""}{item.nowPlayingIndex && item.nowPlayingTotal ? `Item ${item.nowPlayingIndex}/${item.nowPlayingTotal}` : "Posição não informada"}</small></span><span className="telemetry-origin-cell"><b className={`origin-badge ${meta.className}`}>{meta.label}</b><small>{cacheLabel(item)}</small></span><span>{mediaCounters(item) ? fmtBytes(mediaCounters(item).bytesDownloaded) : EMPTY}</span><span>{formatRelativeCommunication(lastCommunication(item), now)}</span><span>{telemetryLabel(item, now)}</span><span className="telemetry-app-version">{appVersion(item)}</span></button>; })}</div>}
     </section>
