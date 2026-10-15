@@ -7,7 +7,7 @@ export function mediaDocumentToTemplateAsset(media = {}) {
   return {
     mediaId: media.id || "",
     type: getTemplateV2MediaType(media),
-    url: media.publicUrl || media.url || media.preview || media.remotePreview || media.imageUrl || "",
+    url: media.publicUrl || media.url || media.preview || media.remotePreview || media.imageUrl || media.downloadURL || media.previewUrl || media.thumbnailUrl || "",
     storagePath: media.storagePath || "",
     storageProvider: media.storageProvider || media.provider || "",
     fileHash: media.fileHash || media.hash || "",
