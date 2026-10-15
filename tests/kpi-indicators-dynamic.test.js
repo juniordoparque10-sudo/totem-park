@@ -16,4 +16,5 @@ test("KPI persiste no draft e usa renderer próprio", () => {
   const draft=createTemplateV2Draft(KPI_INDICATORS_TYPE,{kpi:{items:[{id:"a",title:"Meta",value:8,unit:"%",source:"manual"}]}});
   assert.equal(draft.kpi.items[0].unit,"%");
   assert.match(fs.readFileSync("src/templates-v2/TemplateV2Renderer.jsx","utf8"),/KpiIndicatorsRenderer/);
+  assert.match(fs.readFileSync("src/templates-v2/kpi-indicators/KpiIndicatorsRenderer.jsx","utf8"),/collection=\{kpi\} items=\{items\}/);
 });
