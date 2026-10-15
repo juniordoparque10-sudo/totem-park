@@ -14,9 +14,9 @@ import {
   cloneTemplateV2Config,
   createTemplateV2Document,
   getPublishedTemplateV2View,
+  getTemplateV2LibraryPreviewState,
   getTemplateV2DraftConfig,
   getTemplateV2Name,
-  isTemplateV2Dirty,
   isTemplateV2,
 } from "../schema";
 import { TEMPLATE_V2_CATEGORIES, getTemplateV2Definition, listTemplateV2Definitions } from "../registry";
@@ -387,12 +387,10 @@ export default function TemplateV2Editor({ client, access, entitlement = { allow
         <h3>Meus Templates V2</h3>
         {[{ title: "Paisagem — 16:9", orientation: "Paisagem" }, { title: "Retrato — 9:16", orientation: "Retrato" }].map((group) => {
           const items = templates.filter((item) => {
-            const view = getPublishedTemplateV2View(item);
-            const draft = getTemplateV2DraftConfig(item);
-            const preview = view && !isTemplateV2Dirty(draft, view.published) ? view.published : draft;
-            return normalizeTemplateV2Orientation(preview.display?.defaultOrientation) === group.orientation;
+            const thumbnail = getTemplateV2LibraryPreviewState(item);
+            return normalizeTemplateV2Orientation(thumbnail.config.display?.defaultOrientation) === group.orientation;
           });
-          return <section className="tpv2-orientation-group" key={group.orientation}><h4>{group.title}</h4><div className="tpv2-published-strip">{items.length ? items.map((item) => { const view = getPublishedTemplateV2View(item); const draft = getTemplateV2DraftConfig(item); const hasChanges = Boolean(view && isTemplateV2Dirty(draft,view.published)); const preview = hasChanges ? draft : view?.published || draft; const previewOrientation = normalizeTemplateV2Orientation(preview.display?.defaultOrientation); return <article role="button" tabIndex="0" className={previewOrientation === "Retrato" ? "portrait" : "landscape"} key={item.id} onClick={() => openTemplate(item)} onKeyDown={(event) => { if (event.key === "Enter" || event.key === " ") openTemplate(item); }}><TemplateV2DynamicStage className="tpv2-created-thumbnail" template={item} config={preview} orientation={previewOrientation} mode="thumbnail" loadWeather={loadWeather} loadNews={loadNews}/><div className="tpv2-created-meta"><strong>{getTemplateV2Name(item)}</strong><span>{item.identity?.templateType || item.templateType} · {previewOrientation}</span><em className={view ? "published" : "draft"}>{hasChanges ? "Alterações não publicadas" : view ? "Publicado" : "Rascunho"}</em></div><div className="tpv2-created-actions"><button type="button" onClick={(event) => { event.stopPropagation(); openTemplate(item); }}>Editar</button>{view && !hasChanges ? <button type="button" className="primary" onClick={(event) => { event.stopPropagation(); onUseInPlaylist?.(); }}>Usar em playlist</button> : <button type="button" className="primary" disabled={saving} onClick={(event) => { event.stopPropagation(); publishFromCard(item); }}>{view ? "Atualizar publicação" : "Publicar"}</button>}<button type="button" className="danger" onClick={(event) => { event.stopPropagation(); requestDelete(item); }}>Excluir</button></div></article>; }) : <div className="tpv2-library-empty">Nenhum template nesta orientação.</div>}</div></section>;
+          return <section className="tpv2-orientation-group" key={group.orientation}><h4>{group.title}</h4><div className="tpv2-published-strip">{items.length ? items.map((item) => { const view = getPublishedTemplateV2View(item); const thumbnail = getTemplateV2LibraryPreviewState(item); const previewOrientation = normalizeTemplateV2Orientation(thumbnail.config.display?.defaultOrientation); return <article role="button" tabIndex="0" className={previewOrientation === "Retrato" ? "portrait" : "landscape"} key={item.id} onClick={() => openTemplate(item)} onKeyDown={(event) => { if (event.key === "Enter" || event.key === " ") openTemplate(item); }}><TemplateV2DynamicStage key={thumbnail.versionKey} className="tpv2-created-thumbnail" template={item} config={thumbnail.config} orientation={previewOrientation} mode="thumbnail" loadWeather={loadWeather} loadNews={loadNews}/><div className="tpv2-created-meta"><strong>{getTemplateV2Name(item)}</strong><span>{item.identity?.templateType || item.templateType} · {previewOrientation}</span><em className={view ? "published" : "draft"}>{thumbnail.hasUnpublishedChanges ? "Alterações não publicadas" : view ? "Publicado" : "Rascunho"}</em></div><div className="tpv2-created-actions"><button type="button" onClick={(event) => { event.stopPropagation(); openTemplate(item); }}>Editar</button>{view && !thumbnail.hasUnpublishedChanges ? <button type="button" className="primary" onClick={(event) => { event.stopPropagation(); onUseInPlaylist?.(); }}>Usar em playlist</button> : <button type="button" className="primary" disabled={saving} onClick={(event) => { event.stopPropagation(); publishFromCard(item); }}>{view ? "Atualizar publicação" : "Publicar"}</button>}<button type="button" className="danger" onClick={(event) => { event.stopPropagation(); requestDelete(item); }}>Excluir</button></div></article>; }) : <div className="tpv2-library-empty">Nenhum template nesta orientação.</div>}</div></section>;
         })}
       </div>}
     </div>

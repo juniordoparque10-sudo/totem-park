@@ -27,6 +27,7 @@ const VISIBILITY_CONTROLS = {
   [SMART_LOBBY_TYPE]: ["showLogo","showContent","showHeadline","showSubtitle","showCta","showServices"],
   [CLOCK_PRO_TYPE]: ["showLogo","showContent"],
   [WEATHER_PREMIUM_TYPE]: ["showLogo","showContent"],
+  [NEWS_EDITORIAL_DYNAMIC_TYPE]: ["showLogo","showContent","showHeadline","showSubtitle","showServices"],
   [SPORTS_PREMIUM_TYPE]: ["showLogo","showContent"],
 };
 

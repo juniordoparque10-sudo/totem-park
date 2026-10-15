@@ -260,3 +260,28 @@ export function getPublishedTemplateV2View(template = {}) {
     published,
   };
 }
+
+function templateV2PreviewFingerprint(config) {
+  const source = stableTemplateV2Stringify(config);
+  let hash = 2166136261;
+  for (let index = 0; index < source.length; index += 1) {
+    hash ^= source.charCodeAt(index);
+    hash = Math.imul(hash, 16777619);
+  }
+  return (hash >>> 0).toString(36);
+}
+
+export function getTemplateV2LibraryPreviewState(template = {}) {
+  const publishedView = getPublishedTemplateV2View(template);
+  const draft = getTemplateV2DraftConfig(template);
+  const hasUnpublishedChanges = Boolean(publishedView && isTemplateV2Dirty(draft, publishedView.published));
+  const source = hasUnpublishedChanges || !publishedView ? "draft" : "published";
+  const config = source === "draft" ? draft : publishedView.published;
+  const revision = source === "draft" ? template.status?.draftRevision : template.status?.publishedRevision;
+  return {
+    config,
+    source,
+    hasUnpublishedChanges,
+    versionKey:`${template.id || "template"}:${source}:${revision || templateV2PreviewFingerprint(config)}`,
+  };
+}
