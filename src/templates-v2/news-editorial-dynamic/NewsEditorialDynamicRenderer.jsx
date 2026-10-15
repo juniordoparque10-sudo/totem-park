@@ -9,7 +9,7 @@ export default function NewsEditorialDynamicRenderer({ config, orientation, name
   const byId = (id) => items.find((item) => (item.id || item.link || item.title) === id);
   const featured = byId(frame.featuredId) || items[0];
   const secondary = frame.secondaryIds.map(byId).filter(Boolean);
-  return <section className={`tpv2-root tpv2-news-dynamic layout-${options.layout || "A"} ${orientation === "Retrato" ? "is-portrait" : "is-landscape"} ${mode === "thumbnail" ? "is-thumbnail" : ""} ${secondary.length ? "" : "has-no-secondary"}`} style={{ "--tpv2-primary":config.style?.primaryColor, "--tpv2-secondary":config.style?.secondaryColor, "--tpv2-bg":config.style?.backgroundColor, "--tpv2-text":config.style?.textColor, "--secondary-count":Math.max(1,secondary.length) }}>
+  return <section data-secondary-count={secondary.length} className={`tpv2-root tpv2-news-dynamic layout-${options.layout || "A"} ${orientation === "Retrato" ? "is-portrait" : "is-landscape"} ${mode === "thumbnail" ? "is-thumbnail" : ""} ${secondary.length ? "" : "has-no-secondary"}`} style={{ "--tpv2-primary":config.style?.primaryColor, "--tpv2-secondary":config.style?.secondaryColor, "--tpv2-bg":config.style?.backgroundColor, "--tpv2-text":config.style?.textColor, "--secondary-count":Math.max(1,secondary.length) }}>
     <div className="tpv2-news-background"><TemplateMedia asset={config.media?.primary} mode={mode}/></div>
     <header><TemplateLogo asset={config.content?.logo} name={name}/><span>NOTÍCIAS</span></header>
     {!featured ? <div className="tpv2-dynamic-empty">Notícias temporariamente indisponíveis</div> : <main>

@@ -39,3 +39,12 @@ test("Notícias Editorial identifica o modo thumbnail e preserva os cards secund
   assert.match(newsCss, /\.tpv2-news-dynamic \.secondary article:has\(>img\)\{[^}]*grid-template-columns:minmax\(8cqw,34%\)/);
   assert.match(newsCss, /\.tpv2-news-dynamic\.has-no-secondary main\{[^}]*grid-template-columns:1fr/);
 });
+
+test("Notícias Editorial contém e dimensiona 1, 2 e 3 secundárias no canvas paisagem", () => {
+  assert.match(newsRenderer, /data-secondary-count=\{secondary\.length\}/);
+  assert.match(newsCss, /\.tpv2-news-dynamic\.is-landscape main\{[^}]*grid-template-rows:minmax\(0,1fr\)[^}]*overflow:hidden/);
+  assert.match(newsCss, /\.tpv2-news-dynamic\.is-landscape \.featured\{[^}]*min-height:0[^}]*overflow:hidden/);
+  assert.match(newsCss, /\.tpv2-news-dynamic\.is-landscape\[data-secondary-count="1"\][^}]*grid-template-columns:minmax\(12cqw,48%\)/);
+  assert.match(newsCss, /\.tpv2-news-dynamic\.is-landscape\[data-secondary-count="2"\][^}]*grid-template-columns:minmax\(10cqw,44%\)/);
+  assert.match(newsCss, /\.tpv2-news-dynamic\.is-landscape\[data-secondary-count="3"\][^}]*grid-template-columns:minmax\(8cqw,40%\)/);
+});
