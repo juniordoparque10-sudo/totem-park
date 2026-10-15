@@ -1,4 +1,5 @@
 import { normalizeTemplateV2Orientation } from "./orientation.js";
+import { normalizeNewsEditorialDynamicConfig } from "./news-editorial-dynamic/config.js";
 
 export const TEMPLATE_V2_SCHEMA_VERSION = 2;
 export const TEMPLATE_V2_RENDERER = "template-v2";
@@ -130,7 +131,9 @@ export function createHeroBusinessDraft(overrides = {}) {
 export function createTemplateV2Draft(type = HERO_BUSINESS_TYPE, overrides = {}) {
   const preset = TEMPLATE_PRESETS[type] || TEMPLATE_PRESETS[HERO_BUSINESS_TYPE];
   const seeded = createHeroBusinessDraft(preset);
-  return createHeroBusinessDraft({ ...seeded, ...overrides, layout:{...seeded.layout,...(overrides.layout||{})}, content:{...seeded.content,...(overrides.content||{})}, media:{...seeded.media,...(overrides.media||{})}, style:{...seeded.style,...(overrides.style||{})}, modules:{...seeded.modules,...(overrides.modules||{})} });
+  const draft = createHeroBusinessDraft({ ...seeded, ...overrides, layout:{...seeded.layout,...(overrides.layout||{})}, content:{...seeded.content,...(overrides.content||{})}, media:{...seeded.media,...(overrides.media||{})}, style:{...seeded.style,...(overrides.style||{})}, modules:{...seeded.modules,...(overrides.modules||{})} });
+  if (type === NEWS_EDITORIAL_DYNAMIC_TYPE) draft.dynamicNews = normalizeNewsEditorialDynamicConfig(draft.dynamicNews, draft.modules.news);
+  return draft;
 }
 
 export function createTemplateV2Document({ name = "Hero Business", type = HERO_BUSINESS_TYPE, draft } = {}) {
