@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useRef, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { Activity, AlertTriangle, Clock3, Database, Download, FileText, Monitor, RefreshCw, Search, Wifi, X } from "lucide-react";
 import { collection, doc, onSnapshot, serverTimestamp, setDoc } from "firebase/firestore";
 import { db } from "./firebase";
@@ -123,13 +123,10 @@ export default function TelemetryDashboard({ focusScreen }) {
   const [activityScreenId, setActivityScreenId] = useState("all");
   const [activityPeriod, setActivityPeriod] = useState("day");
   const [activityDate, setActivityDate] = useState(() => isoDate(Date.now()));
-  const screenOrderRef = useRef(null);
-  if (!screenOrderRef.current) {
-    screenOrderRef.current = createPortalScreenOrderTracker({
-      getKey: (screen) => `${screen.clientId}/${screen.id}`,
-      sortOfflineByLastSignal: true,
-    });
-  }
+  const [screenOrder] = useState(() => createPortalScreenOrderTracker({
+    getKey: (screen) => `${screen.clientId}/${screen.id}`,
+    sortOfflineByLastSignal: true,
+  }));
 
   useEffect(() => { const interval = setInterval(() => setNow(Date.now()), 5_000); return () => clearInterval(interval); }, []);
   useEffect(() => {
@@ -176,9 +173,9 @@ export default function TelemetryDashboard({ focusScreen }) {
   const versions = useMemo(() => [...new Set(enriched.map(appVersion).filter((item) => item !== EMPTY))].sort(), [enriched]);
   const filtered = useMemo(() => {
     const term = search.trim().toLocaleLowerCase("pt-BR");
-    const ordered = screenOrderRef.current.sort(enriched, now);
+    const ordered = screenOrder.sort(enriched, now);
     return ordered.filter((item) => (clientId === "all" || item.clientId === clientId) && (screenId === "all" || item.id === screenId) && (status === "all" || item.portalStatus === status) && (source === "all" || sourceMeta(item).key === source) && (version === "all" || appVersion(item) === version) && (!term || [item.name, item.code, item.clientName, item.location].some((value) => String(value || "").toLocaleLowerCase("pt-BR").includes(term))));
-  }, [enriched, clientId, screenId, status, source, version, search, now]);
+  }, [enriched, clientId, screenId, status, source, version, search, now, screenOrder]);
   const metrics = useMemo(() => aggregateSchema4Traffic(filtered), [filtered]);
   const cacheTotal = metrics.cacheHits + metrics.cacheMisses;
   const countStatus = (value) => filtered.filter((item) => item.portalStatus === value).length;
