@@ -5,6 +5,7 @@ import { CLOCK_PRO_TYPE, HERO_BUSINESS_TYPE, KPI_INDICATORS_TYPE, SPORTS_PREMIUM
 import SportsPremiumRenderer from "./sports-v2/SportsPremiumRenderer";
 import { reportTemplateRenderDiagnostics } from "./render-diagnostics";
 import { getConfiguredTemplateWeatherCity } from "./weather-city";
+import { selectTemplateV2ForecastDays } from "./dynamic-data";
 import "@fontsource-variable/inter/wght.css";
 import "./template-v2.css";
 
@@ -118,7 +119,7 @@ function WeatherPremium({ config, orientation, name, dynamicData, mode }) {
   const configuredCity = getConfiguredTemplateWeatherCity(weatherConfig.city);
   const missingCity = mode !== "player" && dynamicData?.weatherError === "missing-city";
   const cityLabel = weather?.city || configuredCity || (mode !== "player" ? "Cidade não configurada" : weatherConfig.city);
-  const forecast = (weather?.forecast || []).slice(1,5);
+  const forecast = selectTemplateV2ForecastDays(weather?.forecast, weatherConfig.forecastDays);
   const visibility = config.visibility || {};
   return <section className={`tpv2-root tpv2-weather-premium ${orientation === "Retrato" ? "is-portrait" : "is-landscape"} ${mode === "thumbnail" ? "is-thumbnail" : ""} ${config.modules?.news?.enabled ? `has-news-ticker ticker-${config.modules.news.tickerSize || "normal"}` : ""}`} style={dynamicStyle(config)}><DynamicBackdrop config={config} mode={mode}/>{visibility.showContent !== false && <div className="tpv2-weather-shell"><header>{visibility.showLogo !== false && <TemplateLogo asset={config.content?.logo} name={name}/>} {weatherConfig.showCity && <span>{cityLabel}</span>}</header>{loading ? <div className="tpv2-weather-loading"><i/><i/><i/></div> : missingCity ? <div className="tpv2-weather-unavailable">Selecione uma cidade no editor</div> : weather?.unavailable || !weather ? <div className="tpv2-weather-unavailable">Previsão temporariamente indisponível</div> : <><main>{weatherConfig.showCurrent && <><span className="tpv2-weather-icon"><WeatherVectorIcon glyph={weather.icon}/></span><strong>{weather.temperature}°C</strong><div><b>{weather.condition}</b>{weatherConfig.showFeelsLike && <small>Sensação térmica {weather.sensation}°C</small>}</div></>}</main>{weatherConfig.showForecast && <div className="tpv2-forecast-grid">{forecast.map((day) => <article key={day.date}><span>{day.day}</span><b><WeatherVectorIcon glyph={day.icon}/></b><strong>{day.max}°</strong><small>{day.min}°</small></article>)}</div>}</>}</div>}{config.modules?.news?.enabled && <TemplateNewsTicker items={dynamicData?.news} config={config.modules.news} orientation={orientation}/>}</section>;
 }

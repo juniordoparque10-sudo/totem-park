@@ -202,6 +202,7 @@ import PortalModal from "./PortalModal";
 import PreviewModal from "./PreviewModal";
 import { getPublishedTemplateV2View, isTemplateV2 } from "./templates-v2/schema";
 import { getTemplateV2Orientation } from "./templates-v2/orientation";
+import { getTemplateV2ForecastRequestDays, normalizeTemplateV2ForecastDays } from "./templates-v2/dynamic-data";
 import { getTemplatesV2ScreenCapability } from "./templates-v2/player-capability";
 import logo from "./assets/logo.png";
 import isotipo from "./assets/isotipo.png";
@@ -1642,10 +1643,11 @@ async function fetchWeatherByCityLegacy(cityName) {
   }
 }
 
-async function fetchWeatherByCity(cityName) {
+async function fetchWeatherByCity(cityName, forecastRequestDays = 5) {
   const city = (cityName || "João Câmara/RN").trim();
   const repairedCity = repairWeatherTextSafe(city);
   const normalizedCity = normalizeWeatherCityName(repairedCity);
+  const requestedDays = Math.max(1, Math.min(16, Math.trunc(Number(forecastRequestDays)) || 5));
 
   try {
     let place = WEATHER_COORDINATE_PRESETS[normalizeWeatherKey(repairedCity)]
@@ -1669,7 +1671,7 @@ async function fetchWeatherByCity(cityName) {
     }
 
     const weatherResponse = await fetch(
-      `https://api.open-meteo.com/v1/forecast?latitude=${place.latitude}&longitude=${place.longitude}&current=temperature_2m,relative_humidity_2m,apparent_temperature,weather_code,wind_speed_10m&daily=temperature_2m_max,temperature_2m_min,weather_code&timezone=auto&forecast_days=5`
+      `https://api.open-meteo.com/v1/forecast?latitude=${place.latitude}&longitude=${place.longitude}&current=temperature_2m,relative_humidity_2m,apparent_temperature,weather_code,wind_speed_10m&daily=temperature_2m_max,temperature_2m_min,weather_code&timezone=auto&forecast_days=${requestedDays}`
     );
 
     if (!weatherResponse.ok) {
@@ -14075,14 +14077,16 @@ function ScaledTemplatePortalPreview({ template, playlistThumbnail = false }) {
   return <TemplateScaledStage className={className} orientation={orientation}><LegacyTemplateVisualPreview template={template} compact={false} /></TemplateScaledStage>;
 }
 
-async function loadTemplateV2Weather(city) {
-  const weather = await fetchWeatherByCity(city);
+async function loadTemplateV2Weather(city, forecastDays = 5) {
+  const normalizedForecastDays = normalizeTemplateV2ForecastDays(forecastDays);
+  const requestDays = getTemplateV2ForecastRequestDays(normalizedForecastDays);
+  const weather = await fetchWeatherByCity(city, requestDays);
   const daily = weather?.daily || {};
   return {
     ...weather,
     condition:getWeatherConditionLabel(weather?.weatherCode, getWeatherReferenceDate(weather)),
     icon:getWeatherIconSafe(weather?.weatherCode, getWeatherReferenceDate(weather)),
-    forecast:(daily.time || []).slice(0,5).map((date,index) => ({ date, day:new Date(`${date}T12:00:00`).toLocaleDateString("pt-BR",{weekday:"short"}).replace(".","").toUpperCase(), icon:getWeatherIconSafe(daily.weather_code?.[index]), max:Math.round(daily.temperature_2m_max?.[index] ?? 0), min:Math.round(daily.temperature_2m_min?.[index] ?? 0) })),
+    forecast:(daily.time || []).slice(0,requestDays).map((date,index) => ({ date, day:new Date(`${date}T12:00:00`).toLocaleDateString("pt-BR",{weekday:"short"}).replace(".","").toUpperCase(), icon:getWeatherIconSafe(daily.weather_code?.[index]), max:Math.round(daily.temperature_2m_max?.[index] ?? 0), min:Math.round(daily.temperature_2m_min?.[index] ?? 0) })),
     unavailable:weather?.temperature === "--",
   };
 }
@@ -14145,7 +14149,7 @@ function TemplateV2LivePreview({ template, sourceTemplate = template, compact = 
       const tasks = [];
       if (weatherConfig.enabled && modules.includes("weather")) {
         const fetchWeather = async () => {
-          return loadTemplateV2Weather(weatherConfig.city || "Sua cidade");
+          return loadTemplateV2Weather(weatherConfig.city || "Sua cidade", weatherConfig.forecastDays);
         };
         tasks.push((IS_TEMPLATE_DATA_FRESHNESS_EXPERIMENT
           ? refreshTemplateDataIfNeeded({ ...scope, module:"weather", config:weatherCacheConfig }, { ttlMs:10 * 60 * 1000, fetcher:fetchWeather, source:"open-meteo", isUsable:(weather) => Boolean(weather && !weather.unavailable) }).then(({ payload }) => payload ? { weather:payload } : {})

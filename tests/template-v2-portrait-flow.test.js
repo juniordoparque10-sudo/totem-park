@@ -128,5 +128,5 @@ test("editor e biblioteca distinguem cidade ausente de falha real da API", () =>
   assert.match(editor, /Selecione uma cidade para carregar a previsão no preview\./);
   assert.match(renderer, /dynamicData\?\.weatherError === "missing-city"/);
   assert.match(renderer, /Selecione uma cidade no editor/);
-  assert.match(renderer, /\(weather\?\.forecast \|\| \[\]\)\.slice\(1,5\)/);
+  assert.match(renderer, /selectTemplateV2ForecastDays\(weather\?\.forecast, weatherConfig\.forecastDays\)/);
 });
