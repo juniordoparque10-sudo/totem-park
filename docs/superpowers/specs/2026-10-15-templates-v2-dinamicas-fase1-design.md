@@ -2,7 +2,7 @@
 
 ## Status
 
-Especificação técnica para revisão. Nenhuma alteração funcional, publicação Web, mudança Firebase ou APK faz parte deste documento.
+Especificação técnica aprovada. Nenhuma alteração funcional, publicação Web, mudança Firebase ou APK faz parte deste documento.
 
 Base homologada: `1b4179d3fa6f80636bf34db7c986820e64b92f25`.
 
@@ -46,20 +46,24 @@ O núcleo não conhecerá RSS, produtos, Firestore nem estilos específicos. Not
 
 Cada configuração terá:
 
-- `display.duration`: duração total do item na playlist;
+- `display.duration`: duração publicada da template, usada somente como fallback fora de uma playlist;
 - `rotation.featuredSeconds`: permanência do destaque principal;
 - `rotation.secondarySeconds`: permanência do conjunto secundário;
 - `rotation.transition`: inicialmente `fade` ou `slide-soft`.
 
-O destaque principal também alterna automaticamente. Os cards secundários alternam em relógio independente. Os valores serão limitados a intervalos seguros no schema. O renderer usa uma única origem temporal por execução e calcula o quadro ativo por tempo decorrido, evitando vários intervalos concorrentes.
+O destaque principal também alterna automaticamente. Os cards secundários alternam em cadências próprias, porém derivados da mesma origem temporal da execução. Os valores serão limitados a intervalos seguros no schema. O renderer calcula o quadro ativo por tempo decorrido, sem criar timers concorrentes.
 
-A duração total não será estendida pela rotação interna. Ao final do item, o Player mantém a transição normal para o próximo item da playlist. Atualizações RSS ou mudanças de cache não reiniciam a contagem da playlist.
+A duração efetiva do item recebida da playlist é o limite absoluto da rotação. Quando a template estiver em uma playlist, esse valor prevalece sobre `display.duration`; fora dela, o valor publicado funciona apenas como fallback de preview. Nenhum ciclo principal ou secundário pode estender a exibição, aguardar a conclusão da rotação ou reiniciar o relógio. Ao final do item, o Player mantém a transição normal para o próximo item da playlist. Atualizações RSS ou mudanças de cache não reiniciam a contagem da playlist.
 
 ## Notícias Editorial Dinâmica
 
+### Preservação do tipo legado
+
+O tipo existente `news-editorial` permanece legado e inalterado. O novo comportamento será registrado como um tipo explícito, `news-editorial-dynamic`, com renderer, defaults e contrato próprios. Não haverá conversão automática de rascunhos, publicações, itens de playlist ou templates existentes. Uma template legada continuará usando o fluxo legado até que o usuário crie e atribua conscientemente uma nova template dinâmica.
+
 ### Dados
 
-Evoluir o tipo existente `news-editorial` de forma retrocompatível. A configuração passa a incluir:
+A configuração de `news-editorial-dynamic` inclui:
 
 - uma ou várias fontes RSS;
 - layout por orientação;
@@ -187,15 +191,16 @@ Os campos novos serão aditivos dentro do schema V2 atual. O fluxo permanece:
 
 `editorDraft → draft persistido → published → playlist → Player Web`.
 
-Templates antigas sem os novos campos recebem defaults seguros durante a normalização, sem migração em massa. Publicar preserva a separação entre rascunho e versão ativa.
+Templates antigas permanecem em seus tipos atuais e recebem apenas os defaults já aplicáveis a esses tipos, sem migração em massa. `news-editorial-dynamic` e `market-premium` só passam a existir por criação explícita. Publicar preserva a separação entre rascunho e versão ativa.
 
 ## Compatibilidade Android
 
 Os APKs V51 e V55 contêm bundles anteriores e não possuem os novos renderizadores. Eles não serão modificados nesta fase.
 
-As novas templates declararão uma capacidade específica, por exemplo `templatesV2DynamicPhase1`. O Portal só permitirá atribuí-las a telas que declarem explicitamente essa capacidade. Como V51 e V55 atuais não a declaram:
+As novas templates declararão uma capacidade específica, `templatesV2DynamicPhase1`. O Portal só permitirá atribuí-las a telas que declarem explicitamente essa capacidade. A validação ocorrerá tanto na seleção inicial quanto imediatamente antes de salvar, atualizar ou publicar uma playlist já atribuída, considerando todas as telas atualmente vinculadas e os destinos de agendamento afetados. A operação incompatível será interrompida antes de qualquer gravação ou comando operacional, sem alterar vínculos existentes. Como V51 e V55 atuais não declaram a capacidade:
 
 - a atribuição a essas telas ficará bloqueada;
+- a atualização ou publicação de conteúdo dinâmico em playlist já atribuída também ficará bloqueada;
 - o Portal exibirá aviso com os nomes das telas incompatíveis;
 - playlists e telas existentes não serão alteradas;
 - não será inferida compatibilidade apenas por `versionCode`;
@@ -205,8 +210,9 @@ Uma futura versão Android poderá declarar a capacidade depois de incorporar e 
 
 ## Modelo de renderização e continuidade
 
-- Timers pertencem à instância do renderer e são cancelados no cleanup.
+- A instância do renderer mantém uma única fonte temporal e, no máximo, um agendamento para a próxima fronteira relevante; todo agendamento é cancelado no cleanup.
 - O identificador de execução da playlist participa da fronteira de reinicialização.
+- A duração efetiva do item da playlist é recebida pelo renderer e limita absolutamente qualquer quadro ou transição interna.
 - Alterações de dados dinâmicos não recriam o relógio de execução.
 - Mudança real de item ou de publicação reinicia a composição de forma determinística.
 - Modos `thumbnail` e editor usam um quadro estável, sem animação contínua desnecessária.
@@ -272,6 +278,7 @@ Os controles genéricos de logo, fundo, cores, overlay e transparência permanec
 - editor, biblioteca e Player Web equivalentes;
 - seleção em playlist compatível;
 - bloqueio de V51/V55 sem capacidade declarada;
+- bloqueio também ao atualizar ou publicar playlists já atribuídas a Players incompatíveis;
 - continuidade da playlist;
 - regressão focada das Templates V2 existentes;
 - build Web e Preview isolado.
