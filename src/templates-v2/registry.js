@@ -32,7 +32,7 @@ const VISIBILITY_CONTROLS = {
 };
 
 export const TEMPLATE_V2_REGISTRY = Object.fromEntries(entries.map(([type,label,category,description,preset,modules]) => [type, {
-  type, label, category, description, preset, modules, newsTicker:modules.includes("news"), orientations:["Paisagem","Retrato"], thumbnail:`template-v2-${type}`,
+  type, label, category, description, preset, modules, creatable:type !== NEWS_EDITORIAL_TYPE, newsTicker:modules.includes("news"), orientations:["Paisagem","Retrato"], thumbnail:`template-v2-${type}`,
   visibilityControls: VISIBILITY_CONTROLS[type] || ["showLogo","showContent","showHeadline","showSubtitle","showCta","showServices"],
   createDraft:(overrides) => createTemplateV2Draft(type, overrides),
 }]));
@@ -43,3 +43,4 @@ export function getTemplateV2Definition(type) {
   return TEMPLATE_V2_REGISTRY[type] || null;
 }
 export function listTemplateV2Definitions() { return Object.values(TEMPLATE_V2_REGISTRY); }
+export function listCreatableTemplateV2Definitions() { return listTemplateV2Definitions().filter((definition)=>definition.creatable !== false); }

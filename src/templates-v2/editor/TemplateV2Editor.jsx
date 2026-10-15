@@ -19,7 +19,7 @@ import {
   getTemplateV2Name,
   isTemplateV2,
 } from "../schema";
-import { TEMPLATE_V2_CATEGORIES, getTemplateV2Definition, listTemplateV2Definitions } from "../registry";
+import { TEMPLATE_V2_CATEGORIES, getTemplateV2Definition, listCreatableTemplateV2Definitions } from "../registry";
 import { useTemplateV2Draft } from "./useTemplateV2Draft";
 import TemplateV2MediaField from "./TemplateV2MediaField";
 import { mediaDocumentToTemplateAsset } from "./media-utils";
@@ -94,7 +94,7 @@ export default function TemplateV2Editor({ client, access, entitlement = { allow
   const selected = useMemo(() => templates.find((item) => item.id === selectedId) || null, [templates, selectedId]);
   const activeType = selected?.identity?.templateType || selected?.templateType || newType;
   const definition = getTemplateV2Definition(activeType);
-  const catalogItems = listTemplateV2Definitions().filter((item) => (catalogCategory === "Todos" || item.category === catalogCategory) && (catalogOrientation === "Todos" || item.orientations.includes(catalogOrientation)));
+  const catalogItems = listCreatableTemplateV2Definitions().filter((item) => (catalogCategory === "Todos" || item.category === catalogCategory) && (catalogOrientation === "Todos" || item.orientations.includes(catalogOrientation)));
   const draftState = useTemplateV2Draft(selected, activeType);
   const orientation = normalizeTemplateV2Orientation(draftState.editorDraft.display?.defaultOrientation);
   const configuredWeatherCity = getConfiguredTemplateWeatherCity(draftState.editorDraft.modules.weather?.city);
