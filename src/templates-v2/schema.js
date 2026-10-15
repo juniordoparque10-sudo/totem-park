@@ -2,6 +2,8 @@ import { normalizeTemplateV2Orientation } from "./orientation.js";
 import { normalizeNewsEditorialDynamicConfig } from "./news-editorial-dynamic/config.js";
 import { normalizeSmartLobbyConfig } from "./smart-lobby/config.js";
 import { normalizeAgendaInfoConfig } from "./agenda-info/config.js";
+import { normalizePromotionCampaignConfig } from "./promotion-campaign/config.js";
+import { normalizeDigitalMenuConfig } from "./digital-menu/config.js";
 
 export const TEMPLATE_V2_SCHEMA_VERSION = 2;
 export const TEMPLATE_V2_RENDERER = "template-v2";
@@ -82,8 +84,8 @@ const TEMPLATE_PRESETS = {
   [NEWS_EDITORIAL_DYNAMIC_TYPE]: { dynamicTemplate:true,content:{headline:"Notícias em destaque",subtitle:"Atualização editorial dinâmica",services:[]},style:{preset:"editorial-dynamic",primaryColor:"#22d3ee",secondaryColor:"#8b5cf6",backgroundColor:"#07111f",textColor:"#ffffff",mutedTextColor:"#cbd5e1"},modules:{news:{enabled:true,dynamicStrict:true,newsSource:"",newsFeedUrl:"",selectedNewsSources:[]}},dynamicNews:{layout:"A",showImage:true,showSummary:true,showSource:true,showDate:true,secondarySlots:3,rotation:{featuredSeconds:8,secondarySeconds:5,transition:"fade"}} },
   [MARKET_PREMIUM_TYPE]: { dynamicTemplate:true,content:{headline:"Ofertas da semana",subtitle:"Qualidade e economia",services:[]},style:{preset:"market-premium",primaryColor:"#22d3ee",secondaryColor:"#8b5cf6",backgroundColor:"#061426",textColor:"#ffffff",mutedTextColor:"#b8c8df"},market:{layout:"A",segment:"Supermercado",catalog:[],rotation:{featuredSeconds:8,secondarySeconds:5,transition:"fade"}} },
   [AGENDA_INFO_TYPE]: { dynamicTemplate:true,content:{headline:"Agenda do dia",subtitle:"Reuniões, eventos e comunicados",services:[]},style:{preset:"agenda",primaryColor:"#2563eb",secondaryColor:"#06b6d4",backgroundColor:"#f8fafc",textColor:"#172554",mutedTextColor:"#475569"},agenda:{layout:"A",secondarySlots:3,items:[],rotation:{featuredSeconds:8,secondarySeconds:5,transition:"fade"}} },
-  [PROMOTION_CAMPAIGN_TYPE]: { content:{headline:"Sua ideia ganha vida aqui.",subtitle:"Uma campanha com presença e impacto.",services:[{id:"1",title:"Benefício",description:"Destaque da campanha"}],cta:{enabled:true,label:"Saiba mais",url:""}},style:{preset:"cinematic",primaryColor:"#a855f7",secondaryColor:"#ec4899",backgroundColor:"#10051f"} },
-  [DIGITAL_MENU_TYPE]: { content:{headline:"Menu especial",subtitle:"Produtos preparados para bons momentos",services:[{id:"1",title:"Produto destaque",description:"R$ 0,00"},{id:"2",title:"Produto",description:"R$ 0,00"},{id:"3",title:"Produto",description:"R$ 0,00"},{id:"4",title:"Produto",description:"R$ 0,00"}]},style:{preset:"cafe",primaryColor:"#d97706",secondaryColor:"#f59e0b",backgroundColor:"#1c1009"} },
+  [PROMOTION_CAMPAIGN_TYPE]: { dynamicTemplate:true,content:{headline:"Sua ideia ganha vida aqui.",subtitle:"Uma campanha com presença e impacto.",services:[],cta:{enabled:true,label:"Saiba mais",url:""}},style:{preset:"cinematic",primaryColor:"#a855f7",secondaryColor:"#ec4899",backgroundColor:"#10051f"},campaign:{layout:"A",secondarySlots:3,items:[],rotation:{featuredSeconds:8,secondarySeconds:5,transition:"fade"}} },
+  [DIGITAL_MENU_TYPE]: { dynamicTemplate:true,content:{headline:"Menu especial",subtitle:"Produtos preparados para bons momentos",services:[]},style:{preset:"cafe",primaryColor:"#d97706",secondaryColor:"#f59e0b",backgroundColor:"#1c1009"},digitalMenu:{layout:"A",categories:[],products:[],rotation:{featuredSeconds:8,secondarySeconds:5,transition:"fade"}} },
   [KPI_INDICATORS_TYPE]: { content:{headline:"Indicadores",subtitle:"Visão geral do período",services:[{id:"1",title:"Indicador 01",description:"0"},{id:"2",title:"Indicador 02",description:"0"},{id:"3",title:"Meta",description:"0%"},{id:"4",title:"Variação",description:"0%"}]},style:{preset:"data",primaryColor:"#8b5cf6",secondaryColor:"#22d3ee",backgroundColor:"#07111f"} },
   [QR_INTERACTION_TYPE]: { content:{headline:"Acompanhe nosso conteúdo!",subtitle:"Aponte a câmera e conecte-se.",services:[],cta:{enabled:true,label:"Acesse agora",url:""}},style:{preset:"social",primaryColor:"#ef4444",secondaryColor:"#ffffff",backgroundColor:"#18050a"},modules:{qrCode:{enabled:true,value:""}} },
   [SPORTS_PREMIUM_TYPE]: { content:{headline:"Resultados Esportivos Premium",subtitle:"Sistema visual multiesportes",services:[]},style:{preset:"broadcast-dark",primaryColor:"#22d3ee",secondaryColor:"#8b5cf6",backgroundColor:"#07111f",overlayOpacity:58},modules:{news:{enabled:false,newsSource:"",newsFeedUrl:"",selectedNewsSources:[],tickerSpeed:"normal",tickerSize:"normal",tickerBackground:"#07111f",tickerTextColor:"#ffffff",tickerTransparency:8,tickerLabel:"Notícias esportivas"}},sports:{provider:"thesportsdb",mode:"single",selectedSport:"football",selectedSports:["football"],primarySport:"football",transition:"fade",visualPreset:"broadcast-dark"} },
@@ -137,6 +139,8 @@ export function createTemplateV2Draft(type = HERO_BUSINESS_TYPE, overrides = {})
   if (type === NEWS_EDITORIAL_DYNAMIC_TYPE) draft.dynamicNews = normalizeNewsEditorialDynamicConfig(draft.dynamicNews, draft.modules.news);
   if (type === SMART_LOBBY_TYPE) draft.smartLobby = normalizeSmartLobbyConfig(draft.smartLobby);
   if (type === AGENDA_INFO_TYPE) draft.agenda = normalizeAgendaInfoConfig(draft.agenda);
+  if (type === PROMOTION_CAMPAIGN_TYPE) draft.campaign = normalizePromotionCampaignConfig(draft.campaign);
+  if (type === DIGITAL_MENU_TYPE) draft.digitalMenu = normalizeDigitalMenuConfig(draft.digitalMenu);
   return draft;
 }
 

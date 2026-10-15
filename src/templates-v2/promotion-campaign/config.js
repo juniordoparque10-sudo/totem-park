@@ -1,0 +1,2 @@
+import { normalizeDynamicCollection } from "../dynamic-collections/config.js";
+export function normalizePromotionCampaignConfig(value={}) { const normalized=normalizeDynamicCollection({layout:"A",secondarySlots:3,rotation:{featuredSeconds:8,secondarySeconds:5,transition:"fade"},...value}); return {...normalized,items:normalized.items.map((item)=>({...item,badge:String(item.badge||"").trim().slice(0,32),ctaLabel:String(item.ctaLabel||"").trim().slice(0,40),ctaUrl:String(item.ctaUrl||"").trim(),image:item.image||null}))}; }

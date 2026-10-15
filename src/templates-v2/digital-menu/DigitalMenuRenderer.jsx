@@ -1,0 +1,3 @@
+import CollectionRenderer from "../dynamic-collections/CollectionRenderer";
+import { normalizeDigitalMenuConfig } from "./config.js";
+export default function DigitalMenuRenderer(props){const menu=normalizeDigitalMenuConfig(props.config.digitalMenu);const collection={...menu,secondarySlots:3};const items=menu.products.filter((item)=>item.available).map((item)=>({id:item.id,title:item.name,subtitle:`${item.description}${item.description?" · ":""}R$ ${Number(item.price).toLocaleString("pt-BR",{minimumFractionDigits:2})}`,image:item.image,active:item.available,order:item.order}));return <CollectionRenderer {...props} collection={collection} items={items} label="MENU DIGITAL"/>;}
