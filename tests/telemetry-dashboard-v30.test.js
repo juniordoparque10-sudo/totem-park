@@ -22,3 +22,12 @@ test("media download card does not claim an unavailable individual timestamp", (
   assert.match(dashboard, /timestamp individual não disponível/);
   assert.doesNotMatch(dashboard, /title="Última transferência"/);
 });
+
+test("preserves the existing Firebase listeners and operational integrations", () => {
+  assert.equal((dashboard.match(/\bonSnapshot\s*\(/g) || []).length, 4);
+  assert.doesNotMatch(dashboard, /\bgetDocs\b|\bcollectionGroup\b/);
+  assert.match(dashboard, /renderTelemetryPdfReport/);
+  assert.match(dashboard, /createPortalScreenOrderTracker/);
+  assert.match(dashboard, /sortClientsAlphabetically/);
+  assert.doesNotMatch(dashboard, /android|PlayerActivity|capacitor/i);
+});
