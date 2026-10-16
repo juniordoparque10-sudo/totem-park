@@ -7,11 +7,11 @@ const buildGradle = fs.readFileSync(new URL("../android/app/build.gradle", impor
 const manifest = fs.readFileSync(new URL("../android/app/src/playerRcSecureLinkExperiment/AndroidManifest.xml", import.meta.url), "utf8");
 const styles = fs.readFileSync(new URL("../android/app/src/playerRcSecureLinkExperiment/res/values/styles.xml", import.meta.url), "utf8");
 
-test("V55 experimental identity and controlled launch are recovered exactly", () => {
+test("V56 increments only the recovered V55 experimental identity", () => {
   const flavor = buildGradle.match(/playerRcSecureLinkExperiment\s*\{[\s\S]*?\n\s*\}/)?.[0] ?? "";
   assert.match(flavor, /applicationIdSuffix\s+"\.player\.rcsecurelink"/);
-  assert.match(flavor, /versionCode\s+55/);
-  assert.match(flavor, /versionName\s+"1\.0\.0-v55-stability-recovery-experimental"/);
+  assert.match(flavor, /versionCode\s+56/);
+  assert.match(flavor, /versionName\s+"1\.0\.0-v56-experimental"/);
   assert.match(manifest, /android:name="\.MainActivity"/);
   assert.match(manifest, /android:name="\.BootReceiver"[\s\S]*?android:enabled="false"/);
   assert.doesNotMatch(manifest, /android\.intent\.category\.HOME/);

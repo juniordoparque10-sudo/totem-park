@@ -92,3 +92,13 @@ A APK só poderá ser nomeada V56 quando declarar versionCode `56`, versionName 
 - Evidência em emulador: o binding `ACTIVE` correto consegue gravar, porém as Rules atuais também aceitam gravações em `telemetry.activity` por identidade sem binding, binding revogado e binding de outra tela através de `isAllowedPublicScreenUpdate()`.
 - Decisão: não alterar Rules nesta execução e não ativar o adaptador remoto. Vínculo, cache e reprodução permanecem independentes do journal.
 
+## Entrega candidata V56
+
+- Preview isolado: `https://totem-park-2rurn4x8m-junior-pk-s-projects.vercel.app`
+- Deployment Preview: `dpl_8vQKgGtqRVm8z9HnzCWE4ga4svLz`
+- APK: `artifacts/Totem Park Player V56.apk`
+- VersionCode/VersionName: `56` / `1.0.0-v56-experimental`
+- Certificado SHA-256: `72e6e078aa690a678e8ed2854b348c402762f9d980ec1cdf7e1261bb5f7409a7` (idêntico à V55 instalada)
+- APK SHA-256: `27f6028751f461b89793248df482f5cdf1de5debeeb8cbd78428ae0e135dc072`
+- Instalação automática: não executada.
+

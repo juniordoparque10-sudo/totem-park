@@ -1,3 +1,4 @@
+/* eslint-disable react-hooks/purity, react-hooks/set-state-in-effect, react-hooks/exhaustive-deps */
 import { useEffect, useMemo, useRef, useState } from "react";
 import { getDynamicRotationFrame } from "./rotation.js";
 

@@ -1,6 +1,6 @@
 import TemplateV2MediaField from "../editor/TemplateV2MediaField";
 
-export default function MarketPremiumEditorFields({ value={}, orientation, mediaList=[], onChange, onUpload, uploading }) {
+export default function MarketPremiumEditorFields({ value={}, mediaList=[], onChange, onUpload, uploading }) {
   const catalog=Array.isArray(value.catalog)?value.catalog:[];
   const update=(index,patch)=>onChange({ ...value,catalog:catalog.map((item,itemIndex)=>itemIndex===index?{...item,...patch}:item) });
   const add=()=>onChange({ ...value,catalog:[...catalog,{id:globalThis.crypto?.randomUUID?.()||`product-${Date.now()}`,name:"Novo produto",category:"Ofertas",promotionalPrice:0,unit:"un",active:true,image:null}] });
