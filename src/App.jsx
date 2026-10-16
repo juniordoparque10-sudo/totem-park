@@ -166,6 +166,7 @@ import {
 } from "./android-link-lifecycle";
 import { readCachedPlayerDocument } from "./player-local-first";
 import { getPlaybackRemainingAfterWake, subscribePlayerRuntimeWake } from "./player-runtime-recovery";
+import { buildPlayerVisibleLayers } from "./player-visible-layers";
 import { getActivePlaylistListenerDependencies } from "./active-playlist-listener";
 import { selectFallbackTemplates } from "./player-playlist-boundary";
 import {
@@ -18352,33 +18353,18 @@ function PlayerPage() {
         ? "landscape-mode"
         : getPlayerOrientationClass();
 
-  const visibleLayers = [];
-  const retainedPreviousIndex = previousMediaIndex ?? (!currentMediaReady ? previousMediaIndexRef.current : null);
-
-  if (
-    !decoderReleasePending &&
-    retainedPreviousIndex !== null &&
-    retainedPreviousIndex !== safeMediaIndex &&
-    playerItems[retainedPreviousIndex]
-  ) {
-    visibleLayers.push({
-      item: playerItems[retainedPreviousIndex],
-      index: retainedPreviousIndex,
-      executionId: previousPlaybackExecutionId ?? previousPlaybackExecutionIdRef.current,
-      state: "is-previous",
-    });
-  }
-
-  if (!decoderReleasePending) {
-    visibleLayers.push({
-      item: currentMedia,
-      index: safeMediaIndex,
-      executionId: currentPlaybackExecutionId,
-      state: currentMediaReady
-        ? `is-current is-ready ${currentTransitionReady ? "transition-active" : ""}`
-        : "is-current is-pending",
-    });
-  }
+  const visibleLayers = buildPlayerVisibleLayers({
+    playerItems,
+    mediaIndex,
+    previousMediaIndex,
+    previousMediaIndexFallback:previousMediaIndexRef.current,
+    previousPlaybackExecutionId,
+    previousPlaybackExecutionIdFallback:previousPlaybackExecutionIdRef.current,
+    currentPlaybackExecutionId,
+    currentMediaReady,
+    currentTransitionReady,
+    decoderReleasePending,
+  });
 
   function renderPlayerItem(item, index, isCurrent, executionId) {
     if (item.playerItemType === "template") {
