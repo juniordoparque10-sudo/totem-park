@@ -3,34 +3,28 @@
 **Base:** `c49579bf1ec06f64dbb06e8b0165c2cb13ffab83`  
 **Coleta:** 2026-10-15  
 **Pacote esperado:** `br.com.parksolutions.totempark.player.rcsecurelink`  
-**Dispositivo autorizado:** `192.168.31.251:5555`  
-**Decisão do gate:** `BLOCKED`
+**Dispositivo autorizado:** `adb-1C281HFDD4RZPM-E95Um9._adb-tls-connect._tcp` (`sabrina`, IP informado `192.168.31.253`)
+**Decisão do gate físico:** `PASS`
 
 ## Evidência física
 
-Comando de conexão somente leitura:
+Coleta somente leitura concluída em `2026-10-16T02:33:27.4962153+00:00`:
 
 ```text
-adb connect 192.168.31.251
+scripts/verify-player-v56-metadata.ps1 -AdbSerial adb-1C281HFDD4RZPM-E95Um9._adb-tls-connect._tcp
 ```
 
 Resultado observado:
 
 ```text
-cannot connect to 192.168.31.251:5555: ... host conectado não respondeu. (10060)
-List of devices attached
-adb.exe: device '192.168.31.251:5555' not found
+installedPackage: br.com.parksolutions.totempark.player.rcsecurelink
+activity: br.com.parksolutions.totempark.MainActivity
+versionCode: 55
+versionName: 1.0.0-v55-stability-recovery-experimental
+certificateSha256: 72e6e078aa690a678e8ed2854b348c402762f9d980ec1cdf7e1261bb5f7409a7
 ```
 
-O coletor `scripts/verify-player-v56-metadata.ps1` não conseguiu executar `dumpsys package` porque nenhum dispositivo estava disponível. Portanto, estes valores continuam não confirmados:
-
-- package efetivamente instalado;
-- Activity efetiva;
-- versionCode e versionName;
-- caminho da APK instalada;
-- SHA-256 do certificado da APK instalada.
-
-Sem o certificado físico não é permitido presumir que uma chave Debug local seja compatível. O versionCode da candidata também não será definido.
+O gate físico confirma que a candidata deverá manter o package e o certificado acima. O próximo versionCode permitido é `56`; a APK final ainda depende dos gates operacionais e da comparação do certificado da candidata.
 
 ## Base consolidada
 
@@ -56,15 +50,9 @@ O diretório não versionado `android/app/src/playerRcSecureLinkExperiment/` e o
 
 ## Consequência
 
-O gate físico da Task 1 está bloqueado. Conforme a especificação e o plano aprovados:
+O gate físico da Task 1 está aprovado. Os candidatos locais continuam sem autorização automática: a Task 2 deve provar cada delta de Secure Link/`exitTv`, e a Task 3 deve provar Local First/cache/reprodução offline/recuperação antes de qualquer funcionalidade V56.
 
-- Tasks 2–10 não podem iniciar;
-- nenhuma recuperação V55 será copiada;
-- nenhuma funcionalidade V56 será implementada;
-- nenhum Preview ou APK será gerado;
-- nenhum arquivo Firebase, V51, V55 física ou produção será alterado.
+## Condição para a APK candidata
 
-## Condição objetiva para retomada
-
-Disponibilizar novamente o Chromecast em `192.168.31.251:5555`, com depuração ADB acessível e a V55 instalada. A retomada começa repetindo somente o coletor de metadados; se package, versão e certificado forem obtidos, o inventário seletivo prossegue.
+A APK só poderá ser nomeada V56 quando declarar versionCode `56`, versionName compatível, package idêntico e o mesmo certificado SHA-256 `72e6e078aa690a678e8ed2854b348c402762f9d980ec1cdf7e1261bb5f7409a7`.
 

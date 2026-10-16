@@ -14,8 +14,15 @@ $ErrorActionPreference = "Stop"
 
 function Invoke-AdbReadOnly {
     param([string[]]$Arguments)
-    $output = & $AdbPath -s $AdbSerial @Arguments 2>&1
-    if ($LASTEXITCODE -ne 0) {
+    $previousErrorActionPreference = $ErrorActionPreference
+    try {
+        $ErrorActionPreference = "Continue"
+        $output = & $AdbPath -s $AdbSerial @Arguments 2>&1
+        $nativeExitCode = $LASTEXITCODE
+    } finally {
+        $ErrorActionPreference = $previousErrorActionPreference
+    }
+    if ($nativeExitCode -ne 0) {
         throw "ADB read failed: $($Arguments -join ' ')"
     }
     return @($output | ForEach-Object { "$_" })

@@ -12,6 +12,8 @@ test("metadata collector is read-only and inspects only the requested package", 
   assert.match(source, /pm\s+path/i);
   assert.match(source, /apksigner/i);
   assert.match(source, /\[string\]\$PackageName/);
+  assert.match(source, /\$ErrorActionPreference\s*=\s*"Continue"/);
+  assert.match(source, /\$nativeExitCode\s*=\s*\$LASTEXITCODE/);
   assert.doesNotMatch(source, /adb(?:\.exe)?\s+(?:-s\s+\S+\s+)?(?:install|uninstall)/i);
   assert.doesNotMatch(source, /pm\s+clear/i);
   assert.doesNotMatch(source, /shell\s+rm/i);
