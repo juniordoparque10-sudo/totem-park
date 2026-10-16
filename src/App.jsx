@@ -165,6 +165,9 @@ import {
   updateTvConnectionScreenId,
 } from "./android-link-lifecycle";
 import { readCachedPlayerDocument } from "./player-local-first";
+import { getPlaybackRemainingAfterWake, subscribePlayerRuntimeWake } from "./player-runtime-recovery";
+import { getActivePlaylistListenerDependencies } from "./active-playlist-listener";
+import { selectFallbackTemplates } from "./player-playlist-boundary";
 import {
   isSingleImagePlaylist,
   isSingleVideoPlaylist,
@@ -3775,6 +3778,7 @@ function logTemplatesV2Diagnostic(event, payload = {}) {
 const IS_PLAYER_TELEMETRY_BUILD = APP_BUILD_MODE === "playerTelemetry";
 const IS_OPERATIONAL_TELEMETRY_BUILD = IS_PLAYER_RC_BUILD || IS_PLAYER_TELEMETRY_BUILD;
 const IS_SECURE_LINK_SPLASH_BUILD = import.meta.env.VITE_PLAYER_SECURE_LINK_SPLASH === "1";
+const IS_STRICT_PLAYLIST_EXPERIMENT = import.meta.env.VITE_PLAYER_STRICT_PLAYLIST === "1";
 const IS_PLAYER_JUMP_DIAG_BUILD = APP_BUILD_MODE === "playerJumpDiag";
 const IS_PLAYER_DECODER_EXPERIMENT_BUILD = APP_BUILD_MODE === "playerDecoderExperiment";
 const IS_TEMPLATE_DATA_FRESHNESS_EXPERIMENT = IS_PLAYER_RC_BUILD || APP_BUILD_MODE === "playerDecoderExperiment";
@@ -3880,12 +3884,13 @@ function PlayerOnlyApp() {
   const navigate = useNavigate();
   const [savedTvConnection] = useState(() => readTvConnection());
   const [screenRotation, setScreenRotation] = useState(getSavedScreenRotation);
-  const [showSplash, setShowSplash] = useState(true);
+  const [showSplash, setShowSplash] = useState(() => !IS_SECURE_LINK_SPLASH_BUILD);
   const [orientationReady, setOrientationReady] = useState(() =>
     Boolean(localStorage.getItem("totempark-screen-rotation")) || Boolean(savedTvConnection)
   );
 
   useEffect(() => {
+    if (IS_SECURE_LINK_SPLASH_BUILD) return undefined;
     const timeoutId = setTimeout(() => setShowSplash(false), 900);
     return () => clearTimeout(timeoutId);
   }, []);
@@ -15756,6 +15761,7 @@ function PlayerPage() {
   });
   const [loading, setLoading] = useState(true);
   const [now, setNow] = useState(new Date());
+  const [runtimeWakeRevision, setRuntimeWakeRevision] = useState(0);
   const [remoteOverlay, setRemoteOverlay] = useState(null);
   const [takeoverMessage, setTakeoverMessage] = useState(null);
   const [maintenanceMode, setMaintenanceMode] = useState(false);
@@ -15769,6 +15775,7 @@ function PlayerPage() {
   const transitionCleanupRef = useRef(null);
   const offlineStatusTimerRef = useRef(null);
   const cacheQueueRef = useRef(Promise.resolve());
+  const nativeCacheRunRef = useRef(0);
   const mediaCacheRunRef = useRef(0);
   const mediaCacheProgressReportAtRef = useRef(0);
   const pendingNativeMediaUrlsRef = useRef(new Set());
@@ -15907,6 +15914,11 @@ function PlayerPage() {
     window.addEventListener("totempark-operational-event", onOperationalEvent);
     return () => window.removeEventListener("totempark-operational-event", onOperationalEvent);
   }, []);
+
+  useEffect(() => subscribePlayerRuntimeWake(() => {
+    setNow(new Date());
+    setRuntimeWakeRevision((revision) => revision + 1);
+  }), []);
 
   function isCurrentSessionExitCommand(remoteCommand, commandStatus) {
     return isFreshExitCommand({ remoteCommand, commandStatus, sessionStartedAtMs: playerSessionStartedAtRef.current });
@@ -16291,7 +16303,7 @@ function PlayerPage() {
         playerItemType: "media",
       };
     }),
-    ...(hasActivePlaylistItems ? [] : screenTemplates).map((template) => {
+    ...selectFallbackTemplates(activePlaylistItems, screenTemplates, IS_STRICT_PLAYLIST_EXPERIMENT).map((template) => {
       const localizedTemplate = applyOfflineAssetUrls(template, offlineAssetMap);
       const cachedTemplate = applyPlayerMediaCache(localizedTemplate);
 
@@ -16547,7 +16559,7 @@ function PlayerPage() {
   const offlineAssetUrls = collectOfflineAssetUrls([
     defaultPlaylist,
     activeTemplate,
-    hasActivePlaylistItems ? [] : screenTemplates,
+    selectFallbackTemplates(activePlaylistItems, screenTemplates, IS_STRICT_PLAYLIST_EXPERIMENT),
     playlistsForOffline,
   ]);
   const offlinePlaylistMediaItems = [
@@ -16576,6 +16588,9 @@ function PlayerPage() {
   useEffect(() => {
     if (!isNativeApp() || nativeOfflineAssetUrls.length === 0) return;
 
+    const runId = nativeCacheRunRef.current + 1;
+    nativeCacheRunRef.current = runId;
+    const isCurrentRun = () => nativeCacheRunRef.current === runId;
     let active = true;
     let mediaDownloadStarted = false;
     const mediaPreparation = getPlaylistMediaPreparation(offlinePlaylistMediaItems, offlineAssetMap);
@@ -16697,6 +16712,7 @@ function PlayerPage() {
         offlineStorageKey,
         {
           purgeUnused: true,
+          shouldContinue: isCurrentRun,
           mediaByUrl: offlinePlaylistMediaByUrl,
           onDownloadStart: beginNativeMediaDownload,
           onProgress: reportNativeOfflineProgress,
@@ -16796,6 +16812,7 @@ function PlayerPage() {
 
     return () => {
       active = false;
+      if (nativeCacheRunRef.current === runId) nativeCacheRunRef.current += 1;
       pendingNativeMediaUrlsRef.current.clear();
       clearTimeout(offlineStatusTimerRef.current);
     };
@@ -17929,25 +17946,52 @@ function PlayerPage() {
     return () => unsubscribe();
   }, [clientId, screen?.id]);
 
+  const [, activePlaylistId, activePlaylistLegacyScreenDependency] = getActivePlaylistListenerDependencies({
+    appBuildMode: APP_BUILD_MODE,
+    clientId,
+    screen,
+  });
+
   useEffect(() => {
-    if (!screen?.playlistId || !clientId) {
+    if (!activePlaylistId || !clientId) {
       setDefaultPlaylist(null);
       return;
     }
 
-    const unsubscribe = onSnapshot(
-      doc(db, "clients", clientId, "playlists", screen.playlistId),
-      (playlistDoc) => {
-        if (playlistDoc.exists()) {
-          setDefaultPlaylist({ id: playlistDoc.id, ...playlistDoc.data() });
-        } else {
-          setDefaultPlaylist(null);
-        }
-      }
-    );
+    let cancelled = false;
+    let unsubscribe = null;
+    const playlistRef = doc(db, "clients", clientId, "playlists", activePlaylistId);
 
-    return () => unsubscribe();
-  }, [screen, clientId]);
+    async function restorePlaylistThenSubscribe() {
+      const cachedPlaylist = await readCachedPlayerDocument({
+        getFromCache: getDocFromCache,
+        reference: playlistRef,
+        expectedId: activePlaylistId,
+      });
+      if (cancelled) return;
+      if (cachedPlaylist) setDefaultPlaylist({ id: cachedPlaylist.id, ...cachedPlaylist.data() });
+      unsubscribe = onSnapshot(
+        playlistRef,
+        (playlistDoc) => {
+          if (playlistDoc.exists()) {
+            setDefaultPlaylist({ id: playlistDoc.id, ...playlistDoc.data() });
+          } else {
+            setDefaultPlaylist(null);
+          }
+        },
+        (error) => {
+          console.log("Erro ao acompanhar playlist ativa:", error);
+          setDefaultPlaylist((current) => current);
+        }
+      );
+    }
+    restorePlaylistThenSubscribe();
+
+    return () => {
+      cancelled = true;
+      unsubscribe?.();
+    };
+  }, [activePlaylistId, activePlaylistLegacyScreenDependency, clientId]);
 
   useEffect(() => {
     if (!screen?.templateEnabled || !screen?.templateId || !clientId) {
@@ -18091,12 +18135,13 @@ function PlayerPage() {
       recordJumpEvent("TIMER_CANCELLED", { reason: "effect-cleanup", expectedFireAt, index: safeIndex, mediaId: currentItem?.mediaId || currentItem?.id || "", currentTime: document.querySelector(".player-transition-layer.is-current video")?.currentTime ?? null });
       clearTimeout(playbackTimerRef.current);
       playbackTimerRef.current = null;
-      playbackRemainingRef.current = Math.max(
-        0,
-        playbackRemainingRef.current - (Date.now() - playbackStartedAtRef.current)
-      );
+      playbackRemainingRef.current = getPlaybackRemainingAfterWake({
+        remainingMs: playbackRemainingRef.current,
+        startedAtMs: playbackStartedAtRef.current,
+        nowMs: Date.now(),
+      });
     };
-  }, [activePlaylist?.id, activeItemsKey, mediaIndex, previousMediaIndex, readyMediaKey, pauseMode, takeoverMessage, blackoutMode, maintenanceMode, isAndroidSmartTv, singleImageLoopCycle, currentPlaybackExecutionId]);
+  }, [activePlaylist?.id, activeItemsKey, mediaIndex, previousMediaIndex, readyMediaKey, pauseMode, takeoverMessage, blackoutMode, maintenanceMode, isAndroidSmartTv, singleImageLoopCycle, currentPlaybackExecutionId, runtimeWakeRevision]);
 
   useEffect(() => {
     const mediaElement = document.querySelector(

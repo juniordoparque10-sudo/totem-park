@@ -7,17 +7,18 @@ const source = fs.readFileSync(new URL('../src/offline-player-cache.js', import.
 const sw = fs.readFileSync(new URL('../public/sw.js', import.meta.url), 'utf8');
 const names = new Set(['totem-park-pwa-v1', 'totem-park-pwa-v2',
   'totem-park-pwa-v3', 'totempark-player-media-v1', 'other-cache',
-  'totem-park-pwa-v99', 'totem-park-pwa-v2-other']);
+  'totem-park-pwa-v99', 'totem-park-pwa-v2-other', 'totem-park-pwa-shell-3']);
 const handlers = {};
 vm.runInNewContext(sw, {
-  self: { addEventListener: (name, handler) => { handlers[name] = handler; }, clients: { claim() {} } },
+  URL,
+  self: { location: { href: 'https://totempark.test/sw.js?v=3' }, addEventListener: (name, handler) => { handlers[name] = handler; }, clients: { claim() {} } },
   caches: { keys: async () => [...names], delete: async name => names.delete(name) },
 });
 let activation;
 handlers.activate({ waitUntil: promise => { activation = promise; } });
 await activation;
-assert.deepEqual([...names], ['totem-park-pwa-v3', 'totempark-player-media-v1',
-  'other-cache', 'totem-park-pwa-v99', 'totem-park-pwa-v2-other']);
+assert.deepEqual([...names], ['totempark-player-media-v1',
+  'other-cache', 'totem-park-pwa-v99', 'totem-park-pwa-v2-other', 'totem-park-pwa-shell-3']);
 console.log('A: SW removes only explicitly retired shell caches; current, media and unknown caches survive.');
 
 const entries = new Map();
@@ -31,11 +32,19 @@ const cache = {
 };
 const context = vm.createContext({
   Capacitor: { isNativePlatform: () => native }, Request, URL,
+  getPlaylistMediaCanonicalIdentity: item => item.mediaId || item.sourceMediaId || item.id || '',
+  getPlaylistMediaContentVersion: item => item.contentVersion || item.fileVersion || '',
   localStorage: { getItem: key => metadata.get(key), setItem: (key, value) => metadata.set(key, value) },
   caches: { open: async name => { assert.equal(name, 'totempark-player-media-v1'); return cache; } },
   fetch: async () => { downloads++; throw new Error('Unexpected download'); },
 });
-vm.runInContext(source.replace(/^import .*;\r?\n/gm, '').replace(/export /g, ''), context);
+vm.runInContext(
+  source
+    .replace(/import\s+[\s\S]*?\s+from\s+["'][^"']+["'];\r?\n/g, '')
+    .replace(/^import\s+["'][^"']+["'];\r?\n/gm, '')
+    .replace(/export /g, ''),
+  context,
+);
 const item = id => ({ id, type: 'video', preview: `https://example.test/${id}.mp4`, sizeBytes: 5 });
 const key = (client, id) => context.getMediaCacheKey(client, item(id));
 const a1 = key('A', 'video01');

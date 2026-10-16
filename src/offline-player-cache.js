@@ -572,6 +572,7 @@ export async function cacheOfflineAssets(urls, scope, storageKey, options = {}) 
   let mediaFailed = 0;
   let mediaDownloaded = 0;
   let mediaDownloadedBytes = 0;
+  let superseded = false;
   const sizeByUrl = {};
 
   try {
@@ -592,6 +593,11 @@ export async function cacheOfflineAssets(urls, scope, storageKey, options = {}) 
   }).catch(() => {});
 
   for (const url of uniqueUrls) {
+    if (options.shouldContinue?.() === false) {
+      superseded = true;
+      break;
+    }
+
     const playlistMedia = options.mediaByUrl?.[url] || null;
     const cacheIdentity = playlistMedia?.cacheIdentity || "";
     const contentVersion = playlistMedia?.contentVersion || "";
@@ -838,6 +844,7 @@ export async function cacheOfflineAssets(urls, scope, storageKey, options = {}) 
     mediaFailed,
     mediaDownloaded,
     mediaDownloadedBytes,
+    superseded,
     urlMap,
   };
 }

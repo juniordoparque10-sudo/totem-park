@@ -68,6 +68,20 @@ Foram recuperados seletivamente, sem copiar a árvore suja em bloco:
 
 Resultados: `18/18` testes focados aprovados e `2/2` testes de identidade da Function aprovados no emulador Firebase `demo-*`, sem acesso ou mutação de produção.
 
+## Gate Task 3 — equivalência operacional V55
+
+**V55_OPERATIONAL_EQUIVALENCE:** `PASS`
+
+- estado de playlist válido é restaurado do cache antes da assinatura remota;
+- heartbeat da tela não recria o listener da playlist;
+- retomada de processo/WebView reconcilia o tempo restante sem zerar identidade ou reprodução;
+- flavor estrito não transforma a biblioteca de templates em playlist implícita;
+- download nativo obsoleto é interrompido por identidade de execução, sem apagar cache válido;
+- perda de rede não aciona limpeza de vínculo, cache ou playback;
+- manutenção, blackout, pausa/retomada e saída confirmada preservam os estados já previstos.
+
+O gate focado aprovou `51/51` cenários. O teste legado de retenção Web recebeu somente compatibilidade de harness para o service worker versionado e imports ESM atuais; não houve mudança na política de cache Web.
+
 ## Condição para a APK candidata
 
 A APK só poderá ser nomeada V56 quando declarar versionCode `56`, versionName compatível, package idêntico e o mesmo certificado SHA-256 `72e6e078aa690a678e8ed2854b348c402762f9d980ec1cdf7e1261bb5f7409a7`.
