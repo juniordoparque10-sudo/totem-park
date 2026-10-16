@@ -1,0 +1,47 @@
+.remote-control-panel-inline .remote-playback-row {
+  display: grid;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  gap: 10px;
+  margin-bottom: 12px;
+  padding: 10px;
+  border: 1px solid rgba(96, 165, 250, 0.14);
+  border-radius: 17px;
+  background: rgba(3, 10, 24, 0.34);
+}
+
+.remote-control-panel-inline .remote-playback-button {
+  min-height: 68px;
+  flex-direction: column;
+  gap: 5px;
+}
+
+.remote-control-panel-inline .remote-playback-button svg {
+  width: 20px;
+  height: 20px;
+}
+
+.remote-control-panel-inline .remote-playback-button small {
+  color: #94a3b8;
+  font-size: 8px;
+  line-height: 1.1;
+}
+
+.remote-control-panel-inline .remote-playback-button:disabled {
+  cursor: not-allowed;
+  opacity: 0.54;
+  transform: none;
+}
+
+.remote-control-panel-inline .remote-operational-grid {
+  margin-bottom: 10px;
+}
+
+.remote-control-panel-inline .remote-exit-row .exit-tv {
+  width: 100%;
+}
+
+@media (max-width: 760px) {
+  .remote-control-panel-inline .remote-playback-row {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+}

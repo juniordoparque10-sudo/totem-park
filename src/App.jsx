@@ -74,6 +74,8 @@ import {
   RefreshCw,
   Pause,
   Play,
+  SkipBack,
+  SkipForward,
   MessageSquare,
   TriangleAlert,
   Wrench,
@@ -167,6 +169,7 @@ import {
 import { readCachedPlayerDocument } from "./player-local-first";
 import { getPlaybackRemainingAfterWake, subscribePlayerRuntimeWake } from "./player-runtime-recovery";
 import { buildPlayerVisibleLayers } from "./player-visible-layers";
+import { getPlaylistNavigationCapability, getPlaylistNavigationCommand } from "./player-remote-capability";
 import { getActivePlaylistListenerDependencies } from "./active-playlist-listener";
 import { selectFallbackTemplates } from "./player-playlist-boundary";
 import {
@@ -221,6 +224,7 @@ import { getDynamicPlaylistCapability } from "./templates-v2/playlist-capability
 import logo from "./assets/logo.png";
 import isotipo from "./assets/isotipo.png";
 import "./App.css";
+import "./remote-control.css";
 import "./portal-theme.css";
 
 const PUBLIC_WEB_URL = "https://totempark.com.br";
@@ -10092,6 +10096,7 @@ function ClientScreensPage({ client, access = getClientPlanAccess(client), isAdm
   const [rebindDialog, setRebindDialog] = useState(null);
   const [screenSuccessNotice, setScreenSuccessNotice] = useState("");
   const screenEditorRef = useRef(null);
+  const remoteNavigationPendingRef = useRef(new Set());
 
   useEffect(() => {
     if (!screenSuccessNotice) return undefined;
@@ -10434,9 +10439,22 @@ function ClientScreensPage({ client, access = getClientPlanAccess(client), isAdm
       }
 
       await updateDoc(doc(db, "clients", client.id, "screens", screenId), payload);
+      return true;
     } catch (error) {
       console.log(error);
       alert("Erro ao enviar comando para a TV.");
+      return false;
+    }
+  }
+
+  async function sendPlaylistNavigationCommand(screen, direction) {
+    const command = getPlaylistNavigationCommand(direction, screen);
+    if (!command || remoteNavigationPendingRef.current.has(screen.id)) return;
+    remoteNavigationPendingRef.current.add(screen.id);
+    try {
+      await sendRemoteCommand(screen.id, command);
+    } finally {
+      globalThis.setTimeout(() => remoteNavigationPendingRef.current.delete(screen.id), 700);
     }
   }
 
@@ -10635,6 +10653,7 @@ function ClientScreensPage({ client, access = getClientPlanAccess(client), isAdm
                 }
               : activeItem;
             const previewIndexLabel = activePlaylist?.items?.length ? currentIndex + 1 : screen.nowPlayingIndex;
+            const navigationCapability = getPlaylistNavigationCapability(screen);
 
             return (
               <div className="media-card" key={screen.id}>
@@ -10742,29 +10761,53 @@ function ClientScreensPage({ client, access = getClientPlanAccess(client), isAdm
                       <span className="remote-live-label">Tempo real</span>
                     </div>
 
-                    <div className="remote-control-grid-inline">
+                    <div className="remote-playback-row">
+                      <button
+                        className="remote-mini-button remote-playback-button"
+                        disabled={!navigationCapability.supported}
+                        title={navigationCapability.reason || "Voltar ao item anterior da playlist"}
+                        onClick={() => sendPlaylistNavigationCommand(screen, "previous")}
+                      >
+                        <SkipBack size={18} />
+                        <span>Mídia anterior</span>
+                        {!navigationCapability.supported && <small>Requer atualização do Player</small>}
+                      </button>
+
+                      <button
+                        className="remote-mini-button remote-playback-button"
+                        onClick={() => sendRemoteCommand(screen.id, { type: "pause" })}
+                      >
+                        <Pause size={18} />
+                        <span>Pausar</span>
+                      </button>
+
+                      <button
+                        className="remote-mini-button remote-playback-button play"
+                        onClick={() => sendRemoteCommand(screen.id, { type: "play" })}
+                      >
+                        <Play size={18} />
+                        <span>Play</span>
+                      </button>
+
+                      <button
+                        className="remote-mini-button remote-playback-button"
+                        disabled={!navigationCapability.supported}
+                        title={navigationCapability.reason || "Avançar ao próximo item da playlist"}
+                        onClick={() => sendPlaylistNavigationCommand(screen, "next")}
+                      >
+                        <SkipForward size={18} />
+                        <span>Mídia próxima</span>
+                        {!navigationCapability.supported && <small>Requer atualização do Player</small>}
+                      </button>
+                    </div>
+
+                    <div className="remote-control-grid-inline remote-operational-grid">
                       <button
                         className="remote-mini-button info"
                         onClick={() => sendRemoteCommand(screen.id, { type: "refresh" })}
                       >
                         <RefreshCw size={16} />
                         <span>Atualizar</span>
-                      </button>
-
-                      <button
-                        className="remote-mini-button"
-                        onClick={() => sendRemoteCommand(screen.id, { type: "pause" })}
-                      >
-                        <Pause size={16} />
-                        <span>Pausar</span>
-                      </button>
-
-                      <button
-                        className="remote-mini-button play"
-                        onClick={() => sendRemoteCommand(screen.id, { type: "play" })}
-                      >
-                        <Play size={16} />
-                        <span>Play</span>
                       </button>
 
                       <button
@@ -10837,6 +10880,9 @@ function ClientScreensPage({ client, access = getClientPlanAccess(client), isAdm
                         <span>Reiniciar</span>
                       </button>
 
+                    </div>
+
+                    <div className="remote-exit-row">
                       <button
                         className="remote-mini-button exit-tv"
                         onClick={() => {

@@ -23,6 +23,6 @@ test("the eight V56 templates use only the semantic shared logo component", () =
   for (const relative of files) {
     const source = fs.readFileSync(new URL(relative, import.meta.url), "utf8");
     assert.match(source, /import TemplateLogo from "\.\.\/TemplateLogo"|import TemplateLogo from "\.\.\/\.\.\/TemplateLogo"/);
-    assert.match(source, /<TemplateLogo\s+src=/);
+    assert.match(source, /<TemplateLogo[^>]*\ssrc=/);
   }
 });
