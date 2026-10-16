@@ -6643,18 +6643,29 @@ video.player-media::-webkit-media-controls-start-playback-button {
   letter-spacing: 1px !important;
 }
 
-.tv-screen-in-use-icon {
-  width: 92px;
-  height: 92px;
+.tv-screen-in-use-logo {
+  width: min(210px, 62%);
   margin: 0 auto 18px;
-  border-radius: 26px;
   display: flex;
   align-items: center;
   justify-content: center;
-  color: #fbbf24;
-  background: rgba(245, 158, 11, 0.14);
-  border: 1px solid rgba(251, 191, 36, 0.35);
-  box-shadow: 0 18px 50px rgba(245, 158, 11, 0.14);
+}
+
+.tv-screen-in-use-logo img {
+  display: block;
+  width: 100%;
+  height: auto;
+}
+
+@media (orientation: portrait) {
+  .tv-screen-in-use {
+    width: min(520px, 100%) !important;
+  }
+
+  .tv-screen-in-use-details,
+  .tv-screen-in-use-actions {
+    grid-template-columns: 1fr;
+  }
 }
 
 .tv-screen-in-use-details {
@@ -9994,16 +10005,9 @@ video.player-media::-webkit-media-controls-start-playback-button {
   font-size: 10px !important;
 }
 
-.native-rotation-content .tv-screen-in-use-icon {
-  width: 62px;
-  height: 62px;
+.native-rotation-content .tv-screen-in-use-logo {
+  width: 150px;
   margin-bottom: 10px;
-  border-radius: 18px;
-}
-
-.native-rotation-content .tv-screen-in-use-icon svg {
-  width: 34px;
-  height: 34px;
 }
 
 .native-rotation-content .tv-screen-in-use-details {

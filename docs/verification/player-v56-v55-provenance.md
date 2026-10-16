@@ -52,6 +52,22 @@ O diretório não versionado `android/app/src/playerRcSecureLinkExperiment/` e o
 
 O gate físico da Task 1 está aprovado. Os candidatos locais continuam sem autorização automática: a Task 2 deve provar cada delta de Secure Link/`exitTv`, e a Task 3 deve provar Local First/cache/reprodução offline/recuperação antes de qualquer funcionalidade V56.
 
+## Gate Task 2 — Secure Link e `exitTv`
+
+**Decisão:** `PASS`
+
+Foram recuperados seletivamente, sem copiar a árvore suja em bloco:
+
+| Delta provado | Arquivos | Evidência |
+| --- | --- | --- |
+| flavor/package experimental e launch theme navy | `android/app/build.gradle`, `.env.playerRcSecureLinkExperiment`, `android/app/src/playerRcSecureLinkExperiment/**` | pacote/versão física da Task 1 e teste estrutural do flavor |
+| claim inicial seguro, conflito amigável e sem bypass de ocupação | `src/player-initial-binding.js`, `src/player-identity.js`, `src/App.jsx` | `player-v56-secure-link-equivalence`, `player-identity`, `player-rebind` e emulador Functions |
+| timestamp ISO e rejeição de `exitTv` antigo/inválido | `src/android-link-lifecycle.js`, `src/App.jsx` | teste focado aceita comando recente e rejeita ausente, inválido e anterior à sessão |
+| vínculo local preservado em falha transitória/`failed-precondition` | `src/android-link-lifecycle.js`, `src/App.jsx` | limpeza local depende de liberação remota confirmada |
+| identidade visual aprovada da tela ocupada | `src/App.jsx`, `src/App.css` | logo original, estado desconhecido sem dado inventado e responsividade retrato/paisagem |
+
+Resultados: `18/18` testes focados aprovados e `2/2` testes de identidade da Function aprovados no emulador Firebase `demo-*`, sem acesso ou mutação de produção.
+
 ## Condição para a APK candidata
 
 A APK só poderá ser nomeada V56 quando declarar versionCode `56`, versionName compatível, package idêntico e o mesmo certificado SHA-256 `72e6e078aa690a678e8ed2854b348c402762f9d980ec1cdf7e1261bb5f7409a7`.

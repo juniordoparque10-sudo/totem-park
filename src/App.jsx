@@ -157,9 +157,11 @@ import {
   LINK_STATES,
   classifyLinkValidation,
   clearTvConnection,
+  isFreshExitCommand,
   logLinkEvent,
   persistTvConnection,
   readTvConnection,
+  shouldClearTvConnectionAfterRelease,
   updateTvConnectionScreenId,
 } from "./android-link-lifecycle";
 import { readCachedPlayerDocument } from "./player-local-first";
@@ -176,11 +178,15 @@ import { reportedAppVersion } from "./telemetry-card-data";
 import {
   authorizePlayerRebind,
   claimPlayerBinding,
+  classifyPlayerBindingClaimFailure,
   classifyPlayerIdentityFailure,
+  PLAYER_BINDING_CLAIM_FAILURES,
   PLAYER_IDENTITY_STATES,
   revokeOwnPlayerBinding,
+  shouldRevokeSecureBindingOnRelease,
   uploadTransitionDiagnosticRescue,
 } from "./player-identity";
+import { attemptInitialSecureBinding } from "./player-initial-binding";
 import { deleteStoredAsset, getStorageAssetVersionMetadata, uploadStorageAsset } from "./storage-service";
 import {
   createUploadPreviewLifecycle,
@@ -3768,6 +3774,7 @@ function logTemplatesV2Diagnostic(event, payload = {}) {
 }
 const IS_PLAYER_TELEMETRY_BUILD = APP_BUILD_MODE === "playerTelemetry";
 const IS_OPERATIONAL_TELEMETRY_BUILD = IS_PLAYER_RC_BUILD || IS_PLAYER_TELEMETRY_BUILD;
+const IS_SECURE_LINK_SPLASH_BUILD = import.meta.env.VITE_PLAYER_SECURE_LINK_SPLASH === "1";
 const IS_PLAYER_JUMP_DIAG_BUILD = APP_BUILD_MODE === "playerJumpDiag";
 const IS_PLAYER_DECODER_EXPERIMENT_BUILD = APP_BUILD_MODE === "playerDecoderExperiment";
 const IS_TEMPLATE_DATA_FRESHNESS_EXPERIMENT = IS_PLAYER_RC_BUILD || APP_BUILD_MODE === "playerDecoderExperiment";
@@ -15350,15 +15357,21 @@ function LegacyTemplateVisualPreview({ template, sourceTemplate = template, comp
 }
 
 function ScreenInUseCard({ screen, loading, onBack, onTryAnother }) {
+  const connectionStatusLabel = screen.connectionStatus === "ONLINE"
+    ? "Online"
+    : screen.connectionStatus === "OFFLINE"
+      ? "Offline"
+      : "Não informado";
+
   return (
     <div className="tv-connect-page">
       <div className="tv-connect-card tv-code-only-card tv-screen-in-use">
-        <div className="tv-screen-in-use-icon">
-          <Monitor size={52} />
+        <div className="tv-screen-in-use-logo">
+          <img src={logo} alt="Totem Park" />
         </div>
 
         <div className="tv-connect-kicker">Totem Park Player</div>
-        <h1>Tela em uso</h1>
+        <h1>Tela já conectada</h1>
         <p>Este código já está conectado em outro aparelho.</p>
 
         <div className="tv-screen-in-use-details">
@@ -15376,7 +15389,9 @@ function ScreenInUseCard({ screen, loading, onBack, onTryAnother }) {
           </div>
           <div>
             <span>Status</span>
-            <strong className="tv-screen-online-status">Online</strong>
+            <strong className={screen.connectionStatus === "ONLINE" ? "tv-screen-online-status" : ""}>
+              {connectionStatusLabel}
+            </strong>
           </div>
         </div>
 
@@ -15426,17 +15441,48 @@ function TVConnectPage({ playerOnly = false }) {
     try {
       setLoading(true);
 
-      if (IS_PLAYER_TELEMETRY_BUILD) {
+      if (IS_OPERATIONAL_TELEMETRY_BUILD) {
         const deviceId = getTotemDeviceId();
-        const binding = await claimPlayerBinding({
-          app: firebaseApp,
-          auth,
-          code,
-          deviceId,
-          appVersion: import.meta.env.VITE_APP_VERSION || "2a2-c.1",
-        });
-        finishConnection(binding.clientId, code, deviceId, binding.screenId);
-        return;
+        let binding;
+        try {
+          binding = await attemptInitialSecureBinding({
+            appBuildMode: APP_BUILD_MODE,
+            claimBinding: () => claimPlayerBinding({
+              app: firebaseApp,
+              auth,
+              code,
+              deviceId,
+              appVersion: import.meta.env.VITE_APP_VERSION || "2a2-c.1",
+            }),
+          });
+        } catch (error) {
+          const failure = classifyPlayerBindingClaimFailure(error);
+          if (failure === PLAYER_BINDING_CLAIM_FAILURES.SCREEN_ALREADY_CONNECTED) {
+            setScreenInUse({ code, screenName: "Não informado", clientName: "Não informado", lastConnection: "Não informado", connectionStatus: "UNKNOWN" });
+            setLoading(false);
+            return;
+          }
+          if (failure === PLAYER_BINDING_CLAIM_FAILURES.INVALID_CODE) {
+            alert("Código inválido ou tela não encontrada. Confira o código e tente novamente.");
+            setLoading(false);
+            return;
+          }
+          if (failure === PLAYER_BINDING_CLAIM_FAILURES.PERMISSION) {
+            alert("Não foi possível autenticar este Player. Verifique a conexão e tente novamente.");
+            setLoading(false);
+            return;
+          }
+          if (failure === PLAYER_BINDING_CLAIM_FAILURES.CONNECTION) {
+            alert("Falha de conexão ao validar o código. Tente novamente.");
+            setLoading(false);
+            return;
+          }
+          throw error;
+        }
+        if (binding) {
+          finishConnection(binding.clientId, code, deviceId, binding.screenId);
+          return;
+        }
       }
 
       const codeRef = doc(db, "tv_codes", code);
@@ -15862,14 +15908,8 @@ function PlayerPage() {
     return () => window.removeEventListener("totempark-operational-event", onOperationalEvent);
   }, []);
 
-  function isFreshExitCommand(remoteCommand, commandStatus) {
-    if (remoteCommand?.type !== "exitTv" || commandStatus !== "sent") return false;
-
-    const sentAtMs = getTimestampMs(remoteCommand.sentAt);
-
-    if (!sentAtMs) return true;
-
-    return sentAtMs >= playerSessionStartedAtRef.current - 5000;
+  function isCurrentSessionExitCommand(remoteCommand, commandStatus) {
+    return isFreshExitCommand({ remoteCommand, commandStatus, sessionStartedAtMs: playerSessionStartedAtRef.current });
   }
 
   useEffect(() => {
@@ -17443,7 +17483,7 @@ function PlayerPage() {
 
         const screenData = currentScreen.data();
 
-        if (isFreshExitCommand(screenData.remoteCommand, screenData.commandStatus)) {
+        if (isCurrentSessionExitCommand(screenData.remoteCommand, screenData.commandStatus)) {
           return;
         }
 
@@ -17567,26 +17607,30 @@ function PlayerPage() {
   }, [screen?.id, clientId]);
 
   async function releaseCurrentScreen() {
-    if (!screen?.id || !clientId) return;
+    if (!screen?.id || !clientId) return false;
 
     try {
       exitingTvRef.current = true;
       clearTimeout(returnToTvTimerRef.current);
-      if (IS_PLAYER_TELEMETRY_BUILD && playerBindingRef.current?.status === "ACTIVE") {
+      if (shouldRevokeSecureBindingOnRelease({
+        isPlayerTelemetryBuild: IS_PLAYER_TELEMETRY_BUILD,
+        isSecureLinkExperiment: IS_SECURE_LINK_SPLASH_BUILD,
+        bindingStatus: playerBindingRef.current?.status,
+      })) {
         await revokeOwnPlayerBinding({ app: firebaseApp, auth, reason: "PLAYER_RELEASE" });
         playerBindingRef.current = null;
         playerIdentityStateRef.current = PLAYER_IDENTITY_STATES.REVOKED;
-        return;
+        return true;
       }
       const screenRef = doc(db, "clients", clientId, "screens", screen.id);
       const localDeviceId = getTotemDeviceId();
 
-      await runTransaction(db, async (transaction) => {
+      const released = await runTransaction(db, async (transaction) => {
         const currentScreen = await transaction.get(screenRef);
 
-        if (!currentScreen.exists()) return;
+        if (!currentScreen.exists()) return false;
         const connectedDeviceId = currentScreen.data().connectedDeviceId;
-        if (connectedDeviceId && connectedDeviceId !== localDeviceId) return;
+        if (connectedDeviceId && connectedDeviceId !== localDeviceId) return false;
 
         transaction.update(screenRef, {
           connectedDeviceId: deleteField(),
@@ -17595,9 +17639,14 @@ function PlayerPage() {
           lastSeenAt: null,
           commandStatus: "disconnected",
         });
+        return true;
       });
+      if (!released) exitingTvRef.current = false;
+      return released === true;
     } catch (error) {
+      exitingTvRef.current = false;
       console.log("Não foi possível liberar o vínculo da TV:", error);
+      return false;
     }
   }
 
@@ -17626,7 +17675,7 @@ function PlayerPage() {
         return;
       }
 
-      const isPendingExit = isFreshExitCommand(remoteCommand, data.commandStatus);
+      const isPendingExit = isCurrentSessionExitCommand(remoteCommand, data.commandStatus);
 
       if (firstSnapshot && !isPendingExit) {
         lastCommandIdRef.current = remoteCommand.id;
@@ -17645,11 +17694,13 @@ function PlayerPage() {
       setLastCommandId(remoteCommand.id);
 
       if (remoteCommand.type === "exitTv") {
-        if (!isFreshExitCommand(remoteCommand, data.commandStatus)) return;
+        if (!isCurrentSessionExitCommand(remoteCommand, data.commandStatus)) return;
 
         exitingTvRef.current = true;
-        await releaseCurrentScreen();
-        clearTvConnectionAndShowCode("remote-exit-command");
+        const released = await releaseCurrentScreen();
+        if (shouldClearTvConnectionAfterRelease(released)) {
+          clearTvConnectionAndShowCode("remote-exit-command");
+        }
         return;
       }
 

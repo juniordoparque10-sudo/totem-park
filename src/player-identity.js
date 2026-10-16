@@ -9,6 +9,33 @@ export const PLAYER_IDENTITY_STATES = Object.freeze({
   REVOKED: "REVOKED",
 });
 
+export const PLAYER_BINDING_CLAIM_FAILURES = Object.freeze({
+  SCREEN_ALREADY_CONNECTED: "SCREEN_ALREADY_CONNECTED",
+  INVALID_CODE: "INVALID_CODE",
+  PERMISSION: "PERMISSION",
+  CONNECTION: "CONNECTION",
+  UNKNOWN: "UNKNOWN",
+});
+
+export function classifyPlayerBindingClaimFailure(error) {
+  const code = String(error?.code || "").toLowerCase();
+  const message = String(error?.message || "").toLowerCase();
+  if (code.includes("already-exists")) return PLAYER_BINDING_CLAIM_FAILURES.SCREEN_ALREADY_CONNECTED;
+  if (code.includes("failed-precondition") && message.includes("already bound")) return PLAYER_BINDING_CLAIM_FAILURES.SCREEN_ALREADY_CONNECTED;
+  if (code.includes("not-found") || code.includes("invalid-argument") || code.includes("failed-precondition")) return PLAYER_BINDING_CLAIM_FAILURES.INVALID_CODE;
+  if (code.includes("permission-denied") || code.includes("unauthenticated")) return PLAYER_BINDING_CLAIM_FAILURES.PERMISSION;
+  if (code.includes("unavailable") || code.includes("network") || code.includes("deadline-exceeded")) return PLAYER_BINDING_CLAIM_FAILURES.CONNECTION;
+  return PLAYER_BINDING_CLAIM_FAILURES.UNKNOWN;
+}
+
+export function shouldRevokeSecureBindingOnRelease({
+  isPlayerTelemetryBuild = false,
+  isSecureLinkExperiment = false,
+  bindingStatus = "",
+} = {}) {
+  return bindingStatus === "ACTIVE" && (isPlayerTelemetryBuild || isSecureLinkExperiment);
+}
+
 function waitForAuth(auth) {
   return new Promise((resolve) => {
     const unsubscribe = onAuthStateChanged(auth, (user) => {

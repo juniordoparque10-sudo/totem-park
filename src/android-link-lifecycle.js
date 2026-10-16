@@ -69,6 +69,31 @@ export function clearTvConnection({ explicit = false, reason = "" } = {}, storag
   return true;
 }
 
+export function getTimestampMs(value) {
+  if (!value) return 0;
+  if (typeof value === "number") return Number.isFinite(value) ? value : 0;
+  if (value instanceof Date) return value.getTime();
+  if (typeof value === "string") {
+    const parsed = Date.parse(value);
+    return Number.isFinite(parsed) ? parsed : 0;
+  }
+  if (typeof value.toDate === "function") return value.toDate().getTime();
+  if (value.seconds) return value.seconds * 1000;
+  return 0;
+}
+
+export function isFreshExitCommand({ remoteCommand, commandStatus, sessionStartedAtMs } = {}) {
+  if (remoteCommand?.type !== "exitTv" || commandStatus !== "sent") return false;
+  const sentAtMs = getTimestampMs(remoteCommand.sentAt);
+  const sessionStartMs = getTimestampMs(sessionStartedAtMs);
+  if (!sentAtMs || !sessionStartMs) return false;
+  return sentAtMs >= sessionStartMs - 5000;
+}
+
+export function shouldClearTvConnectionAfterRelease(releaseConfirmed) {
+  return releaseConfirmed === true;
+}
+
 export function classifyLinkValidation({
   online = true,
   error = null,
