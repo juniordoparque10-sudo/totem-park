@@ -1,4 +1,5 @@
 const STORAGE_KEY = "totempark-player-activity-v2a";
+export const PLAYER_ACTIVITY_SYNC_ENABLED = false;
 
 function safeParse(value) {
   try { return JSON.parse(value || "null"); } catch { return null; }
@@ -95,3 +96,31 @@ export function createPlayerActivityTelemetry({ storage = globalThis.localStorag
 }
 
 export { STORAGE_KEY as PLAYER_ACTIVITY_STORAGE_KEY };
+
+function sanitizeActivityEvent(event = {}) {
+  return {
+    id: String(event.id || ""),
+    screenId: String(event.screenId || ""),
+    type: String(event.type || ""),
+    state: String(event.state || ""),
+    atMs: Number(event.atMs || 0),
+    mediaId: String(event.mediaId || ""),
+    mediaType: String(event.mediaType || ""),
+    reason: String(event.reason || ""),
+  };
+}
+
+export async function syncPlayerActivityBatch({ screenRef, existingEvents = [], events = [], updateDoc } = {}) {
+  const batch = events.slice(0, 20).map(sanitizeActivityEvent).filter((event) => event.id && event.screenId && event.atMs > 0);
+  if (batch.length === 0) return { status:"synced", acknowledgedIds:[] };
+  const byId = new Map();
+  [...existingEvents, ...batch].map(sanitizeActivityEvent).filter((event) => event.id && event.screenId).forEach((event) => byId.set(event.id, event));
+  const history = [...byId.values()].sort((left, right) => left.atMs - right.atMs || left.id.localeCompare(right.id)).slice(-200);
+  try {
+    await updateDoc(screenRef, { "telemetry.activity":{ schemaVersion:1, events:history } });
+    return { status:"synced", acknowledgedIds:batch.map((event) => event.id) };
+  } catch (error) {
+    const status = String(error?.code || "").includes("permission-denied") ? "blocked" : "retry";
+    return { status, acknowledgedIds:[] };
+  }
+}

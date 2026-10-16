@@ -86,3 +86,9 @@ O gate focado aprovou `51/51` cenários. O teste legado de retenção Web recebe
 
 A APK só poderá ser nomeada V56 quando declarar versionCode `56`, versionName compatível, package idêntico e o mesmo certificado SHA-256 `72e6e078aa690a678e8ed2854b348c402762f9d980ec1cdf7e1261bb5f7409a7`.
 
+# Telemetria V2-A — gate de sincronização
+
+- Estado: `BLOCKED_RULES` (journal local permanece ativo; sincronização remota permanece desligada).
+- Evidência em emulador: o binding `ACTIVE` correto consegue gravar, porém as Rules atuais também aceitam gravações em `telemetry.activity` por identidade sem binding, binding revogado e binding de outra tela através de `isAllowedPublicScreenUpdate()`.
+- Decisão: não alterar Rules nesta execução e não ativar o adaptador remoto. Vínculo, cache e reprodução permanecem independentes do journal.
+
