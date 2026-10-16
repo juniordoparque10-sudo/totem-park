@@ -1,4 +1,21 @@
 export const TEMPLATES_V2_MINIMUM_PLAYER_CODE = 17;
+const V56_DYNAMIC_TEMPLATE_TYPES = Object.freeze([
+  "smart-lobby",
+  "agenda-info",
+  "promotion-campaign",
+  "digital-menu",
+  "kpi-indicators",
+  "qr-interaction",
+  "news-editorial-dynamic",
+  "market-premium",
+]);
+
+export function getPlayerV2Capabilities() {
+  return {
+    templatesV2: true,
+    dynamicTemplateTypes: [...V56_DYNAMIC_TEMPLATE_TYPES],
+  };
+}
 
 export function getPlayerVersionLabel(screen = {}) {
   return String(
