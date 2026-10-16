@@ -190,6 +190,7 @@ import {
   uploadTransitionDiagnosticRescue,
 } from "./player-identity";
 import { attemptInitialSecureBinding } from "./player-initial-binding";
+import MaintenanceScreen from "./player/MaintenanceScreen";
 import { deleteStoredAsset, getStorageAssetVersionMetadata, uploadStorageAsset } from "./storage-service";
 import {
   createUploadPreviewLifecycle,
@@ -18214,29 +18215,7 @@ function PlayerPage() {
   }
 
   if (maintenanceMode) {
-    return (
-      <div className={`player-screen tv-maintenance-screen ${getPlayerOrientationClass()}`}>
-        <div className="tv-maintenance-content">
-          <img src={logo} alt="Totem Park" />
-
-          <div className="tv-maintenance-icon">
-            🛠️
-          </div>
-
-          <h1>
-            <span>TELA</span> em Manutenção
-          </h1>
-
-          <div className="tv-maintenance-divider"></div>
-
-          <p>
-            Aguarde. Esta tela está temporariamente em modo manutenção.
-          </p>
-
-          <div className="tv-maintenance-loader"></div>
-        </div>
-      </div>
-    );
+    return <MaintenanceScreen orientation={getPlayerOrientationClass()} />;
   }
 
   if (takeoverMessage) {
