@@ -78,8 +78,8 @@ android {
         playerRcSecureLinkExperiment {
             dimension "appMode"
             applicationIdSuffix ".player.rcsecurelink"
-            versionCode 56
-            versionName "1.0.0-v56-experimental"
+            versionCode 57
+            versionName "1.0.0-v57-experimental"
             manifestPlaceholders = [
                 appLabel: "Totem Park Player SECURE LINK EXP",
                 tvLauncherEnabled: "false"
