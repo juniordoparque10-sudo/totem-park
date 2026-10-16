@@ -174,6 +174,7 @@ import {
   restartSingleVideo,
 } from "./single-item-loop";
 import { createPlayerTelemetry, readPlayerTelemetryReport, TELEMETRY_DEFAULT_CONFIG } from "./player-telemetry";
+import { createPlayerActivityTelemetry } from "./player-activity-telemetry";
 import { buildOperationalSnapshot, normalizeNativeAppInfo, normalizeOperationalMediaSource, OPERATIONAL_HEARTBEAT_INTERVAL_MS } from "./operational-telemetry";
 import { createTrafficTelemetry } from "./traffic-telemetry";
 import { createPortalScreenOrderTracker, getPortalLastSignalMs, getPortalScreenPage, getPortalScreenStatus, sortClientsAlphabetically } from "./portal-status";
@@ -15799,6 +15800,7 @@ function PlayerPage() {
   const exitingTvRef = useRef(false);
   const playerSessionStartedAtRef = useRef(Date.now());
   const telemetryRef = useRef(null);
+  const activityTelemetryRef = useRef(null);
   const trafficTelemetryRef = useRef(null);
   const trafficVideoOccurrencesRef = useRef(new WeakMap());
   const telemetryTransitionRef = useRef("");
@@ -15823,6 +15825,11 @@ function PlayerPage() {
         deviceId: getTotemDeviceId(),
         platform: isNativeApp() ? "ANDROID" : "WEB",
       },
+    });
+  }
+  if (!activityTelemetryRef.current) {
+    activityTelemetryRef.current = createPlayerActivityTelemetry({
+      identity: { clientId, deviceId: getTotemDeviceId() },
     });
   }
   if (!trafficTelemetryRef.current) {
@@ -15879,6 +15886,10 @@ function PlayerPage() {
   }, [clientId, screen?.id, screen?.templatesV2TestMode]);
 
   useEffect(() => {
+    activityTelemetryRef.current.updateIdentity({ clientId, screenId: screen?.id || "", deviceId: getTotemDeviceId() });
+  }, [clientId, screen?.id]);
+
+  useEffect(() => {
     if (!IS_OPERATIONAL_TELEMETRY_BUILD || !screen?.id || !clientId) return undefined;
     const telemetry = telemetryRef.current;
     telemetry.updateIdentity({ clientId, screenId: screen.id, deviceId: getTotemDeviceId() });
@@ -15887,8 +15898,15 @@ function PlayerPage() {
       (snapshot) => telemetry.configure(snapshot.exists() ? snapshot.data() : TELEMETRY_DEFAULT_CONFIG),
       () => telemetry.configure(TELEMETRY_DEFAULT_CONFIG)
     );
-    const online = () => telemetry.setConnection("ONLINE");
-    const offline = () => telemetry.setConnection("OFFLINE");
+    const online = () => {
+      telemetry.setConnection("ONLINE");
+      activityTelemetryRef.current.setConnection("ONLINE");
+    };
+    const offline = () => {
+      telemetry.setConnection("OFFLINE");
+      activityTelemetryRef.current.setConnection("OFFLINE");
+    };
+    if (navigator.onLine === false) activityTelemetryRef.current.setConnection("OFFLINE");
     window.addEventListener("online", online);
     window.addEventListener("offline", offline);
     return () => {
@@ -18061,6 +18079,20 @@ function PlayerPage() {
   }, [activeItemsKey, mediaIndex]);
 
   useEffect(() => {
+    const reason = maintenanceMode
+      ? "MAINTENANCE"
+      : blackoutMode
+        ? "BLACKOUT"
+        : takeoverMessage
+          ? "TAKEOVER"
+          : pauseMode
+            ? "PAUSE"
+            : "";
+    if (reason) activityTelemetryRef.current.interrupt(reason);
+    else activityTelemetryRef.current.recover();
+  }, [pauseMode, takeoverMessage, blackoutMode, maintenanceMode]);
+
+  useEffect(() => {
     const items = playerItems;
     if (items.length === 0) return;
 
@@ -18113,6 +18145,7 @@ function PlayerPage() {
       recordJumpEvent("TIMER_FIRED", { expectedFireAt, actualFireAt: Date.now(), remainingMs: remaining, durationMs: durationInMs, ...mediaElementSnapshot(video, currentItem?.mediaId || currentItem?.id || "", safeIndex) });
       playbackTimerRef.current = null;
       playbackRemainingRef.current = 0;
+      activityTelemetryRef.current.finishPlayback("ENDED");
       if (currentItem?.type === "Imagem") {
         const source = getEffectiveTrafficSource(currentItem);
         if (source === "LOCAL") {
@@ -18128,6 +18161,7 @@ function PlayerPage() {
         }
       }
       goToNextMedia(currentItem?.playerItemType === "template" ? "TEMPLATE_TIMER" : currentItem?.type === "Imagem" ? "IMAGE_TIMER" : "VIDEO_TIMER");
+      if (playerItems.length === 1) activityTelemetryRef.current.startPlayback({ id:currentItem?.templateId || currentItem?.mediaId || currentItem?.id || "", type:currentItem?.playerItemType === "template" ? "template" : "image" });
     }, remaining);
 
     return () => {
@@ -18355,7 +18389,10 @@ function PlayerPage() {
         const diagnosticPayload = { templateId:item.templateId||item.id||"", itemKey, playbackExecutionId:executionId, ...details, CURRENT_VISIBLE:previousMediaIndexRef.current !== null, NEXT_PENDING:event !== "ready" };
         if (event === "load") logTemplatesV2Diagnostic("T4_IMAGE_LOADED", diagnosticPayload);
         if (event === "decoded") logTemplatesV2Diagnostic("T5_IMAGE_DECODED", diagnosticPayload);
-        if (event === "ready") markCurrentMediaReady(item,index,executionId);
+        if (event === "ready") {
+          markCurrentMediaReady(item,index,executionId);
+          activityTelemetryRef.current.startPlayback({ id:item.templateId || item.id || "", type:"template" });
+        }
       } : null;
       return <TemplateVisualPreview template={renderItem} tv playbackExecutionId={executionId} onVisualEvent={onVisualEvent} offlineContext={{ clientId, screenId:screen?.id || "" }} />;
     }
@@ -18445,6 +18482,7 @@ function PlayerPage() {
               }
               recordPlayback("PLAYBACK_START", source, diagnosticMedia);
               telemetryRef.current.record("PLAYBACK_START", telemetryMedia);
+              activityTelemetryRef.current.startPlayback({ id:item.mediaId || item.id || "", type:"video" });
             }
           }}
           onPlay={(event) => {
@@ -18474,6 +18512,7 @@ function PlayerPage() {
               closeTrafficPlayback(item, executionId, occurrenceId);
             }
             telemetryRef.current.record("PLAYBACK_END", telemetryMedia);
+            activityTelemetryRef.current.finishPlayback("ENDED");
             recordPlayback("PLAYBACK_END", source, diagnosticMedia);
             if (isSingleVideoPlaylist(playerItems)) {
               telemetryTransitionRef.current = telemetryRef.current.startTransition({
@@ -18499,6 +18538,7 @@ function PlayerPage() {
             }
             captureVideoEvent("error", event, { message: "Erro ao carregar vídeo" });
             telemetryRef.current.record("PLAYBACK_ERROR", { ...telemetryMedia, message: "Erro ao carregar vídeo" });
+            activityTelemetryRef.current.finishPlayback("ERROR");
             recordPlayback("PLAYBACK_ERROR", source, { ...diagnosticMedia, message: "Erro ao carregar vídeo" });
             if (fallbackToRemoteMedia(item)) return;
             console.log("Erro ao carregar video. Pulando midia.");
@@ -18535,12 +18575,14 @@ function PlayerPage() {
           markCurrentMediaReady(item, index);
           recordPlayback("PLAYBACK_START", source, diagnosticMedia);
           telemetryRef.current.record("PLAYBACK_START", telemetryMedia);
+          activityTelemetryRef.current.startPlayback({ id:item.mediaId || item.id || "", type:"image" });
         }}
         onError={() => {
           if (!isCurrent) return;
           operationalPlayerErrorRef.current = true;
           closeTrafficPlayback(item, executionId);
           telemetryRef.current.record("PLAYBACK_ERROR", { ...telemetryMedia, message: "Erro ao carregar imagem" });
+          activityTelemetryRef.current.finishPlayback("ERROR");
           recordPlayback("PLAYBACK_ERROR", source, { ...diagnosticMedia, message: "Erro ao carregar imagem" });
           if (fallbackToRemoteMedia(item)) return;
           console.log("Erro ao carregar imagem. Pulando midia.");
