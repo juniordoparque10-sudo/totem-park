@@ -51,7 +51,7 @@ test("published V2 template selector wraps as a responsive grid without horizont
 test("telemetry table uses stable screen ordering instead of heartbeat timestamps", () => {
   assert.match(telemetryDashboard, /createPortalScreenOrderTracker/);
   assert.match(telemetryDashboard, /sortOfflineByLastSignal:\s*true/);
-  assert.match(telemetryDashboard, /screenOrderRef\.current\.sort\(enriched, now\)/);
+  assert.match(telemetryDashboard, /screenOrder\.sort\(enriched, now\)/);
   assert.doesNotMatch(telemetryDashboard, /return enriched\.filter\([\s\S]*?\.sort\(\(left, right\) => compareTelemetryScreens\(left, right, now\)\)/);
 });
 
