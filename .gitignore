@@ -9,7 +9,9 @@ lerna-debug.log*
 
 node_modules
 dist
+dist-player-rc-secure-link
 dist-ssr
+android/app/src/playerRcSecureLinkExperiment/assets/public
 *.local
 
 # Editor directories and files
