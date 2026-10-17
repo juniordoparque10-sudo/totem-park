@@ -170,6 +170,7 @@ import { readCachedPlayerDocument } from "./player-local-first";
 import { getPlaybackRemainingAfterWake, subscribePlayerRuntimeWake } from "./player-runtime-recovery";
 import { buildPlayerVisibleLayers } from "./player-visible-layers";
 import { getPlaylistNavigationCapability, getPlaylistNavigationCommand } from "./player-remote-capability";
+import { getAdjacentPlaylistIndex } from "./player-playlist-navigation";
 import { getActivePlaylistListenerDependencies } from "./active-playlist-listener";
 import { selectFallbackTemplates } from "./player-playlist-boundary";
 import {
@@ -225,6 +226,7 @@ import logo from "./assets/logo.png";
 import isotipo from "./assets/isotipo.png";
 import "./App.css";
 import "./remote-control.css";
+import "./tv-connect.css";
 import "./portal-theme.css";
 
 const PUBLIC_WEB_URL = "https://totempark.com.br";
@@ -10087,6 +10089,29 @@ function ClientPlaylistsPage({ client, access = getClientPlanAccess(client), isA
 
 
 
+function ExitTvConfirmationModal({ screen, busy = false, onCancel, onConfirm }) {
+  const cancelRef = useRef(null);
+  useEffect(() => {
+    cancelRef.current?.focus();
+    const handleKeyDown = (event) => {
+      if (event.key === "Escape" && !busy) onCancel();
+    };
+    window.addEventListener("keydown", handleKeyDown);
+    return () => window.removeEventListener("keydown", handleKeyDown);
+  }, [busy, onCancel]);
+  return <div className="remote-exit-modal-backdrop" onMouseDown={(event) => { if (event.target === event.currentTarget && !busy) onCancel(); }}>
+    <section className="remote-exit-modal" role="dialog" aria-modal="true" aria-labelledby="remote-exit-title" aria-describedby="remote-exit-description">
+      <div className="remote-exit-modal-icon" aria-hidden="true"><MonitorOff/><LogOut/></div>
+      <h2 id="remote-exit-title">Deseja sair da TV?</h2>
+      <p id="remote-exit-description">Ao confirmar, esta tela sairá do modo TV e voltará para a seleção de modo.</p>
+      <div className="remote-exit-modal-actions">
+        <button ref={cancelRef} type="button" className="cancel" disabled={busy} onClick={onCancel}>Cancelar</button>
+        <button type="button" className="confirm" disabled={busy} onClick={() => onConfirm(screen)}>{busy ? "Confirmando..." : "Confirmar saída"}</button>
+      </div>
+    </section>
+  </div>;
+}
+
 function ClientScreensPage({ client, access = getClientPlanAccess(client), isAdmin = false, adminUser = null }) {
   const [screens, setScreens] = useState([]);
   const [playlists, setPlaylists] = useState([]);
@@ -10094,6 +10119,8 @@ function ClientScreensPage({ client, access = getClientPlanAccess(client), isAdm
   const [editingScreen, setEditingScreen] = useState(null);
   const [isScreenEditorOpen, setIsScreenEditorOpen] = useState(false);
   const [rebindDialog, setRebindDialog] = useState(null);
+  const [exitTvTarget, setExitTvTarget] = useState(null);
+  const [exitTvSending, setExitTvSending] = useState(false);
   const [screenSuccessNotice, setScreenSuccessNotice] = useState("");
   const screenEditorRef = useRef(null);
   const remoteNavigationPendingRef = useRef(new Set());
@@ -10455,6 +10482,17 @@ function ClientScreensPage({ client, access = getClientPlanAccess(client), isAdm
       await sendRemoteCommand(screen.id, command);
     } finally {
       globalThis.setTimeout(() => remoteNavigationPendingRef.current.delete(screen.id), 700);
+    }
+  }
+
+  async function confirmExitTv() {
+    if (!exitTvTarget || exitTvSending) return;
+    setExitTvSending(true);
+    try {
+      const sent = await sendRemoteCommand(exitTvTarget.id, { type: "exitTv" });
+      if (sent) setExitTvTarget(null);
+    } finally {
+      setExitTvSending(false);
     }
   }
 
@@ -10885,15 +10923,7 @@ function ClientScreensPage({ client, access = getClientPlanAccess(client), isAdm
                     <div className="remote-exit-row">
                       <button
                         className="remote-mini-button exit-tv"
-                        onClick={() => {
-                          const confirmExit = window.confirm(
-                            "Deseja tirar esta tela do modo TV e voltar para a escolha de modo?"
-                          );
-
-                          if (!confirmExit) return;
-
-                          sendRemoteCommand(screen.id, { type: "exitTv" });
-                        }}
+                        onClick={() => setExitTvTarget(screen)}
                       >
                         <LogOut size={16} />
                         <span>Sair da TV</span>
@@ -10920,6 +10950,13 @@ function ClientScreensPage({ client, access = getClientPlanAccess(client), isAdm
           })
         )}
       </section>
+
+      {exitTvTarget && <ExitTvConfirmationModal
+        screen={exitTvTarget}
+        busy={exitTvSending}
+        onCancel={() => { if (!exitTvSending) setExitTvTarget(null); }}
+        onConfirm={confirmExitTv}
+      />}
 
       {rebindDialog && <PortalModal
         title={rebindDialog.phase === "success" ? "Player reautorizado" : "Reautorizar Player"}
@@ -14110,11 +14147,13 @@ function releaseRetiredTemplateAssetUrlsAfterPaint(localUrls) {
 
 function TemplateVisualPreview({ template, compact = false, tv = false, playbackExecutionId = null, onVisualEvent = null, offlineContext = null }) {
   const templateId = template.id || template.templateId || template.identity?.templateId || "";
-  const [offlineTemplate, setOfflineTemplate] = useState(() => createOfflineSafeTemplate(template));
+  const preserveRemoteOnMiss = !isNativeApp();
+  const [offlineTemplate, setOfflineTemplate] = useState(() => preserveRemoteOnMiss ? template : createOfflineSafeTemplate(template));
   const assetKey = JSON.stringify([...collectTemplateAssetUrls(template)]);
   useEffect(() => {
     let active = true;
-    prepareTemplateAssets(template, templateAssetCacheOptions).then((result) => {
+    const assetOptions = { ...templateAssetCacheOptions, preserveRemoteOnMiss };
+    prepareTemplateAssets(template, assetOptions).then((result) => {
       if (!active) return;
       logTemplateOffline(result.hits ? "TEMPLATE_ASSET_CACHE_HIT" : "TEMPLATE_ASSET_CACHE_MISS", { templateId, hits:result.hits, misses:result.misses });
       setOfflineTemplate(result.template);
@@ -14124,10 +14163,10 @@ function TemplateVisualPreview({ template, compact = false, tv = false, playback
     const refreshRemoteAssets = () => {
       if (navigator.onLine === false) return;
       logTemplateOffline("TEMPLATE_REMOTE_REFRESH_STARTED", { templateId, type:"assets" });
-      refreshTemplateAssets(template, templateAssetCacheOptions).then((results) => {
+      refreshTemplateAssets(template, assetOptions).then((results) => {
         const failed = results.filter((result) => result.status === "failed").length;
         logTemplateOffline(failed ? "TEMPLATE_REMOTE_REFRESH_FAILED" : "TEMPLATE_REMOTE_REFRESH_COMPLETED", { templateId, type:"assets", failed });
-        return prepareTemplateAssets(template, templateAssetCacheOptions);
+        return prepareTemplateAssets(template, assetOptions);
       }).then((result) => {
         if (!active) return;
         setOfflineTemplate(result.template);
@@ -15665,8 +15704,8 @@ function TVConnectPage({ playerOnly = false }) {
   }
 
   return (
-    <div className="tv-connect-page">
-      <div className="tv-connect-card tv-code-only-card">
+    <div className="tv-connect-page tv-connect-shell">
+      <div className="tv-connect-card tv-code-only-card tv-connect-premium-card">
         <img src={logo} alt="Totem Park" className="tv-connect-logo" />
 
         <div className="tv-connect-kicker">
@@ -15710,7 +15749,8 @@ function TVConnectPage({ playerOnly = false }) {
             onClick={handleConnect}
             disabled={loading}
           >
-            {loading ? "Conectando..." : "Iniciar player"}
+            <span>{loading ? "Conectando..." : "Iniciar player"}</span>
+            {!loading && <b aria-hidden="true">→</b>}
           </button>
         </div>
 
@@ -15754,6 +15794,7 @@ function TVConnectPage({ playerOnly = false }) {
             Trocar Modo Gestor / Modo TV
           </button>
         )}
+
       </div>
     </div>
   );
@@ -17060,7 +17101,7 @@ function PlayerPage() {
     ].join("|");
   }
 
-  function goToNextMedia(reason = "UNKNOWN") {
+  function goToNextMedia(reason = "UNKNOWN", requestedIndex = null) {
     operationalPlayerErrorRef.current = false;
     if (advancingRef.current) return;
 
@@ -17077,7 +17118,9 @@ function PlayerPage() {
     }
 
     const currentItemForTraffic = items[mediaIndex >= items.length ? 0 : mediaIndex];
-    const nextItemIndex = findNextReadyMediaIndex({ items, currentIndex:mediaIndex, native:isNativeApp(), pendingUrls:pendingNativeMediaUrlsRef.current });
+    const nextItemIndex = Number.isInteger(requestedIndex)
+      ? requestedIndex
+      : findNextReadyMediaIndex({ items, currentIndex:mediaIndex, native:isNativeApp(), pendingUrls:pendingNativeMediaUrlsRef.current });
     if (nextItemIndex < 0) return;
     if (nextItemIndex === mediaIndex) {
       recordJumpEvent("PLAYER_PENDING_MEDIA_SKIPPED_LOOP_CURRENT", { reason, index:mediaIndex });
@@ -17137,6 +17180,12 @@ function PlayerPage() {
     setCurrentPlaybackExecutionId(nextExecutionId);
     setReadyMediaKey("");
     setMediaIndex(nextIndex);
+  }
+
+  function goToPreviousMedia(reason = "UNKNOWN") {
+    const previousIndex = getAdjacentPlaylistIndex(mediaIndex, playerItems.length, "previous");
+    if (previousIndex < 0 || previousIndex === mediaIndex) return;
+    goToNextMedia(reason, previousIndex);
   }
 
   useLayoutEffect(() => {
@@ -17586,6 +17635,7 @@ function PlayerPage() {
           status: "online",
           lastConnection: new Date().toLocaleString("pt-BR"),
           lastSeenAt: serverTimestamp(),
+          "capabilities.playlistItemNavigation": !isNativeApp(),
         };
 
         if (canSyncTelemetry) {
@@ -17843,6 +17893,16 @@ function PlayerPage() {
       if (remoteCommand.type === "play") {
         setPauseMode(false);
         setNow(new Date());
+        return;
+      }
+
+      if (remoteCommand.type === "previousMedia") {
+        goToPreviousMedia("REMOTE_PREVIOUS");
+        return;
+      }
+
+      if (remoteCommand.type === "nextMedia") {
+        if (playerItems.length > 1) goToNextMedia("REMOTE_NEXT");
         return;
       }
 

@@ -1,0 +1,145 @@
+.tv-connect-shell {
+  position: relative;
+  display: grid;
+  place-items: center;
+  min-height: 100svh !important;
+  padding: clamp(18px, 4vh, 42px) 24px !important;
+  overflow: auto !important;
+  isolation: isolate;
+  background:
+    radial-gradient(circle at 12% 20%, rgba(0, 174, 255, 0.14), transparent 30%),
+    radial-gradient(circle at 86% 18%, rgba(124, 58, 237, 0.15), transparent 34%),
+    linear-gradient(135deg, #020b1d 0%, #06142d 47%, #10072c 100%) !important;
+}
+
+.tv-connect-shell::before,
+.tv-connect-shell::after {
+  content: "";
+  position: fixed;
+  z-index: -1;
+  width: 48vw;
+  height: 48vw;
+  border: 1px solid rgba(56, 189, 248, 0.22);
+  border-radius: 50%;
+  pointer-events: none;
+}
+
+.tv-connect-shell::before { left: -31vw; top: 12vh; }
+.tv-connect-shell::after { right: -34vw; top: 8vh; border-color: rgba(168, 85, 247, 0.25); }
+
+.tv-connect-shell .tv-connect-premium-card {
+  position: relative;
+  width: min(100%, 590px);
+  max-width: 590px !important;
+  padding: clamp(24px, 4vh, 38px) 38px 22px !important;
+  border: 1px solid transparent;
+  border-radius: 25px !important;
+  background:
+    linear-gradient(#061126, #061126) padding-box,
+    linear-gradient(135deg, rgba(14, 165, 233, 0.85), rgba(139, 92, 246, 0.78)) border-box !important;
+  box-shadow: 0 28px 80px rgba(0, 0, 0, 0.42), inset 0 0 45px rgba(30, 64, 175, 0.07);
+}
+
+.tv-connect-shell .tv-connect-logo {
+  width: clamp(132px, 22vh, 180px) !important;
+  max-height: 108px;
+  object-fit: contain;
+  margin-bottom: 12px !important;
+}
+
+.tv-connect-shell .tv-connect-kicker {
+  width: fit-content;
+  margin: 0 auto 14px !important;
+  border: 1px solid rgba(34, 211, 238, 0.26);
+  background: rgba(6, 182, 212, 0.08);
+  color: #4de6fa;
+}
+
+.tv-connect-shell .tv-connect-card h1 {
+  margin-bottom: 10px !important;
+  font-size: clamp(32px, 5vh, 52px) !important;
+  line-height: 1;
+  background: linear-gradient(90deg, #fff 20%, #dbeafe 55%, #8b5cf6 95%);
+  -webkit-background-clip: text;
+  background-clip: text;
+  color: transparent;
+}
+
+.tv-connect-shell .tv-connect-card > p {
+  max-width: 470px;
+  margin: 0 auto 18px !important;
+  color: #d4def1;
+  font-size: 15px !important;
+}
+
+.tv-connect-shell .tv-code-field {
+  min-height: 76px !important;
+  grid-template-columns: 76px minmax(0, 1fr) !important;
+  overflow: hidden;
+  border: 1px solid rgba(56, 189, 248, 0.56);
+  background: rgba(2, 10, 26, 0.68);
+  box-shadow: inset 0 0 28px rgba(37, 99, 235, 0.07);
+}
+
+.tv-connect-shell .tv-field-icon {
+  align-self: stretch;
+  display: grid;
+  place-items: center;
+  border-right: 1px solid rgba(125, 145, 180, 0.22);
+  color: #5de8ff;
+  background: rgba(7, 17, 38, 0.46);
+}
+
+.tv-connect-shell .tv-field-content {
+  min-width: 0;
+  padding: 8px 20px !important;
+  background: transparent !important;
+}
+
+.tv-connect-shell .tv-code-field .tv-field-content input {
+  width: 100%;
+  min-width: 0;
+  height: auto;
+  padding: 0 !important;
+  border: 0 !important;
+  outline: 0;
+  background: transparent !important;
+  box-shadow: none !important;
+  color: #f8fbff;
+  font-size: clamp(29px, 5vh, 42px) !important;
+  letter-spacing: clamp(4px, 0.9vw, 8px) !important;
+}
+
+.tv-connect-shell .tv-connect-button {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 18px;
+  height: 54px !important;
+  background: linear-gradient(100deg, #16c9f5 0%, #2563eb 52%, #a855f7 100%) !important;
+  box-shadow: 0 10px 30px rgba(37, 99, 235, 0.22);
+}
+
+.tv-connect-shell .tv-connect-button b { font-size: 26px; font-weight: 400; }
+.tv-connect-shell .tv-help { margin-top: 14px !important; padding-top: 10px !important; }
+.tv-connect-shell .tv-change-mode-button { background: rgba(16, 26, 47, 0.78); border-color: rgba(148, 163, 184, 0.19); }
+.tv-connect-shell .tv-change-mode-button.secondary { color: #fda4af; border-color: rgba(244, 63, 94, 0.32); background: rgba(83, 17, 36, 0.34); }
+
+@media (max-height: 760px) {
+  .tv-connect-shell { align-items: start; padding-block: 14px !important; }
+  .tv-connect-shell .tv-connect-premium-card { padding: 20px 30px 16px !important; transform: none !important; }
+  .tv-connect-shell .tv-connect-logo { width: 130px !important; max-height: 72px; margin-bottom: 7px !important; }
+  .tv-connect-shell .tv-connect-kicker { margin-bottom: 9px !important; }
+  .tv-connect-shell .tv-connect-card h1 { font-size: 34px !important; margin-bottom: 7px !important; }
+  .tv-connect-shell .tv-connect-card > p { margin-bottom: 11px !important; font-size: 13px !important; }
+  .tv-connect-shell .tv-code-field { min-height: 64px !important; }
+  .tv-connect-shell .tv-connect-button { height: 48px !important; }
+  .tv-connect-shell .tv-help { margin-top: 8px !important; padding-top: 7px !important; }
+  .tv-connect-shell .tv-change-mode-button { min-height: 36px !important; margin-top: 7px !important; }
+}
+
+@media (max-width: 620px) {
+  .tv-connect-shell { padding-inline: 14px !important; }
+  .tv-connect-shell .tv-connect-premium-card { padding-inline: 20px !important; }
+  .tv-connect-shell .tv-code-field { grid-template-columns: 62px minmax(0, 1fr) !important; }
+}

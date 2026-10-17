@@ -254,14 +254,14 @@ export async function refreshTemplateAsset(remoteUrl, options = {}) {
   return refresh;
 }
 
-function replaceRemoteUrls(value, localByRemote, parentKey = "") {
-  if (Array.isArray(value)) return value.map((entry) => replaceRemoteUrls(entry, localByRemote, parentKey));
+function replaceRemoteUrls(value, localByRemote, parentKey = "", preserveRemoteOnMiss = false) {
+  if (Array.isArray(value)) return value.map((entry) => replaceRemoteUrls(entry, localByRemote, parentKey, preserveRemoteOnMiss));
   if (!value || typeof value !== "object") return value;
   const next = {};
   for (const [key, entry] of Object.entries(value)) {
     if (typeof entry === "string" && isRemoteUrl(entry)) {
-      next[key] = isVisualUrlField(key, value, parentKey) ? (localByRemote.get(entry) || "") : entry;
-    } else next[key] = replaceRemoteUrls(entry, localByRemote, `${parentKey}.${key}`);
+      next[key] = isVisualUrlField(key, value, parentKey) ? (localByRemote.get(entry) || (preserveRemoteOnMiss ? entry : "")) : entry;
+    } else next[key] = replaceRemoteUrls(entry, localByRemote, `${parentKey}.${key}`, preserveRemoteOnMiss);
   }
   return next;
 }
@@ -280,7 +280,7 @@ export async function prepareTemplateAssets(template, options = {}) {
     if (result.localUrl) localByRemote.set(url, result.localUrl);
     result.retiredLocalUrls.forEach((localUrl) => retiredLocalUrls.add(localUrl));
   }));
-  return { template:replaceRemoteUrls(template, localByRemote), urls, localByRemote, retiredLocalUrls:[...retiredLocalUrls], hits:localByRemote.size, misses:urls.length-localByRemote.size };
+  return { template:replaceRemoteUrls(template, localByRemote, "", options.preserveRemoteOnMiss === true), urls, localByRemote, retiredLocalUrls:[...retiredLocalUrls], hits:localByRemote.size, misses:urls.length-localByRemote.size };
 }
 
 export async function refreshTemplateAssets(template, options = {}) {

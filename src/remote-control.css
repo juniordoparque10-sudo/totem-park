@@ -40,8 +40,54 @@
   width: 100%;
 }
 
+.remote-exit-modal-backdrop {
+  position: fixed;
+  inset: 0;
+  z-index: 1200;
+  display: grid;
+  place-items: center;
+  padding: 24px;
+  background: rgba(1, 7, 18, 0.78);
+  backdrop-filter: blur(10px);
+}
+
+.remote-exit-modal {
+  width: min(100%, 680px);
+  padding: clamp(28px, 5vw, 54px);
+  border: 1px solid rgba(56, 189, 248, 0.38);
+  border-radius: 28px;
+  background: radial-gradient(circle at 50% 0%, rgba(37, 99, 235, 0.12), transparent 42%), #071327;
+  box-shadow: 0 32px 100px rgba(0, 0, 0, 0.58), inset 0 0 40px rgba(59, 130, 246, 0.05);
+  text-align: center;
+}
+
+.remote-exit-modal-icon {
+  position: relative;
+  display: grid;
+  place-items: center;
+  width: 92px;
+  height: 92px;
+  margin: 0 auto 26px;
+  border: 1px solid rgba(96, 165, 250, 0.42);
+  border-radius: 26px;
+  color: #67e8f9;
+  background: linear-gradient(145deg, rgba(91, 33, 182, 0.23), rgba(8, 145, 178, 0.16));
+}
+
+.remote-exit-modal-icon svg:first-child { width: 44px; height: 44px; }
+.remote-exit-modal-icon svg:last-child { position: absolute; right: 13px; bottom: 13px; width: 24px; height: 24px; }
+.remote-exit-modal h2 { margin: 0 0 14px; color: #f8fafc; font-size: clamp(30px, 5vw, 46px); line-height: 1.1; }
+.remote-exit-modal p { max-width: 540px; margin: 0 auto 34px; color: #9fb1cf; font-size: clamp(16px, 2.4vw, 22px); line-height: 1.45; }
+.remote-exit-modal-actions { display: grid; grid-template-columns: 1fr 1.12fr; gap: 16px; }
+.remote-exit-modal-actions button { min-height: 58px; border-radius: 999px; font-size: 17px; font-weight: 800; cursor: pointer; }
+.remote-exit-modal-actions .cancel { border: 1px solid rgba(125, 160, 205, 0.58); color: #dbeafe; background: rgba(4, 12, 28, 0.68); }
+.remote-exit-modal-actions .confirm { border: 0; color: #03101f; background: linear-gradient(100deg, #55dcf7, #5b8ff9 58%, #8b5cf6); box-shadow: 0 10px 30px rgba(59, 130, 246, 0.24); }
+.remote-exit-modal-actions button:focus-visible { outline: 3px solid #67e8f9; outline-offset: 3px; }
+.remote-exit-modal-actions button:disabled { opacity: 0.58; cursor: wait; }
+
 @media (max-width: 760px) {
   .remote-control-panel-inline .remote-playback-row {
     grid-template-columns: repeat(2, minmax(0, 1fr));
   }
+  .remote-exit-modal-actions { grid-template-columns: 1fr; }
 }

@@ -59,6 +59,17 @@ test("template sem asset local nasce com fallback e não mantém URL remota", ()
   assert.equal(shouldRevealTemplateImmediately(template), true);
 });
 
+test("Player Web preserva a URL remota quando o cache visual ainda não existe", async () => {
+  const remote = "https://cdn.example/market-logo.png";
+  const template = { published:{ content:{ logo:{ type:"image", mediaId:"logo-1", url:remote } } } };
+  const result = await prepareTemplateAssets(template, {
+    cacheStorage:{ open:async () => ({ match:async () => null }) },
+    preserveRemoteOnMiss:true,
+  });
+  assert.equal(result.hits, 0);
+  assert.equal(result.template.published.content.logo.url, remote);
+});
+
 test("falha de atualização preserva asset antigo válido", async () => {
   const remote = "https://cdn.example/stable.png";
   const storage = cacheStorage();
