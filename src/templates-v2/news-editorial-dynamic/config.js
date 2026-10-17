@@ -1,5 +1,5 @@
 const EMPTY_SOURCE = { enabled:true, newsSource:"", newsFeedUrl:"", selectedNewsSources:[] };
-const EMPTY_FEED = { enabled:false, news:{ ...EMPTY_SOURCE }, includeWeather:false, weatherCities:[], tickerSpeed:"normal", tickerSize:"normal", tickerBackground:"#07111f", tickerTextColor:"#ffffff", tickerAccentColor:"#8b5cf6", tickerTransparency:8, tickerLabel:"Últimas notícias", position:"compact" };
+const EMPTY_FEED = { enabled:false, news:{ ...EMPTY_SOURCE }, includeWeather:false, weatherCities:[], tickerSpeed:"normal", tickerSize:"normal", tickerBackground:"#07111f", tickerTextColor:"#ffffff", tickerAccentColor:"", tickerTransparency:8, tickerLabel:"Últimas notícias", position:"compact" };
 const EMPTY_APPEARANCE = { cards:{ featuredTransparency:22, secondaryTransparency:10 } };
 const POSITIONS = new Set(["compact", "intermediate", "expanded"]);
 const clampPercent = (value, fallback) => Math.max(0, Math.min(100, Number.isFinite(Number(value)) ? Number(value) : fallback));
@@ -52,7 +52,7 @@ export function normalizeNewsEditorialDynamicConfig(value = {}, legacyNews = {})
 export function getNewsEditorialAppearanceStyle(value = {}, orientation = "Paisagem") {
   const config = normalizeNewsEditorialDynamicConfig(value);
   const gaps = orientation === "Retrato"
-    ? { compact:"5cqw", intermediate:"3.2cqw", expanded:"1.8cqw" }
+    ? { compact:"4cqw", intermediate:"2.8cqw", expanded:"1.4cqw" }
     : { compact:"4cqw", intermediate:"2.2cqw", expanded:"0.8cqw" };
   return {
     featuredBackgroundAlpha:(100 - config.appearance.cards.featuredTransparency) / 100,

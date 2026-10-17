@@ -92,7 +92,7 @@ test("templates antigas preservam a aparência editorial atual", () => {
   assert.equal(normalized.feed.tickerBackground, "#07111f");
   assert.equal(normalized.feed.tickerTransparency, 8);
   assert.equal(normalized.feed.tickerTextColor, "#ffffff");
-  assert.equal(normalized.feed.tickerAccentColor, "#8b5cf6");
+  assert.equal(normalized.feed.tickerAccentColor, "");
   assert.equal(normalized.feed.position, "compact");
 });
 
@@ -115,7 +115,7 @@ test("três posições reservam áreas crescentes e respeitam a orientação", (
   const landscape = ["compact","intermediate","expanded"].map((position) => newsConfig.getNewsEditorialAppearanceStyle(newsConfig.normalizeNewsEditorialDynamicConfig({ feed:{ position } }), "Paisagem").editorialFooterGap);
   const portrait = ["compact","intermediate","expanded"].map((position) => newsConfig.getNewsEditorialAppearanceStyle(newsConfig.normalizeNewsEditorialDynamicConfig({ feed:{ position } }), "Retrato").editorialFooterGap);
   assert.deepEqual(landscape, ["4cqw","2.2cqw","0.8cqw"]);
-  assert.deepEqual(portrait, ["5cqw","3.2cqw","1.8cqw"]);
+  assert.deepEqual(portrait, ["4cqw","2.8cqw","1.4cqw"]);
 });
 
 test("aparência V2.2 persiste ao salvar e reabrir", () => {
