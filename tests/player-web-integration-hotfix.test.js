@@ -13,9 +13,9 @@ test("navegação do Player Web respeita ordem, loop, vazio e item único", () =
   assert.equal(getAdjacentPlaylistIndex(0, 0, "next"), -1);
 });
 
-test("Player Web preserva heartbeat permitido e mantém os handlers de anterior/próxima", async () => {
+test("Player Web anuncia capacidade vinculada e mantém os handlers de anterior/próxima", async () => {
   const app = await readFile(new URL("../src/App.jsx", import.meta.url), "utf8");
-  assert.doesNotMatch(app, /"capabilities\.playlistItemNavigation": !isNativeApp\(\)/);
+  assert.match(app, /heartbeatPayload\.capabilities\s*=\s*\{\s*playlistItemNavigation:\s*true,\s*deviceId:\s*localDeviceId,\s*platform:\s*"WEB"/s);
   assert.match(app, /remoteCommand\.type === "previousMedia"/);
   assert.match(app, /remoteCommand\.type === "nextMedia"/);
   assert.match(app, /goToPreviousMedia\("REMOTE_PREVIOUS"\)/);

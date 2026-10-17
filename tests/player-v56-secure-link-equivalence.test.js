@@ -56,6 +56,7 @@ test("secure experiment revokes only an ACTIVE binding through the authorized re
 
 test("initial secure claim preserves temporary offline recovery but never bypasses a conflict", async () => {
   assert.equal(shouldClaimInitialPlayerBinding("playerRc"), true);
+  assert.equal(shouldClaimInitialPlayerBinding("web"), true);
   assert.equal(await attemptInitialSecureBinding({
     appBuildMode: "playerRc",
     claimBinding: async () => {

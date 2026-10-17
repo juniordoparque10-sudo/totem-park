@@ -61,6 +61,38 @@ test("active binding can write its own screen", async () => {
   await assertSucceeds(setDoc(doc(db, sessionPath()), telemetry()));
 });
 
+test("active binding can announce only the supported Web playlist navigation capability", async () => {
+  const bound = env.authenticatedContext("player-a").firestore();
+  const unbound = env.authenticatedContext("unbound").firestore();
+  const revoked = env.authenticatedContext("revoked").firestore();
+  const capability = { playlistItemNavigation: true, deviceId: "device-a", platform: "WEB" };
+
+  await assertFails(updateDoc(doc(unbound, screenPath()), { capabilities: capability }));
+  await assertFails(updateDoc(doc(revoked, screenPath()), { capabilities: capability }));
+  await assertFails(updateDoc(doc(bound, screenPath("screen-b")), { capabilities: capability }));
+  await assertSucceeds(updateDoc(doc(bound, screenPath()), {
+    activeDeviceId: null,
+    capabilities: capability,
+    connectedDeviceId: "device-a",
+    lastConnection: "agora",
+    lastSeenAt: new Date(),
+    status: "online",
+  }));
+  await assertFails(updateDoc(doc(bound, screenPath()), {
+    capabilities: { ...capability, deviceId: "other-device" },
+  }));
+  await assertFails(updateDoc(doc(bound, screenPath()), {
+    capabilities: { ...capability, platform: "ANDROID" },
+  }));
+  await assertFails(updateDoc(doc(bound, screenPath()), {
+    capabilities: { ...capability, arbitraryCapability: true },
+  }));
+  await assertFails(updateDoc(doc(bound, screenPath()), {
+    capabilities: capability,
+    name: "alteração indevida",
+  }));
+});
+
 test("screen A binding cannot write screen B", async () => {
   const db = env.authenticatedContext("player-a").firestore();
   await assertFails(updateDoc(doc(db, screenPath("screen-b")), {

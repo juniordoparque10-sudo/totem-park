@@ -1,4 +1,4 @@
-const INITIAL_SECURE_BINDING_MODES = new Set(["playerRc", "playerTelemetry"]);
+const INITIAL_SECURE_BINDING_MODES = new Set(["web", "playerRc", "playerTelemetry"]);
 const TEMPORARY_CLAIM_ERROR_MARKERS = [
   "unavailable",
   "network",

@@ -178,6 +178,29 @@ service cloud.firestore {
         && telemetryIdentityMatches(clientId, screenId, request.resource.data.telemetry);
     }
 
+    function isAllowedPlayerCapabilityUpdate(clientId, screenId) {
+      return hasActivePlayerBinding(clientId, screenId)
+        && request.resource.data.diff(resource.data).affectedKeys().hasOnly([
+          "activeDeviceId",
+          "capabilities",
+          "connectedDeviceId",
+          "lastConnection",
+          "lastSeenAt",
+          "status"
+        ])
+        && request.resource.data.connectedDeviceId == playerBinding().data.deviceId
+        && request.resource.data.status == "online"
+        && request.resource.data.capabilities is map
+        && request.resource.data.capabilities.keys().hasOnly([
+          "deviceId",
+          "platform",
+          "playlistItemNavigation"
+        ])
+        && request.resource.data.capabilities.deviceId == playerBinding().data.deviceId
+        && request.resource.data.capabilities.platform == "WEB"
+        && request.resource.data.capabilities.playlistItemNavigation == true;
+    }
+
     match /clients/{clientId} {
       allow read: if true;
       allow create: if isMaster();
@@ -215,7 +238,8 @@ service cloud.firestore {
         allow update: if isMaster()
           || ((isClientOwner(clientId)
             || isAllowedPublicScreenUpdate()
-            || isAllowedPlayerTelemetryUpdate(clientId, screenId))
+            || isAllowedPlayerTelemetryUpdate(clientId, screenId)
+            || isAllowedPlayerCapabilityUpdate(clientId, screenId))
             && !request.resource.data.diff(resource.data).affectedKeys().hasAny([
               "templatesV2TestMode",
               "templatesV2TestModeUpdatedAt",

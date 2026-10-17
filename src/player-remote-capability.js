@@ -1,5 +1,9 @@
 export function getPlaylistNavigationCapability(screen = {}) {
-  const supported = screen.capabilities?.playlistItemNavigation === true;
+  const capability = screen.capabilities;
+  const supported = capability?.playlistItemNavigation === true
+    && capability.platform === "WEB"
+    && Boolean(screen.connectedDeviceId)
+    && capability.deviceId === screen.connectedDeviceId;
   return { supported, reason:supported ? "" : "Requer atualização do Player" };
 }
 

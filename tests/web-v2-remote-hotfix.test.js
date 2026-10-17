@@ -13,10 +13,22 @@ test("playlist navigation stays disabled unless the Player reports explicit supp
     reason:"Requer atualização do Player",
   });
   assert.equal(getPlaylistNavigationCommand("previous", { versionCode:57 }), null);
+  const webScreen = {
+    connectedDeviceId:"web-device",
+    capabilities:{ playlistItemNavigation:true, deviceId:"web-device", platform:"WEB" },
+  };
   assert.deepEqual(
-    getPlaylistNavigationCommand("next", { capabilities:{ playlistItemNavigation:true } }),
+    getPlaylistNavigationCommand("next", webScreen),
     { type:"nextMedia" }
   );
+  assert.equal(getPlaylistNavigationCommand("next", {
+    ...webScreen,
+    connectedDeviceId:"android-device",
+  }), null);
+  assert.equal(getPlaylistNavigationCommand("next", {
+    ...webScreen,
+    capabilities:{ ...webScreen.capabilities, platform:"ANDROID" },
+  }), null);
 });
 
 test("Mercado and shared collections constrain logo slots and keep background behind content", async () => {

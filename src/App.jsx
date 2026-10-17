@@ -15534,7 +15534,7 @@ function TVConnectPage({ playerOnly = false }) {
     try {
       setLoading(true);
 
-      if (IS_OPERATIONAL_TELEMETRY_BUILD) {
+      if (IS_OPERATIONAL_TELEMETRY_BUILD || !isNativeApp()) {
         const deviceId = getTotemDeviceId();
         let binding;
         try {
@@ -15937,7 +15937,7 @@ function PlayerPage() {
   const isAndroidSmartTv = isNativeApp() && isAndroidTv === true;
 
   useEffect(() => {
-    if (!(IS_OPERATIONAL_TELEMETRY_BUILD || IS_TEMPLATES_V2_DIAGNOSTIC_BUILD) || !clientId || !codigo) return undefined;
+    if (!(IS_OPERATIONAL_TELEMETRY_BUILD || IS_TEMPLATES_V2_DIAGNOSTIC_BUILD || !isNativeApp()) || !clientId || !codigo) return undefined;
     let cancelled = false;
     const establishIdentity = async () => {
       try {
@@ -17636,6 +17636,18 @@ function PlayerPage() {
           lastConnection: new Date().toLocaleString("pt-BR"),
           lastSeenAt: serverTimestamp(),
         };
+
+        if (!isNativeApp()
+          && binding?.status === "ACTIVE"
+          && binding.clientId === clientId
+          && binding.screenId === screen.id
+          && binding.deviceId === localDeviceId) {
+          heartbeatPayload.capabilities = {
+            playlistItemNavigation: true,
+            deviceId: localDeviceId,
+            platform: "WEB",
+          };
+        }
 
         if (canSyncTelemetry) {
           heartbeatPayload.telemetry = telemetrySnapshot;
