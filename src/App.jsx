@@ -17635,7 +17635,6 @@ function PlayerPage() {
           status: "online",
           lastConnection: new Date().toLocaleString("pt-BR"),
           lastSeenAt: serverTimestamp(),
-          "capabilities.playlistItemNavigation": !isNativeApp(),
         };
 
         if (canSyncTelemetry) {

@@ -29,11 +29,11 @@
 
 .tv-connect-shell .tv-connect-premium-card {
   position: relative;
-  width: min(100%, 590px);
-  max-width: 590px !important;
-  padding: clamp(24px, 4vh, 38px) 38px 22px !important;
+  width: min(100%, 500px);
+  max-width: 500px !important;
+  padding: clamp(20px, 3vh, 28px) 30px 18px !important;
   border: 1px solid transparent;
-  border-radius: 25px !important;
+  border-radius: 22px !important;
   background:
     linear-gradient(#061126, #061126) padding-box,
     linear-gradient(135deg, rgba(14, 165, 233, 0.85), rgba(139, 92, 246, 0.78)) border-box !important;
@@ -41,23 +41,23 @@
 }
 
 .tv-connect-shell .tv-connect-logo {
-  width: clamp(132px, 22vh, 180px) !important;
-  max-height: 108px;
+  width: clamp(118px, 17vh, 152px) !important;
+  max-height: 88px;
   object-fit: contain;
-  margin-bottom: 12px !important;
+  margin-bottom: 8px !important;
 }
 
 .tv-connect-shell .tv-connect-kicker {
   width: fit-content;
-  margin: 0 auto 14px !important;
+  margin: 0 auto 10px !important;
   border: 1px solid rgba(34, 211, 238, 0.26);
   background: rgba(6, 182, 212, 0.08);
   color: #4de6fa;
 }
 
 .tv-connect-shell .tv-connect-card h1 {
-  margin-bottom: 10px !important;
-  font-size: clamp(32px, 5vh, 52px) !important;
+  margin-bottom: 8px !important;
+  font-size: clamp(30px, 4.4vh, 44px) !important;
   line-height: 1;
   background: linear-gradient(90deg, #fff 20%, #dbeafe 55%, #8b5cf6 95%);
   -webkit-background-clip: text;
@@ -67,14 +67,14 @@
 
 .tv-connect-shell .tv-connect-card > p {
   max-width: 470px;
-  margin: 0 auto 18px !important;
+  margin: 0 auto 14px !important;
   color: #d4def1;
   font-size: 15px !important;
 }
 
 .tv-connect-shell .tv-code-field {
-  min-height: 76px !important;
-  grid-template-columns: 76px minmax(0, 1fr) !important;
+  min-height: 66px !important;
+  grid-template-columns: 66px minmax(0, 1fr) !important;
   overflow: hidden;
   border: 1px solid rgba(56, 189, 248, 0.56);
   background: rgba(2, 10, 26, 0.68);
@@ -115,13 +115,13 @@
   align-items: center;
   justify-content: center;
   gap: 18px;
-  height: 54px !important;
+  height: 50px !important;
   background: linear-gradient(100deg, #16c9f5 0%, #2563eb 52%, #a855f7 100%) !important;
   box-shadow: 0 10px 30px rgba(37, 99, 235, 0.22);
 }
 
 .tv-connect-shell .tv-connect-button b { font-size: 26px; font-weight: 400; }
-.tv-connect-shell .tv-help { margin-top: 14px !important; padding-top: 10px !important; }
+.tv-connect-shell .tv-help { margin-top: 10px !important; padding-top: 8px !important; }
 .tv-connect-shell .tv-change-mode-button { background: rgba(16, 26, 47, 0.78); border-color: rgba(148, 163, 184, 0.19); }
 .tv-connect-shell .tv-change-mode-button.secondary { color: #fda4af; border-color: rgba(244, 63, 94, 0.32); background: rgba(83, 17, 36, 0.34); }
 

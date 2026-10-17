@@ -13,9 +13,9 @@ test("navegação do Player Web respeita ordem, loop, vazio e item único", () =
   assert.equal(getAdjacentPlaylistIndex(0, 0, "next"), -1);
 });
 
-test("Player Web anuncia capacidade e trata anterior/próxima sem afetar Android", async () => {
+test("Player Web preserva heartbeat permitido e mantém os handlers de anterior/próxima", async () => {
   const app = await readFile(new URL("../src/App.jsx", import.meta.url), "utf8");
-  assert.match(app, /capabilities\.playlistItemNavigation/);
+  assert.doesNotMatch(app, /"capabilities\.playlistItemNavigation": !isNativeApp\(\)/);
   assert.match(app, /remoteCommand\.type === "previousMedia"/);
   assert.match(app, /remoteCommand\.type === "nextMedia"/);
   assert.match(app, /goToPreviousMedia\("REMOTE_PREVIOUS"\)/);
@@ -45,4 +45,12 @@ test("Conectar TV usa folha local e preserva campo funcional", async () => {
   assert.match(app, /autoFocus/);
   assert.match(css, /\.tv-connect-shell/);
   assert.match(css, /@media \(max-height:/);
+  assert.match(css, /\.tv-connect-shell \.tv-connect-premium-card\s*\{[^}]*width:\s*min\(100%,\s*500px\)/s);
+});
+
+test("modal de saída permanece compacto e usa a ação destrutiva vermelha do Portal", async () => {
+  const css = await readFile(new URL("../src/remote-control.css", import.meta.url), "utf8");
+  assert.match(css, /\.remote-exit-modal\s*\{[^}]*width:\s*min\(100%,\s*440px\)/s);
+  assert.match(css, /\.remote-exit-modal-actions \.confirm\s*\{[^}]*background:\s*#[a-f\d]{6}/is);
+  assert.doesNotMatch(css, /\.remote-exit-modal-actions \.confirm\s*\{[^}]*linear-gradient/s);
 });
