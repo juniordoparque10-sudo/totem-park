@@ -152,6 +152,19 @@ function getCacheRequest(key) {
   return new Request(`${CACHE_URL_PREFIX}${key}`);
 }
 
+function shouldBypassWebMediaCache(remoteUrl) {
+  if (Capacitor.isNativePlatform()) return false;
+
+  const webOrigin = String(globalThis.location?.origin || "").trim();
+  if (!webOrigin) return false;
+
+  try {
+    return new URL(remoteUrl, webOrigin).origin !== webOrigin;
+  } catch {
+    return false;
+  }
+}
+
 async function openMediaCache() {
   if (typeof caches === "undefined") return null;
   return caches.open(MEDIA_CACHE_NAME);
@@ -210,6 +223,17 @@ export async function getCachedMediaUrl(clientId, item = {}) {
 async function cacheSingleMedia(clientId, item = {}) {
   const remoteUrl = getMediaRemoteUrl(item);
   const key = getMediaCacheKey(clientId, item);
+
+  if (shouldBypassWebMediaCache(remoteUrl)) {
+    return {
+      key,
+      remoteUrl,
+      status: "remote-bypass",
+      source: "remote",
+      sizeBytes: Number(item.sizeBytes || 0),
+    };
+  }
+
   const cache = await openMediaCache();
 
   if (!cache) {
@@ -301,6 +325,7 @@ export async function cachePlaylistMedia({
   });
   const results = {};
   const failures = [];
+  let bypassed = 0;
   let completed = 0;
   let cursor = 0;
 
@@ -311,7 +336,8 @@ export async function cachePlaylistMedia({
 
       try {
         const result = await cacheSingleMedia(clientId, entry.item);
-        results[result.key] = result;
+        if (result.status === "remote-bypass") bypassed += 1;
+        else results[result.key] = result;
       } catch (error) {
         failures.push({
           key: getMediaCacheKey(clientId, entry.item),
@@ -342,6 +368,7 @@ export async function cachePlaylistMedia({
     cached: Object.values(results).filter((result) => result.source === "cache").length,
     failed: failures.length,
     downloaded: Object.values(results).filter((result) => result.status === "miss").length,
+    bypassed,
     downloadedBytes: Object.values(results).reduce(
       (total, result) => total + (result.status === "miss" ? Number(result.sizeBytes || 0) : 0),
       0

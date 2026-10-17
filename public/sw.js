@@ -43,6 +43,7 @@ self.addEventListener("fetch", (event) => {
   const request = event.request;
 
   if (request.method !== "GET") return;
+  if (new URL(request.url).origin !== self.location.origin) return;
 
   if (request.mode === "navigate") {
     const fallbackUrl = new URL(request.url).pathname.startsWith("/tv") ? "/tv" : "/";
