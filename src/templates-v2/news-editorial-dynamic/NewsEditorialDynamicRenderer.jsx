@@ -2,11 +2,12 @@ import { TemplateMedia, TemplateNewsTicker } from "../TemplateV2Modules";
 import TemplateLogo from "../TemplateLogo";
 import { getTemplateV2ImageAssetUrl } from "../player-preload";
 import { useDynamicRotation } from "../dynamic-layout/useDynamicRotation.js";
-import { buildNewsEditorialFeedItems, normalizeNewsEditorialDynamicConfig } from "./config.js";
+import { buildNewsEditorialFeedItems, getNewsEditorialAppearanceStyle, normalizeNewsEditorialDynamicConfig } from "./config.js";
 import "./news-editorial-dynamic.css";
 
 export default function NewsEditorialDynamicRenderer({ config, orientation, name, dynamicData, mode = "player", playbackExecutionId, effectiveDurationSeconds }) {
   const options = normalizeNewsEditorialDynamicConfig(config.dynamicNews, config.modules?.news);
+  const appearance = getNewsEditorialAppearanceStyle(options, orientation);
   const visibility = config.visibility || {};
   const items = Array.isArray(dynamicData?.editorialNews) ? dynamicData.editorialNews : Array.isArray(dynamicData?.news) ? dynamicData.news : [];
   let feedItems = buildNewsEditorialFeedItems(dynamicData?.feedNews, dynamicData?.feedWeather);
@@ -16,7 +17,7 @@ export default function NewsEditorialDynamicRenderer({ config, orientation, name
   const byId = (id) => items.find((item) => (item.id || item.link || item.title) === id);
   const featured = byId(frame.featuredId) || items[0];
   const secondary = frame.secondaryIds.map(byId).filter(Boolean);
-  return <section data-secondary-count={secondary.length} className={`tpv2-root tpv2-news-dynamic layout-${options.layout || "A"} ${orientation === "Retrato" ? "is-portrait" : "is-landscape"} ${mode === "thumbnail" ? "is-thumbnail" : ""} ${secondary.length ? "" : "has-no-secondary"} ${options.feed.enabled ? `has-news-ticker ticker-${options.feed.tickerSize}` : ""}`} style={{ "--tpv2-primary":config.style?.primaryColor, "--tpv2-secondary":config.style?.secondaryColor, "--tpv2-bg":config.style?.backgroundColor, "--tpv2-text":config.style?.textColor, "--secondary-count":Math.max(1,secondary.length) }}>
+  return <section data-secondary-count={secondary.length} className={`tpv2-root tpv2-news-dynamic layout-${options.layout || "A"} feed-position-${appearance.position} ${orientation === "Retrato" ? "is-portrait" : "is-landscape"} ${mode === "thumbnail" ? "is-thumbnail" : ""} ${secondary.length ? "" : "has-no-secondary"} ${options.feed.enabled ? `has-news-ticker ticker-${options.feed.tickerSize}` : ""}`} style={{ "--tpv2-primary":config.style?.primaryColor, "--tpv2-secondary":config.style?.secondaryColor, "--tpv2-bg":config.style?.backgroundColor, "--tpv2-text":config.style?.textColor, "--featured-card-alpha":appearance.featuredBackgroundAlpha, "--secondary-card-alpha":appearance.secondaryBackgroundAlpha, "--news-editorial-footer-gap":appearance.editorialFooterGap, "--ticker-accent":appearance.tickerAccentColor, "--secondary-count":Math.max(1,secondary.length) }}>
     <div className="tpv2-news-background"><TemplateMedia asset={config.media?.primary} mode={mode}/></div>
     <header>{visibility.showLogo !== false&&<TemplateLogo src={getTemplateV2ImageAssetUrl(config.content?.logo)} alt={name}/>}<span>NOTÍCIAS</span></header>
     {visibility.showContent !== false&&(!featured ? <div className="tpv2-dynamic-empty">Notícias temporariamente indisponíveis</div> : <main>

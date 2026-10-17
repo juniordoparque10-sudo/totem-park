@@ -86,6 +86,47 @@ test("configuração independente persiste ao reabrir o rascunho", () => {
   assert.deepEqual(reopened.dynamicNews.feed.weatherCities, ["Natal/RN"]);
 });
 
+test("templates antigas preservam a aparência editorial atual", () => {
+  const normalized = newsConfig.normalizeNewsEditorialDynamicConfig({});
+  assert.deepEqual(normalized.appearance.cards, { featuredTransparency:22, secondaryTransparency:10 });
+  assert.equal(normalized.feed.tickerBackground, "#07111f");
+  assert.equal(normalized.feed.tickerTransparency, 8);
+  assert.equal(normalized.feed.tickerTextColor, "#ffffff");
+  assert.equal(normalized.feed.tickerAccentColor, "#8b5cf6");
+  assert.equal(normalized.feed.position, "compact");
+});
+
+test("aparência normaliza transparências independentes sem apagar conteúdo", () => {
+  const normalized = newsConfig.normalizeNewsEditorialDynamicConfig({
+    appearance:{ cards:{ featuredTransparency:37, secondaryTransparency:64 } },
+    feed:{ tickerTransparency:45, tickerBackground:"#112233", tickerTextColor:"#fefefe", tickerAccentColor:"#ffcc00", position:"expanded" },
+  });
+  const style = newsConfig.getNewsEditorialAppearanceStyle(normalized, "Paisagem");
+  assert.equal(style.featuredBackgroundAlpha, 0.63);
+  assert.equal(style.secondaryBackgroundAlpha, 0.36);
+  assert.equal(style.tickerBackground, "#112233");
+  assert.equal(style.tickerTextColor, "#fefefe");
+  assert.equal(style.tickerAccentColor, "#ffcc00");
+  assert.equal(style.position, "expanded");
+  assert.equal(style.editorialFooterGap, "0.8cqw");
+});
+
+test("três posições reservam áreas crescentes e respeitam a orientação", () => {
+  const landscape = ["compact","intermediate","expanded"].map((position) => newsConfig.getNewsEditorialAppearanceStyle(newsConfig.normalizeNewsEditorialDynamicConfig({ feed:{ position } }), "Paisagem").editorialFooterGap);
+  const portrait = ["compact","intermediate","expanded"].map((position) => newsConfig.getNewsEditorialAppearanceStyle(newsConfig.normalizeNewsEditorialDynamicConfig({ feed:{ position } }), "Retrato").editorialFooterGap);
+  assert.deepEqual(landscape, ["4cqw","2.2cqw","0.8cqw"]);
+  assert.deepEqual(portrait, ["5cqw","3.2cqw","1.8cqw"]);
+});
+
+test("aparência V2.2 persiste ao salvar e reabrir", () => {
+  const draft = createTemplateV2Draft(NEWS_EDITORIAL_DYNAMIC_TYPE, { dynamicNews:{ appearance:{ cards:{ featuredTransparency:40, secondaryTransparency:55 } }, feed:{ position:"intermediate", tickerAccentColor:"#12abef" } } });
+  const reopened = createTemplateV2Draft(NEWS_EDITORIAL_DYNAMIC_TYPE, draft);
+  assert.equal(reopened.dynamicNews.appearance.cards.featuredTransparency, 40);
+  assert.equal(reopened.dynamicNews.appearance.cards.secondaryTransparency, 55);
+  assert.equal(reopened.dynamicNews.feed.position, "intermediate");
+  assert.equal(reopened.dynamicNews.feed.tickerAccentColor, "#12abef");
+});
+
 test("renderer usa dados editoriais e feed separados e reserva a faixa", () => {
   const renderer = fs.readFileSync(new URL("../src/templates-v2/news-editorial-dynamic/NewsEditorialDynamicRenderer.jsx", import.meta.url), "utf8");
   const css = fs.readFileSync(new URL("../src/templates-v2/news-editorial-dynamic/news-editorial-dynamic.css", import.meta.url), "utf8");

@@ -43,7 +43,7 @@ import { getSportsV2Timing, normalizeSportsV2Config, SPORTS_V2_MODES } from "../
 import { normalizeTemplateV2Orientation } from "../orientation";
 import { getConfiguredTemplateWeatherCity } from "../weather-city";
 import { classifyTemplateUpload, getTemplateEditorResources, isTemplateResource } from "../../media-library-purpose";
-import NewsEditorialDynamicEditorFields from "../news-editorial-dynamic/NewsEditorialDynamicEditorFields";
+import NewsEditorialDynamicEditorFields, { NewsEditorialDynamicAppearanceFields } from "../news-editorial-dynamic/NewsEditorialDynamicEditorFields";
 import MarketPremiumEditorFields from "../market-premium/MarketPremiumEditorFields";
 import { getDynamicPlaylistCapability } from "../playlist-capability";
 import SmartLobbyEditorFields from "../smart-lobby/SmartLobbyEditorFields";
@@ -377,6 +377,7 @@ export default function TemplateV2Editor({ client, access, entitlement = { allow
             <label>Overlay da imagem <input type="range" min="0" max="90" disabled={!draftState.editorDraft.media.primary} value={draftState.editorDraft.style.overlayOpacity} onChange={(event) => draftState.update("style.overlayOpacity", Number(event.target.value))} /><span>{draftState.editorDraft.media.primary ? `${draftState.editorDraft.style.overlayOpacity}%` : "Selecione uma mídia principal"}</span></label>
             <label>Nível de transparência <input type="range" min="0" max="100" value={draftState.editorDraft.style.panelTransparency} onChange={(event) => draftState.update("style.panelTransparency", Number(event.target.value))} /><span>{draftState.editorDraft.style.panelTransparency}%</span></label>
             <label>Uso da mídia principal<select value={draftState.editorDraft.style.mediaLayout} onChange={(event) => draftState.update("style.mediaLayout", event.target.value)}><option value="split">Painel dividido</option><option value="full">Fundo completo</option></select></label>
+            {activeType === NEWS_EDITORIAL_DYNAMIC_TYPE && <NewsEditorialDynamicAppearanceFields value={draftState.editorDraft.dynamicNews} legacyNews={draftState.editorDraft.modules.news} onChange={(value)=>draftState.update("dynamicNews",value)}/>}
           </Section>
           <Section sectionId="dynamicData" icon={<CloudSun />} title="Dados dinâmicos" open={openSections.dynamicData} onToggle={toggleSection}>
             {definition?.modules.includes("clock") && activeType !== CLOCK_PRO_TYPE && <label className="tpv2-check"><input type="checkbox" checked={draftState.editorDraft.modules.clock.enabled} onChange={(event) => draftState.update("modules.clock.enabled", event.target.checked)} /> Exibir relógio</label>}

@@ -1,5 +1,9 @@
 const EMPTY_SOURCE = { enabled:true, newsSource:"", newsFeedUrl:"", selectedNewsSources:[] };
-const EMPTY_FEED = { enabled:false, news:{ ...EMPTY_SOURCE }, includeWeather:false, weatherCities:[], tickerSpeed:"normal", tickerSize:"normal", tickerBackground:"#07111f", tickerTextColor:"#ffffff", tickerTransparency:8, tickerLabel:"Últimas notícias" };
+const EMPTY_FEED = { enabled:false, news:{ ...EMPTY_SOURCE }, includeWeather:false, weatherCities:[], tickerSpeed:"normal", tickerSize:"normal", tickerBackground:"#07111f", tickerTextColor:"#ffffff", tickerAccentColor:"#8b5cf6", tickerTransparency:8, tickerLabel:"Últimas notícias", position:"compact" };
+const EMPTY_APPEARANCE = { cards:{ featuredTransparency:22, secondaryTransparency:10 } };
+const POSITIONS = new Set(["compact", "intermediate", "expanded"]);
+const clampPercent = (value, fallback) => Math.max(0, Math.min(100, Number.isFinite(Number(value)) ? Number(value) : fallback));
+const validColor = (value, fallback) => /^#[0-9a-f]{6}$/i.test(String(value || "")) ? String(value) : fallback;
 
 const uniqueStrings = (values) => [...new Set((Array.isArray(values) ? values : []).map((value) => String(value || "").trim()).filter(Boolean))];
 
@@ -24,6 +28,10 @@ export function normalizeNewsEditorialDynamicConfig(value = {}, legacyNews = {})
     showDate:value.showDate !== false,
     secondarySlots:Math.max(1,Math.min(4,Math.trunc(Number(value.secondarySlots)) || 3)),
     rotation:{ featuredSeconds:8, secondarySeconds:5, transition:"fade", ...(value.rotation || {}) },
+    appearance:{ cards:{
+      featuredTransparency:clampPercent(value.appearance?.cards?.featuredTransparency, EMPTY_APPEARANCE.cards.featuredTransparency),
+      secondaryTransparency:clampPercent(value.appearance?.cards?.secondaryTransparency, EMPTY_APPEARANCE.cards.secondaryTransparency),
+    } },
     editorial,
     feed:{
       ...EMPTY_FEED,
@@ -32,7 +40,28 @@ export function normalizeNewsEditorialDynamicConfig(value = {}, legacyNews = {})
       news:normalizeSource(feedValue.news, { enabled:true }),
       includeWeather:feedValue.includeWeather === true,
       weatherCities:uniqueStrings(feedValue.weatherCities),
+      tickerBackground:validColor(feedValue.tickerBackground, EMPTY_FEED.tickerBackground),
+      tickerTextColor:validColor(feedValue.tickerTextColor, EMPTY_FEED.tickerTextColor),
+      tickerAccentColor:validColor(feedValue.tickerAccentColor, EMPTY_FEED.tickerAccentColor),
+      tickerTransparency:clampPercent(feedValue.tickerTransparency, EMPTY_FEED.tickerTransparency),
+      position:POSITIONS.has(feedValue.position) ? feedValue.position : EMPTY_FEED.position,
     },
+  };
+}
+
+export function getNewsEditorialAppearanceStyle(value = {}, orientation = "Paisagem") {
+  const config = normalizeNewsEditorialDynamicConfig(value);
+  const gaps = orientation === "Retrato"
+    ? { compact:"5cqw", intermediate:"3.2cqw", expanded:"1.8cqw" }
+    : { compact:"4cqw", intermediate:"2.2cqw", expanded:"0.8cqw" };
+  return {
+    featuredBackgroundAlpha:(100 - config.appearance.cards.featuredTransparency) / 100,
+    secondaryBackgroundAlpha:(100 - config.appearance.cards.secondaryTransparency) / 100,
+    tickerBackground:config.feed.tickerBackground,
+    tickerTextColor:config.feed.tickerTextColor,
+    tickerAccentColor:config.feed.tickerAccentColor,
+    position:config.feed.position,
+    editorialFooterGap:gaps[config.feed.position],
   };
 }
 
