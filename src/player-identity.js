@@ -79,6 +79,28 @@ export async function authorizePlayerRebind({ app, clientId, screenId }) {
   return result.data;
 }
 
+export async function releasePlayerBindingForScreen({ app, clientId, screenId }) {
+  const release = httpsCallable(getFunctions(app), "releasePlayerBindingForScreen");
+  const result = await release({ clientId, screenId });
+  return result.data;
+}
+
+export function getPlayerBindingClaimMessage(failure) {
+  if (failure === PLAYER_BINDING_CLAIM_FAILURES.SCREEN_ALREADY_CONNECTED) {
+    return "Esta tela possui um vínculo ativo com outro dispositivo. Use a reautorização explícita no Portal para liberar a troca.";
+  }
+  if (failure === PLAYER_BINDING_CLAIM_FAILURES.INVALID_CODE) {
+    return "Código inválido ou tela não encontrada. Confira o código e tente novamente.";
+  }
+  if (failure === PLAYER_BINDING_CLAIM_FAILURES.PERMISSION) {
+    return "A autenticação deste Player não tem permissão para concluir o vínculo.";
+  }
+  if (failure === PLAYER_BINDING_CLAIM_FAILURES.CONNECTION) {
+    return "O serviço de vínculo está temporariamente indisponível. Tente novamente.";
+  }
+  return "Não foi possível consultar o vínculo desta tela. Tente novamente.";
+}
+
 export async function uploadTransitionDiagnosticRescue({ app, auth, payload }) {
   await ensurePlayerAuth(auth);
   const upload = httpsCallable(getFunctions(app), "uploadTransitionDiagnosticRescue");

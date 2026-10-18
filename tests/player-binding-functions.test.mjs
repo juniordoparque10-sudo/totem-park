@@ -138,3 +138,75 @@ test("authenticated backend claim creates an authoritative binding", async () =>
     assert.equal(screen.linkedAt.toMillis(), binding.linkedAt.toMillis());
   });
 });
+
+test("master explicitly releases only the requested screen binding and a new Web identity can claim it", async () => {
+  const oldPlayer = emulatorApp("binding-release-old-player");
+  const nextPlayer = emulatorApp("binding-release-next-player");
+  const unauthorizedPlayer = emulatorApp("binding-release-unauthorized-player");
+  const master = emulatorApp("binding-release-master");
+  const oldCredential = await signInAnonymously(getAuth(oldPlayer));
+  await signInAnonymously(getAuth(nextPlayer));
+  await signInAnonymously(getAuth(unauthorizedPlayer));
+  await createUserWithEmailAndPassword(getAuth(master), "release-master@example.com", "secure-test-password");
+
+  await env.withSecurityRulesDisabled(async (context) => {
+    const db = context.firestore();
+    await setDoc(doc(db, "settings/masterAccess"), { emails: ["release-master@example.com"] });
+    await setDoc(doc(db, "tv_codes/WEBREL1"), { clientId: "client-web", screenId: "screen-web" });
+    await setDoc(doc(db, "clients/client-web/screens/screen-web"), {
+      name: "Web Experimental",
+      connectedAuthUid: oldCredential.user.uid,
+      connectedDeviceId: "preview-origin-a",
+      status: "online",
+    });
+    await setDoc(doc(db, `playerDeviceBindings/${oldCredential.user.uid}`), {
+      uid: oldCredential.user.uid,
+      clientId: "client-web",
+      screenId: "screen-web",
+      deviceId: "preview-origin-a",
+      status: "ACTIVE",
+    });
+    await setDoc(doc(db, "clients/other-client/screens/screen-web"), {
+      name: "Other client screen",
+      connectedAuthUid: "other-uid",
+      connectedDeviceId: "other-device",
+      status: "online",
+    });
+  });
+
+  const unauthorizedRelease = httpsCallable(getFunctions(unauthorizedPlayer), "releasePlayerBindingForScreen");
+  await assertCallableCode(
+    () => unauthorizedRelease({ clientId: "client-web", screenId: "screen-web" }),
+    "permission-denied",
+  );
+
+  const release = httpsCallable(getFunctions(master), "releasePlayerBindingForScreen");
+  const concurrentResults = await Promise.all([
+    release({ clientId: "client-web", screenId: "screen-web" }),
+    release({ clientId: "client-web", screenId: "screen-web" }),
+  ]);
+  assert.deepEqual(
+    concurrentResults.map((result) => result.data.status).sort(),
+    ["ALREADY_RELEASED", "RELEASED"],
+    "concurrent explicit releases must be atomic and idempotent",
+  );
+
+  await env.withSecurityRulesDisabled(async (context) => {
+    const db = context.firestore();
+    const screen = (await getDoc(doc(db, "clients/client-web/screens/screen-web"))).data();
+    const oldBinding = (await getDoc(doc(db, `playerDeviceBindings/${oldCredential.user.uid}`))).data();
+    const otherScreen = (await getDoc(doc(db, "clients/other-client/screens/screen-web"))).data();
+    assert.equal(screen.connectedAuthUid, undefined);
+    assert.equal(screen.connectedDeviceId, undefined);
+    assert.equal(screen.status, "offline");
+    assert.equal(oldBinding.status, "REVOKED");
+    assert.equal(oldBinding.revokeReason, "MASTER_EXPLICIT_RELEASE");
+    assert.equal(otherScreen.connectedAuthUid, "other-uid", "same screenId in another client must remain untouched");
+  });
+
+  const nextClaim = httpsCallable(getFunctions(nextPlayer), "claimPlayerBinding");
+  const rebound = await nextClaim({ code: "WEBREL1", deviceId: "preview-origin-b", appVersion: "web-preview" });
+  assert.equal(rebound.data.status, "ACTIVE");
+  assert.equal(rebound.data.clientId, "client-web");
+  assert.equal(rebound.data.screenId, "screen-web");
+});

@@ -193,6 +193,80 @@ exports.authorizePlayerRebind = onCall(async (request) => {
   };
 });
 
+exports.releasePlayerBindingForScreen = onCall(async (request) => {
+  const uid = requireUid(request);
+  if (!(await isMaster(request))) {
+    throw new HttpsError("permission-denied", "Only an authorized master can release a Player binding.");
+  }
+  const clientId = clean(request.data?.clientId, 120);
+  const screenId = clean(request.data?.screenId, 120);
+  if (!clientId || !screenId) {
+    throw new HttpsError("invalid-argument", "clientId and screenId are required.");
+  }
+
+  const screenRef = db.doc(`clients/${clientId}/screens/${screenId}`);
+  const authorizationRef = playerRebindAuthorizationRef(clientId, screenId);
+  return db.runTransaction(async (transaction) => {
+    const [screenSnapshot, authorizationSnapshot] = await Promise.all([
+      transaction.get(screenRef),
+      transaction.get(authorizationRef),
+    ]);
+    if (!screenSnapshot.exists) throw new HttpsError("not-found", "Screen was not found.");
+
+    const connectedUid = clean(screenSnapshot.get("connectedAuthUid"));
+    const connectedDeviceId = clean(screenSnapshot.get("connectedDeviceId"));
+    const bindingRef = connectedUid ? db.doc(`playerDeviceBindings/${connectedUid}`) : null;
+    const bindingSnapshot = bindingRef ? await transaction.get(bindingRef) : null;
+    const binding = bindingSnapshot?.data() || null;
+    const matchesRequestedScreen = binding
+      && binding.clientId === clientId
+      && binding.screenId === screenId;
+    const alreadyReleased = !connectedUid && !connectedDeviceId;
+    const now = FieldValue.serverTimestamp();
+
+    if (matchesRequestedScreen && binding.status === "ACTIVE") {
+      transaction.update(bindingRef, {
+        status: "REVOKED",
+        revokedAt: now,
+        updatedAt: now,
+        revokedBy: uid,
+        revokeReason: "MASTER_EXPLICIT_RELEASE",
+      });
+    }
+
+    if (!alreadyReleased) {
+      transaction.update(screenRef, {
+        connectedAuthUid: FieldValue.delete(),
+        connectedDeviceId: FieldValue.delete(),
+        activeDeviceId: FieldValue.delete(),
+        status: "offline",
+        lastSeenAt: null,
+        commandStatus: "disconnected",
+      });
+    }
+
+    if (authorizationSnapshot.exists && authorizationSnapshot.get("status") === "ACTIVE") {
+      const authorizationId = clean(authorizationSnapshot.get("authorizationId"), 160);
+      transaction.update(authorizationRef, {
+        status: "CANCELLED",
+        cancelledAt: now,
+        cancelledBy: uid,
+        cancelReason: "MASTER_EXPLICIT_RELEASE",
+      });
+      if (authorizationId) {
+        transaction.set(db.doc(`playerRebindAuthorizations/${authorizationId}`), {
+          status: "CANCELLED",
+          cancelledAt: now,
+          cancelledBy: uid,
+          cancelReason: "MASTER_EXPLICIT_RELEASE",
+        }, { merge: true });
+      }
+    }
+
+    return { status: alreadyReleased ? "ALREADY_RELEASED" : "RELEASED", clientId, screenId };
+  });
+});
+
 exports.claimPlayerBinding = onCall(async (request) => {
   const uid = requireUid(request);
   const code = clean(request.data?.code, 16).toUpperCase();

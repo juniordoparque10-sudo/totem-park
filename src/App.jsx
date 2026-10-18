@@ -185,12 +185,13 @@ import { createTrafficTelemetry } from "./traffic-telemetry";
 import { createPortalScreenOrderTracker, getPortalLastSignalMs, getPortalScreenPage, getPortalScreenStatus, sortClientsAlphabetically } from "./portal-status";
 import { reportedAppVersion } from "./telemetry-card-data";
 import {
-  authorizePlayerRebind,
   claimPlayerBinding,
   classifyPlayerBindingClaimFailure,
   classifyPlayerIdentityFailure,
+  getPlayerBindingClaimMessage,
   PLAYER_BINDING_CLAIM_FAILURES,
   PLAYER_IDENTITY_STATES,
+  releasePlayerBindingForScreen,
   revokeOwnPlayerBinding,
   shouldRevokeSecureBindingOnRelease,
   uploadTransitionDiagnosticRescue,
@@ -10514,7 +10515,7 @@ function ClientScreensPage({ client, access = getClientPlanAccess(client), isAdm
     if (!isAdmin || !rebindDialog?.screen || rebindDialog.phase === "saving") return;
     setRebindDialog((current) => ({ ...current, phase: "saving", error: "" }));
     try {
-      const result = await authorizePlayerRebind({
+      const result = await releasePlayerBindingForScreen({
         app: firebaseApp,
         clientId: client.id,
         screenId: rebindDialog.screen.id,
@@ -10522,8 +10523,7 @@ function ClientScreensPage({ client, access = getClientPlanAccess(client), isAdm
       setRebindDialog((current) => ({
         ...current,
         phase: "success",
-        expiresAt: result.expiresAt,
-        authorizationId: result.authorizationId,
+        releaseStatus: result.status,
       }));
     } catch (error) {
       console.log("Não foi possível reautorizar o Player:", error);
@@ -10959,16 +10959,16 @@ function ClientScreensPage({ client, access = getClientPlanAccess(client), isAdm
       />}
 
       {rebindDialog && <PortalModal
-        title={rebindDialog.phase === "success" ? "Player reautorizado" : "Reautorizar Player"}
+        title={rebindDialog.phase === "success" ? "Player liberado para novo vínculo" : "Reautorizar Player"}
         message={rebindDialog.phase === "success"
-          ? `A autorização temporária foi criada para ${rebindDialog.screen.name}. O próximo claim legítimo poderá registrar a nova identidade.`
+          ? `O vínculo anterior de ${rebindDialog.screen.name} foi revogado. O próximo Player com o código correto poderá criar um novo vínculo seguro.`
           : rebindDialog.phase === "error"
             ? rebindDialog.error
-            : "Esta ação autoriza temporariamente este Player a registrar uma nova identidade autenticada. A tela, playlist e vínculo operacional serão preservados."}
+            : "Esta ação revoga exclusivamente o vínculo atual desta tela e permite um novo pareamento seguro. A tela, playlist e mídias serão preservadas."}
         details={rebindDialog.phase === "success"
-          ? ["Uso único: será consumida no primeiro rebind válido.", `Expira em: ${new Date(rebindDialog.expiresAt).toLocaleString("pt-BR")}.`]
-          : ["Não apaga a tela, playlist, mídias ou configurações.", "A autorização expira em 10 minutos.", "Após um rebind válido, ela é consumida e não pode ser reutilizada."]}
-        confirmLabel={rebindDialog.phase === "success" ? "Concluir" : rebindDialog.phase === "saving" ? "Autorizando..." : rebindDialog.phase === "error" ? "Tentar novamente" : "Autorizar por 10 minutos"}
+          ? ["O vínculo antigo não poderá voltar a escrever como Player ativo.", "Nenhuma outra tela ou cliente foi alterado."]
+          : ["Não apaga a tela, playlist, mídias ou configurações.", "A operação é restrita ao Master e a esta tela.", "Um vínculo ativo válido só será removido após esta confirmação explícita."]}
+        confirmLabel={rebindDialog.phase === "success" ? "Concluir" : rebindDialog.phase === "saving" ? "Liberando..." : rebindDialog.phase === "error" ? "Tentar novamente" : "Revogar vínculo e reautorizar"}
         confirmDisabled={rebindDialog.phase === "saving"}
         danger={rebindDialog.phase !== "success"}
         onConfirm={rebindDialog.phase === "success" ? () => setRebindDialog(null) : confirmPlayerRebindAuthorization}
@@ -15551,22 +15551,12 @@ function TVConnectPage({ playerOnly = false }) {
         } catch (error) {
           const failure = classifyPlayerBindingClaimFailure(error);
           if (failure === PLAYER_BINDING_CLAIM_FAILURES.SCREEN_ALREADY_CONNECTED) {
-            setScreenInUse({ code, screenName: "Não informado", clientName: "Não informado", lastConnection: "Não informado", connectionStatus: "UNKNOWN" });
+            setScreenInUse({ code, screenName: "Protegido", clientName: "Protegido", lastConnection: "Protegido", connectionStatus: "UNKNOWN" });
             setLoading(false);
             return;
           }
-          if (failure === PLAYER_BINDING_CLAIM_FAILURES.INVALID_CODE) {
-            alert("Código inválido ou tela não encontrada. Confira o código e tente novamente.");
-            setLoading(false);
-            return;
-          }
-          if (failure === PLAYER_BINDING_CLAIM_FAILURES.PERMISSION) {
-            alert("Não foi possível autenticar este Player. Verifique a conexão e tente novamente.");
-            setLoading(false);
-            return;
-          }
-          if (failure === PLAYER_BINDING_CLAIM_FAILURES.CONNECTION) {
-            alert("Falha de conexão ao validar o código. Tente novamente.");
+          if (failure !== PLAYER_BINDING_CLAIM_FAILURES.UNKNOWN) {
+            alert(getPlayerBindingClaimMessage(failure));
             setLoading(false);
             return;
           }
