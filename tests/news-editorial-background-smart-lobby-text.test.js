@@ -29,3 +29,8 @@ test("Smart Lobby usa o espaço real dos cards e justifica somente o corpo", () 
   assert.match(collectionCss, /flex:1 1 auto/);
   assert.doesNotMatch(collectionCss, /\.tpv2-collection-smart-lobby[^}]*h[23][^}]*text-align:justify/);
 });
+
+test("Smart Lobby remove a coluna de imagem quando o card não possui imagem", () => {
+  assert.match(collectionCss, /\.tpv2-collection-smart-lobby \.featured:not\(:has\(>img\)\)[^{]*\{[^}]*grid-template-columns:minmax\(0,1fr\)/);
+  assert.match(collectionCss, /\.tpv2-collection-smart-lobby \.secondary article:not\(:has\(>img\)\)[^{]*\{[^}]*grid-template-columns:minmax\(0,1fr\)/);
+});

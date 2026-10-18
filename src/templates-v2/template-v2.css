@@ -66,6 +66,7 @@
 .tpv2-news-ticker>strong { position:relative; z-index:2; flex:none; padding-right:18px; border-right:2px solid color-mix(in srgb,var(--ticker-text) 30%,transparent); text-transform:uppercase; font-size:clamp(10px,1cqw,17px); letter-spacing:.06em; white-space:nowrap; }
 .tpv2-ticker-window { min-width:0; flex:1; overflow:hidden; mask-image:linear-gradient(90deg,transparent,#000 3%,#000 97%,transparent); }
 .tpv2-ticker-track { width:max-content; display:flex; align-items:center; will-change:transform; animation:tpv2-ticker-scroll var(--ticker-duration) linear infinite; }
+.player-transition-layer.is-pending .tpv2-news-dynamic .tpv2-ticker-track { animation-play-state:paused; }
 .tpv2-ticker-track span { flex:none; padding-right:46px; font-size:clamp(11px,1.15cqw,21px); font-weight:750; white-space:nowrap; }.tpv2-ticker-track span::after { content:"•"; margin-left:46px; color:var(--tpv2-primary); }
 @keyframes tpv2-ticker-scroll { from { transform:translateX(0); } to { transform:translateX(-50%); } }
 @media(prefers-reduced-motion:reduce){.tpv2-ticker-track{animation:none}}
