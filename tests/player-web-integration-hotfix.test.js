@@ -51,7 +51,7 @@ test("Player Web anuncia capacidade vinculada e mantém os handlers de anterior/
     readFile(new URL("../src/App.jsx", import.meta.url), "utf8"),
     readFile(new URL("../src/player-remote-command.js", import.meta.url), "utf8"),
   ]);
-  assert.match(app, /heartbeatPayload\.capabilities\s*=\s*\{\s*playlistItemNavigation:\s*true,\s*deviceId:\s*localDeviceId,\s*platform:\s*"WEB"/s);
+  assert.match(app, /heartbeatPayload\.capabilities\s*=\s*getWebPlayerV2Capabilities\(localDeviceId\)/);
   assert.match(commandHandler, /command\?\.type === "previousMedia"/);
   assert.match(commandHandler, /command\?\.type === "nextMedia"/);
   assert.match(app, /previous:\(\) => goToPreviousMedia\("REMOTE_PREVIOUS"\)/);

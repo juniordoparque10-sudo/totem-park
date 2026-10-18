@@ -191,11 +191,28 @@ service cloud.firestore {
         && request.resource.data.connectedDeviceId == playerBinding().data.deviceId
         && request.resource.data.status == "online"
         && request.resource.data.capabilities is map
-        && request.resource.data.capabilities.keys().hasOnly([
-          "deviceId",
-          "platform",
-          "playlistItemNavigation"
-        ])
+        && (
+          request.resource.data.capabilities.keys().hasOnly([
+            "deviceId",
+            "platform",
+            "playlistItemNavigation"
+          ])
+          || (
+            request.resource.data.capabilities.keys().hasOnly([
+              "deviceId",
+              "platform",
+              "playlistItemNavigation",
+              "templatesV2",
+              "templatesV2DynamicPhase1"
+            ])
+            && request.resource.data.capabilities.keys().hasAll([
+              "templatesV2",
+              "templatesV2DynamicPhase1"
+            ])
+            && request.resource.data.capabilities.templatesV2 == true
+            && request.resource.data.capabilities.templatesV2DynamicPhase1 == true
+          )
+        )
         && request.resource.data.capabilities.deviceId == playerBinding().data.deviceId
         && request.resource.data.capabilities.platform == "WEB"
         && request.resource.data.capabilities.playlistItemNavigation == true;

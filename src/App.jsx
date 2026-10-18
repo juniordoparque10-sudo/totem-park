@@ -222,7 +222,7 @@ import { getPublishedTemplateV2View, isTemplateV2 } from "./templates-v2/schema"
 import { getTemplateV2Orientation } from "./templates-v2/orientation";
 import { getTemplateV2ForecastRequestDays, normalizeTemplateV2ForecastDays } from "./templates-v2/dynamic-data";
 import { normalizeDynamicNewsItems } from "./templates-v2/news-editorial-dynamic/data";
-import { getTemplatesV2ScreenCapability } from "./templates-v2/player-capability";
+import { getTemplatesV2ScreenCapability, getWebPlayerV2Capabilities } from "./templates-v2/player-capability";
 import { getDynamicPlaylistCapability } from "./templates-v2/playlist-capability";
 import logo from "./assets/logo.png";
 import isotipo from "./assets/isotipo.png";
@@ -17648,11 +17648,7 @@ function PlayerPage() {
           && binding.clientId === clientId
           && binding.screenId === screen.id
           && binding.deviceId === localDeviceId) {
-          heartbeatPayload.capabilities = {
-            playlistItemNavigation: true,
-            deviceId: localDeviceId,
-            platform: "WEB",
-          };
+          heartbeatPayload.capabilities = getWebPlayerV2Capabilities(localDeviceId);
         }
 
         if (canSyncTelemetry) {

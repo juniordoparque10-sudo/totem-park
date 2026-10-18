@@ -9,7 +9,12 @@ export function isDynamicTemplateV2Item(item = {}) {
 }
 
 export function supportsDynamicTemplatesV2(player = {}) {
-  return player?.runtime === "web" || player?.playerRuntime === "web" || player?.capabilities?.[DYNAMIC_TEMPLATES_V2_CAPABILITY] === true;
+  const capabilities = player?.capabilities;
+  const connectedDeviceId = String(player?.connectedDeviceId || "");
+  return capabilities?.[DYNAMIC_TEMPLATES_V2_CAPABILITY] === true
+    && capabilities?.platform === "WEB"
+    && connectedDeviceId !== ""
+    && String(capabilities?.deviceId || "") === connectedDeviceId;
 }
 
 export function getDynamicPlaylistCapability(items = [], screens = []) {

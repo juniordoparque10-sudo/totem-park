@@ -1,6 +1,6 @@
 import test from "node:test";
 import assert from "node:assert/strict";
-import { getTemplatesV2ScreenCapability, supportsTemplatesV2 } from "../src/templates-v2/player-capability.js";
+import { getTemplatesV2ScreenCapability, getWebPlayerV2Capabilities, supportsTemplatesV2 } from "../src/templates-v2/player-capability.js";
 
 test("V16 remains protected while V17 supports Templates V2", () => {
   assert.equal(supportsTemplatesV2({ telemetry:{ session:{ appVersion:"1.0.0-v16-field-release-candidate" } } }), false);
@@ -10,6 +10,16 @@ test("V16 remains protected while V17 supports Templates V2", () => {
 test("explicit capability takes precedence and unknown players stay protected", () => {
   assert.equal(supportsTemplatesV2({ capabilities:{ templatesV2:true }, versionCode:16 }), true);
   assert.equal(supportsTemplatesV2({}), false);
+});
+
+test("Player Web advertises the exact explicit V2 contracts", () => {
+  assert.deepEqual(getWebPlayerV2Capabilities("web-device"), {
+    deviceId: "web-device",
+    platform: "WEB",
+    playlistItemNavigation: true,
+    templatesV2: true,
+    templatesV2DynamicPhase1: true,
+  });
 });
 
 test("the master canary override is isolated to the selected screen", () => {

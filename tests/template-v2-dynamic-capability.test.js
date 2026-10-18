@@ -4,11 +4,14 @@ import { getDynamicPlaylistCapability, supportsDynamicTemplatesV2 } from "../src
 
 test("exige capacidade dinâmica explícita e não infere por versionCode", () => {
   assert.equal(supportsDynamicTemplatesV2({ versionCode: 999 }), false);
-  assert.equal(supportsDynamicTemplatesV2({ capabilities: { templatesV2DynamicPhase1: true } }), true);
+  assert.equal(supportsDynamicTemplatesV2({ runtime: "web" }), false);
+  assert.equal(supportsDynamicTemplatesV2({ versionCode: 57, capabilities: { platform: "ANDROID", templatesV2: true } }), false);
+  assert.equal(supportsDynamicTemplatesV2({ connectedDeviceId:"web-a", capabilities: { deviceId:"web-a", platform:"WEB", templatesV2DynamicPhase1: true } }), true);
+  assert.equal(supportsDynamicTemplatesV2({ connectedDeviceId:"android-b", capabilities: { deviceId:"web-a", platform:"WEB", templatesV2DynamicPhase1: true } }), false);
 });
 
 test("bloqueia playlist dinâmica atribuída a qualquer tela incompatível", () => {
-  const result = getDynamicPlaylistCapability([{ templateType: "market-premium" }], [{ id: "ok", capabilities: { templatesV2DynamicPhase1: true } }, { id: "v55", versionCode: 55 }]);
+  const result = getDynamicPlaylistCapability([{ templateType: "market-premium" }], [{ id: "ok", connectedDeviceId:"web-a", capabilities: { deviceId:"web-a", platform:"WEB", templatesV2DynamicPhase1: true } }, { id: "v55", versionCode: 55 }]);
   assert.equal(result.allowed, false);
   assert.deepEqual(result.blockedScreens.map((screen) => screen.id), ["v55"]);
 });
@@ -26,6 +29,6 @@ test("conteúdo consolidado novo exige capacidade mas documento legado do mesmo 
 });
 
 test("revalidação é atômica para atualização de playlist atribuída",()=>{
-  const result=getDynamicPlaylistCapability([{templateType:"digital-menu",dynamicTemplate:true}],[{id:"web",runtime:"web"},{id:"old",versionCode:51}]);
+  const result=getDynamicPlaylistCapability([{templateType:"digital-menu",dynamicTemplate:true}],[{id:"web",connectedDeviceId:"web-a",capabilities:{deviceId:"web-a",platform:"WEB",templatesV2DynamicPhase1:true}},{id:"old",versionCode:51}]);
   assert.deepEqual(result.blockedScreens.map((screen)=>screen.id),["old"]);
 });

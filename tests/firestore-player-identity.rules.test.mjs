@@ -61,11 +61,18 @@ test("active binding can write its own screen", async () => {
   await assertSucceeds(setDoc(doc(db, sessionPath()), telemetry()));
 });
 
-test("active binding can announce only the supported Web playlist navigation capability", async () => {
+test("active binding can announce only the supported Web capabilities", async () => {
   const bound = env.authenticatedContext("player-a").firestore();
   const unbound = env.authenticatedContext("unbound").firestore();
   const revoked = env.authenticatedContext("revoked").firestore();
-  const capability = { playlistItemNavigation: true, deviceId: "device-a", platform: "WEB" };
+  const capability = {
+    playlistItemNavigation: true,
+    templatesV2: true,
+    templatesV2DynamicPhase1: true,
+    deviceId: "device-a",
+    platform: "WEB",
+  };
+  const legacyCapability = { playlistItemNavigation: true, deviceId: "device-a", platform: "WEB" };
 
   await assertFails(updateDoc(doc(unbound, screenPath()), { capabilities: capability }));
   await assertFails(updateDoc(doc(revoked, screenPath()), { capabilities: capability }));
@@ -78,6 +85,9 @@ test("active binding can announce only the supported Web playlist navigation cap
     lastSeenAt: new Date(),
     status: "online",
   }));
+  await assertSucceeds(updateDoc(doc(bound, screenPath()), {
+    capabilities: legacyCapability,
+  }));
   await assertFails(updateDoc(doc(bound, screenPath()), {
     capabilities: { ...capability, deviceId: "other-device" },
   }));
@@ -86,6 +96,9 @@ test("active binding can announce only the supported Web playlist navigation cap
   }));
   await assertFails(updateDoc(doc(bound, screenPath()), {
     capabilities: { ...capability, arbitraryCapability: true },
+  }));
+  await assertFails(updateDoc(doc(bound, screenPath()), {
+    capabilities: { ...capability, templatesV2DynamicPhase1: false },
   }));
   await assertFails(updateDoc(doc(bound, screenPath()), {
     capabilities: capability,

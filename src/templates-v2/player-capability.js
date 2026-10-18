@@ -17,6 +17,16 @@ export function getPlayerV2Capabilities() {
   };
 }
 
+export function getWebPlayerV2Capabilities(deviceId = "") {
+  return {
+    deviceId:String(deviceId),
+    platform:"WEB",
+    playlistItemNavigation:true,
+    templatesV2:true,
+    templatesV2DynamicPhase1:true,
+  };
+}
+
 export function getPlayerVersionLabel(screen = {}) {
   return String(
     screen?.telemetry?.session?.appVersion
