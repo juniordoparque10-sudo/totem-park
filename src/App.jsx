@@ -24,7 +24,7 @@ import { normalizeSportsV2Config } from "./templates-v2/sports-v2/config";
 import { resolveSportsDataProvider } from "./templates-v2/sports-v2/data/SportsDataProvider";
 import { withSportsV2ReadinessTimeout } from "./templates-v2/sports-v2/readiness";
 import { clearTemplateV2BackgroundOnlineRetry, getTemplateV2CriticalImageState, getTemplateV2CriticalImageUrl, getTemplateV2ReadinessFingerprint, localizeTemplateV2Assets, markTemplateV2BackgroundForOnlineRetry, prepareTemplateV2CriticalImage, preloadImageForPaint, suppressTemplateV2CriticalImage, takeTemplateV2BackgroundOnlineRetries } from "./templates-v2/player-preload";
-import { collectTemplateAssetUrls, createOfflineSafeTemplate, prepareTemplateAssets, refreshTemplateAssets, releaseRetiredTemplateAssetUrls } from "./templates-v2/offline-asset-cache";
+import { collectTemplateAssetUrls, createOfflineSafeTemplate, prepareTemplateAssets, refreshTemplateAssets, releaseRetiredTemplateAssetUrls, selectTemplateAssetRenderSource, shouldUsePersistentTemplateAssetCache } from "./templates-v2/offline-asset-cache";
 import { buildSportsDataCacheContext, buildTemplateDataCacheKey, createNewsDataFingerprintConfig, createWeatherDataFingerprintConfig, hasUsableSportsPayload, mergeSportsLastKnown, readSportsTemplateDataCache, readTemplateDataCache, refreshTemplateDataIfNeeded, writeSportsTemplateDataCache, writeTemplateDataCache } from "./templates-v2/offline-data-cache";
 import { shouldRevealTemplateImmediately } from "./templates-v2/offline-readiness";
 import { getNextTemplateToPrepare } from "./templates-v2/offline-preload";
@@ -14148,10 +14148,12 @@ function releaseRetiredTemplateAssetUrlsAfterPaint(localUrls) {
 
 function TemplateVisualPreview({ template, compact = false, tv = false, playbackExecutionId = null, onVisualEvent = null, offlineContext = null }) {
   const templateId = template.id || template.templateId || template.identity?.templateId || "";
-  const preserveRemoteOnMiss = !isNativeApp();
+  const nativeAssetCache = { isNativePlatform:isNativeApp };
+  const preserveRemoteOnMiss = !shouldUsePersistentTemplateAssetCache(nativeAssetCache);
   const [offlineTemplate, setOfflineTemplate] = useState(() => preserveRemoteOnMiss ? template : createOfflineSafeTemplate(template));
   const assetKey = JSON.stringify([...collectTemplateAssetUrls(template)]);
   useEffect(() => {
+    if (!shouldUsePersistentTemplateAssetCache(nativeAssetCache)) return undefined;
     let active = true;
     const assetOptions = { ...templateAssetCacheOptions, preserveRemoteOnMiss };
     prepareTemplateAssets(template, assetOptions).then((result) => {
@@ -14180,11 +14182,12 @@ function TemplateVisualPreview({ template, compact = false, tv = false, playback
   // Asset URLs are the refresh boundary; object identity is intentionally ignored.
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [assetKey, templateId]);
+  const renderTemplate = selectTemplateAssetRenderSource(template, offlineTemplate, nativeAssetCache);
   if (isTemplateV2(template)) {
-    return <TemplateV2LivePreview template={offlineTemplate} sourceTemplate={template} compact={compact} tv={tv} playbackExecutionId={playbackExecutionId} onVisualEvent={onVisualEvent} offlineContext={offlineContext} />;
+    return <TemplateV2LivePreview template={renderTemplate} sourceTemplate={template} compact={compact} tv={tv} playbackExecutionId={playbackExecutionId} onVisualEvent={onVisualEvent} offlineContext={offlineContext} />;
   }
 
-  return <LegacyTemplateVisualPreview template={offlineTemplate} sourceTemplate={template} compact={compact} tv={tv} offlineContext={offlineContext} />;
+  return <LegacyTemplateVisualPreview template={renderTemplate} sourceTemplate={template} compact={compact} tv={tv} offlineContext={offlineContext} />;
 }
 
 function ScaledTemplatePortalPreview({ template, playlistThumbnail = false }) {

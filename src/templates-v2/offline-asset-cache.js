@@ -21,6 +21,14 @@ const IMAGE_CONTENT_TYPES_BY_EXTENSION = {
   webp:"image/webp",
 };
 
+export function shouldUsePersistentTemplateAssetCache(capacitor = Capacitor) {
+  return capacitor?.isNativePlatform?.() === true;
+}
+
+export function selectTemplateAssetRenderSource(sourceTemplate, preparedTemplate, capacitor = Capacitor) {
+  return shouldUsePersistentTemplateAssetCache(capacitor) ? preparedTemplate : sourceTemplate;
+}
+
 function isRemoteUrl(value) {
   return /^https?:\/\//i.test(String(value || "").trim());
 }

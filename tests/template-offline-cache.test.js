@@ -3,7 +3,7 @@ import assert from "node:assert/strict";
 import { Buffer } from "node:buffer";
 import { readFileSync } from "node:fs";
 import { buildSportsDataCacheContext, buildTemplateDataCacheKey, clearTemplateDataMemoryCacheForTests, createSportsDataFingerprintConfig, mergeSportsLastKnown, readSportsTemplateDataCache, readTemplateDataCache, writeSportsTemplateDataCache, writeTemplateDataCache } from "../src/templates-v2/offline-data-cache.js";
-import { clearTemplateAssetMemoryCacheForTests, collectTemplateAssetUrls, createOfflineSafeTemplate, fetchTemplateAssetResponse, prepareTemplateAssets, refreshTemplateAsset } from "../src/templates-v2/offline-asset-cache.js";
+import { clearTemplateAssetMemoryCacheForTests, collectTemplateAssetUrls, createOfflineSafeTemplate, fetchTemplateAssetResponse, prepareTemplateAssets, refreshTemplateAsset, selectTemplateAssetRenderSource, shouldUsePersistentTemplateAssetCache } from "../src/templates-v2/offline-asset-cache.js";
 import { shouldRevealTemplateImmediately } from "../src/templates-v2/offline-readiness.js";
 import { prepareTemplateV2CriticalImage } from "../src/templates-v2/player-preload.js";
 import { getNextTemplateToPrepare } from "../src/templates-v2/offline-preload.js";
@@ -95,6 +95,20 @@ test("Player Web preserva a URL remota quando o cache visual ainda não existe",
   });
   assert.equal(result.hits, 0);
   assert.equal(result.template.published.content.logo.url, remote);
+});
+
+test("Player Web renderiza a mesma URL remota validada pelo preloader sem trocar para blob tardio", () => {
+  const source = { published:{ media:{ primary:{ type:"image", url:"https://cdn.example/news-background.jpg" } } } };
+  const prepared = { published:{ media:{ primary:{ type:"image", url:"blob:late-cache-copy" } } } };
+  assert.equal(shouldUsePersistentTemplateAssetCache(webCapacitor), false);
+  assert.equal(selectTemplateAssetRenderSource(source, prepared, webCapacitor), source);
+});
+
+test("Android mantém o template preparado pelo cache Local First", () => {
+  const source = { published:{ media:{ primary:{ type:"image", url:"https://cdn.example/clock-background.jpg" } } } };
+  const prepared = { published:{ media:{ primary:{ type:"image", url:"file:///local-first/clock-background.jpg" } } } };
+  assert.equal(shouldUsePersistentTemplateAssetCache(nativeCapacitor), true);
+  assert.equal(selectTemplateAssetRenderSource(source, prepared, nativeCapacitor), prepared);
 });
 
 test("falha de atualização preserva asset antigo válido", async () => {
