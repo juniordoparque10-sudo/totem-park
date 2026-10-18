@@ -1,6 +1,6 @@
 import test from "node:test";
 import assert from "node:assert/strict";
-import { confirmTemplateImageForPaint, getTemplatePlaybackLayerKey, getTemplatePlaybackReadyKey, isCurrentPlaybackExecution, nextPlaybackExecutionId } from "../src/templates-v2/player-execution.js";
+import { confirmTemplateImageForPaint, getTemplatePlaybackLayerKey, getTemplatePlaybackReadyKey, isCurrentPlaybackExecution, nextPlaybackExecutionId, shouldReleaseTemplateAfterPreload } from "../src/templates-v2/player-execution.js";
 
 test("cada entrada V2 recebe uma identidade de execução diferente", () => {
   const first = 1;
@@ -30,9 +30,16 @@ test("callback de execução antiga não corresponde à execução atual", () =>
   assert.equal(isCurrentPlaybackExecution(7,8), false);
 });
 
-test("elemento visual real confirma load, decode, frame e ready nessa ordem", async () => {
+test("elemento visual real confirma load, decode, duas molduras e ready nessa ordem", async () => {
   const events = [];
   const image = { decode: async () => events.push("decode-call") };
   await confirmTemplateImageForPaint(image, (event) => events.push(event), (callback) => { events.push("frame"); callback(); });
-  assert.deepEqual(events, ["load","decode-call","decoded","frame","ready"]);
+  assert.deepEqual(events, ["load","decode-call","decoded","frame","frame","ready"]);
+});
+
+test("preload V2 não libera a camada antes da imagem montada confirmar pintura", () => {
+  assert.equal(shouldReleaseTemplateAfterPreload({ status:"ready", templateV2:true }), false);
+  assert.equal(shouldReleaseTemplateAfterPreload({ status:"ready", templateV2:false }), true);
+  assert.equal(shouldReleaseTemplateAfterPreload({ status:"no-background", templateV2:true }), true);
+  assert.equal(shouldReleaseTemplateAfterPreload({ status:"failed", templateV2:true }), true);
 });

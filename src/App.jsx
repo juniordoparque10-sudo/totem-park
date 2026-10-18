@@ -28,7 +28,7 @@ import { collectTemplateAssetUrls, createOfflineSafeTemplate, prepareTemplateAss
 import { buildSportsDataCacheContext, buildTemplateDataCacheKey, createNewsDataFingerprintConfig, createWeatherDataFingerprintConfig, hasUsableSportsPayload, mergeSportsLastKnown, readSportsTemplateDataCache, readTemplateDataCache, refreshTemplateDataIfNeeded, writeSportsTemplateDataCache, writeTemplateDataCache } from "./templates-v2/offline-data-cache";
 import { shouldRevealTemplateImmediately } from "./templates-v2/offline-readiness";
 import { getNextTemplateToPrepare } from "./templates-v2/offline-preload";
-import { confirmTemplateImageForPaint, getTemplatePlaybackLayerKey, getTemplatePlaybackReadyKey, isCurrentPlaybackExecution, nextPlaybackExecutionId } from "./templates-v2/player-execution";
+import { confirmTemplateImageForPaint, getTemplatePlaybackLayerKey, getTemplatePlaybackReadyKey, isCurrentPlaybackExecution, nextPlaybackExecutionId, shouldReleaseTemplateAfterPreload } from "./templates-v2/player-execution";
 import { deriveMediaCacheState, finalizeCompletedMediaCache } from "./player-cache-state";
 import { formatScheduledPlaylistSummary } from "./portal-schedule-presentation";
 import { getClientDashboardDestination, shouldShowClientDashboardCardsInitially } from "./client-dashboard-navigation";
@@ -16566,12 +16566,10 @@ function PlayerPage() {
       }).then((result) => {
         if (!active || !isCurrentPlaybackExecution(executionId,currentPlaybackExecutionIdRef.current)) return;
         if (result.status === "ready") clearTemplateV2BackgroundOnlineRetry(retryableTemplateBackgroundKeysRef.current, currentItemKey);
-        if ((result.status === "no-background" || result.status === "ready") && !sportsNeedsFinalData) reveal();
-        else if (result.status === "ready" && !isTemplateV2(currentItem)) reveal();
-        else if (result.status !== "ready") {
+        if (shouldReleaseTemplateAfterPreload({ status:result.status, templateV2:isTemplateV2(currentItem) }) && !sportsNeedsFinalData) reveal();
+        if (result.status !== "ready" && result.status !== "no-background") {
           setSuppressedTemplateBackgroundKeys((previous) => new Set(previous).add(currentItemKey));
           logTemplatesV2Diagnostic("CRITICAL_BACKGROUND_NOT_READY", { ...diagnosticPayload, status:result.status, attempts:result.attempts, CURRENT_VISIBLE:previousMediaIndexRef.current !== null, NEXT_PENDING:false });
-          if (!sportsNeedsFinalData) reveal();
         }
       });
     }
