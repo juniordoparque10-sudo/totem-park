@@ -13,3 +13,16 @@ export function getPlaylistNavigationCommand(direction, screen = {}) {
   if (direction === "next") return { type:"nextMedia" };
   return null;
 }
+
+function isConnectedWebPlayer(screen = {}) {
+  const capability = screen.capabilities;
+  return capability?.platform === "WEB"
+    && Boolean(screen.connectedDeviceId)
+    && capability.deviceId === screen.connectedDeviceId;
+}
+
+export function getBlackoutToggleCommand(screen = {}) {
+  const active = screen.lastCommandExecuted === "blackout";
+  if (isConnectedWebPlayer(screen)) return { type:"blackout", enabled:!active };
+  return active ? { type:"clear" } : { type:"blackout" };
+}

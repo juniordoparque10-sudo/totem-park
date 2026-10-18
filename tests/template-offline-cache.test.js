@@ -5,6 +5,7 @@ import { readFileSync } from "node:fs";
 import { buildSportsDataCacheContext, buildTemplateDataCacheKey, clearTemplateDataMemoryCacheForTests, createSportsDataFingerprintConfig, mergeSportsLastKnown, readSportsTemplateDataCache, readTemplateDataCache, writeSportsTemplateDataCache, writeTemplateDataCache } from "../src/templates-v2/offline-data-cache.js";
 import { clearTemplateAssetMemoryCacheForTests, collectTemplateAssetUrls, createOfflineSafeTemplate, fetchTemplateAssetResponse, prepareTemplateAssets, refreshTemplateAsset } from "../src/templates-v2/offline-asset-cache.js";
 import { shouldRevealTemplateImmediately } from "../src/templates-v2/offline-readiness.js";
+import { prepareTemplateV2CriticalImage } from "../src/templates-v2/player-preload.js";
 import { getNextTemplateToPrepare } from "../src/templates-v2/offline-preload.js";
 
 class MemoryStorage {
@@ -56,7 +57,33 @@ test("template sem asset local nasce com fallback e não mantém URL remota", ()
   const remote = "https://cdn.example/missing.jpg";
   const template = { schemaVersion:2, playerItemType:"template", published:{ media:{ primary:{ type:"image", url:remote } } } };
   assert.equal(createOfflineSafeTemplate(template).published.media.primary.url, "");
-  assert.equal(shouldRevealTemplateImmediately(template), true);
+  assert.equal(shouldRevealTemplateImmediately(template, { native:true }), true);
+  assert.equal(shouldRevealTemplateImmediately(template, { native:false }), false);
+});
+
+test("Player Web aguarda decode do background crítico antes de revelar", async () => {
+  let decodeResolved = false;
+  class DecodedImage {
+    set src(value) {
+      this.currentSrc = value;
+      queueMicrotask(() => this.onload?.());
+    }
+    async decode() { decodeResolved = true; }
+  }
+  const template = { playerItemType:"template", published:{ media:{ primary:{ type:"image", url:"https://cdn.example/critical-ready.jpg" } } } };
+  const result = await prepareTemplateV2CriticalImage(template, DecodedImage, { maxAttempts:1, timeoutMs:100 });
+  assert.equal(result.status, "ready");
+  assert.equal(decodeResolved, true);
+});
+
+test("background crítico lento usa timeout limitado sem fetch", async () => {
+  class HangingImage { set src(value) { this.currentSrc = value; } }
+  const template = { playerItemType:"template", published:{ media:{ primary:{ type:"image", url:"https://cdn.example/critical-timeout.jpg" } } } };
+  const startedAt = Date.now();
+  const result = await prepareTemplateV2CriticalImage(template, HangingImage, { maxAttempts:1, timeoutMs:15 });
+  assert.equal(result.status, "failed");
+  assert.match(result.error.message, /tempo limite/i);
+  assert.ok(Date.now() - startedAt < 250);
 });
 
 test("Player Web preserva a URL remota quando o cache visual ainda não existe", async () => {

@@ -169,8 +169,9 @@ import {
 import { readCachedPlayerDocument } from "./player-local-first";
 import { getPlaybackRemainingAfterWake, subscribePlayerRuntimeWake } from "./player-runtime-recovery";
 import { buildPlayerVisibleLayers } from "./player-visible-layers";
-import { getPlaylistNavigationCapability, getPlaylistNavigationCommand } from "./player-remote-capability";
+import { getBlackoutToggleCommand, getPlaylistNavigationCapability, getPlaylistNavigationCommand } from "./player-remote-capability";
 import { getAdjacentPlaylistIndex } from "./player-playlist-navigation";
+import { executePlaylistNavigationCommand } from "./player-remote-command";
 import { getActivePlaylistListenerDependencies } from "./active-playlist-listener";
 import { selectFallbackTemplates } from "./player-playlist-boundary";
 import {
@@ -10888,10 +10889,10 @@ function ClientScreensPage({ client, access = getClientPlanAccess(client), isAdm
 
                       <button
                         className="remote-mini-button blackout"
-                        onClick={() => sendRemoteCommand(screen.id, { type: "blackout" })}
+                        onClick={() => sendRemoteCommand(screen.id, getBlackoutToggleCommand(screen))}
                       >
                         <MonitorOff size={16} />
-                        <span>Tela preta</span>
+                        <span>{screen.lastCommandExecuted === "blackout" ? "Sair tela preta" : "Tela preta"}</span>
                       </button>
 
                       <button
@@ -15851,6 +15852,7 @@ function PlayerPage() {
   const [linkValidationState, setLinkValidationState] = useState(LINK_STATES.VALIDATION_START);
   const [lastCommandId, setLastCommandId] = useState(null);
   const lastCommandIdRef = useRef(null);
+  const playlistNavigationHandlersRef = useRef({ previous:() => {}, next:() => {} });
   const transitionInProgressRef = useRef(false);
   const transitionCleanupRef = useRef(null);
   const offlineStatusTimerRef = useRef(null);
@@ -16541,7 +16543,7 @@ function PlayerPage() {
       if (active && isCurrentPlaybackExecution(executionId,currentPlaybackExecutionIdRef.current)) markCurrentMediaReady(currentItem, safeIndex, executionId);
     };
 
-    if (shouldRevealTemplateImmediately(currentItem)) {
+    if (shouldRevealTemplateImmediately(currentItem, { native:isNativeApp() })) {
       logTemplatesV2Diagnostic("TEMPLATE_NETWORK_INDEPENDENT_READY", { ...diagnosticPayload, CURRENT_VISIBLE:previousMediaIndexRef.current !== null, NEXT_PENDING:false });
       reveal();
       return () => { active = false; };
@@ -16553,6 +16555,7 @@ function PlayerPage() {
     } else {
       prepareTemplateV2CriticalImage(currentItem, globalThis.Image, {
         maxAttempts:2,
+        timeoutMs:5000,
         onFailure:(error,details)=>{
           markTemplateV2BackgroundForOnlineRetry(retryableTemplateBackgroundKeysRef.current, currentItemKey);
           logTemplatesV2Diagnostic("CRITICAL_BACKGROUND_PRELOAD_FAILED",{...diagnosticPayload,...details,message:String(error?.message||error||"").slice(0,300),CURRENT_VISIBLE:previousMediaIndexRef.current !== null,NEXT_PENDING:true});
@@ -16560,10 +16563,13 @@ function PlayerPage() {
       }).then((result) => {
         if (!active || !isCurrentPlaybackExecution(executionId,currentPlaybackExecutionIdRef.current)) return;
         if (result.status === "ready") clearTemplateV2BackgroundOnlineRetry(retryableTemplateBackgroundKeysRef.current, currentItemKey);
-        if (result.status === "no-background" && !sportsNeedsFinalData) reveal();
+        if ((result.status === "no-background" || result.status === "ready") && !sportsNeedsFinalData) reveal();
         else if (result.status === "ready" && !isTemplateV2(currentItem)) reveal();
-        else if (result.status === "ready") return;
-        else logTemplatesV2Diagnostic("CRITICAL_BACKGROUND_NOT_READY", { ...diagnosticPayload, status:result.status, attempts:result.attempts, CURRENT_VISIBLE:previousMediaIndexRef.current !== null, NEXT_PENDING:true });
+        else if (result.status !== "ready") {
+          setSuppressedTemplateBackgroundKeys((previous) => new Set(previous).add(currentItemKey));
+          logTemplatesV2Diagnostic("CRITICAL_BACKGROUND_NOT_READY", { ...diagnosticPayload, status:result.status, attempts:result.attempts, CURRENT_VISIBLE:previousMediaIndexRef.current !== null, NEXT_PENDING:false });
+          if (!sportsNeedsFinalData) reveal();
+        }
       });
     }
 
@@ -16585,6 +16591,8 @@ function PlayerPage() {
       if (!active) return;
       logTemplateOffline(result.hits ? "TEMPLATE_PRELOAD_LOCAL_READY" : "TEMPLATE_ASSET_CACHE_MISS", { templateId, hits:result.hits, misses:result.misses, fromType:playerItems[safeIndex]?.type || playerItems[safeIndex]?.playerItemType || "" });
     }).catch(() => {});
+    const nextCriticalUrl = getTemplateV2CriticalImageUrl(nextItem);
+    if (nextCriticalUrl) preloadImageForPaint(nextCriticalUrl, globalThis.Image, { timeoutMs:5000 }).catch(() => {});
     const nextConfig = nextItem.published || {};
     const preloadScope = { clientId, screenId:screen?.id || "", templateId };
     const cachedModules = [
@@ -17177,6 +17185,11 @@ function PlayerPage() {
     if (previousIndex < 0 || previousIndex === mediaIndex) return;
     goToNextMedia(reason, previousIndex);
   }
+
+  playlistNavigationHandlersRef.current = {
+    previous:() => goToPreviousMedia("REMOTE_PREVIOUS"),
+    next:() => goToNextMedia("REMOTE_NEXT"),
+  };
 
   useLayoutEffect(() => {
     if (!IS_PLAYER_DECODER_LIFECYCLE_BUILD || !decoderReleasePending) return;
@@ -17838,9 +17851,12 @@ function PlayerPage() {
         return;
       }
 
+      const acknowledgedCommand = remoteCommand.type === "blackout" && remoteCommand.enabled === false
+        ? "clear"
+        : remoteCommand.type || "";
       try {
         await updateDoc(screenDocRef, {
-          lastCommandExecuted: remoteCommand.type || "",
+          lastCommandExecuted: acknowledgedCommand,
           lastCommandExecutedAt: serverTimestamp(),
           commandStatus: "executed",
           lastSeenAt: serverTimestamp(),
@@ -17897,20 +17913,15 @@ function PlayerPage() {
         return;
       }
 
-      if (remoteCommand.type === "previousMedia") {
-        goToPreviousMedia("REMOTE_PREVIOUS");
-        return;
-      }
-
-      if (remoteCommand.type === "nextMedia") {
-        if (playerItems.length > 1) goToNextMedia("REMOTE_NEXT");
-        return;
-      }
+      if (executePlaylistNavigationCommand(remoteCommand, playlistNavigationHandlersRef.current)) return;
 
       if (remoteCommand.type === "blackout") {
-        setBlackoutMode(true);
-        setMaintenanceMode(false);
-        setTakeoverMessage(null);
+        const enabled = remoteCommand.enabled !== false;
+        setBlackoutMode(enabled);
+        if (enabled) {
+          setMaintenanceMode(false);
+          setTakeoverMessage(null);
+        }
         return;
       }
 

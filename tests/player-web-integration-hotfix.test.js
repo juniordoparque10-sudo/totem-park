@@ -3,6 +3,8 @@ import { readFile } from "node:fs/promises";
 import test from "node:test";
 
 import { getAdjacentPlaylistIndex } from "../src/player-playlist-navigation.js";
+import { executePlaylistNavigationCommand } from "../src/player-remote-command.js";
+import { getBlackoutToggleCommand } from "../src/player-remote-capability.js";
 
 test("navegação do Player Web respeita ordem, loop, vazio e item único", () => {
   assert.equal(getAdjacentPlaylistIndex(0, 3, "next"), 1);
@@ -13,13 +15,47 @@ test("navegação do Player Web respeita ordem, loop, vazio e item único", () =
   assert.equal(getAdjacentPlaylistIndex(0, 0, "next"), -1);
 });
 
+test("listener remoto usa os handlers mais recentes da playlist", () => {
+  const calls = [];
+  const navigationRef = { current:{
+    previous:() => calls.push("previous-old"),
+    next:() => calls.push("next-old"),
+  } };
+  const dispatch = (command) => executePlaylistNavigationCommand(command, navigationRef.current);
+
+  navigationRef.current = {
+    previous:() => calls.push("previous-current"),
+    next:() => calls.push("next-current"),
+  };
+
+  assert.equal(dispatch({ type:"previousMedia" }), true);
+  assert.equal(dispatch({ type:"nextMedia" }), true);
+  assert.equal(dispatch({ type:"pause" }), false);
+  assert.deepEqual(calls, ["previous-current", "next-current"]);
+});
+
+test("tela preta alterna com estado explícito somente no Player Web conectado", () => {
+  const webScreen = {
+    connectedDeviceId:"web-device",
+    capabilities:{ platform:"WEB", deviceId:"web-device", playlistItemNavigation:true },
+  };
+  assert.deepEqual(getBlackoutToggleCommand(webScreen), { type:"blackout", enabled:true });
+  assert.deepEqual(getBlackoutToggleCommand({ ...webScreen, lastCommandExecuted:"blackout" }), { type:"blackout", enabled:false });
+
+  const androidScreen = { connectedDeviceId:"android-device", lastCommandExecuted:"blackout", capabilities:{ platform:"ANDROID", deviceId:"android-device" } };
+  assert.deepEqual(getBlackoutToggleCommand(androidScreen), { type:"clear" });
+});
+
 test("Player Web anuncia capacidade vinculada e mantém os handlers de anterior/próxima", async () => {
-  const app = await readFile(new URL("../src/App.jsx", import.meta.url), "utf8");
+  const [app, commandHandler] = await Promise.all([
+    readFile(new URL("../src/App.jsx", import.meta.url), "utf8"),
+    readFile(new URL("../src/player-remote-command.js", import.meta.url), "utf8"),
+  ]);
   assert.match(app, /heartbeatPayload\.capabilities\s*=\s*\{\s*playlistItemNavigation:\s*true,\s*deviceId:\s*localDeviceId,\s*platform:\s*"WEB"/s);
-  assert.match(app, /remoteCommand\.type === "previousMedia"/);
-  assert.match(app, /remoteCommand\.type === "nextMedia"/);
-  assert.match(app, /goToPreviousMedia\("REMOTE_PREVIOUS"\)/);
-  assert.match(app, /goToNextMedia\("REMOTE_NEXT"\)/);
+  assert.match(commandHandler, /command\?\.type === "previousMedia"/);
+  assert.match(commandHandler, /command\?\.type === "nextMedia"/);
+  assert.match(app, /previous:\(\) => goToPreviousMedia\("REMOTE_PREVIOUS"\)/);
+  assert.match(app, /next:\(\) => goToNextMedia\("REMOTE_NEXT"\)/);
 });
 
 test("saída da TV usa modal próprio e mantém o comando original somente na confirmação", async () => {

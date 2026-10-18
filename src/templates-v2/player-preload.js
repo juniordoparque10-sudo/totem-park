@@ -79,6 +79,19 @@ export function preloadImageForPaint(url, ImageClass = globalThis.Image, options
   const entry = { promise: null, loadedAt: 0, decodedAt: 0 };
   const promise = new Promise((resolve, reject) => {
     const image = new ImageClass();
+    const timeoutMs = Math.max(0, Number(options.timeoutMs) || 0);
+    let settled = false;
+    const finish = (callback, value) => {
+      if (settled) return;
+      settled = true;
+      if (timeoutId) clearTimeout(timeoutId);
+      image.onload = null;
+      image.onerror = null;
+      callback(value);
+    };
+    const timeoutId = timeoutMs > 0 ? setTimeout(() => {
+      finish(reject, new Error(`Tempo limite ao preparar imagem V2: ${url}`));
+    }, timeoutMs) : null;
     image.onload = async () => {
       try {
         entry.loadedAt = Date.now();
@@ -86,12 +99,12 @@ export function preloadImageForPaint(url, ImageClass = globalThis.Image, options
         if (typeof image.decode === "function") await image.decode();
         entry.decodedAt = Date.now();
         options.onEvent?.("T5", { cached: false, decodedAt: entry.decodedAt });
-        resolve();
+        finish(resolve);
       } catch (error) {
-        reject(error);
+        finish(reject, error);
       }
     };
-    image.onerror = () => reject(new Error(`Falha ao preparar imagem V2: ${url}`));
+    image.onerror = () => finish(reject, new Error(`Falha ao preparar imagem V2: ${url}`));
     image.src = url;
   });
   entry.promise = promise;
