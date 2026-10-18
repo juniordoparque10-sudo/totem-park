@@ -1,9 +1,10 @@
-import { createContext, useContext, useEffect, useRef, useSyncExternalStore } from "react";
+import { createContext, useContext, useEffect, useLayoutEffect, useRef, useState, useSyncExternalStore } from "react";
 import { Clock3, CloudSun, Sparkles } from "lucide-react";
 import QRCodeLayer from "../QRCodeLayer";
 import { shouldRenderTemplateV2InternalVideo, shouldShowTemplateMediaPlaceholder } from "./render-mode";
 import { getTemplateV2ImageAssetUrl } from "./player-preload";
 import { confirmTemplateImageForPaint } from "./player-execution";
+import { getTickerDurationSeconds } from "./ticker-speed";
 
 let clockSnapshot = Date.now();
 let clockTimer = null;
@@ -84,8 +85,25 @@ export function TemplateQRCode({ config = {}, logicalWidth = 1920 }) { return <Q
 export function TemplateNewsTicker({ items = [], config = {}, orientation = "Paisagem" }) {
   const headlines = items.map((item) => item?.title || item?.headline).filter(Boolean);
   const content = headlines.length ? headlines : [`Aguardando notícias de ${(config.selectedNewsSources || []).join(", ") || "fonte selecionada"}`];
-  const duration = config.tickerSpeed === "slow" ? 70 : config.tickerSpeed === "fast" ? 28 : 46;
+  const trackRef = useRef(null);
+  const [travelDistance, setTravelDistance] = useState(0);
+  const distanceBasedSpeed = config.distanceBasedSpeed === true;
+  const contentKey = content.join("|");
+  useLayoutEffect(() => {
+    if (!distanceBasedSpeed) return undefined;
+    const track = trackRef.current;
+    if (!track) return undefined;
+    const measure = () => setTravelDistance(Math.max(0, track.scrollWidth / 2));
+    measure();
+    if (typeof ResizeObserver !== "function") return undefined;
+    const observer = new ResizeObserver(measure);
+    observer.observe(track);
+    return () => observer.disconnect();
+  }, [distanceBasedSpeed, contentKey]);
+  const duration = distanceBasedSpeed
+    ? getTickerDurationSeconds(travelDistance, config.tickerSpeed)
+    : config.tickerSpeed === "slow" ? 70 : config.tickerSpeed === "fast" ? 28 : 46;
   const opacity = 100 - Math.max(0, Math.min(100, Number(config.tickerTransparency) || 0));
   const customAccent = config.tickerAccentColor || "";
-  return <div className={`tpv2-news-ticker size-${config.tickerSize || "normal"} ${orientation === "Retrato" ? "is-portrait" : "is-landscape"} ${customAccent ? "has-custom-accent" : ""}`} style={{"--ticker-duration":`${duration}s`,"--ticker-background":config.tickerBackground || "#07111f","--ticker-text":config.tickerTextColor || "#fff",...(customAccent ? {"--ticker-accent":customAccent} : {}),"--ticker-opacity":`${opacity}%`}}><strong>{config.tickerLabel || "Últimas notícias"}</strong><div className="tpv2-ticker-window"><div className="tpv2-ticker-track">{[...content,...content].map((title,index) => <span key={`${index}-${title}`}>{title}</span>)}</div></div></div>;
+  return <div className={`tpv2-news-ticker size-${config.tickerSize || "normal"} ${orientation === "Retrato" ? "is-portrait" : "is-landscape"} ${customAccent ? "has-custom-accent" : ""}`} style={{"--ticker-duration":`${duration}s`,"--ticker-background":config.tickerBackground || "#07111f","--ticker-text":config.tickerTextColor || "#fff",...(customAccent ? {"--ticker-accent":customAccent} : {}),"--ticker-opacity":`${opacity}%`}}><strong>{config.tickerLabel || "Últimas notícias"}</strong><div className="tpv2-ticker-window"><div ref={trackRef} className="tpv2-ticker-track">{[...content,...content].map((title,index) => <span key={`${index}-${title}`}>{title}</span>)}</div></div></div>;
 }

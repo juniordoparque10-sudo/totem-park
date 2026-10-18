@@ -25,5 +25,7 @@ test("Smart Lobby usa o espaço real dos cards e justifica somente o corpo", () 
   assert.match(collectionCss, /text-align-last:left/);
   assert.match(collectionCss, /overflow-wrap:anywhere/);
   assert.match(collectionCss, /-webkit-line-clamp:unset/);
+  assert.match(collectionCss, /white-space:pre-wrap/);
+  assert.match(collectionCss, /flex:1 1 auto/);
   assert.doesNotMatch(collectionCss, /\.tpv2-collection-smart-lobby[^}]*h[23][^}]*text-align:justify/);
 });

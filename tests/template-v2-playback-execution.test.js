@@ -1,6 +1,6 @@
 import test from "node:test";
 import assert from "node:assert/strict";
-import { confirmTemplateImageForPaint, getTemplatePlaybackLayerKey, getTemplatePlaybackReadyKey, isCurrentPlaybackExecution, nextPlaybackExecutionId, shouldReleaseTemplateAfterPreload } from "../src/templates-v2/player-execution.js";
+import { confirmTemplateImageForPaint, getTemplateBackgroundSuppressionKey, getTemplatePlaybackLayerKey, getTemplatePlaybackReadyKey, isCurrentPlaybackExecution, nextPlaybackExecutionId, shouldReleaseTemplateAfterPreload } from "../src/templates-v2/player-execution.js";
 
 test("cada entrada V2 recebe uma identidade de execução diferente", () => {
   const first = 1;
@@ -28,6 +28,14 @@ test("previous preserva sua key enquanto a nova execução recebe outra", () => 
 test("callback de execução antiga não corresponde à execução atual", () => {
   assert.equal(isCurrentPlaybackExecution(8,8), true);
   assert.equal(isCurrentPlaybackExecution(7,8), false);
+});
+
+test("fallback de background vale somente para a execução que falhou", () => {
+  const failedExecution = getTemplateBackgroundSuppressionKey("playlist-template-2", 11);
+  const nextCycle = getTemplateBackgroundSuppressionKey("playlist-template-2", 12);
+  assert.equal(failedExecution, "playlist-template-2-execution-11");
+  assert.equal(nextCycle, "playlist-template-2-execution-12");
+  assert.notEqual(failedExecution, nextCycle);
 });
 
 test("elemento visual real confirma load, decode, duas molduras e ready nessa ordem", async () => {

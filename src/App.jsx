@@ -28,7 +28,7 @@ import { collectTemplateAssetUrls, createOfflineSafeTemplate, prepareTemplateAss
 import { buildSportsDataCacheContext, buildTemplateDataCacheKey, createNewsDataFingerprintConfig, createWeatherDataFingerprintConfig, hasUsableSportsPayload, mergeSportsLastKnown, readSportsTemplateDataCache, readTemplateDataCache, refreshTemplateDataIfNeeded, writeSportsTemplateDataCache, writeTemplateDataCache } from "./templates-v2/offline-data-cache";
 import { shouldRevealTemplateImmediately } from "./templates-v2/offline-readiness";
 import { getNextTemplateToPrepare } from "./templates-v2/offline-preload";
-import { confirmTemplateImageForPaint, getTemplatePlaybackLayerKey, getTemplatePlaybackReadyKey, isCurrentPlaybackExecution, nextPlaybackExecutionId, shouldReleaseTemplateAfterPreload } from "./templates-v2/player-execution";
+import { confirmTemplateImageForPaint, getTemplateBackgroundSuppressionKey, getTemplatePlaybackLayerKey, getTemplatePlaybackReadyKey, isCurrentPlaybackExecution, nextPlaybackExecutionId, shouldReleaseTemplateAfterPreload } from "./templates-v2/player-execution";
 import { deriveMediaCacheState, finalizeCompletedMediaCache } from "./player-cache-state";
 import { formatScheduledPlaylistSummary } from "./portal-schedule-presentation";
 import { getClientDashboardDestination, shouldShowClientDashboardCardsInitially } from "./client-dashboard-navigation";
@@ -16536,6 +16536,7 @@ function PlayerPage() {
 
     let active = true;
     const executionId = currentPlaybackExecutionId;
+    const backgroundSuppressionKey = getTemplateBackgroundSuppressionKey(currentItemKey, executionId);
     const criticalImage = getTemplateV2CriticalImageState(currentItem);
     const criticalUrl = criticalImage.url;
     const diagnosticPayload = { templateId:currentItem.templateId||currentItem.id||"", itemKey:currentItemKey, playbackExecutionId:executionId };
@@ -16552,7 +16553,7 @@ function PlayerPage() {
       return () => { active = false; };
     }
 
-    if (suppressedTemplateBackgroundKeys.has(currentItemKey)) {
+    if (suppressedTemplateBackgroundKeys.has(backgroundSuppressionKey)) {
       logTemplatesV2Diagnostic("CRITICAL_BACKGROUND_FALLBACK_ACTIVE", { ...diagnosticPayload, CURRENT_VISIBLE:previousMediaIndexRef.current !== null, NEXT_PENDING:true });
       if (!sportsNeedsFinalData) reveal();
     } else {
@@ -16560,15 +16561,15 @@ function PlayerPage() {
         maxAttempts:2,
         timeoutMs:5000,
         onFailure:(error,details)=>{
-          markTemplateV2BackgroundForOnlineRetry(retryableTemplateBackgroundKeysRef.current, currentItemKey);
+          markTemplateV2BackgroundForOnlineRetry(retryableTemplateBackgroundKeysRef.current, backgroundSuppressionKey);
           logTemplatesV2Diagnostic("CRITICAL_BACKGROUND_PRELOAD_FAILED",{...diagnosticPayload,...details,message:String(error?.message||error||"").slice(0,300),CURRENT_VISIBLE:previousMediaIndexRef.current !== null,NEXT_PENDING:true});
         },
       }).then((result) => {
         if (!active || !isCurrentPlaybackExecution(executionId,currentPlaybackExecutionIdRef.current)) return;
-        if (result.status === "ready") clearTemplateV2BackgroundOnlineRetry(retryableTemplateBackgroundKeysRef.current, currentItemKey);
+        if (result.status === "ready") clearTemplateV2BackgroundOnlineRetry(retryableTemplateBackgroundKeysRef.current, backgroundSuppressionKey);
         if (shouldReleaseTemplateAfterPreload({ status:result.status, templateV2:isTemplateV2(currentItem) }) && !sportsNeedsFinalData) reveal();
         if (result.status !== "ready" && result.status !== "no-background") {
-          setSuppressedTemplateBackgroundKeys((previous) => new Set(previous).add(currentItemKey));
+          setSuppressedTemplateBackgroundKeys((previous) => new Set(previous).add(backgroundSuppressionKey));
           logTemplatesV2Diagnostic("CRITICAL_BACKGROUND_NOT_READY", { ...diagnosticPayload, status:result.status, attempts:result.attempts, CURRENT_VISIBLE:previousMediaIndexRef.current !== null, NEXT_PENDING:false });
         }
       });
@@ -16643,11 +16644,12 @@ function PlayerPage() {
     const safeIndex = mediaIndex >= playerItems.length ? 0 : mediaIndex;
     const item = playerItems[safeIndex];
     const itemKey = item ? getPlayerItemKey(item,safeIndex) : "";
+    const backgroundSuppressionKey = getTemplateBackgroundSuppressionKey(itemKey, currentPlaybackExecutionId);
     if (!item || item.playerItemType !== "template" || readyMediaKey === getPlaybackReadyKey(item,safeIndex,currentPlaybackExecutionId) || previousMediaIndexRef.current === null) return undefined;
     const timeout = setTimeout(() => {
       logTemplatesV2Diagnostic("READINESS_TIMEOUT_CURRENT_PRESERVED", { templateId:item.templateId||item.id||"", itemKey, CURRENT_VISIBLE:true, NEXT_PENDING:true, NEXT_VISIBLE:false });
       if (getTemplateV2CriticalImageState(item).configured) {
-        setSuppressedTemplateBackgroundKeys((previous) => new Set(previous).add(itemKey));
+        setSuppressedTemplateBackgroundKeys((previous) => new Set(previous).add(backgroundSuppressionKey));
       }
     }, 15000);
     return () => clearTimeout(timeout);
@@ -18484,7 +18486,8 @@ function PlayerPage() {
   function renderPlayerItem(item, index, isCurrent, executionId) {
     if (item.playerItemType === "template") {
       const itemKey = getPlayerItemKey(item,index);
-      const renderItem = suppressedTemplateBackgroundKeys.has(itemKey) ? suppressTemplateV2CriticalImage(item) : item;
+      const backgroundSuppressionKey = getTemplateBackgroundSuppressionKey(itemKey, executionId);
+      const renderItem = suppressedTemplateBackgroundKeys.has(backgroundSuppressionKey) ? suppressTemplateV2CriticalImage(item) : item;
       const onVisualEvent = isTemplateV2(renderItem) ? async (event, details = {}) => {
         if (!isCurrentPlaybackExecution(executionId,currentPlaybackExecutionIdRef.current)) return;
         const diagnosticPayload = { templateId:item.templateId||item.id||"", itemKey, playbackExecutionId:executionId, ...details, CURRENT_VISIBLE:previousMediaIndexRef.current !== null, NEXT_PENDING:event !== "ready" };

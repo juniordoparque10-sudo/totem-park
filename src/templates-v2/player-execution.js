@@ -6,6 +6,10 @@ export function getTemplatePlaybackReadyKey(baseKey, executionId, templateV2) {
   return getTemplatePlaybackLayerKey(baseKey, executionId, templateV2);
 }
 
+export function getTemplateBackgroundSuppressionKey(baseKey, executionId) {
+  return getTemplatePlaybackReadyKey(baseKey, executionId, true);
+}
+
 export function isCurrentPlaybackExecution(callbackExecutionId, currentExecutionId) {
   return callbackExecutionId === currentExecutionId;
 }
