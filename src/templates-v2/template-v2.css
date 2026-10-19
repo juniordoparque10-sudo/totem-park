@@ -65,10 +65,13 @@
 .tpv2-news-ticker.is-portrait { height:clamp(72px,8cqw,112px); }.tpv2-news-ticker.is-portrait.size-large { height:clamp(92px,10cqw,142px); }
 .tpv2-news-ticker>strong { position:relative; z-index:2; flex:none; padding-right:18px; border-right:2px solid color-mix(in srgb,var(--ticker-text) 30%,transparent); text-transform:uppercase; font-size:clamp(10px,1cqw,17px); letter-spacing:.06em; white-space:nowrap; }
 .tpv2-ticker-window { min-width:0; flex:1; overflow:hidden; mask-image:linear-gradient(90deg,transparent,#000 3%,#000 97%,transparent); }
-.tpv2-ticker-track { width:max-content; display:flex; align-items:center; will-change:transform; animation:tpv2-ticker-scroll var(--ticker-duration) linear infinite; }
+.tpv2-ticker-track { width:max-content; min-width:100%; display:flex; align-items:center; will-change:transform; animation:tpv2-ticker-scroll var(--ticker-duration) linear infinite; }
+.tpv2-ticker-group { min-width:var(--ticker-window-width,100%); flex:none; display:flex; align-items:center; justify-content:space-around; }
+.tpv2-news-ticker.is-unavailable .tpv2-ticker-track { width:100%; animation:none; transform:none; }
+.tpv2-news-ticker.is-unavailable .tpv2-ticker-group { justify-content:flex-start; }
 .player-transition-layer.is-pending .tpv2-news-dynamic .tpv2-ticker-track { animation-play-state:paused; }
-.tpv2-ticker-track span { flex:none; padding-right:46px; font-size:clamp(11px,1.15cqw,21px); font-weight:750; white-space:nowrap; }.tpv2-ticker-track span::after { content:"•"; margin-left:46px; color:var(--tpv2-primary); }
-@keyframes tpv2-ticker-scroll { from { transform:translateX(0); } to { transform:translateX(-50%); } }
+.tpv2-ticker-track span { flex:none; padding:0 46px; font-size:clamp(11px,1.15cqw,21px); font-weight:750; white-space:nowrap; }.tpv2-ticker-track span::after { content:"•"; margin-left:46px; color:var(--tpv2-primary); }.tpv2-news-ticker.is-unavailable .tpv2-ticker-track span{padding-left:0}.tpv2-news-ticker.is-unavailable .tpv2-ticker-track span::after{content:none}
+@keyframes tpv2-ticker-scroll { from { transform:translateX(0); } to { transform:translateX(calc(0px - var(--ticker-distance,50%))); } }
 @media(prefers-reduced-motion:reduce){.tpv2-ticker-track{animation:none}}
 .tpv2-qr-code { position:absolute; z-index:6; width:clamp(112px,10cqw,190px); max-width:24%; padding:10px; box-sizing:border-box; border-radius:16px; background:#fff; color:#0f172a; box-shadow:0 14px 36px rgba(0,0,0,.32); overflow:hidden; }
 .tpv2-qr-code.size-small { width:clamp(96px,8cqw,150px); }.tpv2-qr-code.size-large { width:clamp(150px,13cqw,240px); }

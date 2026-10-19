@@ -11,7 +11,7 @@ export default function NewsEditorialDynamicRenderer({ config, orientation, name
   const visibility = config.visibility || {};
   const items = Array.isArray(dynamicData?.editorialNews) ? dynamicData.editorialNews : Array.isArray(dynamicData?.news) ? dynamicData.news : [];
   let feedItems = buildNewsEditorialFeedItems(dynamicData?.feedNews, dynamicData?.feedWeather);
-  if (options.feed.enabled && options.feed.includeWeather && !options.feed.weatherCities.length && !feedItems.length) feedItems = [{ title:"Selecione uma cidade para exibir o clima no feed" }];
+  if (options.feed.enabled && options.feed.includeWeather && !options.feed.weatherCities.length && !options.feed.news.enabled && !feedItems.length) feedItems = [{ title:"Selecione uma cidade para exibir o clima no feed" }];
   const tickerConfig = { ...options.feed, selectedNewsSources:options.feed.news.selectedNewsSources, distanceBasedSpeed:true };
   const frame = useDynamicRotation({ itemIds: items.map((item) => item.id || item.link || item.title), effectiveDurationMs: Number(effectiveDurationSeconds || config.display?.duration || 15) * 1000, rotation: options.rotation, secondarySlots: Number(options.secondarySlots || 3), enabled: mode === "player", executionId: playbackExecutionId || `news-${mode}` });
   const byId = (id) => items.find((item) => (item.id || item.link || item.title) === id);

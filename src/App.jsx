@@ -223,6 +223,8 @@ import { getPublishedTemplateV2View, isTemplateV2 } from "./templates-v2/schema"
 import { getTemplateV2Orientation } from "./templates-v2/orientation";
 import { getTemplateV2ForecastRequestDays, normalizeTemplateV2ForecastDays } from "./templates-v2/dynamic-data";
 import { normalizeDynamicNewsItems } from "./templates-v2/news-editorial-dynamic/data";
+import { loadTemplateV2DynamicData } from "./templates-v2/editor/template-v2-dynamic-loader";
+import { normalizeRssText } from "./rss-text";
 import { getAndroidPlayerV2Capabilities, getTemplatesV2ScreenCapability, getWebPlayerV2Capabilities } from "./templates-v2/player-capability";
 import { getDynamicPlaylistCapability } from "./templates-v2/playlist-capability";
 import logo from "./assets/logo.png";
@@ -1383,33 +1385,7 @@ function saveCustomNewsSource(url) {
 }
 
 function stripHtml(value) {
-  return String(value || "")
-    .replace(/<[^>]*>/g, " ")
-    .replace(/&nbsp;/g, " ")
-    .replace(/&amp;/g, "&")
-    .replace(/&quot;/g, '"')
-    .replace(/&ldquo;|&rdquo;/g, '"')
-    .replace(/&lsquo;|&rsquo;/g, "'")
-    .replace(/&aacute;/g, "á")
-    .replace(/&eacute;/g, "é")
-    .replace(/&iacute;/g, "í")
-    .replace(/&oacute;/g, "ó")
-    .replace(/&uacute;/g, "ú")
-    .replace(/&atilde;/g, "ã")
-    .replace(/&otilde;/g, "õ")
-    .replace(/&ccedil;/g, "ç")
-    .replace(/&Aacute;/g, "Á")
-    .replace(/&Eacute;/g, "É")
-    .replace(/&Iacute;/g, "Í")
-    .replace(/&Oacute;/g, "Ó")
-    .replace(/&Uacute;/g, "Ú")
-    .replace(/&Atilde;/g, "Ã")
-    .replace(/&Otilde;/g, "Õ")
-    .replace(/&Ccedil;/g, "Ç")
-    .replace(/&#39;/g, "'")
-    .replace(/&#(\d+);/g, (_, code) => String.fromCharCode(Number(code)))
-    .replace(/\s+/g, " ")
-    .trim();
+  return normalizeRssText(value);
 }
 
 function normalizeSearchText(value = "") {
@@ -1818,7 +1794,7 @@ async function fetchNewsFromRss(feedUrl) {
     );
 
     const data = await response.json();
-    const feedTitle = data?.feed?.title || data?.feed?.description || "Notícias";
+    const feedTitle = stripHtml(data?.feed?.title || data?.feed?.description || "Notícias");
 
     const items = (data?.items || [])
       .slice(0, 8)
@@ -14250,6 +14226,9 @@ function TemplateV2LivePreview({ template, sourceTemplate = template, compact = 
   const weatherConfig = originalConfig?.modules?.weather || {};
   const newsConfig = originalConfig?.modules?.news || {};
   const sportsConfig = originalConfig?.sports || null;
+  const dynamicNewsPlayerConfig = originalConfig?.dynamicNews
+    ? { dynamicNews:originalConfig.dynamicNews, modules:{ news:newsConfig } }
+    : null;
   const weatherCacheConfig = IS_TEMPLATE_DATA_FRESHNESS_EXPERIMENT ? createWeatherDataFingerprintConfig(weatherConfig) : weatherConfig;
   const newsCacheConfig = IS_TEMPLATE_DATA_FRESHNESS_EXPERIMENT ? createNewsDataFingerprintConfig(newsConfig) : newsConfig;
   const sportsCanonicalCacheKey = sportsConfig?.provider ? buildTemplateDataCacheKey(buildSportsDataCacheContext(scope, sportsConfig)) : "";
@@ -14258,14 +14237,25 @@ function TemplateV2LivePreview({ template, sourceTemplate = template, compact = 
   const readModule = (module, moduleConfig) => readTemplateDataCache({ ...scope, module, config:moduleConfig });
   const initialDynamicData = () => {
     const weather = weatherConfig.enabled ? readModule("weather", weatherCacheConfig) : null;
-    const news = newsConfig.enabled ? readModule("news", newsCacheConfig) : null;
+    const news = newsConfig.enabled && !dynamicNewsPlayerConfig ? readModule("news", newsCacheConfig) : null;
     const sports = sportsConfig?.provider ? readSportsTemplateDataCache(scope, sportsConfig) : null;
     [["weather",weather],["news",news],["sports",sports]].forEach(([module,record]) => logTemplateOffline(record ? "TEMPLATE_DATA_CACHE_HIT" : "TEMPLATE_DATA_CACHE_MISS", { templateId, module }));
     return { ...(weather ? { weather:weather.payload } : {}), ...(news ? { news:news.payload } : {}), ...(sports ? sports.payload : {}) };
   };
   const config = template.published;
   const [dynamicData, setDynamicData] = useState(initialDynamicData);
-  const dynamicKey = JSON.stringify({ weather:weatherCacheConfig, enabledWeather:weatherConfig.enabled, news:newsCacheConfig, enabledNews:newsConfig.enabled, sports:sportsConfig });
+  const dynamicKey = JSON.stringify({ weather:weatherCacheConfig, enabledWeather:weatherConfig.enabled, news:newsCacheConfig, enabledNews:newsConfig.enabled, dynamicNews:dynamicNewsPlayerConfig?.dynamicNews || null, sports:sportsConfig });
+
+  useEffect(() => {
+    if (!dynamicNewsPlayerConfig) return undefined;
+    let cancelled = false;
+    loadTemplateV2DynamicData(dynamicNewsPlayerConfig, { loadWeather:loadTemplateV2Weather, loadNews:loadTemplateV2News })
+      .then((data) => { if (!cancelled) setDynamicData((previous) => ({ ...(previous || {}), ...data })); })
+      .catch(() => {});
+    return () => { cancelled = true; };
+  // The serialized dynamic key is the complete refresh boundary.
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [dynamicKey]);
 
   useLayoutEffect(() => {
     logTemplatesV2Diagnostic("T1_RENDERER_MOUNTED", { templateId: template.id || template.templateId || "", templateType: template.identity?.templateType || template.templateType || template.type || "", playbackExecutionId });
@@ -14301,7 +14291,7 @@ function TemplateV2LivePreview({ template, sourceTemplate = template, compact = 
               return { weather };
             })));
       }
-      if (newsConfig.enabled && modules.includes("news")) {
+      if (newsConfig.enabled && !dynamicNewsPlayerConfig && modules.includes("news")) {
         const fetchNews = async () => {
           return loadTemplateV2News(newsConfig);
         };

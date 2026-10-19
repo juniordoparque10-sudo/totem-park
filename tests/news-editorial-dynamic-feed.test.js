@@ -42,10 +42,10 @@ test("loader consulta editorial, feed e cidades separadamente sem bloquear falha
     modules:{ news:{ enabled:true, newsFeedUrl:"legacy.xml" }, weather:{ enabled:false } },
   };
   const data = await loadTemplateV2DynamicData(config, {
-    loadNews:async (source) => { newsCalls.push(source.newsFeedUrl); return [{ title:source.newsFeedUrl }]; },
+    loadNews:async (source) => { newsCalls.push([source.newsFeedUrl,source.dynamicStrict]); return [{ title:source.newsFeedUrl }]; },
     loadWeather:async (city) => { weatherCalls.push(city); if (city === "Cidade inválida") throw new Error("indisponível"); return { city, temperature:28, condition:"Céu limpo" }; },
   });
-  assert.deepEqual(newsCalls, ["editorial.xml","feed.xml"]);
+  assert.deepEqual(newsCalls, [["editorial.xml",true],["feed.xml",true]]);
   assert.deepEqual(weatherCalls, ["Natal/RN","Cidade inválida","Recife/PE"]);
   assert.equal(data.editorialNews[0].title, "editorial.xml");
   assert.equal(data.feedNews[0].title, "feed.xml");
@@ -60,6 +60,24 @@ test("alterar somente o feed reutiliza o cache editorial de dez minutos", async 
   await loadTemplateV2DynamicData(base, { loadNews });
   await loadTemplateV2DynamicData({ ...base, dynamicNews:{ ...base.dynamicNews, feed:{ ...base.dynamicNews.feed, news:{ enabled:true, newsFeedUrl:"feed-b.xml" } } } }, { loadNews });
   assert.deepEqual(calls, ["editorial.xml","feed-a.xml","feed-b.xml"]);
+});
+
+test("falha temporária após o TTL preserva o último feed válido", async () => {
+  clearTemplateV2DynamicDataCache();
+  const originalNow = Date.now;
+  let now = 1_000;
+  Date.now = () => now;
+  const config = { dynamicNews:{ editorial:{ enabled:false }, feed:{ enabled:true, news:{ enabled:true, newsFeedUrl:"feed.xml" } } } };
+  try {
+    const first = await loadTemplateV2DynamicData(config, { loadNews:async () => [{ title:"Manchete válida" }] });
+    assert.equal(first.feedNews[0].title, "Manchete válida");
+    now += 10 * 60 * 1000 + 1;
+    const second = await loadTemplateV2DynamicData(config, { loadNews:async () => { throw new Error("offline"); } });
+    assert.equal(second.feedNews[0].title, "Manchete válida");
+  } finally {
+    Date.now = originalNow;
+    clearTemplateV2DynamicDataCache();
+  }
 });
 
 test("itens mistos do ticker combinam notícias e clima sem dados fictícios", () => {
@@ -134,9 +152,17 @@ test("renderer usa dados editoriais e feed separados e reserva a faixa", () => {
   assert.match(renderer, /buildNewsEditorialFeedItems/);
   assert.match(renderer, /TemplateNewsTicker/);
   assert.match(renderer, /has-news-ticker/);
+  assert.doesNotMatch(renderer, /feedItems\s*=\s*buildNewsEditorialFeedItems\(items/);
   assert.match(css, /\.tpv2-news-dynamic\.is-landscape \.featured h2\{[^}]*-webkit-line-clamp/);
   assert.match(css, /\.tpv2-news-dynamic\.is-landscape \.featured p\{[^}]*-webkit-line-clamp/);
   assert.match(css, /\.tpv2-news-dynamic\.has-news-ticker\{/);
+});
+
+test("Player carrega os segmentos editoriais e do feed dinâmico, não apenas modules.news", () => {
+  const app = fs.readFileSync(new URL("../src/App.jsx", import.meta.url), "utf8");
+  assert.match(app, /loadTemplateV2DynamicData\(dynamicNewsPlayerConfig/);
+  assert.match(app, /dynamicNews:originalConfig\.dynamicNews/);
+  assert.match(app, /!dynamicNewsPlayerConfig/);
 });
 
 test("editor específico oferece fontes independentes e clima multi-cidade", () => {

@@ -1,3 +1,5 @@
+import { normalizeRssText } from "../../rss-text.js";
+
 function stableNewsId(item = {}) {
   const link = String(item.link || item.url || "").trim().toLowerCase();
   if (link) return link.replace(/[#?].*$/, "");
@@ -8,12 +10,12 @@ export function normalizeDynamicNewsItems(items = []) {
   const seen = new Set();
   const normalized = [];
   for (const item of items.flat()) {
-    const title = String(item?.title || "").trim();
+    const title = normalizeRssText(item?.title);
     if (!title) continue;
     const id = stableNewsId(item);
     if (!id || seen.has(id)) continue;
     seen.add(id);
-    normalized.push({ id, title, summary: String(item.summary || item.description || "").trim(), image: item.image || item.imageUrl || "", source: String(item.source || item.sourceName || "").trim(), date: item.date || item.publishedAt || item.pubDate || null, link: item.link || item.url || "" });
+    normalized.push({ id, title, summary: normalizeRssText(item.summary || item.description), image: item.image || item.imageUrl || "", source: normalizeRssText(item.source || item.sourceName), date: item.date || item.publishedAt || item.pubDate || null, link: item.link || item.url || "" });
     if (normalized.length === 24) break;
   }
   return normalized;

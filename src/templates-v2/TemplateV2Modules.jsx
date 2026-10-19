@@ -4,7 +4,7 @@ import QRCodeLayer from "../QRCodeLayer";
 import { shouldRenderTemplateV2InternalVideo, shouldShowTemplateMediaPlaceholder } from "./render-mode";
 import { getTemplateV2ImageAssetUrl } from "./player-preload";
 import { confirmTemplateImageForPaint } from "./player-execution";
-import { getTickerDurationSeconds } from "./ticker-speed";
+import { buildTickerContentModel, getTickerDurationSeconds } from "./ticker-speed";
 
 let clockSnapshot = Date.now();
 let clockTimer = null;
@@ -83,27 +83,31 @@ export function TemplateLogo({ asset, name }) {
 export function TemplateCTA({ config = {} }) { return config.enabled ? <span className="tpv2-cta">{config.label || "Saiba mais"}</span> : null; }
 export function TemplateQRCode({ config = {}, logicalWidth = 1920 }) { return <QRCodeLayer config={config} logicalWidth={logicalWidth} />; }
 export function TemplateNewsTicker({ items = [], config = {}, orientation = "Paisagem" }) {
-  const headlines = items.map((item) => item?.title || item?.headline).filter(Boolean);
-  const content = headlines.length ? headlines : [`Aguardando notícias de ${(config.selectedNewsSources || []).join(", ") || "fonte selecionada"}`];
+  const content = buildTickerContentModel(items);
   const trackRef = useRef(null);
-  const [travelDistance, setTravelDistance] = useState(0);
+  const [tickerMetrics, setTickerMetrics] = useState({ windowWidth:0, travelDistance:0 });
   const distanceBasedSpeed = config.distanceBasedSpeed === true;
-  const contentKey = content.join("|");
+  const contentKey = content.items.join("|");
   useLayoutEffect(() => {
     if (!distanceBasedSpeed) return undefined;
     const track = trackRef.current;
     if (!track) return undefined;
-    const measure = () => setTravelDistance(Math.max(0, track.scrollWidth / 2));
+    const measure = () => {
+      const windowWidth = Math.max(0, track.parentElement?.clientWidth || 0);
+      const travelDistance = Math.max(windowWidth, track.firstElementChild?.scrollWidth || 0);
+      setTickerMetrics((current) => current.windowWidth === windowWidth && current.travelDistance === travelDistance ? current : { windowWidth, travelDistance });
+    };
     measure();
     if (typeof ResizeObserver !== "function") return undefined;
     const observer = new ResizeObserver(measure);
     observer.observe(track);
+    if (track.parentElement) observer.observe(track.parentElement);
     return () => observer.disconnect();
   }, [distanceBasedSpeed, contentKey]);
-  const duration = distanceBasedSpeed
-    ? getTickerDurationSeconds(travelDistance, config.tickerSpeed)
+  const duration = distanceBasedSpeed && !content.unavailable
+    ? getTickerDurationSeconds(tickerMetrics.travelDistance, config.tickerSpeed)
     : config.tickerSpeed === "slow" ? 70 : config.tickerSpeed === "fast" ? 28 : 46;
   const opacity = 100 - Math.max(0, Math.min(100, Number(config.tickerTransparency) || 0));
   const customAccent = config.tickerAccentColor || "";
-  return <div className={`tpv2-news-ticker size-${config.tickerSize || "normal"} ${orientation === "Retrato" ? "is-portrait" : "is-landscape"} ${customAccent ? "has-custom-accent" : ""}`} style={{"--ticker-duration":`${duration}s`,"--ticker-background":config.tickerBackground || "#07111f","--ticker-text":config.tickerTextColor || "#fff",...(customAccent ? {"--ticker-accent":customAccent} : {}),"--ticker-opacity":`${opacity}%`}}><strong>{config.tickerLabel || "Últimas notícias"}</strong><div className="tpv2-ticker-window"><div ref={trackRef} className="tpv2-ticker-track">{[...content,...content].map((title,index) => <span key={`${index}-${title}`}>{title}</span>)}</div></div></div>;
+  return <div className={`tpv2-news-ticker size-${config.tickerSize || "normal"} ${orientation === "Retrato" ? "is-portrait" : "is-landscape"} ${customAccent ? "has-custom-accent" : ""} ${content.unavailable ? "is-unavailable" : ""}`} style={{"--ticker-duration":`${duration}s`,"--ticker-distance":distanceBasedSpeed ? `${tickerMetrics.travelDistance}px` : "50%","--ticker-window-width":`${tickerMetrics.windowWidth}px`,"--ticker-background":config.tickerBackground || "#07111f","--ticker-text":config.tickerTextColor || "#fff",...(customAccent ? {"--ticker-accent":customAccent} : {}),"--ticker-opacity":`${opacity}%`}}><strong>{config.tickerLabel || "Últimas notícias"}</strong><div className="tpv2-ticker-window"><div ref={trackRef} className="tpv2-ticker-track">{Array.from({ length:content.copies },(_,copyIndex) => <div className="tpv2-ticker-group" key={copyIndex} aria-hidden={copyIndex > 0}>{content.items.map((title,index) => <span key={`${index}-${title}`}>{title}</span>)}</div>)}</div></div></div>;
 }

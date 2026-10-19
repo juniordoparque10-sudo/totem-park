@@ -12,7 +12,10 @@ async function loadCachedSegment(key, load) {
   const cached = segmentCache.get(key);
   if (cached && Date.now() - cached.loadedAt < CACHE_TTL_MS) return cached.data;
   if (pendingSegments.has(key)) return pendingSegments.get(key);
-  const request = Promise.resolve().then(load).then((data)=>{ segmentCache.set(key,{ data,loadedAt:Date.now() }); return data; }).finally(()=>pendingSegments.delete(key));
+  const request = Promise.resolve().then(load).then((data)=>{ segmentCache.set(key,{ data,loadedAt:Date.now() }); return data; }).catch((error)=>{
+    if (cached?.data != null) return cached.data;
+    throw error;
+  }).finally(()=>pendingSegments.delete(key));
   pendingSegments.set(key,request);
   return request;
 }
@@ -40,8 +43,8 @@ export async function loadTemplateV2DynamicData(config, { loadWeather, loadNews 
     if (weather.enabled && !weatherCity) data.weatherError = "missing-city";
     else if (weather.enabled && loadWeather) tasks.push({ key:"weather", run:()=>loadWeather(weatherCity, normalizeTemplateV2ForecastDays(weather.forecastDays)) });
     if (dynamicNews) {
-      if (dynamicNews.editorial.enabled && loadNews) tasks.push({ key:"editorialNews", run:()=>loadCachedSegment(`editorial:${JSON.stringify(dynamicNews.editorial)}`,()=>loadNews(dynamicNews.editorial)) });
-      if (dynamicNews.feed.enabled && dynamicNews.feed.news.enabled && loadNews) tasks.push({ key:"feedNews", run:()=>loadCachedSegment(`feed:${JSON.stringify(dynamicNews.feed.news)}`,()=>loadNews(dynamicNews.feed.news)) });
+      if (dynamicNews.editorial.enabled && loadNews) tasks.push({ key:"editorialNews", run:()=>loadCachedSegment(`editorial:${JSON.stringify(dynamicNews.editorial)}`,()=>loadNews({ ...dynamicNews.editorial, dynamicStrict:true })) });
+      if (dynamicNews.feed.enabled && dynamicNews.feed.news.enabled && loadNews) tasks.push({ key:"feedNews", run:()=>loadCachedSegment(`feed:${JSON.stringify(dynamicNews.feed.news)}`,()=>loadNews({ ...dynamicNews.feed.news, dynamicStrict:true })) });
       if (dynamicNews.feed.enabled && dynamicNews.feed.includeWeather && loadWeather && dynamicNews.feed.weatherCities.length) tasks.push({ key:"feedWeather", run:async()=>{
         const results = await Promise.allSettled(dynamicNews.feed.weatherCities.map((city)=>loadCachedSegment(`feed-weather:${city}`,()=>loadWeather(city,3))));
         return results.filter((result)=>result.status === "fulfilled" && result.value && !result.value.unavailable).map((result)=>result.value);
