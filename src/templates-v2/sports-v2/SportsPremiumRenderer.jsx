@@ -3,6 +3,7 @@ import { TemplateLogo, TemplateMedia, TemplateNewsTicker } from "../TemplateV2Mo
 import { getSportsV2Appearance, normalizeSportsV2Config, SPORTS_V2_MODES } from "./config";
 import { SPORTS_V2_CARD_COMPONENTS } from "./cards/SportsCards";
 import "./sports-v2.css";
+import "./sports-v2-semantic-colors.css";
 
 function SportsCard({ type, item, snapshot, compact, appearance }) {
   const Card = SPORTS_V2_CARD_COMPONENTS[type] || SPORTS_V2_CARD_COMPONENTS.football;
