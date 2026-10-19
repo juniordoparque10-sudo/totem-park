@@ -1,7 +1,12 @@
 export function getPlaylistNavigationCapability(screen = {}) {
   const capability = screen.capabilities;
+  const supportedAndroid = capability?.platform === "ANDROID"
+    && capability?.packageName === "br.com.parksolutions.totempark.player.rcsecurelink"
+    && Number(capability?.versionCode) === 58
+    && capability?.templatesV2 === true
+    && capability?.templatesV2DynamicPhase1 === true;
   const supported = capability?.playlistItemNavigation === true
-    && (capability.platform === "WEB" || capability.platform === "ANDROID")
+    && (capability.platform === "WEB" || supportedAndroid)
     && Boolean(screen.connectedDeviceId)
     && capability.deviceId === screen.connectedDeviceId;
   return { supported, reason:supported ? "" : "Requer atualização do Player" };

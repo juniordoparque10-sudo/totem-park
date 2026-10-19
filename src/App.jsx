@@ -8675,6 +8675,7 @@ function ClientPlaylistsPage({ client, access = getClientPlanAccess(client), isA
   const [templates, setTemplates] = useState([]);
   const [playlists, setPlaylists] = useState([]);
   const [screens, setScreens] = useState([]);
+  const [playerBindings, setPlayerBindings] = useState([]);
   const [editingPlaylist, setEditingPlaylist] = useState(null);
   const [isPlaylistEditorOpen, setIsPlaylistEditorOpen] = useState(false);
   const [draggedMediaId, setDraggedMediaId] = useState(null);
@@ -8762,13 +8763,25 @@ function ClientPlaylistsPage({ client, access = getClientPlanAccess(client), isA
       }
     );
 
+    const unsubBindings = isAdmin
+      ? onSnapshot(collection(db, "playerDeviceBindings"), (snapshot) => {
+          setPlayerBindings(snapshot.docs.map((item) => ({ id:item.id, ...item.data() })));
+        }, () => setPlayerBindings([]))
+      : () => {};
+
     return () => {
       unsubMedia();
       unsubTemplates();
       unsubPlaylists();
       unsubScreens();
+      unsubBindings();
     };
-  }, [client.id, templatesV2Entitlement.allowed]);
+  }, [client.id, isAdmin, templatesV2Entitlement.allowed]);
+
+  function withActivePlayerBinding(screen) {
+    const binding = playerBindings.find((item) => item.id === screen.connectedAuthUid) || null;
+    return { ...screen, clientId:client.id, playerBinding:binding };
+  }
 
   function getMediaKey(mediaId) {
     return `media:${mediaId}`;
@@ -9322,7 +9335,7 @@ function ClientPlaylistsPage({ client, access = getClientPlanAccess(client), isA
         (editingPlaylist && screen.playlistId === editingPlaylist.id)
         || (form.scheduleEnabled && form.targetScreenIds.includes(screen.id))
         || (editingPlaylist?.scheduleEnabled && editingPlaylist.targetScreenIds?.includes(screen.id))
-      ));
+      )).map(withActivePlayerBinding);
       const dynamicCapability = getDynamicPlaylistCapability(selectedItems, capabilityScreens);
       if (!dynamicCapability.allowed) {
         setPortalNotice({
@@ -9429,7 +9442,7 @@ function ClientPlaylistsPage({ client, access = getClientPlanAccess(client), isA
   const playlistLinkedScreens = screens.filter((screen) => (
     (editingPlaylist && screen.playlistId === editingPlaylist.id)
     || (form.scheduleEnabled && form.targetScreenIds.includes(screen.id))
-  ));
+  )).map(withActivePlayerBinding);
   const templatesV2PlayerCapability = getTemplatesV2ScreenCapability(playlistLinkedScreens);
 
   function renderSelectableMediaCard(media) {
