@@ -7,7 +7,11 @@ const css = readFileSync(new URL("../src/App.css", import.meta.url), "utf8");
 test("template page does not create an accidental scroll container", () => {
   assert.match(
     css,
-    /\.content:has\(\.templates-library-tabs\)\s*\{[^}]*overflow-x:\s*clip;[^}]*overflow-y:\s*visible;/s,
+    /\.content:has\(\.templates-library-tabs\)\s*\{[^}]*min-width:\s*0;[^}]*max-width:\s*100%;[^}]*overflow-y:\s*visible;/s,
+  );
+  assert.doesNotMatch(
+    css,
+    /\.content:has\(\.templates-library-tabs\)\s*\{[^}]*overflow-x:\s*(?:hidden|clip)/,
   );
   assert.match(
     css,

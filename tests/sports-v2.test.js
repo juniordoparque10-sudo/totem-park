@@ -9,7 +9,7 @@ test("sports V2 provides six isolated expandable sport objects", () => {
   const config = createSportsV2Config();
   assert.deepEqual(Object.keys(config.items), SPORTS_V2_TYPES.map(([type])=>type));
   assert.notEqual(config.items.football, config.items.basketball);
-  assert.equal(config.provider, "manual");
+  assert.equal(config.provider, "thesportsdb");
 });
 
 test("rotation timing distributes the full template duration", () => {
