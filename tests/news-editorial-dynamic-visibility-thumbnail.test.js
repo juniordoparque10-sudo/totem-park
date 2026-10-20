@@ -48,7 +48,9 @@ test("miniatura versiona rascunho salvo e publicação separadamente", () => {
 
 test("editor usa a chave de revisão ao montar a miniatura estática", () => {
   const editor = fs.readFileSync(new URL("../src/templates-v2/editor/TemplateV2Editor.jsx", import.meta.url), "utf8");
+  const thumbnail = fs.readFileSync(new URL("../src/templates-v2/editor/TemplateV2LibraryThumbnail.jsx", import.meta.url), "utf8");
   assert.match(editor, /getTemplateV2LibraryPreviewState/);
   assert.match(editor, /key=\{thumbnail\.versionKey\}/);
-  assert.match(editor, /mode="thumbnail"/);
+  assert.match(editor, /TemplateV2LibraryThumbnail/);
+  assert.match(thumbnail, /mode:"thumbnail"/);
 });

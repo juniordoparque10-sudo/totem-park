@@ -35,6 +35,7 @@ import { getClientDashboardDestination, shouldShowClientDashboardCardsInitially 
 import { filterTemplateResources, isPlaybackMedia } from "./media-library-purpose";
 import { getTemplateResourceUsage } from "./template-resource-usage";
 import { createUnavailableWeather, getWeatherConditionLabel, getWeatherIconSafe } from "./weather-presentation";
+import { selectRealNewsState } from "./template-news-state";
 import { findNextReadyMediaIndex, getCanonicalPlaylistMediaEntries, getNativeOfflineQueueUrls, getPlaylistMediaPreparation } from "./media-download-readiness";
 import { localizeOfflineAssetFields } from "./offline-asset-localization";
 import { linkedAtForScreen, telemetryStatus } from "./telemetry-v1";
@@ -1982,16 +1983,16 @@ function getRotatingNewsIndex(items, template) {
 }
 
 function rotateNewsItems(items, startIndex = 0) {
-  if (!Array.isArray(items) || items.length === 0) return DEFAULT_NEWS_ITEMS;
+  if (!Array.isArray(items) || items.length === 0) return [];
   const index = Math.max(0, Math.min(startIndex, items.length - 1));
   return [...items.slice(index), ...items.slice(0, index)];
 }
 
 function buildSequentialNewsTicker(items, template = {}) {
-  const newsItems = (Array.isArray(items) && items.length > 0 ? items : DEFAULT_NEWS_ITEMS)
+  const newsItems = (Array.isArray(items) ? items : [])
     .filter((item) => getNewsItemTitle(item));
 
-  if (newsItems.length === 0) return "Notícias em atualização";
+  if (newsItems.length === 0) return "Notícias indisponíveis no momento";
 
   const grouped = newsItems.reduce((groups, item) => {
     const source = getNewsItemSource(item, template.newsSource || "Notícias");
@@ -3684,7 +3685,7 @@ async function fetchTemplateLiveContent(template = {}) {
           ? filterBeautyNewsItems(realNews.length ? realNews : collectedNews)
           : (realNews.length ? realNews : collectedNews);
         const news = topicalNews.slice(0, 12);
-        result.news = news.length ? news : DEFAULT_NEWS_ITEMS;
+        result.news = news;
       })
     );
   }
@@ -14353,7 +14354,7 @@ function LegacyTemplateVisualPreview({ template, sourceTemplate = template, comp
   const persistentLiveContent = readTemplateDataCache(legacyDataContext)?.payload || null;
   const initialLiveContent = getCachedTemplateLiveContent(activeTemplate) || persistentLiveContent;
   const [weather, setWeather] = useState(initialLiveContent?.weather || null);
-  const [news, setNews] = useState(initialLiveContent?.news || DEFAULT_NEWS_ITEMS);
+  const [news, setNews] = useState(() => selectRealNewsState({ cached:initialLiveContent?.news }));
   const [realSportsData, setRealSportsData] = useState(initialLiveContent?.sportsData || null);
   const [realTideForecast, setRealTideForecast] = useState(initialLiveContent?.tideForecast || null);
   const [loading, setLoading] = useState(false);
@@ -14377,7 +14378,7 @@ function LegacyTemplateVisualPreview({ template, sourceTemplate = template, comp
 
     function applyLiveContent(data = {}) {
       if (data.weather) setWeather(data.weather);
-      if (data.news) setNews(data.news.length ? data.news : DEFAULT_NEWS_ITEMS);
+      if (Object.hasOwn(data, "news")) setNews((current) => selectRealNewsState({ cached:current, fetched:data.news }));
       if (Object.hasOwn(data, "sportsData")) setRealSportsData(data.sportsData);
       if (Object.hasOwn(data, "tideForecast")) setRealTideForecast(data.tideForecast);
     }
@@ -14419,10 +14420,6 @@ function LegacyTemplateVisualPreview({ template, sourceTemplate = template, comp
           });
         }
 
-        if (isRssTemplateType(template.templateType || template.type) && !cancelled) {
-          setNews(DEFAULT_NEWS_ITEMS);
-        }
-
         if ((template.templateType || template.type) === "resultados_esportivos_premium" && !cancelled) {
           setRealSportsData(null);
         }
@@ -14452,8 +14449,8 @@ function LegacyTemplateVisualPreview({ template, sourceTemplate = template, comp
   const orientationLabel = isPortrait ? "Retrato" : "Paisagem";
   const newsRotationIndex = getRotatingNewsIndex(news, template);
   const rotatedNews = rotateNewsItems(news, newsRotationIndex);
-  const mainNews = rotatedNews[0] || DEFAULT_NEWS_ITEMS[0];
-  const mainNewsTitle = getNewsItemTitle(mainNews);
+  const mainNews = rotatedNews[0] || null;
+  const mainNewsTitle = mainNews ? getNewsItemTitle(mainNews) : "Notícias indisponíveis no momento";
   const mainNewsTitleSize = compact
     ? 18
     : isPortrait
@@ -16576,8 +16573,12 @@ function PlayerPage() {
     }
 
     const nextItem = playerItems[(safeIndex + 1) % playerItems.length];
-    const nextUrl = nextItem?.playerItemType === "template" ? getTemplateV2CriticalImageUrl(nextItem) : "";
-    if (nextUrl) preloadImageForPaint(nextUrl).catch(() => {});
+    if (nextItem?.playerItemType === "template" && isTemplateV2(nextItem)) {
+      prepareTemplateV2CriticalImage(nextItem, globalThis.Image, { maxAttempts:1, timeoutMs:5000 }).catch(() => {});
+    } else {
+      const nextUrl = nextItem?.playerItemType === "template" ? getTemplateV2CriticalImageUrl(nextItem) : "";
+      if (nextUrl) preloadImageForPaint(nextUrl).catch(() => {});
+    }
 
     return () => { active = false; };
   }, [activeItemsKey, mediaIndex, suppressedTemplateBackgroundKeys, currentPlaybackExecutionId, templateBackgroundRecoveryRevision]);
@@ -16593,8 +16594,7 @@ function PlayerPage() {
       if (!active) return;
       logTemplateOffline(result.hits ? "TEMPLATE_PRELOAD_LOCAL_READY" : "TEMPLATE_ASSET_CACHE_MISS", { templateId, hits:result.hits, misses:result.misses, fromType:playerItems[safeIndex]?.type || playerItems[safeIndex]?.playerItemType || "" });
     }).catch(() => {});
-    const nextCriticalUrl = getTemplateV2CriticalImageUrl(nextItem);
-    if (nextCriticalUrl) preloadImageForPaint(nextCriticalUrl, globalThis.Image, { timeoutMs:5000 }).catch(() => {});
+    prepareTemplateV2CriticalImage(nextItem, globalThis.Image, { maxAttempts:1, timeoutMs:5000 }).catch(() => {});
     const nextConfig = nextItem.published || {};
     const preloadScope = { clientId, screenId:screen?.id || "", templateId };
     const cachedModules = [

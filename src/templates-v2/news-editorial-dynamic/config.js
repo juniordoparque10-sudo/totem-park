@@ -4,6 +4,7 @@ const EMPTY_APPEARANCE = { cards:{ featuredTransparency:22, secondaryTransparenc
 const POSITIONS = new Set(["compact", "intermediate", "expanded"]);
 const clampPercent = (value, fallback) => Math.max(0, Math.min(100, Number.isFinite(Number(value)) ? Number(value) : fallback));
 const validColor = (value, fallback) => /^#[0-9a-f]{6}$/i.test(String(value || "")) ? String(value) : fallback;
+const clampInterval = (value, fallback = 12) => Math.max(5, Math.min(60, Number.isFinite(Number(value)) ? Number(value) : fallback));
 
 const uniqueStrings = (values) => [...new Set((Array.isArray(values) ? values : []).map((value) => String(value || "").trim()).filter(Boolean))];
 
@@ -27,7 +28,12 @@ export function normalizeNewsEditorialDynamicConfig(value = {}, legacyNews = {})
     showSource:value.showSource !== false,
     showDate:value.showDate !== false,
     secondarySlots:Math.max(1,Math.min(4,Math.trunc(Number(value.secondarySlots)) || 3)),
-    rotation:{ featuredSeconds:8, secondarySeconds:5, transition:"fade", ...(value.rotation || {}) },
+    rotation:{
+      featuredSeconds:clampInterval(value.rotation?.intervalSeconds ?? value.rotation?.featuredSeconds, 12),
+      secondarySeconds:clampInterval(value.rotation?.intervalSeconds ?? value.rotation?.featuredSeconds, 12),
+      transition:["fade","slide-soft"].includes(value.rotation?.transition) ? value.rotation.transition : "fade",
+      intervalSeconds:clampInterval(value.rotation?.intervalSeconds ?? value.rotation?.featuredSeconds, 12),
+    },
     appearance:{ cards:{
       featuredTransparency:clampPercent(value.appearance?.cards?.featuredTransparency, EMPTY_APPEARANCE.cards.featuredTransparency),
       secondaryTransparency:clampPercent(value.appearance?.cards?.secondaryTransparency, EMPTY_APPEARANCE.cards.secondaryTransparency),

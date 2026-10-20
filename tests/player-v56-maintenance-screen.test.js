@@ -11,7 +11,9 @@ test("maintenance screen renders the approved official artwork without fake prog
   assert.match(component, /Desenvolvido por Park Solutions/);
   assert.match(component, /maintenance-screen--\$\{orientation\}/);
   assert.doesNotMatch(component, /percent|percentage|%/i);
-  assert.match(css, /@keyframes maintenance-progress-glow/);
+  assert.match(css, /@keyframes maintenance-progress-fill/);
+  assert.match(css, /@keyframes maintenance-ring-rotation/);
+  assert.doesNotMatch(css, /@keyframes maintenance-gear/);
   assert.match(css, /object-fit:\s*cover/);
 });
 

@@ -1,6 +1,7 @@
 .player-startup-splash{position:relative;width:100%;height:100%;min-height:100%;overflow:hidden;background:#020817}
 .player-startup-splash.is-overlay{position:absolute;inset:0;z-index:100}
 .player-startup-splash__artwork{display:block;width:100%;height:100%;object-fit:cover;object-position:center}
-.player-startup-splash__progress-glow{position:absolute;left:38%;top:57.45%;width:12%;height:.7%;border-radius:999px;background:linear-gradient(90deg,transparent,rgba(255,255,255,.72),transparent);filter:blur(1px);opacity:.45;animation:player-startup-progress-glow 1.35s ease-in-out infinite alternate;pointer-events:none}
-@keyframes player-startup-progress-glow{from{transform:translateX(-18%);opacity:.22}to{transform:translateX(18%);opacity:.72}}
-@media (prefers-reduced-motion:reduce){.player-startup-splash__progress-glow{animation-duration:4s}}
+.player-startup-splash__progress-track{position:absolute;left:37.92%;top:57.68%;width:24.17%;height:.74%;overflow:hidden;border-radius:999px;background:#2b3854;box-shadow:inset 0 0 .18vw rgba(2,8,23,.45);pointer-events:none}
+.player-startup-splash__progress-fill{display:block;width:100%;height:100%;transform:scaleX(0);transform-origin:left center;border-radius:inherit;background:linear-gradient(90deg,#25c6ff 0%,#469df7 46%,#8b6df6 100%);box-shadow:0 0 .55vw rgba(69,181,255,.38);animation:player-startup-progress-fill 2.4s cubic-bezier(.42,0,.58,1) infinite}
+@keyframes player-startup-progress-fill{0%{transform:scaleX(0)}82%,100%{transform:scaleX(1)}}
+@media (prefers-reduced-motion:reduce){.player-startup-splash__progress-fill{animation-duration:6s}}

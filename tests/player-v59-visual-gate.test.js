@@ -12,9 +12,9 @@ test("V59 preserva exatamente as duas referências visuais oficiais", () => {
   assert.ok(exists("../src/assets/player-v59/loading-reference.png"), "arte oficial de carregamento ausente");
   assert.ok(exists("../src/assets/player-v59/maintenance-reference.png"), "arte oficial de manutenção ausente");
   assert.ok(exists("../android/app/src/main/res/drawable-nodpi/player_splash_v59_art.png"), "arte nativa oficial ausente");
-  assert.equal(sha256("../src/assets/player-v59/loading-reference.png"), "85315A9049ACB758BB9B38E9DFCE6F6A7D01FA8C46AC38E7C35D5A3C5546CEBF");
-  assert.equal(sha256("../src/assets/player-v59/maintenance-reference.png"), "2BA411CC54E571FF8EF034CB8D851980AC8C324AF97769CFF5164B1F57EE760F");
-  assert.equal(sha256("../android/app/src/main/res/drawable-nodpi/player_splash_v59_art.png"), "85315A9049ACB758BB9B38E9DFCE6F6A7D01FA8C46AC38E7C35D5A3C5546CEBF");
+  assert.equal(sha256("../src/assets/player-v59/loading-reference.png"), "EFE7AFCD57392EBA65CF2F8814DC472C00498620FFB08CDE34662AEBCAE518A5");
+  assert.equal(sha256("../src/assets/player-v59/maintenance-reference.png"), "A11A219E03025F80312F8461E4D5CD15D1350307C72D0B42930F1E5E9F184683");
+  assert.equal(sha256("../android/app/src/main/res/drawable-nodpi/player_splash_v59_art.png"), "EFE7AFCD57392EBA65CF2F8814DC472C00498620FFB08CDE34662AEBCAE518A5");
 });
 
 test("splash nativo usa a mesma arte oficial da transição React", () => {
@@ -31,7 +31,13 @@ test("splash React usa a arte oficial sem alterar o fluxo de inicialização", (
   const app = text("../src/App.jsx");
   assert.match(component, /loading-reference\.png/);
   assert.match(component, /player-startup-splash__artwork/);
-  assert.match(component, /player-startup-splash__progress-glow/);
+  assert.match(component, /player-startup-splash__progress-track/);
+  assert.match(component, /player-startup-splash__progress-fill/);
+  const css = text("../src/player/player-startup-splash.css");
+  assert.match(css, /animation:player-startup-progress-fill/);
+  assert.match(css, /transform:scaleX\(0\)/);
+  assert.match(css, /transform:scaleX\(1\)/);
+  assert.doesNotMatch(component, /progress-glow/);
   assert.match(app, /import PlayerStartupSplash from "\.\/player\/PlayerStartupSplash"/);
   assert.match(app, /<PlayerStartupSplash overlay=\{overlay\} \/>/);
   assert.doesNotMatch(app, /Preparando player da TV/);
@@ -42,10 +48,13 @@ test("manutenção usa a arte oficial e mantém o mesmo estado funcional", () =>
   const css = text("../src/player/maintenance-screen.css");
   assert.match(component, /maintenance-reference\.png/);
   assert.match(component, /maintenance-screen__artwork/);
-  assert.match(component, /maintenance-screen__gear-glow/);
-  assert.match(component, /maintenance-screen__progress-glow/);
-  assert.match(css, /@keyframes maintenance-gear-glow/);
-  assert.match(css, /@keyframes maintenance-progress-glow/);
+  assert.match(component, /maintenance-screen__ring/);
+  assert.match(component, /maintenance-screen__gear/);
+  assert.match(component, /maintenance-screen__progress-fill/);
+  assert.match(css, /@keyframes maintenance-ring-rotation/);
+  assert.match(css, /@keyframes maintenance-progress-fill/);
+  assert.doesNotMatch(css, /@keyframes maintenance-gear/);
+  assert.doesNotMatch(component, /gear-glow|progress-glow/);
 });
 
 test("gate visual renderiza os componentes reais sem atraso de produção", () => {

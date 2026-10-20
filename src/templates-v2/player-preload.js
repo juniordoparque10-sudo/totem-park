@@ -1,3 +1,5 @@
+import { getMarketPreloadImageUrls } from "./market-premium/config.js";
+
 const decodedImagePromises = new Map();
 
 export function markTemplateV2BackgroundForOnlineRetry(retryKeys, key, online = globalThis.navigator?.onLine !== false) {
@@ -25,6 +27,20 @@ export function getTemplateV2ImageAssetUrl(asset) {
 export function getTemplateV2CriticalImageUrl(item) {
   const asset = item?.published?.media?.primary;
   return asset?.type === "video" ? "" : getTemplateV2ImageAssetUrl(asset);
+}
+
+export function getTemplateV2EssentialImageUrls(item) {
+  const urls = new Set();
+  const background = getTemplateV2CriticalImageUrl(item);
+  if (background) urls.add(background);
+  const type = item?.identity?.templateType || item?.templateType || item?.type || "";
+  if (type === "market-premium") {
+    getMarketPreloadImageUrls(item?.published?.market, {
+      secondarySlots:item?.published?.display?.defaultOrientation === "Retrato" ? 4 : 6,
+      frameCount:2,
+    }).forEach((url) => urls.add(url));
+  }
+  return [...urls];
 }
 
 export function getTemplateV2CriticalImageState(item) {
@@ -115,23 +131,24 @@ export function preloadImageForPaint(url, ImageClass = globalThis.Image, options
 
 export async function prepareTemplateV2CriticalImage(item, ImageClass = globalThis.Image, options = {}) {
   const state = getTemplateV2CriticalImageState(item);
+  const essentialUrls = getTemplateV2EssentialImageUrls(item);
   if (state.status === "pending-hydration") return { status: "pending-hydration", attempts: 0, url: "" };
-  if (!state.configured) return { status: "no-background", attempts: 0, url: "" };
-  if (!state.url) return { status: "asset-unresolved", attempts: 0, url: "" };
+  if (!state.configured && !essentialUrls.length) return { status: "no-background", attempts: 0, url: "" };
+  if (state.configured && !state.url) return { status: "asset-unresolved", attempts: 0, url: "" };
 
   const maxAttempts = Math.max(1, Number(options.maxAttempts) || 2);
   let lastError = null;
   for (let attempt = 1; attempt <= maxAttempts; attempt += 1) {
     try {
-      await preloadImageForPaint(state.url, ImageClass, options);
-      return { status: "ready", attempts: attempt, url: state.url };
+      await Promise.all(essentialUrls.map((url) => preloadImageForPaint(url, ImageClass, options)));
+      return { status: "ready", attempts: attempt, url: state.url || essentialUrls[0], urls:essentialUrls };
     } catch (error) {
       lastError = error;
-      options.onFailure?.(error, { attempt, maxAttempts, url: state.url });
+      options.onFailure?.(error, { attempt, maxAttempts, url: state.url || essentialUrls[0] });
     }
   }
 
-  return { status: "failed", attempts: maxAttempts, url: state.url, error: lastError };
+  return { status: "failed", attempts: maxAttempts, url: state.url || essentialUrls[0], urls:essentialUrls, error: lastError };
 }
 
 export function suppressTemplateV2CriticalImage(item) {

@@ -1,8 +1,16 @@
 .maintenance-screen{position:relative;box-sizing:border-box;width:100%;height:100%;min-height:100%;overflow:hidden;background:#020817}
 .maintenance-screen__artwork{display:block;width:100%;height:100%;object-fit:cover;object-position:center}
-.maintenance-screen__gear-glow{position:absolute;left:43.15%;top:36.4%;width:13.7%;aspect-ratio:1;border-radius:50%;box-shadow:0 0 2.2vw rgba(17,220,255,.55),inset 0 0 1.3vw rgba(125,25,255,.32);opacity:.34;animation:maintenance-gear-glow 1.8s ease-in-out infinite alternate;pointer-events:none}
-.maintenance-screen__progress-glow{position:absolute;left:28%;top:76.15%;width:43%;height:3.5%;border-radius:999px;background:linear-gradient(90deg,transparent,rgba(255,255,255,.58),transparent);filter:blur(2px);opacity:.28;animation:maintenance-progress-glow 1.9s ease-in-out infinite;pointer-events:none}
+.maintenance-screen__ring-cleanup{position:absolute;left:43.1%;top:35.2%;width:13.8%;aspect-ratio:1;border-radius:50%;background:radial-gradient(circle at 48% 42%,#082552 0,#061d43 46%,#07173a 74%,#081433 100%);box-shadow:0 0 1.2vw .65vw rgba(5,24,59,.88);pointer-events:none}
+.maintenance-screen__motion-stage{position:absolute;left:43.75%;top:36.34%;width:12.5%;aspect-ratio:1;overflow:hidden;border-radius:50%;pointer-events:none}
+.maintenance-screen__ring,.maintenance-screen__gear{position:absolute;inset:0;overflow:hidden;border-radius:50%;transform-origin:center}
+.maintenance-screen__ring{z-index:1;background:conic-gradient(from 8deg,#243477 0 10%,#8022e7 16%,#ee23e8 24%,#19296b 31% 54%,#0757bd 61%,#0fe8ff 70%,#075cc1 80%,#193079 89% 100%);-webkit-mask-image:radial-gradient(circle,transparent 0 43%,#000 44% 49%,transparent 50%);mask-image:radial-gradient(circle,transparent 0 43%,#000 44% 49%,transparent 50%);animation:maintenance-ring-rotation 4.8s linear infinite}
+.maintenance-screen__gear{z-index:2;-webkit-mask-image:radial-gradient(circle,#000 0 43%,transparent 44%);mask-image:radial-gradient(circle,#000 0 43%,transparent 44%)}
+.maintenance-screen__ring img{display:none}
+.maintenance-screen__gear img{position:absolute;left:-350%;top:-163.55%;width:800%;height:auto;max-width:none}
+.maintenance-screen__progress-cleanup{position:absolute;left:29.8%;top:73.9%;width:40.5%;height:4.5%;background:linear-gradient(90deg,#071c42,#08183e 48%,#0b1238);box-shadow:0 0 1.2vw 1vw rgba(7,22,56,.9);pointer-events:none}
+.maintenance-screen__progress-track{position:absolute;left:30.8%;top:75.35%;width:38.5%;height:1.7%;overflow:hidden;border:1px solid #168ee8;border-radius:999px;background:#071938;box-sizing:border-box;pointer-events:none}
+.maintenance-screen__progress-fill{display:block;width:100%;height:100%;transform:scaleX(0);transform-origin:left center;border-radius:inherit;background:linear-gradient(90deg,#11ecf0 0%,#159cf3 37%,#8e36ff 78%,#c42df4 100%);box-shadow:0 0 .7vw rgba(30,205,255,.55);animation:maintenance-progress-fill 2.8s cubic-bezier(.42,0,.58,1) infinite}
 .maintenance-screen__accessible-copy{position:absolute;width:1px;height:1px;padding:0;margin:-1px;overflow:hidden;clip:rect(0,0,0,0);white-space:nowrap;border:0}
-@keyframes maintenance-gear-glow{from{transform:scale(.98);opacity:.24}to{transform:scale(1.02);opacity:.48}}
-@keyframes maintenance-progress-glow{from{transform:translateX(-42%);opacity:.12}50%{opacity:.5}to{transform:translateX(42%);opacity:.12}}
-@media (prefers-reduced-motion:reduce){.maintenance-screen__gear-glow,.maintenance-screen__progress-glow{animation-duration:6s}}
+@keyframes maintenance-ring-rotation{to{transform:rotate(360deg)}}
+@keyframes maintenance-progress-fill{0%{transform:scaleX(0)}84%,100%{transform:scaleX(1)}}
+@media (prefers-reduced-motion:reduce){.maintenance-screen__ring{animation-duration:12s}.maintenance-screen__progress-fill{animation-duration:7s}}
