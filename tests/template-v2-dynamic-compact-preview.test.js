@@ -47,4 +47,7 @@ test("Notícias Editorial contém e dimensiona 1, 2 e 3 secundárias no canvas p
   assert.match(newsCss, /\.tpv2-news-dynamic\.is-landscape\[data-secondary-count="1"\][^}]*grid-template-columns:minmax\(12cqw,48%\)/);
   assert.match(newsCss, /\.tpv2-news-dynamic\.is-landscape\[data-secondary-count="2"\][^}]*grid-template-columns:minmax\(10cqw,44%\)/);
   assert.match(newsCss, /\.tpv2-news-dynamic\.is-landscape\[data-secondary-count="3"\][^}]*grid-template-columns:minmax\(8cqw,40%\)/);
+  assert.match(newsCss, /\.tpv2-news-dynamic \.secondary h3\{[^}]*overflow:hidden[^}]*-webkit-line-clamp:/);
+  assert.match(newsCss, /\.tpv2-news-dynamic \.secondary span\{[^}]*overflow:hidden[^}]*text-overflow:ellipsis/);
+  assert.match(newsCss, /\.tpv2-news-dynamic \.featured time\{[^}]*white-space:nowrap/);
 });

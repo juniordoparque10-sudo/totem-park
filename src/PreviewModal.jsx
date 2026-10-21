@@ -1,7 +1,7 @@
 import { useEffect } from "react";
 import { X } from "lucide-react";
 
-export default function PreviewModal({ title = "Prévia ampliada", subtitle = "", logicalWidth, logicalHeight, onClose, children }) {
+export default function PreviewModal({ title = "Prévia ampliada", subtitle = "", logicalWidth, logicalHeight, onClose, actions = null, children }) {
   useEffect(() => {
     const previousOverflow = document.body.style.overflow;
     const closeOnEscape = (event) => event.key === "Escape" && onClose();
@@ -30,6 +30,7 @@ export default function PreviewModal({ title = "Prévia ampliada", subtitle = ""
             {subtitle && <span>{subtitle}</span>}
           </div>
           <div className="portal-preview-modal-actions">
+            {actions}
             <button type="button" onClick={onClose}>Fechar</button>
             <button type="button" className="icon" onClick={onClose} aria-label="Fechar prévia"><X /></button>
           </div>

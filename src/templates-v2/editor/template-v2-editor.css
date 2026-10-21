@@ -151,3 +151,4 @@
 .tpv2-news-position-options{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:8px;margin-top:8px}.tpv2-news-position-options button{min-width:0}.tpv2-news-position-options button.active{border-color:#22d3ee;background:color-mix(in srgb,#22d3ee 18%,#111c31);color:#dffbff;box-shadow:0 0 0 1px rgba(34,211,238,.25)}
 .tpv2-rotation-interval-field{display:grid;gap:6px;padding:12px 14px;border:1px solid rgba(71,105,148,.42);border-radius:12px;background:rgba(5,15,31,.42)}
 .tpv2-rotation-interval-field>label{display:flex;align-items:center;justify-content:space-between;gap:16px;font-weight:750}.tpv2-rotation-interval-field>label span{display:flex;align-items:center;gap:8px;white-space:nowrap}.tpv2-rotation-interval-field input{width:84px}.tpv2-rotation-interval-field>small{color:#91a4bd;line-height:1.35}
+.tpv2-preview-in-modal{color:#94a3b8;text-align:center}.portal-preview-modal-actions button{white-space:nowrap}

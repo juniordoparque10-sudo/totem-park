@@ -11,12 +11,14 @@ export default function useTemplateV2DynamicData(config, { loadWeather, loadNews
   useEffect(() => {
     if (!hasTemplateV2DynamicModules(config)) { setState(null); return undefined; }
     let cancelled = false;
-    setState({ loading:true });
+    setState((current) => ({ ...current, loading:true }));
     loadTemplateV2DynamicData(config, { loadWeather, loadNews })
       .then((data) => { if (!cancelled) setState(data); })
       .catch(() => { if (!cancelled) setState({ weather:null, news:[], error:true }); });
     return () => { cancelled = true; };
-  }, [config, key, loadNews, loadWeather]);
+  // `key` fingerprints every dynamic field; object identity alone must not reload the feeds.
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [key, loadNews, loadWeather]);
   /* eslint-enable react-hooks/set-state-in-effect */
 
   return state;

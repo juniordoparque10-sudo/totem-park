@@ -2,24 +2,27 @@
 import { useEffect, useMemo, useRef, useState } from "react";
 import { getDynamicRotationFrame } from "./rotation.js";
 
-export function useDynamicRotation({ itemIds = [], effectiveDurationMs = Infinity, rotation = {}, secondarySlots = 3, enabled = true, executionId = "preview" } = {}) {
+export function useDynamicRotation({ itemIds = [], effectiveDurationMs = Infinity, rotation = {}, secondarySlots = 3, enabled = true, executionId = "preview", controlledElapsedMs = null } = {}) {
   const startedAtRef = useRef(Date.now());
   const [elapsedMs, setElapsedMs] = useState(0);
   const idsKey = itemIds.join("|");
+  const controlled = Number.isFinite(Number(controlledElapsedMs));
+  const resolvedElapsedMs = controlled ? Math.max(0, Number(controlledElapsedMs)) : elapsedMs;
 
   useEffect(() => {
+    if (controlled) return;
     startedAtRef.current = Date.now();
     setElapsedMs(0);
-  }, [executionId]);
+  }, [controlled, executionId]);
 
-  const frame = useMemo(() => getDynamicRotationFrame({ itemIds, elapsedMs, effectiveDurationMs, secondarySlots, ...rotation }), [idsKey, elapsedMs, effectiveDurationMs, rotation.featuredSeconds, rotation.secondarySeconds, secondarySlots]);
+  const frame = useMemo(() => getDynamicRotationFrame({ itemIds, elapsedMs:resolvedElapsedMs, effectiveDurationMs, secondarySlots, ...rotation }), [idsKey, resolvedElapsedMs, effectiveDurationMs, rotation.featuredSeconds, rotation.secondarySeconds, secondarySlots]);
 
   useEffect(() => {
-    if (!enabled || frame.expired || !itemIds.length || !Number.isFinite(frame.nextBoundaryMs)) return undefined;
+    if (controlled || !enabled || frame.expired || !itemIds.length || !Number.isFinite(frame.nextBoundaryMs)) return undefined;
     const delay = Math.max(16, frame.nextBoundaryMs - elapsedMs);
     const timer = globalThis.setTimeout(() => setElapsedMs(Date.now() - startedAtRef.current), delay);
     return () => globalThis.clearTimeout(timer);
-  }, [enabled, executionId, frame.expired, frame.nextBoundaryMs, elapsedMs, idsKey]);
+  }, [controlled, enabled, executionId, frame.expired, frame.nextBoundaryMs, elapsedMs, idsKey]);
 
   return frame;
 }

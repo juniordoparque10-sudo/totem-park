@@ -1,7 +1,7 @@
 import { ExternalLink } from "lucide-react";
 import TemplateV2ScaledStage from "./TemplateV2ScaledStage";
 
-export default function TemplateV2PreviewPanel({ template, config, orientation, onOrientationChange, scale, onScaleChange, onOpen, dynamicData }) {
+export default function TemplateV2PreviewPanel({ template, config, orientation, onOrientationChange, scale, onScaleChange, onOpen, dynamicData, active = true, previewPlayback }) {
   return (
     <aside className="tpv2-preview-panel">
       <div className="tpv2-preview-head">
@@ -12,7 +12,7 @@ export default function TemplateV2PreviewPanel({ template, config, orientation, 
         <div><button type="button" className={orientation === "Paisagem" ? "active" : ""} onClick={() => onOrientationChange("Paisagem")}>Paisagem 16:9</button><button type="button" className={orientation === "Retrato" ? "active" : ""} onClick={() => onOrientationChange("Retrato")}>Retrato 9:16</button></div>
         <select value={scale} onChange={(event) => onScaleChange(event.target.value)} aria-label="Escala do preview"><option value="fit">Ajustar</option><option value="50">50%</option><option value="75">75%</option><option value="100">100%</option></select>
       </div>
-      <TemplateV2ScaledStage className={`tpv2-preview-viewport ${orientation === "Retrato" ? "portrait" : "landscape"}`} template={template} config={config} orientation={orientation} zoom={scale} dynamicData={dynamicData} mode="editor" />
+      {active ? <TemplateV2ScaledStage className={`tpv2-preview-viewport ${orientation === "Retrato" ? "portrait" : "landscape"}`} template={template} config={config} orientation={orientation} zoom={scale} dynamicData={dynamicData} mode="preview" previewPlayback={previewPlayback} /> : <div className="tpv2-preview-viewport tpv2-preview-in-modal">Reprodução ativa na prévia ampliada.</div>}
     </aside>
   );
 }

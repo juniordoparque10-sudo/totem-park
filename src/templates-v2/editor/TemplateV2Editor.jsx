@@ -53,6 +53,7 @@ import PromotionCampaignEditorFields from "../promotion-campaign/PromotionCampai
 import DigitalMenuEditorFields from "../digital-menu/DigitalMenuEditorFields";
 import KpiIndicatorsEditorFields from "../kpi-indicators/KpiIndicatorsEditorFields";
 import QrInteractionEditorFields from "../qr-interaction/QrInteractionEditorFields";
+import useTemplateV2PreviewPlayback from "./useTemplateV2PreviewPlayback";
 
 function safeFileName(name = "asset") { return name.normalize("NFD").replace(/[\u0300-\u036f]/g, "").replace(/[^a-zA-Z0-9._-]+/g, "-"); }
 function revision(prefix) { return `${prefix}-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`; }
@@ -68,9 +69,10 @@ function Section({ sectionId, icon, title, children, open, onToggle }) {
   return <section data-section={sectionId} className={`tpv2-editor-section ${open ? "open" : ""}`}><button type="button" aria-expanded={open} onClick={() => onToggle(sectionId)}>{icon}<strong>{title}</strong><ChevronDown /></button><div hidden={!open}>{children}</div></section>;
 }
 
-function PopupPreview({ template, config, orientation, onClose, dynamicData }) {
+function PopupPreview({ template, config, orientation, onClose, dynamicData, previewPlayback }) {
   const logical = orientation === "Retrato" ? { width: 1080, height: 1920 } : { width: 1920, height: 1080 };
-  return <PreviewModal title="Prévia ampliada" subtitle={`${orientation} · editorDraft`} logicalWidth={logical.width} logicalHeight={logical.height} onClose={onClose}><TemplateV2ScaledStage className="portal-preview-scaled-content" template={template} config={config} orientation={orientation} dynamicData={dynamicData} /></PreviewModal>;
+  const actions = <><button type="button" onClick={previewPlayback.restart}>Reiniciar</button><button type="button" onClick={previewPlayback.paused ? previewPlayback.resume : previewPlayback.pause}>{previewPlayback.paused ? "Continuar" : "Pausar"}</button></>;
+  return <PreviewModal title="Prévia ampliada" subtitle={`${orientation} · editorDraft`} logicalWidth={logical.width} logicalHeight={logical.height} onClose={onClose} actions={actions}><TemplateV2ScaledStage className="portal-preview-scaled-content" template={template} config={config} orientation={orientation} dynamicData={dynamicData} mode="preview" previewPlayback={previewPlayback} /></PreviewModal>;
 }
 
 function TypographyControl({ label, value, onChange, sizeLimits, lineLimits = [0.9, 1.7] }) {
@@ -114,6 +116,7 @@ export default function TemplateV2Editor({ client, access, entitlement = { allow
   const sportsDraft = activeType === SPORTS_PREMIUM_TYPE ? normalizeSportsV2Config(draftState.editorDraft.sports) : null;
   const previewTemplate = selected || createTemplateV2Document({ name, type: activeType });
   const previewDynamicData = useTemplateV2DynamicData(draftState.editorDraft, { loadWeather, loadNews });
+  const previewPlayback = useTemplateV2PreviewPlayback();
   const logoResources = useMemo(() => getTemplateEditorResources(mediaList, "logo"), [mediaList]);
   const primaryResources = useMemo(() => getTemplateEditorResources(mediaList, "primary"), [mediaList]);
   const imageResources = useMemo(() => getTemplateEditorResources(mediaList, "image"), [mediaList]);
@@ -397,9 +400,9 @@ export default function TemplateV2Editor({ client, access, entitlement = { allow
           {message && <div className="tpv2-message-bar">{message}</div>}
           <div className="tpv2-editor-actions"><button type="button" onClick={draftState.discard} disabled={!draftState.isDirty || saving}><RotateCcw /> Descartar</button><button type="button" onClick={saveDraft} disabled={saving}><Save /> Salvar alterações</button><button type="button" className="publish" onClick={publish} disabled={!selected || draftState.isDirty || saving}><Send /> {selected?.published ? "Atualizar publicação" : "Publicar"}</button></div>
         </main>
-        <TemplateV2PreviewPanel template={previewTemplate} config={draftState.editorDraft} orientation={orientation} onOrientationChange={updateOrientation} scale={scale} onScaleChange={setScale} onOpen={() => setPreviewOpen(true)} dynamicData={previewDynamicData} />
+        <TemplateV2PreviewPanel template={previewTemplate} config={draftState.editorDraft} orientation={orientation} onOrientationChange={updateOrientation} scale={scale} onScaleChange={setScale} onOpen={() => setPreviewOpen(true)} dynamicData={previewDynamicData} active={!previewOpen} previewPlayback={previewPlayback} />
       </div>
-      {previewOpen && <PopupPreview template={previewTemplate} config={draftState.editorDraft} orientation={orientation} onClose={() => setPreviewOpen(false)} dynamicData={previewDynamicData} />}
+      {previewOpen && <PopupPreview template={previewTemplate} config={draftState.editorDraft} orientation={orientation} onClose={() => setPreviewOpen(false)} dynamicData={previewDynamicData} previewPlayback={previewPlayback} />}
       {templates.length > 0 && <div className="tpv2-library-by-orientation">
         <h3>Meus Templates V2</h3>
         {[{ title: "Paisagem — 16:9", orientation: "Paisagem" }, { title: "Retrato — 9:16", orientation: "Retrato" }].map((group) => {
