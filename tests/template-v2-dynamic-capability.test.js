@@ -1,6 +1,7 @@
 import test from "node:test";
 import assert from "node:assert/strict";
 import { getDynamicPlaylistCapability, supportsDynamicTemplatesV2 } from "../src/templates-v2/playlist-capability.js";
+import * as playlistCapability from "../src/templates-v2/playlist-capability.js";
 
 test("exige capacidade dinâmica explícita e não infere por versionCode", () => {
   assert.equal(supportsDynamicTemplatesV2({ versionCode: 999 }), false);
@@ -80,6 +81,41 @@ test("Web aceita binding ACTIVE equivalente quando connectedDeviceId ainda não 
   assert.equal(supportsDynamicTemplatesV2({ ...screen, playerBinding:{ ...screen.playerBinding, status:"REVOKED" } }), false);
   assert.equal(supportsDynamicTemplatesV2({ ...screen, playerBinding:{ ...screen.playerBinding, screenId:"other" } }), false);
   assert.equal(supportsDynamicTemplatesV2({ ...screen, playerBinding:{ ...screen.playerBinding, deviceId:"other" } }), false);
+});
+
+test("editor recebe os bindings ACTIVE antes de validar a publicação dinâmica", () => {
+  const screens = [
+    {
+      id:"YAvBMn9ufEMSCrQpgstC",
+      connectedAuthUid:"web-auth",
+      capabilities:{ deviceId:"web-device", platform:"WEB", templatesV2DynamicPhase1:true },
+    },
+    {
+      id:"wKJY9pGe2U4p2QtehHTW",
+      connectedAuthUid:"android-auth",
+      connectedDeviceId:"android-device",
+      templatesV2TestMode:true,
+      capabilities:{
+        deviceId:"android-device",
+        platform:"ANDROID",
+        packageName:"br.com.parksolutions.totempark.player.rcsecurelink",
+        versionCode:61,
+        playlistItemNavigation:true,
+        templatesV2:true,
+        templatesV2DynamicPhase1:true,
+      },
+    },
+  ];
+  const bindings = [
+    { id:"web-auth", status:"ACTIVE", clientId:"eCd1q9Dq1SMr9D5FlKN8", screenId:"YAvBMn9ufEMSCrQpgstC", deviceId:"web-device" },
+    { id:"android-auth", status:"ACTIVE", clientId:"eCd1q9Dq1SMr9D5FlKN8", screenId:"wKJY9pGe2U4p2QtehHTW", deviceId:"android-device" },
+  ];
+
+  const prepared = playlistCapability.attachActivePlayerBindings?.(screens, bindings, "eCd1q9Dq1SMr9D5FlKN8");
+  const result = getDynamicPlaylistCapability([{ templateType:"news-editorial-dynamic" }], prepared || []);
+
+  assert.deepEqual(prepared?.map((screen) => screen.playerBinding?.id), ["web-auth", "android-auth"]);
+  assert.equal(result.allowed, true);
 });
 
 test("bloqueia playlist dinâmica atribuída a qualquer tela incompatível", () => {

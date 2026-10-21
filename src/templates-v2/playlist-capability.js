@@ -11,6 +11,14 @@ export function isDynamicTemplateV2Item(item = {}) {
   return isDynamicTemplateV2Type(type) || item?.dynamicTemplate === true || item?.published?.dynamicTemplate === true || item?.draft?.dynamicTemplate === true;
 }
 
+export function attachActivePlayerBindings(screens = [], playerBindings = [], clientId = "") {
+  return screens.map((screen) => ({
+    ...screen,
+    clientId,
+    playerBinding:playerBindings.find((binding) => binding.id === screen.connectedAuthUid) || null,
+  }));
+}
+
 export function supportsDynamicTemplatesV2(player = {}) {
   const capabilities = player?.capabilities;
   const binding = player?.playerBinding;

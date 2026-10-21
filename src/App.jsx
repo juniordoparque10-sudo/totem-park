@@ -230,7 +230,7 @@ import { loadTemplateV2DynamicData } from "./templates-v2/editor/template-v2-dyn
 import { normalizeRssText } from "./rss-text";
 import { buildRssProxyUrl } from "./rss-endpoint";
 import { getAndroidPlayerV2Capabilities, getTemplatesV2ScreenCapability, getWebPlayerV2Capabilities } from "./templates-v2/player-capability";
-import { getDynamicPlaylistCapability } from "./templates-v2/playlist-capability";
+import { attachActivePlayerBindings, getDynamicPlaylistCapability } from "./templates-v2/playlist-capability";
 import logo from "./assets/logo.png";
 import isotipo from "./assets/isotipo.png";
 import "./App.css";
@@ -11884,6 +11884,7 @@ function ClientTemplatesPage({ client, access = getClientPlanAccess(client), isA
   const [libraryTab, setLibraryTab] = useState("legacy");
   const [templates, setTemplates] = useState([]);
   const [screens, setScreens] = useState([]);
+  const [playerBindings, setPlayerBindings] = useState([]);
   const [saving, setSaving] = useState(false);
   const [upgradeMessage, setUpgradeMessage] = useState("");
   const [previewOrientation, setPreviewOrientation] = useState("Paisagem");
@@ -11972,11 +11973,18 @@ function ClientTemplatesPage({ client, access = getClientPlanAccess(client), isA
       }
     );
 
+    const unsubBindings = isAdmin
+      ? onSnapshot(collection(db, "playerDeviceBindings"), (snapshot) => {
+          setPlayerBindings(snapshot.docs.map((item) => ({ id:item.id, ...item.data() })));
+        }, () => setPlayerBindings([]))
+      : () => {};
+
     return () => {
       unsubTemplates();
       unsubScreens();
+      unsubBindings();
     };
-  }, [client.id]);
+  }, [client.id, isAdmin]);
 
   useEffect(() => {
     if (form.orientation === "Paisagem" || form.orientation === "Retrato") {
@@ -12674,7 +12682,7 @@ function ClientTemplatesPage({ client, access = getClientPlanAccess(client), isA
 
       <nav className="templates-library-tabs" aria-label="Bibliotecas de templates"><button type="button" className={libraryTab === "legacy" ? "active" : ""} onClick={() => setLibraryTab("legacy")}>Templates</button><button type="button" className={libraryTab === "v2" ? "active" : ""} onClick={() => setLibraryTab("v2")}>Templates V2 <span>Professional</span></button></nav>
 
-      {libraryTab === "v2" ? <TemplateV2Editor client={client} access={access} entitlement={templatesV2Entitlement} weatherCities={WEATHER_CITY_PRESETS} newsSources={[...Object.entries(NEWS_SOURCE_PRESETS).map(([name,url]) => ({name,url})), ...customNewsSources]} loadWeather={loadTemplateV2Weather} loadNews={loadTemplateV2News} onUseInPlaylist={onUseInPlaylist} screens={screens} /> : <>
+      {libraryTab === "v2" ? <TemplateV2Editor client={client} access={access} entitlement={templatesV2Entitlement} weatherCities={WEATHER_CITY_PRESETS} newsSources={[...Object.entries(NEWS_SOURCE_PRESETS).map(([name,url]) => ({name,url})), ...customNewsSources]} loadWeather={loadTemplateV2Weather} loadNews={loadTemplateV2News} onUseInPlaylist={onUseInPlaylist} screens={attachActivePlayerBindings(screens, playerBindings, client.id)} /> : <>
 
       {upgradeMessage && (
         <UpgradeAccessCard
