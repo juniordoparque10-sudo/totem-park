@@ -13,28 +13,30 @@ export function isDynamicTemplateV2Item(item = {}) {
 
 export function supportsDynamicTemplatesV2(player = {}) {
   const capabilities = player?.capabilities;
+  const binding = player?.playerBinding;
   const connectedDeviceId = String(player?.connectedDeviceId || "");
-  const matchingDevice = connectedDeviceId !== ""
-    && String(capabilities?.deviceId || "") === connectedDeviceId;
+  const capabilityDeviceId = String(capabilities?.deviceId || "");
+  const activeBindingMatches = binding?.status === "ACTIVE"
+    && binding?.clientId === player?.clientId
+    && binding?.screenId === player?.id
+    && String(binding?.deviceId || "") === capabilityDeviceId;
+  const matchingConnectedDevice = connectedDeviceId !== "" && capabilityDeviceId === connectedDeviceId;
   if (capabilities?.platform === "WEB") {
-    return capabilities?.[DYNAMIC_TEMPLATES_V2_CAPABILITY] === true && matchingDevice;
+    return capabilities?.[DYNAMIC_TEMPLATES_V2_CAPABILITY] === true
+      && (matchingConnectedDevice || activeBindingMatches);
   }
 
-  const binding = player?.playerBinding;
   return capabilities?.templatesV2 === true
     && capabilities?.[DYNAMIC_TEMPLATES_V2_CAPABILITY] === true
     && capabilities?.playlistItemNavigation === true
-    && matchingDevice
+    && matchingConnectedDevice
     && capabilities?.platform === "ANDROID"
     && capabilities?.packageName === V58_EXPERIMENTAL_PACKAGE
-    && [58, 59].includes(Number(capabilities?.versionCode))
+    && [58, 59, 60, 61].includes(Number(capabilities?.versionCode))
     && player?.id === V58_CANARY_SCREEN_ID
     && player?.clientId === V58_CANARY_CLIENT_ID
     && player?.templatesV2TestMode === true
-    && binding?.status === "ACTIVE"
-    && binding?.clientId === player.clientId
-    && binding?.screenId === player.id
-    && String(binding?.deviceId || "") === connectedDeviceId;
+    && activeBindingMatches;
 }
 
 export function getDynamicPlaylistCapability(items = [], screens = []) {

@@ -10,7 +10,7 @@ test("exige capacidade dinâmica explícita e não infere por versionCode", () =
   assert.equal(supportsDynamicTemplatesV2({ connectedDeviceId:"android-b", capabilities: { deviceId:"web-a", platform:"WEB", templatesV2DynamicPhase1: true } }), false);
 });
 
-test("reconhece somente Android V58/V59 legítimo na tela canário com binding ACTIVE", () => {
+test("reconhece Android V58 a V61 legítimo na tela canário com binding ACTIVE", () => {
   const capability = {
     deviceId:"device-v58",
     platform:"ANDROID",
@@ -40,11 +40,46 @@ test("reconhece somente Android V58/V59 legítimo na tela canário com binding A
     ...canary,
     capabilities:{ ...capability, versionCode:59 },
   }), true);
+  assert.equal(supportsDynamicTemplatesV2({
+    ...canary,
+    capabilities:{ ...capability, versionCode:60 },
+  }), true);
+  assert.equal(supportsDynamicTemplatesV2({
+    ...canary,
+    capabilities:{ ...capability, versionCode:61 },
+  }), true);
   assert.equal(supportsDynamicTemplatesV2({ ...canary, id:"other-screen", playerBinding:{ ...binding, screenId:"other-screen" } }), false);
   assert.equal(supportsDynamicTemplatesV2({ ...canary, templatesV2TestMode:false }), false);
   assert.equal(supportsDynamicTemplatesV2({ ...canary, playerBinding:{ ...binding, status:"REVOKED" } }), false);
+  assert.equal(supportsDynamicTemplatesV2({ ...canary, connectedDeviceId:"other-device" }), false);
   assert.equal(supportsDynamicTemplatesV2({ ...canary, capabilities:{ ...capability, versionCode:57 } }), false);
   assert.equal(supportsDynamicTemplatesV2({ ...canary, capabilities:{ ...capability, templatesV2:false } }), false);
+});
+
+test("Web aceita binding ACTIVE equivalente quando connectedDeviceId ainda não foi persistido", () => {
+  const screen = {
+    id:"YAvBMn9ufEMSCrQpgstC",
+    clientId:"eCd1q9Dq1SMr9D5FlKN8",
+    connectedDeviceId:"",
+    capabilities:{
+      deviceId:"web-device",
+      platform:"WEB",
+      playlistItemNavigation:true,
+      templatesV2:true,
+      templatesV2DynamicPhase1:true,
+    },
+    playerBinding:{
+      status:"ACTIVE",
+      clientId:"eCd1q9Dq1SMr9D5FlKN8",
+      screenId:"YAvBMn9ufEMSCrQpgstC",
+      deviceId:"web-device",
+    },
+  };
+
+  assert.equal(supportsDynamicTemplatesV2(screen), true);
+  assert.equal(supportsDynamicTemplatesV2({ ...screen, playerBinding:{ ...screen.playerBinding, status:"REVOKED" } }), false);
+  assert.equal(supportsDynamicTemplatesV2({ ...screen, playerBinding:{ ...screen.playerBinding, screenId:"other" } }), false);
+  assert.equal(supportsDynamicTemplatesV2({ ...screen, playerBinding:{ ...screen.playerBinding, deviceId:"other" } }), false);
 });
 
 test("bloqueia playlist dinâmica atribuída a qualquer tela incompatível", () => {
