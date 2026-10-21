@@ -23,3 +23,12 @@ test("Smart Lobby persiste configuração e renderer usa orientação/rotação"
   assert.match(shared,/is-portrait/);
   assert.match(shared,/secondary/);
 });
+
+test("Smart Lobby expõe e persiste intervalo único entre 5 e 60 segundos", () => {
+  assert.equal(normalizeSmartLobbyConfig({ rotation:{ intervalSeconds:2 } }).rotation.intervalSeconds, 5);
+  assert.equal(normalizeSmartLobbyConfig({ rotation:{ intervalSeconds:90 } }).rotation.intervalSeconds, 60);
+  const draft = createTemplateV2Draft(SMART_LOBBY_TYPE, { smartLobby:{ rotation:{ intervalSeconds:15 } } });
+  assert.equal(draft.smartLobby.rotation.intervalSeconds, 15);
+  const editor = fs.readFileSync(new URL("../src/templates-v2/editor/TemplateV2Editor.jsx", import.meta.url), "utf8");
+  assert.match(editor, /SMART_LOBBY_TYPE[^\n]*RotatingCardIntervalField[^\n]*Trocar card\/serviço a cada/);
+});

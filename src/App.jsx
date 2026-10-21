@@ -1792,11 +1792,13 @@ async function fetchNewsFromRss(feedUrl) {
     const beautyItems = await fetchBeautyPostsFromWordPress(url);
     if (beautyItems.length) return beautyItems;
 
-    const response = await fetch(
-      `https://api.rss2json.com/v1/api.json?rss_url=${encodeURIComponent(url)}`
-    );
-
+    let response = await fetch(`/api/rss?url=${encodeURIComponent(url)}`);
+    if (!response.ok) {
+      response = await fetch(`https://api.rss2json.com/v1/api.json?rss_url=${encodeURIComponent(url)}`);
+    }
+    if (!response.ok) throw new Error(`RSS HTTP ${response.status}`);
     const data = await response.json();
+    if (data?.status && data.status !== "ok") throw new Error(data.message || "RSS indisponível");
     const feedTitle = stripHtml(data?.feed?.title || data?.feed?.description || "Notícias");
 
     const items = (data?.items || [])
