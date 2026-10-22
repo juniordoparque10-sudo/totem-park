@@ -178,6 +178,11 @@ import { getBlackoutToggleCommand, getPlaylistNavigationCapability, getPlaylistN
 import { getAdjacentPlaylistIndex } from "./player-playlist-navigation";
 import { executePlaylistNavigationCommand } from "./player-remote-command";
 import { getActivePlaylistListenerDependencies } from "./active-playlist-listener";
+import {
+  createPlaylistListenerScope,
+  resolvePlaylistListenerError,
+  resolvePlaylistSnapshot,
+} from "./active-playlist-snapshot";
 import { selectFallbackTemplates } from "./player-playlist-boundary";
 import {
   isSingleImagePlaylist,
@@ -15849,6 +15854,10 @@ function PlayerPage() {
   const [screenTemplates, setScreenTemplates] = useState([]);
   const [activePlaylist, setActivePlaylist] = useState(null);
   const [playlistResolved, setPlaylistResolved] = useState(false);
+  const [playlistAvailability, setPlaylistAvailability] = useState("waiting");
+  const activePlaylistListenerGenerationRef = useRef(0);
+  const activePlaylistListenerScopeRef = useRef(null);
+  const activePlaylistRetainedRef = useRef(null);
   const [activeTemplate, setActiveTemplate] = useState(null);
   const [activeMode, setActiveMode] = useState("default");
   const [scheduleNotice, setScheduleNotice] = useState(null);
@@ -18128,14 +18137,28 @@ function PlayerPage() {
 
   useEffect(() => {
     if (!activePlaylistId || !clientId) {
+      activePlaylistListenerGenerationRef.current += 1;
+      activePlaylistListenerScopeRef.current = null;
+      activePlaylistRetainedRef.current = null;
       setDefaultPlaylist(null);
       setPlaylistResolved(true);
+      setPlaylistAvailability("absent");
       return;
     }
 
     let cancelled = false;
     let unsubscribe = null;
+    const listenerScope = createPlaylistListenerScope({
+      clientId,
+      screenId:screen.id,
+      playlistId:activePlaylistId,
+      generation:activePlaylistListenerGenerationRef.current + 1,
+    });
+    activePlaylistListenerGenerationRef.current = listenerScope.generation;
+    activePlaylistListenerScopeRef.current = listenerScope;
+    activePlaylistRetainedRef.current = null;
     setPlaylistResolved(false);
+    setPlaylistAvailability("waiting");
     const playlistRef = doc(db, "clients", clientId, "playlists", activePlaylistId);
 
     async function restorePlaylistThenSubscribe() {
@@ -18146,23 +18169,53 @@ function PlayerPage() {
       });
       if (cancelled) return;
       if (cachedPlaylist) {
-        setDefaultPlaylist({ id: cachedPlaylist.id, ...cachedPlaylist.data() });
+        const cachedValue = { id: cachedPlaylist.id, ...cachedPlaylist.data() };
+        activePlaylistRetainedRef.current = {
+          scope:listenerScope,
+          playlist:cachedValue,
+        };
+        setDefaultPlaylist(cachedValue);
         setPlaylistResolved(true);
+        setPlaylistAvailability("available");
       }
       unsubscribe = onSnapshot(
         playlistRef,
+        { includeMetadataChanges:true },
         (playlistDoc) => {
-          if (playlistDoc.exists()) {
-            setDefaultPlaylist({ id: playlistDoc.id, ...playlistDoc.data() });
-          } else {
-            setDefaultPlaylist(null);
-          }
-          setPlaylistResolved(true);
+          const result = resolvePlaylistSnapshot({
+            snapshot:playlistDoc,
+            listenerScope,
+            activeScope:activePlaylistListenerScopeRef.current,
+            retained:activePlaylistRetainedRef.current,
+            networkAvailable:typeof navigator === "undefined" || navigator.onLine !== false,
+          });
+          console.info("TOTEMPARK-DIAG", "PLAYLIST_SNAPSHOT", {
+            clientId,
+            screenId:screen.id,
+            playlistId:activePlaylistId,
+            generation:listenerScope.generation,
+            status:result.status,
+            exists:result.metadata?.exists,
+            fromCache:result.metadata?.fromCache,
+            hasPendingWrites:result.metadata?.hasPendingWrites,
+          });
+          if (result.status === "ignored") return;
+          activePlaylistRetainedRef.current = result.retained;
+          if (result.replacePlaylist) setDefaultPlaylist(result.playlist);
+          setPlaylistResolved(result.resolved);
+          setPlaylistAvailability(result.status);
         },
         (error) => {
           console.log("Erro ao acompanhar playlist ativa:", error);
-          setDefaultPlaylist((current) => current);
-          setPlaylistResolved(true);
+          const result = resolvePlaylistListenerError({
+            listenerScope,
+            activeScope:activePlaylistListenerScopeRef.current,
+            retained:activePlaylistRetainedRef.current,
+          });
+          if (result.status === "ignored") return;
+          activePlaylistRetainedRef.current = result.retained;
+          setPlaylistResolved(result.resolved);
+          setPlaylistAvailability(result.status);
         }
       );
     }
@@ -18172,7 +18225,7 @@ function PlayerPage() {
       cancelled = true;
       unsubscribe?.();
     };
-  }, [activePlaylistId, activePlaylistLegacyScreenDependency, clientId]);
+  }, [activePlaylistId, activePlaylistLegacyScreenDependency, clientId, screen?.id]);
 
   useEffect(() => {
     if (!screen?.templateEnabled || !screen?.templateId || !clientId) {
@@ -18505,6 +18558,18 @@ function PlayerPage() {
         >
           Sair da TV
         </button>
+      </div>
+    );
+  }
+
+  if (playlistAvailability === "unavailable") {
+    return (
+      <div className="player-screen">
+        <div className="player-empty">
+          <img src={logo} alt="Totem Park" style={{ width: 180 }} />
+          <h1>{screen.name}</h1>
+          <p>Playlist temporariamente indisponível. Aguardando reconexão.</p>
+        </div>
       </div>
     );
   }
