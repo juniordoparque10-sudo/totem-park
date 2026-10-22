@@ -95,9 +95,9 @@ test("os quatro avisos usam o contrato visual e textual aprovado", () => {
 
 test("o selo mantém a identidade aprovada em escala visual compacta", () => {
   const css = fs.readFileSync(new URL("../src/App.css", import.meta.url), "utf8");
-  assert.match(css, /width:\s*clamp\(255px,\s*15vw,\s*300px\)/);
-  assert.match(css, /min-height:\s*63px/);
-  assert.match(css, /grid-template-columns:\s*44px minmax\(0,\s*1fr\)/);
+  assert.match(css, /width:\s*clamp\(160px,\s*10vw,\s*200px\)/);
+  assert.match(css, /min-height:\s*42px/);
+  assert.match(css, /grid-template-columns:\s*30px minmax\(0,\s*1fr\)/);
 });
 
 test("snapshot separa criação de atualização sem inventar evento no bootstrap", () => {

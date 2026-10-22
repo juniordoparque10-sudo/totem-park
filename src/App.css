@@ -2293,26 +2293,26 @@
   left: clamp(20px, 2.6vw, 50px);
   z-index: 20;
   box-sizing: border-box;
-  width: clamp(255px, 15vw, 300px);
-  min-height: 63px;
-  padding: 9px 12px 9px 9px;
-  border-radius: 14px;
+  width: clamp(160px, 10vw, 200px);
+  min-height: 42px;
+  padding: 6px 8px 6px 6px;
+  border-radius: 9px;
   background: rgba(4, 18, 42, 0.9);
   border: 1px solid rgba(45, 245, 187, 0.88);
   box-shadow: 0 0 22px rgba(24, 232, 172, 0.2), inset 0 0 18px rgba(17, 82, 117, 0.18);
   color: #f8fafc;
   backdrop-filter: blur(12px);
   display: grid;
-  grid-template-columns: 44px minmax(0, 1fr);
+  grid-template-columns: 30px minmax(0, 1fr);
   align-items: center;
-  gap: 9px;
+  gap: 6px;
   animation: player-schedule-notice-in 180ms ease-out;
 }
 
 .player-schedule-notice-icon {
   box-sizing: border-box;
-  width: 44px;
-  height: 44px;
+  width: 30px;
+  height: 30px;
   border-right: 1px solid rgba(148, 163, 184, 0.2);
   display: grid;
   place-items: center;
@@ -2320,8 +2320,8 @@
 }
 
 .player-schedule-notice-icon svg {
-  width: 29px;
-  height: 29px;
+  width: 20px;
+  height: 20px;
   stroke-width: 1.8;
   filter: drop-shadow(0 0 8px rgba(45, 245, 187, 0.3));
 }
@@ -2339,16 +2339,16 @@
 .player-schedule-notice-copy strong {
   display: block;
   color: #2df5bb;
-  font-size: 12px;
+  font-size: 10px;
   line-height: 1.15;
   font-weight: 850;
 }
 
 .player-schedule-notice-copy > span {
-  margin-top: 4px;
+  margin-top: 2px;
   color: #f8fafc;
-  font-size: 11px;
-  line-height: 1.28;
+  font-size: 9px;
+  line-height: 1.2;
   font-weight: 500;
 }
 
