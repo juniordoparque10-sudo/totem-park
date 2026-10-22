@@ -1,5 +1,6 @@
 import test from "node:test";
 import assert from "node:assert/strict";
+import fs from "node:fs";
 import {
   buildScheduleSnapshot,
   consumeScheduleNotice,
@@ -90,6 +91,13 @@ test("os quatro avisos usam o contrato visual e textual aprovado", () => {
     description:"Alterações aplicadas com sucesso.",
     durationMs:3500,
   });
+});
+
+test("o selo mantém a identidade aprovada em escala visual compacta", () => {
+  const css = fs.readFileSync(new URL("../src/App.css", import.meta.url), "utf8");
+  assert.match(css, /width:\s*clamp\(255px,\s*15vw,\s*300px\)/);
+  assert.match(css, /min-height:\s*63px/);
+  assert.match(css, /grid-template-columns:\s*44px minmax\(0,\s*1fr\)/);
 });
 
 test("snapshot separa criação de atualização sem inventar evento no bootstrap", () => {
