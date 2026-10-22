@@ -32,9 +32,11 @@ test("serviço isolado preserva a proteção SSRF", () => {
 test("handler isolado entrega JSON cacheável sem autenticação própria", async () => {
   assert.equal(typeof handlerModule?.default, "function");
   const originalFetch = globalThis.fetch;
+  const xml = `<rss><channel><title>Fonte</title><item><title>Notícia</title><enclosure url="https://cdn.example/image.jpg" /></item></channel></rss>`;
   globalThis.fetch = async () => ({
     ok:true,
-    text:async () => `<rss><channel><title>Fonte</title><item><title>Notícia</title><enclosure url="https://cdn.example/image.jpg" /></item></channel></rss>`,
+    headers:new Headers({ "content-type":"application/rss+xml; charset=utf-8" }),
+    arrayBuffer:async () => new TextEncoder().encode(xml).buffer,
   });
   const result = { statusCode:null, headers:{}, payload:null };
   const response = {

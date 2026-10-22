@@ -1,4 +1,4 @@
-import { createRssPayload, isAllowedRssUrl } from "../src/rss-feed-parser.js";
+import { createRssPayload, decodeRssBytes, isAllowedRssUrl } from "../src/rss-feed-parser.js";
 
 export default async function handler(request, response) {
   response.setHeader("Access-Control-Allow-Origin", "*");
@@ -7,7 +7,7 @@ export default async function handler(request, response) {
   try {
     const upstream = await fetch(feedUrl, { headers:{ "user-agent":"TotemPark-RSS/1.0" }, signal:AbortSignal.timeout(8000) });
     if (!upstream.ok) return response.status(502).json({ status:"error", message:`RSS HTTP ${upstream.status}` });
-    const xml = await upstream.text();
+    const xml = decodeRssBytes(await upstream.arrayBuffer(), upstream.headers.get("content-type") || "");
     const payload = createRssPayload(xml);
     if (!payload.items.length) return response.status(502).json({ status:"error", message:"RSS sem notícias válidas" });
     response.setHeader("Cache-Control", "public, s-maxage=300, stale-while-revalidate=600");

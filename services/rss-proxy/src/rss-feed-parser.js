@@ -6,6 +6,26 @@ const decodeXml = (value = "") => String(value)
   .replace(/&#39;|&apos;/g, "'")
   .replace(/&amp;/g, "&");
 
+const normalizeCharset = (value = "") => {
+  const charset = String(value).trim().toLowerCase().replace(/["']/g, "");
+  if (["iso-8859-1", "iso8859-1", "latin1", "latin-1", "windows-1252", "cp1252"].includes(charset)) return "windows-1252";
+  if (["utf8", "utf-8"].includes(charset)) return "utf-8";
+  return charset;
+};
+
+export function decodeRssBytes(bytes, contentType = "") {
+  const source = bytes instanceof Uint8Array ? bytes : new Uint8Array(bytes || []);
+  const headerCharset = String(contentType).match(/charset\s*=\s*["']?([^;\s"']+)/i)?.[1] || "";
+  const declaration = new TextDecoder("windows-1252").decode(source.slice(0, 256));
+  const xmlCharset = declaration.match(/<\?xml[^>]*encoding\s*=\s*["']([^"']+)["']/i)?.[1] || "";
+  const declaredCharset = normalizeCharset(headerCharset || xmlCharset);
+  if (declaredCharset) {
+    try { return new TextDecoder(declaredCharset, { fatal:true }).decode(source); } catch { /* use safe fallback below */ }
+  }
+  try { return new TextDecoder("utf-8", { fatal:true }).decode(source); }
+  catch { return new TextDecoder("windows-1252").decode(source); }
+}
+
 const firstTag = (xml, names) => {
   for (const name of names) {
     const match = String(xml).match(new RegExp(`<${name}(?:\\s[^>]*)?>([\\s\\S]*?)<\\/${name}>`, "i"));
