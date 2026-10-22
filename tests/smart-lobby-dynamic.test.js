@@ -1,7 +1,7 @@
 import test from "node:test";
 import assert from "node:assert/strict";
 import fs from "node:fs";
-import { normalizeSmartLobbyConfig } from "../src/templates-v2/smart-lobby/config.js";
+import { getSmartLobbyPanelAlpha, normalizeSmartLobbyConfig } from "../src/templates-v2/smart-lobby/config.js";
 import { createTemplateV2Draft, SMART_LOBBY_TYPE } from "../src/templates-v2/schema.js";
 
 test("Smart Lobby normaliza cards rotativos e preserva validade", () => {
@@ -31,4 +31,12 @@ test("Smart Lobby expõe e persiste intervalo único entre 5 e 60 segundos", () 
   assert.equal(draft.smartLobby.rotation.intervalSeconds, 15);
   const editor = fs.readFileSync(new URL("../src/templates-v2/editor/TemplateV2Editor.jsx", import.meta.url), "utf8");
   assert.match(editor, /SMART_LOBBY_TYPE[^\n]*RotatingCardIntervalField[^\n]*Trocar card\/serviço a cada/);
+});
+
+test("Smart Lobby interpreta transparência como inverso da opacidade dos cards", () => {
+  assert.equal(getSmartLobbyPanelAlpha({ style:{ panelTransparency:0 } }), 1);
+  assert.equal(getSmartLobbyPanelAlpha({ style:{ panelTransparency:75 } }), 0.25);
+  assert.equal(getSmartLobbyPanelAlpha({ style:{ panelTransparency:100 } }), 0);
+  const renderer = fs.readFileSync(new URL("../src/templates-v2/dynamic-collections/CollectionRenderer.jsx",import.meta.url),"utf8");
+  assert.match(renderer, /--tpv2-panel-alpha/);
 });
