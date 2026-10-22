@@ -4905,6 +4905,10 @@
   scroll-margin-top: 18px;
 }
 
+.content:has(.playlist-builder-editing) {
+  overflow-x: clip;
+}
+
 .playlist-builder-editing > .panel {
   border-color: rgba(34, 211, 238, 0.52);
   box-shadow:
