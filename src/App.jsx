@@ -233,6 +233,7 @@ import { normalizeRssText } from "./rss-text";
 import { buildRssProxyUrl } from "./rss-endpoint";
 import { getAndroidPlayerV2Capabilities, getTemplatesV2ScreenCapability, getWebPlayerV2Capabilities } from "./templates-v2/player-capability";
 import { attachActivePlayerBindings, getDynamicPlaylistCapability } from "./templates-v2/playlist-capability";
+import { createPlaylistEditSnapshot, hasPlaylistEditChanges, isPlaylistEditSnapshotFor } from "./playlist-editor-state";
 import logo from "./assets/logo.png";
 import isotipo from "./assets/isotipo.png";
 import "./App.css";
@@ -8647,6 +8648,7 @@ function ClientPlaylistsPage({ client, access = getClientPlanAccess(client), isA
   const [screens, setScreens] = useState([]);
   const [playerBindings, setPlayerBindings] = useState([]);
   const [editingPlaylist, setEditingPlaylist] = useState(null);
+  const [playlistEditBaseline, setPlaylistEditBaseline] = useState(null);
   const [isPlaylistEditorOpen, setIsPlaylistEditorOpen] = useState(false);
   const [draggedMediaId, setDraggedMediaId] = useState(null);
   const [draftPlaylistItems, setDraftPlaylistItems] = useState([]);
@@ -9200,6 +9202,7 @@ function ClientPlaylistsPage({ client, access = getClientPlanAccess(client), isA
 
   function resetPlaylistForm() {
     setEditingPlaylist(null);
+    setPlaylistEditBaseline(null);
     setIsPlaylistEditorOpen(false);
     setDraftPlaylistItems([]);
 
@@ -9228,7 +9231,7 @@ function ClientPlaylistsPage({ client, access = getClientPlanAccess(client), isA
     );
     setDraftPlaylistItems(normalizedItems);
 
-    setForm({
+    const nextForm = {
       name: playlist.name || "",
       transition: playlist.transition || "Fade suave",
       transitionSpeed: playlist.transitionSpeed || "Normal",
@@ -9240,7 +9243,9 @@ function ClientPlaylistsPage({ client, access = getClientPlanAccess(client), isA
       endDate: playlist.endDate || "",
       startTime: playlist.startTime || "08:00",
       endTime: playlist.endTime || "18:00",
-    });
+    };
+    setForm(nextForm);
+    setPlaylistEditBaseline(createPlaylistEditSnapshot(playlist.id, nextForm));
 
     requestAnimationFrame(() => {
       playlistEditorRef.current?.scrollIntoView({
@@ -9250,10 +9255,29 @@ function ClientPlaylistsPage({ client, access = getClientPlanAccess(client), isA
     });
   }
 
+  const hasUnsavedPlaylistChanges = Boolean(
+    editingPlaylist && hasPlaylistEditChanges(playlistEditBaseline, editingPlaylist.id, form)
+  );
+
+  function cancelPlaylistEditing() {
+    if (hasUnsavedPlaylistChanges && !window.confirm(
+      `Descartar as alterações não salvas de “${editingPlaylist.name}”?`
+    )) return;
+    resetPlaylistForm();
+  }
+
   async function handleSavePlaylist() {
     const permission = editingPlaylist ? "canEditPlaylists" : "canCreatePlaylists";
     const action = editingPlaylist ? "editar playlists" : "criar novas playlists";
     if (!requirePlanPermission(access, permission, action)) return;
+
+    if (editingPlaylist && !isPlaylistEditSnapshotFor(playlistEditBaseline, editingPlaylist.id)) {
+      setPortalNotice({
+        title: "Edição interrompida por segurança",
+        message: "A referência da playlist em edição mudou. Cancele e abra novamente a playlist desejada antes de salvar.",
+      });
+      return;
+    }
 
     if (!form.name.trim()) {
       alert("Informe o nome da playlist.");
@@ -9485,15 +9509,22 @@ function ClientPlaylistsPage({ client, access = getClientPlanAccess(client), isA
       >
         <div className="panel">
           {editingPlaylist && (
-            <div className="playlist-edit-mode-banner">
-              <div>
-                <span>Modo de edição</span>
-                <strong>{editingPlaylist.name}</strong>
-                <p>Altere os campos abaixo e use “Salvar alterações” para atualizar esta playlist.</p>
+            <div className="playlist-edit-action-bar">
+              <div className="playlist-edit-action-title">
+                <span>Playlist em edição</span>
+                <strong>{form.name.trim() || editingPlaylist.name}</strong>
               </div>
-              <button type="button" className="client-action" onClick={resetPlaylistForm}>
-                Cancelar edição
-              </button>
+              <div className={`playlist-edit-save-state${hasUnsavedPlaylistChanges ? " dirty" : ""}`}>
+                {hasUnsavedPlaylistChanges ? "Alterações não salvas" : "Sem alterações pendentes"}
+              </div>
+              <div className="playlist-edit-action-buttons">
+                <button type="button" className="client-action" onClick={cancelPlaylistEditing}>
+                  Cancelar edição
+                </button>
+                <button type="button" className="upload-button" onClick={handleSavePlaylist}>
+                  Salvar alterações
+                </button>
+              </div>
             </div>
           )}
 
@@ -9945,22 +9976,16 @@ function ClientPlaylistsPage({ client, access = getClientPlanAccess(client), isA
             </div>
           )}
 
-          <div className="panel-actions">
+          {!editingPlaylist && <div className="panel-actions">
             <button className="upload-button" onClick={handleSavePlaylist}>
               <Plus size={20} />
-              {editingPlaylist ? "Salvar alterações" : "Salvar playlist"}
+              Salvar playlist
             </button>
-
-            {editingPlaylist && (
-              <button className="delete-button" onClick={resetPlaylistForm}>
-                Cancelar edição
-              </button>
-            )}
-          </div>
+          </div>}
         </div>
       </section>
 
-      <section className="playlists-list">
+      {!editingPlaylist && <section className="playlists-list">
         {playlists.length === 0 ? (
           <div className="empty-library">
             Nenhuma playlist criada ainda.
@@ -10071,7 +10096,7 @@ function ClientPlaylistsPage({ client, access = getClientPlanAccess(client), isA
             </div>
           ))
         )}
-      </section>
+      </section>}
     </>
   );
 }
