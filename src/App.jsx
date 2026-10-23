@@ -117,6 +117,7 @@ import {
   setDoc,
   getDoc,
   getDocFromCache,
+  getDocFromServer,
   getDocs,
   getDocsFromServer,
   runTransaction,
@@ -180,7 +181,9 @@ import { getAdjacentPlaylistIndex } from "./player-playlist-navigation";
 import { executePlaylistNavigationCommand } from "./player-remote-command";
 import { getActivePlaylistListenerDependencies } from "./active-playlist-listener";
 import {
+  createPlaylistAbsenceConfirmationCoordinator,
   createPlaylistListenerScope,
+  resolvePlaylistDirectConfirmation,
   resolvePlaylistListenerError,
   resolvePlaylistSnapshot,
 } from "./active-playlist-snapshot";
@@ -15873,6 +15876,10 @@ function PlayerPage() {
   const activePlaylistListenerGenerationRef = useRef(0);
   const activePlaylistListenerScopeRef = useRef(null);
   const activePlaylistRetainedRef = useRef(null);
+  const activePlaylistAbsenceConfirmationRef = useRef(null);
+  if (!activePlaylistAbsenceConfirmationRef.current) {
+    activePlaylistAbsenceConfirmationRef.current = createPlaylistAbsenceConfirmationCoordinator();
+  }
   const [activeTemplate, setActiveTemplate] = useState(null);
   const [activeMode, setActiveMode] = useState("default");
   const [scheduleNotice, setScheduleNotice] = useState(null);
@@ -17747,10 +17754,20 @@ function PlayerPage() {
       unsubscribeClient = onSnapshot(
         clientRef,
         (snapshot) => {
+          const fromCache = Boolean(snapshot.metadata?.fromCache);
+          const hasPendingWrites = Boolean(snapshot.metadata?.hasPendingWrites);
+          const source = fromCache ? "cache-listener" : "server";
           setPlayerClient(snapshot.exists() ? { id: snapshot.id, ...snapshot.data() } : null);
           setClientLoading(false);
-          clientStage.success({ source:"remote", found:snapshot.exists() });
-          runtimeDiagnostics.emit("PLAYER_GATE", { gate:"clientLoading", released:true, source:"remote" }, { dedupeKey:"gate-client-loading" });
+          clientStage.success({ source, found:snapshot.exists(), fromCache, hasPendingWrites });
+          runtimeDiagnostics.emit("CLIENT_LOAD", {
+            clientId,
+            source,
+            exists:snapshot.exists(),
+            fromCache,
+            hasPendingWrites,
+          });
+          runtimeDiagnostics.emit("PLAYER_GATE", { gate:"clientLoading", released:true, source }, { dedupeKey:"gate-client-loading" });
         },
         (error) => {
           console.log("Erro ao carregar cliente do player:", error);
@@ -18329,6 +18346,8 @@ function PlayerPage() {
     activePlaylistListenerGenerationRef.current = listenerScope.generation;
     activePlaylistListenerScopeRef.current = listenerScope;
     activePlaylistRetainedRef.current = null;
+    activePlaylistAbsenceConfirmationRef.current.activate(listenerScope);
+    setDefaultPlaylist(null);
     setPlaylistResolved(false);
     setPlaylistAvailability("waiting");
     const playlistRef = doc(db, "clients", clientId, "playlists", activePlaylistId);
@@ -18356,6 +18375,60 @@ function PlayerPage() {
         playlistStage.success({ source:"cache", found:true });
       }
       runtimeDiagnostics.emit("REMOTE_LISTENER_REGISTERED", { listener:"playlist", clientId, playlistId:activePlaylistId });
+
+      const applyPlaylistResult = (result, source) => {
+        if (cancelled || result.status === "ignored") return;
+        activePlaylistRetainedRef.current = result.retained;
+        if (result.replacePlaylist) setDefaultPlaylist(result.playlist);
+        setPlaylistResolved(result.resolved);
+        setPlaylistAvailability(result.status);
+        if (result.resolved) {
+          playlistStage.success({
+            source,
+            found:Boolean(result.playlist),
+            serverConfirmed:result.serverConfirmed,
+          });
+        }
+      };
+
+      const confirmPlaylistAbsence = async () => {
+        const confirmation = await activePlaylistAbsenceConfirmationRef.current.confirm({
+          scope:listenerScope,
+          loadFromServer:() => getDocFromServer(playlistRef),
+        });
+        if (cancelled || confirmation.status === "stale") {
+          runtimeDiagnostics.emit("PLAYLIST_ABSENCE_CONFIRMATION", {
+            clientId,
+            screenId:screen.id,
+            playlistId:activePlaylistId,
+            generation:listenerScope.generation,
+            status:"stale",
+          });
+          return;
+        }
+
+        const result = resolvePlaylistDirectConfirmation({
+          snapshot:confirmation.snapshot,
+          error:confirmation.error,
+          listenerScope,
+          activeScope:activePlaylistListenerScopeRef.current,
+          retained:activePlaylistRetainedRef.current,
+        });
+        runtimeDiagnostics.emit("PLAYLIST_ABSENCE_CONFIRMATION", {
+          clientId,
+          screenId:screen.id,
+          playlistId:activePlaylistId,
+          generation:listenerScope.generation,
+          status:confirmation.status,
+          result:result.status,
+          exists:Boolean(confirmation.snapshot?.exists?.()),
+          fromCache:Boolean(confirmation.snapshot?.metadata?.fromCache),
+          hasPendingWrites:Boolean(confirmation.snapshot?.metadata?.hasPendingWrites),
+          errorCode:confirmation.error?.code || confirmation.error?.name || "",
+        });
+        applyPlaylistResult(result, confirmation.status === "error" ? "server-confirmation-error" : "server-confirmation");
+      };
+
       unsubscribe = onSnapshot(
         playlistRef,
         { includeMetadataChanges:true },
@@ -18367,7 +18440,7 @@ function PlayerPage() {
             retained:activePlaylistRetainedRef.current,
             networkAvailable:typeof navigator === "undefined" || navigator.onLine !== false,
           });
-          console.info("TOTEMPARK-DIAG", "PLAYLIST_SNAPSHOT", {
+          runtimeDiagnostics.emit("PLAYLIST_SNAPSHOT", {
             clientId,
             screenId:screen.id,
             playlistId:activePlaylistId,
@@ -18378,17 +18451,11 @@ function PlayerPage() {
             hasPendingWrites:result.metadata?.hasPendingWrites,
           });
           if (result.status === "ignored") return;
-          activePlaylistRetainedRef.current = result.retained;
-          if (result.replacePlaylist) setDefaultPlaylist(result.playlist);
-          setPlaylistResolved(result.resolved);
-          setPlaylistAvailability(result.status);
-          if (result.resolved) {
-            playlistStage.success({
-              source:result.metadata?.fromCache ? "cache-listener" : "server",
-              found:Boolean(result.playlist),
-              serverConfirmed:result.serverConfirmed,
-            });
+          if (result.status === "available") {
+            activePlaylistAbsenceConfirmationRef.current.observeAvailable(listenerScope);
           }
+          applyPlaylistResult(result, result.metadata?.fromCache ? "cache-listener" : "server");
+          if (result.status === "confirming") void confirmPlaylistAbsence();
         },
         (error) => {
           console.log("Erro ao acompanhar playlist ativa:", error);
