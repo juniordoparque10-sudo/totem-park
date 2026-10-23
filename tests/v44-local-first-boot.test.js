@@ -63,7 +63,8 @@ test("screen e client cached encerram seus loadings antes do listener remoto", (
 
 test("listeners remotos continuam atualizando e erros não apagam estado restaurado", () => {
   assert.match(app, /unsubscribeScreen = onSnapshot\(screenRef, handleScreenData/);
-  assert.match(app, /unsubscribeClient = onSnapshot\([\s\S]*setPlayerClient\(snapshot\.exists\(\)/);
+  assert.match(app, /unsubscribeClient = onSnapshot\([\s\S]*resolveClientSnapshot\(\{ snapshot, currentClient \}\)/);
+  assert.match(app, /if \(result\.replaceClient\)[\s\S]*setPlayerClient\(result\.client\)/);
   assert.doesNotMatch(app, /Erro ao acompanhar tela do player:[\s\S]{0,300}setScreen\(null\)/);
   assert.doesNotMatch(app, /Erro ao carregar cliente do player:[\s\S]{0,200}setPlayerClient\(null\)/);
   assert.match(app, /remoteCommand\.type === "exitTv"[\s\S]{0,300}clearTvConnectionAndShowCode\("remote-exit-command"\)/);

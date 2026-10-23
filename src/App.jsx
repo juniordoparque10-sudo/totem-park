@@ -171,6 +171,7 @@ import {
   updateTvConnectionScreenId,
 } from "./android-link-lifecycle";
 import { readCachedPlayerDocument } from "./player-local-first";
+import { resolveClientDirectConfirmation, resolveClientSnapshot } from "./player-bootstrap-client";
 import { getPlaybackRemainingAfterWake, subscribePlayerRuntimeWake } from "./player-runtime-recovery";
 import { createDecoderTransitionDiagnostics, describePlayerDiagnosticItem, installPlayerGlobalErrorDiagnostics, playerRuntimeDiagnostics } from "./player-runtime-diagnostics";
 import { buildPlayerVisibleLayers } from "./player-visible-layers";
@@ -15865,6 +15866,11 @@ function PlayerPage() {
   const [screen, setScreen] = useState(null);
   const [playerClient, setPlayerClient] = useState(null);
   const [clientLoading, setClientLoading] = useState(true);
+  const clientListenerGenerationRef = useRef(0);
+  const clientAbsenceConfirmationRef = useRef(null);
+  if (!clientAbsenceConfirmationRef.current) {
+    clientAbsenceConfirmationRef.current = createPlaylistAbsenceConfirmationCoordinator();
+  }
   const [defaultPlaylist, setDefaultPlaylist] = useState(null);
   const [allPlaylists, setAllPlaylists] = useState([]);
   const [clientTemplates, setClientTemplates] = useState([]);
@@ -17731,8 +17737,64 @@ function PlayerPage() {
 
     let cancelled = false;
     let unsubscribeClient = null;
+    let currentClient = null;
     const clientRef = doc(db, "clients", clientId);
+    const clientScope = createPlaylistListenerScope({
+      clientId,
+      screenId:"client-document",
+      playlistId:"client-document",
+      generation:clientListenerGenerationRef.current + 1,
+    });
+    clientListenerGenerationRef.current = clientScope.generation;
+    clientAbsenceConfirmationRef.current.activate(clientScope);
     const clientStage = runtimeDiagnostics.startStage("CLIENT_LOAD", { clientId });
+
+    const applyClientResult = (result, source) => {
+      if (cancelled) return;
+      if (result.replaceClient) {
+        currentClient = result.client;
+        setPlayerClient(result.client);
+      }
+      if (!result.resolved) return;
+      setClientLoading(false);
+      clientStage.success({
+        source,
+        found:Boolean(result.client),
+        serverConfirmed:result.serverConfirmed,
+      });
+      runtimeDiagnostics.emit("PLAYER_GATE", { gate:"clientLoading", released:true, source }, { dedupeKey:"gate-client-loading" });
+    };
+
+    const confirmClientAbsence = async () => {
+      const confirmation = await clientAbsenceConfirmationRef.current.confirm({
+        scope:clientScope,
+        loadFromServer:() => getDocFromServer(clientRef),
+      });
+      if (cancelled || confirmation.status === "stale") {
+        runtimeDiagnostics.emit("CLIENT_ABSENCE_CONFIRMATION", {
+          clientId,
+          generation:clientScope.generation,
+          status:"stale",
+        });
+        return;
+      }
+      const result = resolveClientDirectConfirmation({
+        snapshot:confirmation.snapshot,
+        error:confirmation.error,
+        currentClient,
+      });
+      runtimeDiagnostics.emit("CLIENT_ABSENCE_CONFIRMATION", {
+        clientId,
+        generation:clientScope.generation,
+        status:confirmation.status,
+        result:result.status,
+        exists:Boolean(confirmation.snapshot?.exists?.()),
+        fromCache:Boolean(confirmation.snapshot?.metadata?.fromCache),
+        hasPendingWrites:Boolean(confirmation.snapshot?.metadata?.hasPendingWrites),
+        errorCode:confirmation.error?.code || confirmation.error?.name || "",
+      });
+      applyClientResult(result, confirmation.status === "error" ? "server-confirmation-error" : "server-confirmation");
+    };
 
     async function restoreClientThenSubscribe() {
       const cacheStage = runtimeDiagnostics.startStage("CLIENT_CACHE_READ", { clientId });
@@ -17745,7 +17807,8 @@ function PlayerPage() {
       cacheStage.success({ hit:Boolean(cachedClient) });
       if (cancelled) return;
       if (cachedClient) {
-        setPlayerClient({ id: cachedClient.id, ...cachedClient.data() });
+        currentClient = { id:cachedClient.id, ...cachedClient.data() };
+        setPlayerClient(currentClient);
         setClientLoading(false);
         clientStage.success({ source:"cache", found:true });
         runtimeDiagnostics.emit("PLAYER_GATE", { gate:"clientLoading", released:true, source:"cache" }, { dedupeKey:"gate-client-loading" });
@@ -17754,20 +17817,20 @@ function PlayerPage() {
       unsubscribeClient = onSnapshot(
         clientRef,
         (snapshot) => {
-          const fromCache = Boolean(snapshot.metadata?.fromCache);
-          const hasPendingWrites = Boolean(snapshot.metadata?.hasPendingWrites);
-          const source = fromCache ? "cache-listener" : "server";
-          setPlayerClient(snapshot.exists() ? { id: snapshot.id, ...snapshot.data() } : null);
-          setClientLoading(false);
-          clientStage.success({ source, found:snapshot.exists(), fromCache, hasPendingWrites });
+          const result = resolveClientSnapshot({ snapshot, currentClient });
+          const source = result.metadata.fromCache ? "cache-listener" : "server";
           runtimeDiagnostics.emit("CLIENT_LOAD", {
             clientId,
             source,
-            exists:snapshot.exists(),
-            fromCache,
-            hasPendingWrites,
+            status:result.status,
+            exists:result.metadata.exists,
+            fromCache:result.metadata.fromCache,
+            hasPendingWrites:result.metadata.hasPendingWrites,
+            generation:clientScope.generation,
           });
-          runtimeDiagnostics.emit("PLAYER_GATE", { gate:"clientLoading", released:true, source }, { dedupeKey:"gate-client-loading" });
+          if (result.status === "available") clientAbsenceConfirmationRef.current.observeAvailable(clientScope);
+          applyClientResult(result, source);
+          if (result.status === "confirming") void confirmClientAbsence();
         },
         (error) => {
           console.log("Erro ao carregar cliente do player:", error);
