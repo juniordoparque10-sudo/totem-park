@@ -38,6 +38,19 @@ test("cache miss ou identidade divergente preserva o fluxo remoto", async () => 
   assert.match(app, /if \(cachedScreen\) handleScreenData\(cachedScreen, \{ source: "cache" \}\);\s*subscribeToScreenRef\(screenRef\)/);
 });
 
+test("falha de leitura do cache pode ser observada sem alterar o fallback nulo", async () => {
+  const observed = [];
+  const failure = new Error("indexeddb unavailable");
+  const result = await readCachedPlayerDocument({
+    getFromCache: async () => { throw failure; },
+    reference: {},
+    expectedId: "screen-1",
+    onError: (error) => observed.push(error),
+  });
+  assert.equal(result, null);
+  assert.deepEqual(observed, [failure]);
+});
+
 test("screen e client cached encerram seus loadings antes do listener remoto", () => {
   const cachedScreen = app.indexOf('handleScreenData(cachedScreen, { source: "cache" })');
   const screenListener = app.indexOf("subscribeToScreenRef(screenRef)", cachedScreen);

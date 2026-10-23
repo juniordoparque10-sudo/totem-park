@@ -171,6 +171,7 @@ import {
 } from "./android-link-lifecycle";
 import { readCachedPlayerDocument } from "./player-local-first";
 import { getPlaybackRemainingAfterWake, subscribePlayerRuntimeWake } from "./player-runtime-recovery";
+import { createDecoderTransitionDiagnostics, describePlayerDiagnosticItem, installPlayerGlobalErrorDiagnostics, playerRuntimeDiagnostics } from "./player-runtime-diagnostics";
 import { buildPlayerVisibleLayers } from "./player-visible-layers";
 import { captureVideoTransitionFrame } from "./video-transition-frame";
 import { shouldShowPlayerEmptyState } from "./player-startup-state";
@@ -3787,6 +3788,10 @@ const templateAssetCacheOptions = IS_TEMPLATE_ASSET_CACHE_EXPERIMENT ? { cachePo
 const IS_PLAYER_DECODER_LIFECYCLE_BUILD = IS_PLAYER_RC_BUILD || IS_PLAYER_DECODER_EXPERIMENT_BUILD;
 const IS_PLAYER_PHASE_B_BUILD = APP_BUILD_MODE === "playerPhaseB";
 const IS_PLAYER_LINK_FIX_BUILD = APP_BUILD_MODE === "playerLinkFix";
+const runtimeDiagnostics = IS_PLAYER_RC_BUILD
+  ? playerRuntimeDiagnostics
+  : { emit:() => false, startStage:() => ({ success:() => false, failure:() => false }) };
+const decoderTransitionDiagnostics = createDecoderTransitionDiagnostics({ diagnostics:runtimeDiagnostics });
 
 function PlayerOnlySplash({ overlay = false }) {
   return <PlayerStartupSplash overlay={overlay} />;
@@ -3884,6 +3889,16 @@ function PlayerOnlyApp() {
   useEffect(() => {
     const timeoutId = setTimeout(() => setShowSplash(false), 900);
     return () => clearTimeout(timeoutId);
+  }, []);
+
+  useEffect(() => {
+    if (!IS_PLAYER_RC_BUILD) return undefined;
+    playerRuntimeDiagnostics.emit("RUNTIME_START", { appVersion:import.meta.env.VITE_APP_VERSION || "unknown" });
+    const removeGlobalDiagnostics = installPlayerGlobalErrorDiagnostics({ diagnostics:playerRuntimeDiagnostics });
+    return () => {
+      removeGlobalDiagnostics();
+      playerRuntimeDiagnostics.emit("RUNTIME_STOP");
+    };
   }, []);
 
   function handleScreenRotation(rotation) {
@@ -15873,6 +15888,7 @@ function PlayerPage() {
   const previousPlaybackExecutionIdRef = useRef(null);
   const readyPlaybackExecutionsRef = useRef(new Set());
   const [decoderReleasePending, setDecoderReleasePending] = useState(false);
+  const decoderDiagnosticTransitionRef = useRef(null);
   const [readyMediaKey, setReadyMediaKey] = useState("");
   const [suppressedTemplateBackgroundKeys, setSuppressedTemplateBackgroundKeys] = useState(() => new Set());
   const retryableTemplateBackgroundKeysRef = useRef(new Set());
@@ -15934,6 +15950,7 @@ function PlayerPage() {
   const jumpLastSourceByElement = useRef(new WeakMap());
   const advancingRef = useRef(false);
   const lastPlaybackItemIdentityRef = useRef("");
+  const pendingDiagnosticRef = useRef({ key:"", startedAt:0 });
   const returnToTvTimerRef = useRef(null);
   const exitingTvRef = useRef(false);
   const playerSessionStartedAtRef = useRef(Date.now());
@@ -15991,6 +16008,7 @@ function PlayerPage() {
     if (!(IS_OPERATIONAL_TELEMETRY_BUILD || IS_TEMPLATES_V2_DIAGNOSTIC_BUILD || !isNativeApp()) || !clientId || !codigo) return undefined;
     let cancelled = false;
     const establishIdentity = async () => {
+      const bindingStage = runtimeDiagnostics.startStage("PLAYER_IDENTITY_BINDING", { clientId, codePresent:Boolean(codigo) });
       try {
         const binding = await claimPlayerBinding({
           app: firebaseApp,
@@ -16002,10 +16020,12 @@ function PlayerPage() {
         if (cancelled) return;
         playerBindingRef.current = binding;
         playerIdentityStateRef.current = PLAYER_IDENTITY_STATES.BOUND;
+        bindingStage.success({ bindingStatus:binding?.status || "BOUND", screenId:binding?.screenId || "" });
       } catch (error) {
         if (cancelled) return;
         playerBindingRef.current = null;
         playerIdentityStateRef.current = classifyPlayerIdentityFailure(error);
+        bindingStage.failure(error);
         console.log("Identidade do Player ainda não validada:", error);
       }
     };
@@ -16487,12 +16507,14 @@ function PlayerPage() {
     const safeIndex = mediaIndex >= playerItems.length ? 0 : mediaIndex;
     const item = playerItems[safeIndex];
     const currentMediaKey = item ? getPlaybackReadyKey(item,safeIndex,currentPlaybackExecutionId) : "";
+    const currentReady = Boolean(currentMediaKey && currentMediaKey === readyMediaKey);
+    const itemDiagnostic = describePlayerDiagnosticItem(item, safeIndex);
     const next = {
       mediaIndex,
       previousMediaIndex,
       currentMediaKey,
       readyMediaKey,
-      currentMediaReady:Boolean(currentMediaKey && currentMediaKey === readyMediaKey),
+      currentMediaReady:currentReady,
       activePlaylistRevision,
     };
     const previous = transitionDiagnosticPreviousRef.current;
@@ -16509,6 +16531,34 @@ function PlayerPage() {
         recordTransitionDiagnostic(eventByKey[key], { changedField:key, previousValue:previous[key], nextValue:value });
       }
     });
+    if (Object.prototype.hasOwnProperty.call(previous, "readyMediaKey") && previous.readyMediaKey !== readyMediaKey) {
+      runtimeDiagnostics.emit("READY_MEDIA_KEY_CHANGED", {
+        ...itemDiagnostic,
+        readyKeySet:Boolean(readyMediaKey),
+        matchesCurrent:currentReady,
+        playbackExecutionId:currentPlaybackExecutionId,
+      });
+    }
+    const pendingKey = `${itemDiagnostic.itemId}|${itemDiagnostic.mediaId}|${itemDiagnostic.templateId}|${safeIndex}|${currentPlaybackExecutionId}`;
+    const pending = pendingDiagnosticRef.current;
+    if (!currentReady && item && pending.key !== pendingKey) {
+      if (pending.key) runtimeDiagnostics.emit("MEDIA_PENDING_EXIT", { reason:"current-item-changed", elapsedMs:Math.max(0, Date.now() - pending.startedAt) });
+      pendingDiagnosticRef.current = { key:pendingKey, startedAt:Date.now() };
+      runtimeDiagnostics.emit("MEDIA_PENDING_ENTER", { ...itemDiagnostic, playbackExecutionId:currentPlaybackExecutionId });
+    } else if (currentReady && pending.key) {
+      runtimeDiagnostics.emit("MEDIA_PENDING_EXIT", { ...itemDiagnostic, reason:"ready", elapsedMs:Math.max(0, Date.now() - pending.startedAt), playbackExecutionId:currentPlaybackExecutionId });
+      const decoderDiagnostic = decoderDiagnosticTransitionRef.current;
+      if (decoderDiagnostic?.context.playbackExecutionId === currentPlaybackExecutionId) {
+        decoderTransitionDiagnostics.pendingExited({
+          ...decoderDiagnostic.context,
+          readyMediaKey,
+          reason:"ready",
+          elapsedMs:Math.max(0, Date.now() - pending.startedAt),
+        });
+        decoderDiagnosticTransitionRef.current = { ...decoderDiagnostic, stage:"pending-exited" };
+      }
+      pendingDiagnosticRef.current = { key:"", startedAt:0 };
+    }
     transitionDiagnosticPreviousRef.current = next;
   }, [activeItemsKey, activePlaylistRevision, mediaIndex, previousMediaIndex, readyMediaKey, currentPlaybackExecutionId]);
 
@@ -16651,6 +16701,7 @@ function PlayerPage() {
     if (!item || item.playerItemType !== "template" || readyMediaKey === getPlaybackReadyKey(item,safeIndex,currentPlaybackExecutionId) || previousMediaIndexRef.current === null) return undefined;
     const timeout = setTimeout(() => {
       logTemplatesV2Diagnostic("READINESS_TIMEOUT_CURRENT_PRESERVED", { templateId:item.templateId||item.id||"", itemKey, CURRENT_VISIBLE:true, NEXT_PENDING:true, NEXT_VISIBLE:false });
+      runtimeDiagnostics.emit("MEDIA_PENDING_STILL", { ...describePlayerDiagnosticItem(item, safeIndex), elapsedMs:15000, playbackExecutionId:currentPlaybackExecutionId });
       if (getTemplateV2CriticalImageState(item).configured) {
         setSuppressedTemplateBackgroundKeys((previous) => new Set(previous).add(backgroundSuppressionKey));
       }
@@ -17107,7 +17158,16 @@ function PlayerPage() {
 
   function goToNextMedia(reason = "UNKNOWN", requestedIndex = null) {
     operationalPlayerErrorRef.current = false;
-    if (advancingRef.current) return;
+    const previousItem = playerItems[mediaIndex >= playerItems.length ? 0 : mediaIndex];
+    runtimeDiagnostics.emit("PLAYLIST_ADVANCE_REQUEST", {
+      reason,
+      previous:describePlayerDiagnosticItem(previousItem, mediaIndex),
+      requestedIndex:Number.isInteger(requestedIndex) ? requestedIndex : null,
+    });
+    if (advancingRef.current) {
+      runtimeDiagnostics.emit("PLAYLIST_ADVANCE_INTERRUPTED", { reason:"advance-already-in-progress", previous:describePlayerDiagnosticItem(previousItem, mediaIndex) });
+      return;
+    }
 
     recordTransitionDiagnostic("GO_TO_NEXT_MEDIA", { reason });
 
@@ -17118,6 +17178,7 @@ function PlayerPage() {
       if (isSingleImagePlaylist(items)) {
         setSingleImageLoopCycle((cycle) => cycle + 1);
       }
+      runtimeDiagnostics.emit("PLAYLIST_ADVANCE_INTERRUPTED", { reason:"single-item-loop", previous:describePlayerDiagnosticItem(previousItem, mediaIndex) });
       return;
     }
 
@@ -17125,12 +17186,16 @@ function PlayerPage() {
     const nextItemIndex = Number.isInteger(requestedIndex)
       ? requestedIndex
       : findNextReadyMediaIndex({ items, currentIndex:mediaIndex, native:isNativeApp(), pendingUrls:pendingNativeMediaUrlsRef.current });
-    if (nextItemIndex < 0) return;
+    if (nextItemIndex < 0) {
+      runtimeDiagnostics.emit("PLAYLIST_ADVANCE_INTERRUPTED", { reason:"no-ready-media", previous:describePlayerDiagnosticItem(previousItem, mediaIndex) });
+      return;
+    }
     if (nextItemIndex === mediaIndex) {
       recordJumpEvent("PLAYER_PENDING_MEDIA_SKIPPED_LOOP_CURRENT", { reason, index:mediaIndex });
       const currentVideo = document.querySelector(".player-transition-layer.is-current video.player-media");
       if (currentVideo) restartSingleVideo(currentVideo);
       else setSingleImageLoopCycle((cycle) => cycle + 1);
+      runtimeDiagnostics.emit("PLAYLIST_ADVANCE_INTERRUPTED", { reason:"next-item-is-current", previous:describePlayerDiagnosticItem(previousItem, mediaIndex) });
       return;
     }
 
@@ -17149,6 +17214,23 @@ function PlayerPage() {
       const oldVideo = document.querySelector(".player-transition-layer.is-current video.player-media");
       const frameCaptured = captureVideoTransitionFrame(oldVideo, videoTransitionFrameRef.current);
       setVideoTransitionFrameVisible(frameCaptured);
+      const diagnosticExecutionId = nextPlaybackExecutionId(playbackExecutionCounterRef.current);
+      const existingDiagnostic = decoderDiagnosticTransitionRef.current;
+      if (existingDiagnostic && existingDiagnostic.stage !== "pending-exited") {
+        decoderTransitionDiagnostics.cancelled({
+          ...existingDiagnostic.context,
+          stage:existingDiagnostic.stage,
+          reason:"superseded-by-next-transition",
+        });
+      }
+      const decoderDiagnosticContext = {
+        previous:describePlayerDiagnosticItem(items[mediaIndex], mediaIndex),
+        next:describePlayerDiagnosticItem(items[nextItemIndex], nextItemIndex),
+        playbackExecutionId:diagnosticExecutionId,
+        readyMediaKey,
+      };
+      decoderDiagnosticTransitionRef.current = { stage:"release-started", context:decoderDiagnosticContext };
+      decoderTransitionDiagnostics.releaseStarted(decoderDiagnosticContext);
       recordJumpEvent("DECODER_RELEASE_START", {
         reason,
         fromIndex: mediaIndex,
@@ -17188,6 +17270,12 @@ function PlayerPage() {
     setCurrentPlaybackExecutionId(nextExecutionId);
     setReadyMediaKey("");
     setMediaIndex(nextIndex);
+    runtimeDiagnostics.emit("PLAYLIST_ADVANCE_SELECTED", {
+      reason,
+      previous:describePlayerDiagnosticItem(previousItem, safePrev),
+      next:describePlayerDiagnosticItem(items[nextIndex], nextIndex),
+      singleDecoderTransition,
+    });
   }
 
   function goToPreviousMedia(reason = "UNKNOWN") {
@@ -17205,19 +17293,75 @@ function PlayerPage() {
     if (!IS_PLAYER_DECODER_LIFECYCLE_BUILD || !decoderReleasePending) return;
     const remainingVideoCount = document.querySelectorAll(".player-transition-layer video.player-media").length;
     recordJumpEvent("DECODER_RELEASE_END", { remainingVideoCount, nextIndex: mediaIndex });
-    if (remainingVideoCount === 0) setDecoderReleasePending(false);
+    if (remainingVideoCount === 0) {
+      const diagnostic = decoderDiagnosticTransitionRef.current;
+      if (diagnostic?.stage === "release-started") {
+        decoderTransitionDiagnostics.releaseConfirmed({ ...diagnostic.context, remainingVideoCount });
+        decoderDiagnosticTransitionRef.current = { ...diagnostic, stage:"release-confirmed" };
+      }
+      setDecoderReleasePending(false);
+    }
   }, [decoderReleasePending, mediaIndex]);
 
+  useLayoutEffect(() => {
+    const diagnostic = decoderDiagnosticTransitionRef.current;
+    if (decoderReleasePending || diagnostic?.stage !== "release-confirmed") return;
+    if (diagnostic.context.playbackExecutionId !== currentPlaybackExecutionId) {
+      decoderTransitionDiagnostics.staleCallback({
+        ...diagnostic.context,
+        callback:"mount",
+        activePlaybackExecutionId:currentPlaybackExecutionId,
+      });
+      return;
+    }
+    decoderTransitionDiagnostics.mountStarted({ ...diagnostic.context, readyMediaKey });
+    decoderDiagnosticTransitionRef.current = { ...diagnostic, stage:"mount-started" };
+  }, [decoderReleasePending, currentPlaybackExecutionId, mediaIndex, readyMediaKey]);
+
+  useEffect(() => () => {
+    const diagnostic = decoderDiagnosticTransitionRef.current;
+    if (diagnostic && diagnostic.stage !== "pending-exited") {
+      decoderTransitionDiagnostics.cancelled({
+        ...diagnostic.context,
+        stage:diagnostic.stage,
+        reason:"playlist-context-changed",
+      });
+      decoderDiagnosticTransitionRef.current = null;
+    }
+  }, [activePlaylist?.id, activePlaylistRevision]);
+
   function markCurrentMediaReady(item, index, executionId = currentPlaybackExecutionIdRef.current) {
-    if (isTemplateV2(item) && !isCurrentPlaybackExecution(executionId, currentPlaybackExecutionIdRef.current)) return;
+    if (isTemplateV2(item) && !isCurrentPlaybackExecution(executionId, currentPlaybackExecutionIdRef.current)) {
+      decoderTransitionDiagnostics.staleCallback({
+        callback:"ready",
+        playbackExecutionId:executionId,
+        activePlaybackExecutionId:currentPlaybackExecutionIdRef.current,
+        item:describePlayerDiagnosticItem(item, index),
+      });
+      return;
+    }
     const itemKey = getPlaybackReadyKey(item, index, executionId);
 
-    if (itemKey !== getPlaybackReadyKey(playerItems[mediaIndex], mediaIndex, currentPlaybackExecutionIdRef.current)) return;
+    if (itemKey !== getPlaybackReadyKey(playerItems[mediaIndex], mediaIndex, currentPlaybackExecutionIdRef.current)) {
+      decoderTransitionDiagnostics.staleCallback({
+        callback:"ready-key",
+        playbackExecutionId:executionId,
+        activePlaybackExecutionId:currentPlaybackExecutionIdRef.current,
+        item:describePlayerDiagnosticItem(item, index),
+      });
+      return;
+    }
     if (isTemplateV2(item) && readyPlaybackExecutionsRef.current.has(executionId)) return;
     if (isTemplateV2(item)) readyPlaybackExecutionsRef.current.add(executionId);
 
     operationalPlayerErrorRef.current = false;
     setReadyMediaKey(itemKey);
+    runtimeDiagnostics.emit("MEDIA_READY", { ...describePlayerDiagnosticItem(item, index), playbackExecutionId:executionId });
+    const decoderDiagnostic = decoderDiagnosticTransitionRef.current;
+    if (decoderDiagnostic?.context.playbackExecutionId === executionId) {
+      decoderTransitionDiagnostics.readyConfirmed({ ...decoderDiagnostic.context, readyMediaKey:itemKey });
+      decoderDiagnosticTransitionRef.current = { ...decoderDiagnostic, stage:"ready-confirmed" };
+    }
     logTemplatesV2Diagnostic("T6_TEMPLATE_READY", { templateId:item.templateId||item.id||"", itemKey, playbackExecutionId:executionId, CURRENT_VISIBLE:previousMediaIndexRef.current !== null, NEXT_PENDING:false });
     telemetryRef.current.completeTransition(telemetryTransitionRef.current, "SUCCESS");
     telemetryTransitionRef.current = "";
@@ -17322,6 +17466,7 @@ function PlayerPage() {
 
     let cancelled = false;
     let unsubscribeScreen = null;
+    const screenStage = runtimeDiagnostics.startStage("SCREEN_BINDING", { clientId, codePresent:Boolean(codigo) });
     const localDeviceId = getTotemDeviceId();
     const savedTvConnection = readTvConnection();
     const canRecoverSavedDeviceLink = (connectedDeviceId) =>
@@ -17384,16 +17529,20 @@ function PlayerPage() {
       logLinkEvent(LINK_STATES.VALIDATED, { screenId: screenDoc.id, source });
       setScreen(screenData);
       setLoading(false);
+      screenStage.success({ screenId:screenDoc.id, source });
+      runtimeDiagnostics.emit("PLAYER_GATE", { gate:"loading", released:true, source }, { dedupeKey:"gate-loading" });
     }
 
     function subscribeToScreenRef(screenRef) {
       unsubscribeScreen?.();
+      runtimeDiagnostics.emit("REMOTE_LISTENER_REGISTERED", { listener:"screen", screenId:screenRef.id || "" });
       unsubscribeScreen = onSnapshot(screenRef, handleScreenData, (error) => {
         console.log("Erro ao acompanhar tela do player:", error);
         const result = classifyLinkValidation({ error });
         setLinkValidationState(result.state);
         logLinkEvent(result.state, { stage: "screen-listener", code: error?.code || "" });
         setLoading(false);
+        screenStage.failure(error);
       });
     }
 
@@ -17412,11 +17561,14 @@ function PlayerPage() {
 
         if (savedTvConnection?.screenId) {
           const screenRef = doc(db, "clients", clientId, "screens", savedTvConnection.screenId);
+          const cacheStage = runtimeDiagnostics.startStage("SCREEN_CACHE_READ", { screenId:savedTvConnection.screenId });
           const cachedScreen = await readCachedPlayerDocument({
             getFromCache: getDocFromCache,
             reference: screenRef,
             expectedId: savedTvConnection.screenId,
+            onError:(error) => cacheStage.failure(error),
           });
+          cacheStage.success({ hit:Boolean(cachedScreen) });
           if (cancelled) return;
           if (cachedScreen) handleScreenData(cachedScreen, { source: "cache" });
           subscribeToScreenRef(screenRef);
@@ -17424,7 +17576,9 @@ function PlayerPage() {
         }
 
         const codeRef = doc(db, "tv_codes", codigo.toUpperCase());
+        const codeStage = runtimeDiagnostics.startStage("SCREEN_CODE_RESOLUTION", { codePresent:true });
         const codeSnap = await getDoc(codeRef);
+        codeStage.success({ found:codeSnap.exists() });
 
         if (cancelled) return;
 
@@ -17453,7 +17607,9 @@ function PlayerPage() {
           setLinkValidationState(result.state);
           logLinkEvent(result.state, { stage: "screen-query", code: error?.code || "" });
           setLoading(false);
+          screenStage.failure(error);
         });
+        runtimeDiagnostics.emit("REMOTE_LISTENER_REGISTERED", { listener:"screen-query" });
       } catch (error) {
         console.log("Erro ao resolver codigo da TV:", error);
         const result = classifyLinkValidation({
@@ -17463,6 +17619,7 @@ function PlayerPage() {
         setLinkValidationState(result.state);
         logLinkEvent(result.state, { stage: "code-resolution", code: error?.code || "" });
         setLoading(false);
+        screenStage.failure(error);
       }
     }
 
@@ -17568,17 +17725,23 @@ function PlayerPage() {
     let cancelled = false;
     let unsubscribeClient = null;
     const clientRef = doc(db, "clients", clientId);
+    const clientStage = runtimeDiagnostics.startStage("CLIENT_LOAD", { clientId });
 
     async function restoreClientThenSubscribe() {
+      const cacheStage = runtimeDiagnostics.startStage("CLIENT_CACHE_READ", { clientId });
       const cachedClient = await readCachedPlayerDocument({
         getFromCache: getDocFromCache,
         reference: clientRef,
         expectedId: clientId,
+        onError:(error) => cacheStage.failure(error),
       });
+      cacheStage.success({ hit:Boolean(cachedClient) });
       if (cancelled) return;
       if (cachedClient) {
         setPlayerClient({ id: cachedClient.id, ...cachedClient.data() });
         setClientLoading(false);
+        clientStage.success({ source:"cache", found:true });
+        runtimeDiagnostics.emit("PLAYER_GATE", { gate:"clientLoading", released:true, source:"cache" }, { dedupeKey:"gate-client-loading" });
       }
 
       unsubscribeClient = onSnapshot(
@@ -17586,12 +17749,16 @@ function PlayerPage() {
         (snapshot) => {
           setPlayerClient(snapshot.exists() ? { id: snapshot.id, ...snapshot.data() } : null);
           setClientLoading(false);
+          clientStage.success({ source:"remote", found:snapshot.exists() });
+          runtimeDiagnostics.emit("PLAYER_GATE", { gate:"clientLoading", released:true, source:"remote" }, { dedupeKey:"gate-client-loading" });
         },
         (error) => {
           console.log("Erro ao carregar cliente do player:", error);
           setClientLoading(false);
+          clientStage.failure(error);
         }
       );
+      runtimeDiagnostics.emit("REMOTE_LISTENER_REGISTERED", { listener:"client", clientId });
     }
 
     restoreClientThenSubscribe();
@@ -18093,6 +18260,8 @@ function PlayerPage() {
   useEffect(() => {
     if (!clientId || !screen?.id) return;
 
+    const templatesStage = runtimeDiagnostics.startStage("TEMPLATES_RESOLUTION", { clientId, screenId:screen.id });
+    runtimeDiagnostics.emit("REMOTE_LISTENER_REGISTERED", { listener:"templates", clientId, screenId:screen.id });
     const unsubscribe = onSnapshot(
       collection(db, "clients", clientId, "templates"),
       (snapshot) => {
@@ -18119,10 +18288,12 @@ function PlayerPage() {
         setClientTemplates(list);
         setClientTemplatesResolvedScope(`${clientId}|${screen.id}`);
         setScreenTemplates(screenScopedTemplates);
+        templatesStage.success({ count:screenScopedTemplates.length });
       },
       (error) => {
         console.log("Erro ao acompanhar templates do player:", error);
         setClientTemplatesResolvedScope(`${clientId}|${screen.id}`);
+        templatesStage.failure(error);
       }
     );
 
@@ -18143,6 +18314,7 @@ function PlayerPage() {
       setDefaultPlaylist(null);
       setPlaylistResolved(true);
       setPlaylistAvailability("absent");
+      runtimeDiagnostics.emit("BOOTSTRAP_STAGE", { stage:"PLAYLIST_LOAD", status:"success", elapsedMs:0, reason:"no-active-playlist" }, { dedupeKey:"playlist-no-active" });
       return;
     }
 
@@ -18160,13 +18332,17 @@ function PlayerPage() {
     setPlaylistResolved(false);
     setPlaylistAvailability("waiting");
     const playlistRef = doc(db, "clients", clientId, "playlists", activePlaylistId);
+    const playlistStage = runtimeDiagnostics.startStage("PLAYLIST_LOAD", { clientId, playlistId:activePlaylistId });
 
     async function restorePlaylistThenSubscribe() {
+      const cacheStage = runtimeDiagnostics.startStage("PLAYLIST_CACHE_READ", { playlistId:activePlaylistId });
       const cachedPlaylist = await readCachedPlayerDocument({
         getFromCache: getDocFromCache,
         reference: playlistRef,
         expectedId: activePlaylistId,
+        onError:(error) => cacheStage.failure(error),
       });
+      cacheStage.success({ hit:Boolean(cachedPlaylist) });
       if (cancelled) return;
       if (cachedPlaylist) {
         const cachedValue = { id: cachedPlaylist.id, ...cachedPlaylist.data() };
@@ -18177,7 +18353,9 @@ function PlayerPage() {
         setDefaultPlaylist(cachedValue);
         setPlaylistResolved(true);
         setPlaylistAvailability("available");
+        playlistStage.success({ source:"cache", found:true });
       }
+      runtimeDiagnostics.emit("REMOTE_LISTENER_REGISTERED", { listener:"playlist", clientId, playlistId:activePlaylistId });
       unsubscribe = onSnapshot(
         playlistRef,
         { includeMetadataChanges:true },
@@ -18204,6 +18382,13 @@ function PlayerPage() {
           if (result.replacePlaylist) setDefaultPlaylist(result.playlist);
           setPlaylistResolved(result.resolved);
           setPlaylistAvailability(result.status);
+          if (result.resolved) {
+            playlistStage.success({
+              source:result.metadata?.fromCache ? "cache-listener" : "server",
+              found:Boolean(result.playlist),
+              serverConfirmed:result.serverConfirmed,
+            });
+          }
         },
         (error) => {
           console.log("Erro ao acompanhar playlist ativa:", error);
@@ -18216,6 +18401,7 @@ function PlayerPage() {
           activePlaylistRetainedRef.current = result.retained;
           setPlaylistResolved(result.resolved);
           setPlaylistAvailability(result.status);
+          playlistStage.failure(error);
         }
       );
     }
@@ -18446,6 +18632,17 @@ function PlayerPage() {
     });
   }, [pauseMode, mediaIndex, activePlaylist?.id]);
 
+  useEffect(() => {
+    runtimeDiagnostics.emit("BOOTSTRAP_GATES", {
+      loading,
+      clientLoading,
+      playlistResolved,
+      templatesResolved:clientTemplatesResolvedScope === `${clientId}|${screen?.id || ""}`,
+      linkValidationState,
+      screenResolved:Boolean(screen?.id),
+    }, { dedupeKey:"bootstrap-gates" });
+  }, [loading, clientLoading, playlistResolved, clientTemplatesResolvedScope, clientId, screen?.id, linkValidationState]);
+
   const playerPlanAccess = getClientPlanAccess(playerClient);
   const showDemoWatermark = Boolean(
     playerClient &&
@@ -18638,6 +18835,17 @@ function PlayerPage() {
     decoderReleasePending,
   });
 
+  function recordDecoderDiagnosticFailure(item, index, executionId, stage, errorType) {
+    const diagnostic = decoderDiagnosticTransitionRef.current;
+    if (diagnostic?.context.playbackExecutionId !== executionId) return;
+    decoderTransitionDiagnostics.failed({
+      ...diagnostic.context,
+      item:describePlayerDiagnosticItem(item, index),
+      stage,
+      errorType,
+    });
+  }
+
   function renderPlayerItem(item, index, isCurrent, executionId) {
     if (item.playerItemType === "template") {
       const itemKey = getPlayerItemKey(item,index);
@@ -18646,8 +18854,15 @@ function PlayerPage() {
       const onVisualEvent = isTemplateV2(renderItem) ? async (event, details = {}) => {
         if (!isCurrentPlaybackExecution(executionId,currentPlaybackExecutionIdRef.current)) return;
         const diagnosticPayload = { templateId:item.templateId||item.id||"", itemKey, playbackExecutionId:executionId, ...details, CURRENT_VISIBLE:previousMediaIndexRef.current !== null, NEXT_PENDING:event !== "ready" };
-        if (event === "load") logTemplatesV2Diagnostic("T4_IMAGE_LOADED", diagnosticPayload);
+        if (event === "load") {
+          logTemplatesV2Diagnostic("T4_IMAGE_LOADED", diagnosticPayload);
+          runtimeDiagnostics.emit("MEDIA_LOAD", { ...describePlayerDiagnosticItem(item, index), playbackExecutionId:executionId, source:"template" });
+        }
         if (event === "decoded") logTemplatesV2Diagnostic("T5_IMAGE_DECODED", diagnosticPayload);
+        if (event === "error") {
+          runtimeDiagnostics.emit("MEDIA_ERROR", { ...describePlayerDiagnosticItem(item, index), playbackExecutionId:executionId, errorType:"template-visual" });
+          recordDecoderDiagnosticFailure(item, index, executionId, "readiness", "template-visual");
+        }
         if (event === "ready") {
           markCurrentMediaReady(item,index,executionId);
           activityTelemetryRef.current.startPlayback({ id:item.templateId || item.id || "", type:"template" });
@@ -18709,6 +18924,7 @@ function PlayerPage() {
           }}
           onLoadedData={(event) => {
             captureVideoEvent("loadeddata", event);
+            runtimeDiagnostics.emit("MEDIA_LOAD", { ...describePlayerDiagnosticItem(item, index), playbackExecutionId:executionId, source:"video" });
             if (isCurrent && !isAndroidSmartTv) markCurrentMediaReady(item, index);
 
             if (!pauseMode) {
@@ -18754,6 +18970,7 @@ function PlayerPage() {
           onEnded={(event) => {
             if (!isCurrent || pauseMode || !isCurrentPlaybackExecution(executionId,currentPlaybackExecutionIdRef.current)) return;
             captureVideoEvent("ended", event);
+            runtimeDiagnostics.emit("MEDIA_ENDED", { ...describePlayerDiagnosticItem(item, index), playbackExecutionId:executionId });
             const occurrenceId = event.currentTarget.ended
               ? trafficVideoOccurrencesRef.current.get(event.currentTarget) || null
               : null;
@@ -18796,6 +19013,8 @@ function PlayerPage() {
               closeTrafficPlayback(item, executionId, occurrenceId);
             }
             captureVideoEvent("error", event, { message: "Erro ao carregar vídeo" });
+            runtimeDiagnostics.emit("MEDIA_ERROR", { ...describePlayerDiagnosticItem(item, index), playbackExecutionId:executionId, errorType:"video-load" });
+            recordDecoderDiagnosticFailure(item, index, executionId, "readiness", "video-load");
             telemetryRef.current.record("PLAYBACK_ERROR", { ...telemetryMedia, message: "Erro ao carregar vídeo" });
             activityTelemetryRef.current.finishPlayback("ERROR");
             recordPlayback("PLAYBACK_ERROR", source, { ...diagnosticMedia, message: "Erro ao carregar vídeo" });
@@ -18829,6 +19048,7 @@ function PlayerPage() {
         className="player-media"
         onLoad={async (event) => {
           if (!isCurrent) return;
+          runtimeDiagnostics.emit("MEDIA_LOAD", { ...describePlayerDiagnosticItem(item, index), playbackExecutionId:executionId, source:"image" });
           await confirmTemplateImageForPaint(event.currentTarget);
           if (!isCurrentPlaybackExecution(executionId,currentPlaybackExecutionIdRef.current)) return;
           markCurrentMediaReady(item, index);
@@ -18838,6 +19058,8 @@ function PlayerPage() {
         }}
         onError={() => {
           if (!isCurrent) return;
+          runtimeDiagnostics.emit("MEDIA_ERROR", { ...describePlayerDiagnosticItem(item, index), playbackExecutionId:executionId, errorType:"image-load" });
+          recordDecoderDiagnosticFailure(item, index, executionId, "readiness", "image-load");
           operationalPlayerErrorRef.current = true;
           closeTrafficPlayback(item, executionId);
           telemetryRef.current.record("PLAYBACK_ERROR", { ...telemetryMedia, message: "Erro ao carregar imagem" });
