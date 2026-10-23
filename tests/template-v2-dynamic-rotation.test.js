@@ -1,6 +1,7 @@
 import test from "node:test";
 import assert from "node:assert/strict";
 import { getDynamicRotationFrame, normalizeDynamicRotation } from "../src/templates-v2/dynamic-layout/rotation.js";
+import { isControlledRotationElapsed } from "../src/templates-v2/dynamic-layout/useDynamicRotation.js";
 
 test("normaliza a rotação dinâmica em limites seguros", () => {
   assert.deepEqual(normalizeDynamicRotation({ featuredSeconds: 1, secondarySeconds: 999, transition: "bad" }), {
@@ -18,4 +19,11 @@ test("alterna destaque e secundárias sem duplicar o destaque", () => {
 test("expira exatamente na duração efetiva do item", () => {
   assert.equal(getDynamicRotationFrame({ itemIds: ["a"], elapsedMs: 14_999, effectiveDurationMs: 15_000 }).expired, false);
   assert.equal(getDynamicRotationFrame({ itemIds: ["a"], elapsedMs: 15_000, effectiveDurationMs: 15_000 }).expired, true);
+});
+
+test("null não congela o relógio interno da rotação", () => {
+  assert.equal(isControlledRotationElapsed(null), false);
+  assert.equal(isControlledRotationElapsed(undefined), false);
+  assert.equal(isControlledRotationElapsed(0), true);
+  assert.equal(isControlledRotationElapsed(5_000), true);
 });

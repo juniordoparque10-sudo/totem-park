@@ -2,11 +2,15 @@
 import { useEffect, useMemo, useRef, useState } from "react";
 import { getDynamicRotationFrame } from "./rotation.js";
 
+export function isControlledRotationElapsed(value) {
+  return value !== null && value !== undefined && Number.isFinite(Number(value));
+}
+
 export function useDynamicRotation({ itemIds = [], effectiveDurationMs = Infinity, rotation = {}, secondarySlots = 3, enabled = true, executionId = "preview", controlledElapsedMs = null } = {}) {
   const startedAtRef = useRef(Date.now());
   const [elapsedMs, setElapsedMs] = useState(0);
   const idsKey = itemIds.join("|");
-  const controlled = Number.isFinite(Number(controlledElapsedMs));
+  const controlled = isControlledRotationElapsed(controlledElapsedMs);
   const resolvedElapsedMs = controlled ? Math.max(0, Number(controlledElapsedMs)) : elapsedMs;
 
   useEffect(() => {
