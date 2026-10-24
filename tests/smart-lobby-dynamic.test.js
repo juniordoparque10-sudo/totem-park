@@ -40,3 +40,25 @@ test("Smart Lobby interpreta transparência como inverso da opacidade dos cards"
   const renderer = fs.readFileSync(new URL("../src/templates-v2/dynamic-collections/CollectionRenderer.jsx",import.meta.url),"utf8");
   assert.match(renderer, /--tpv2-panel-alpha/);
 });
+
+test("Smart Lobby normaliza fontes independentes entre 80% e 140% sem alterar templates existentes", () => {
+  assert.deepEqual(normalizeSmartLobbyConfig({}).typography, { titleScale:100, primaryTextScale:100, secondaryTextScale:100 });
+  assert.deepEqual(normalizeSmartLobbyConfig({ typography:{ titleScale:77, primaryTextScale:143, secondaryTextScale:113 } }).typography, { titleScale:80, primaryTextScale:140, secondaryTextScale:115 });
+  const draft = createTemplateV2Draft(SMART_LOBBY_TYPE, { smartLobby:{ typography:{ titleScale:125, primaryTextScale:90, secondaryTextScale:135 } } });
+  assert.deepEqual(draft.smartLobby.typography, { titleScale:125, primaryTextScale:90, secondaryTextScale:135 });
+});
+
+test("Smart Lobby compartilha controles e escalas entre preview e Player sem acoplar transparência", () => {
+  const editor = fs.readFileSync(new URL("../src/templates-v2/smart-lobby/SmartLobbyEditorFields.jsx",import.meta.url),"utf8");
+  const renderer = fs.readFileSync(new URL("../src/templates-v2/dynamic-collections/CollectionRenderer.jsx",import.meta.url),"utf8");
+  const css = fs.readFileSync(new URL("../src/templates-v2/dynamic-collections/collection-renderer.css",import.meta.url),"utf8");
+  assert.match(editor, /min="80" max="140" step="5"/);
+  assert.match(editor, /Títulos dos cards/);
+  assert.match(editor, /Descrição principal/);
+  assert.match(editor, /Textos secundários/);
+  assert.match(renderer, /--smart-lobby-title-scale/);
+  assert.match(css, /var\(--smart-lobby-h2-fluid,4\.4cqw\)/);
+  assert.match(css, /var\(--smart-lobby-primary-fluid,1\.35cqw\)/);
+  assert.match(css, /var\(--smart-lobby-secondary-fluid,\.9cqw\)/);
+  assert.match(css, /background:rgba\(5,18,36,var\(--tpv2-panel-alpha,.86\)\)/);
+});

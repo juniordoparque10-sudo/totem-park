@@ -5,9 +5,9 @@ import { SPORTS_V2_CARD_COMPONENTS } from "./cards/SportsCards";
 import "./sports-v2.css";
 import "./sports-v2-semantic-colors.css";
 
-function SportsCard({ type, item, snapshot, compact, appearance }) {
+function SportsCard({ type, item, snapshot, compact, appearance, timeZone }) {
   const Card = SPORTS_V2_CARD_COMPONENTS[type] || SPORTS_V2_CARD_COMPONENTS.football;
-  return <Card item={item} snapshot={snapshot} compact={compact} cardStyle={{ background: appearance.panelBackground }}/>;
+  return <Card item={{...item,timeZone}} snapshot={snapshot} compact={compact} cardStyle={{ background: appearance.panelBackground }}/>;
 }
 
 function useSportsRotation(config, enabled) {
@@ -27,7 +27,7 @@ function useSportsRotation(config, enabled) {
 function SplitLayout({ config, data, appearance }) {
   const selected = config.selectedSports.slice(0,4);
   const ordered = config.primarySport && selected.includes(config.primarySport) ? [config.primarySport,...selected.filter((type)=>type!==config.primarySport)] : selected;
-  return <div className={`sports-v2-split panels-${ordered.length}`}>{ordered.map((type,index)=><SportsCard key={type} type={type} item={config.items[type]} snapshot={data[type]} compact={ordered.length>2 || index>0} appearance={appearance}/>)}</div>;
+  return <div className={`sports-v2-split panels-${ordered.length}`}>{ordered.map((type,index)=><SportsCard key={type} type={type} item={config.items[type]} snapshot={data[type]} compact={ordered.length>2 || index>0} appearance={appearance} timeZone={config.timeZone}/>)}</div>;
 }
 
 export default function SportsPremiumRenderer({ config, orientation, name, dynamicData, mode="player" }) {
@@ -46,7 +46,7 @@ export default function SportsPremiumRenderer({ config, orientation, name, dynam
   return <section className={`tpv2-root sports-v2-root ${orientation === "Retrato" ? "is-portrait" : "is-landscape"} mode-${sports.mode} preset-${sports.visualPreset} ${ticker?.enabled ? `has-news-ticker ticker-${ticker.tickerSize||"normal"}` : ""}`} style={{"--sports-v2-primary":config.style?.primaryColor||"#22d3ee","--sports-v2-secondary":config.style?.secondaryColor||"#8b5cf6","--sports-v2-bg":config.style?.backgroundColor||"#07111f","--sports-v2-score-color":sports.semanticColors.score,"--sports-v2-points-color":sports.semanticColors.points,"--sports-v2-played-color":sports.semanticColors.played,"--tpv2-text":"#ffffff","--tpv2-muted":"#cbd5e1"}}>
     <div className="sports-v2-backdrop"><TemplateMedia asset={config.media?.primary} fit={config.style?.mediaFit||"cover"} position={config.style?.mediaPosition||"center"} mode="player"/><i style={{ opacity: appearance.overlayAlpha }}/></div>
     {visibility.showContent !== false && <div className="sports-v2-shell"><div className="sports-v2-brand">{visibility.showLogo !== false && <TemplateLogo asset={config.content?.logo} name={name}/>}<span>Sistema multiesportes · Dados dinâmicos</span></div>
-      {!dynamicData || dynamicData.loading ? null : sports.mode === SPORTS_V2_MODES.SPLIT ? <SplitLayout config={sports} data={data} appearance={appearance}/> : <div className={`sports-v2-single transition-${sports.transition}`} key={activeType}><SportsCard type={activeType} item={sports.items[activeType]} snapshot={data[activeType]} compact={false} appearance={appearance}/>{sports.mode===SPORTS_V2_MODES.ROTATION&&<nav>{sports.selectedSports.map((type,index)=><i key={type} className={index===rotationIndex?"active":""}/>)}</nav>}</div>}
+      {!dynamicData || dynamicData.loading ? null : sports.mode === SPORTS_V2_MODES.SPLIT ? <SplitLayout config={sports} data={data} appearance={appearance}/> : <div className={`sports-v2-single transition-${sports.transition}`} key={activeType}><SportsCard type={activeType} item={sports.items[activeType]} snapshot={data[activeType]} compact={false} appearance={appearance} timeZone={sports.timeZone}/>{sports.mode===SPORTS_V2_MODES.ROTATION&&<nav>{sports.selectedSports.map((type,index)=><i key={type} className={index===rotationIndex?"active":""}/>)}</nav>}</div>}
     </div>}
     {ticker?.enabled && <TemplateNewsTicker items={dynamicData?.news} config={ticker} orientation={orientation}/>} 
   </section>;

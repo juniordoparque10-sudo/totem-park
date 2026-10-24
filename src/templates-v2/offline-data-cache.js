@@ -63,6 +63,7 @@ export function createWeatherDataFingerprintConfig(value = {}) {
 
 export function createNewsDataFingerprintConfig(value = {}) {
   return {
+    parserGeneration:2,
     newsSource:String(value.newsSource || "").trim(),
     newsFeedUrl:String(value.newsFeedUrl || "").trim(),
     selectedNewsSources:(value.selectedNewsSources || []).map((item) => String(item).trim()).filter(Boolean),

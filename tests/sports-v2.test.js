@@ -4,12 +4,30 @@ import { readFileSync } from "node:fs";
 import { createSportsV2Config, distributeSportsV2Timing, getSportsV2Timing, normalizeSportsV2Config, SPORTS_V2_TYPES } from "../src/templates-v2/sports-v2/config.js";
 import * as sportsConfig from "../src/templates-v2/sports-v2/config.js";
 import { createTemplateV2Draft, SPORTS_PREMIUM_TYPE } from "../src/templates-v2/schema.js";
+import { formatSportsEventTime } from "../src/templates-v2/sports-v2/event-time.js";
 
 test("sports V2 provides six isolated expandable sport objects", () => {
   const config = createSportsV2Config();
   assert.deepEqual(Object.keys(config.items), SPORTS_V2_TYPES.map(([type])=>type));
   assert.notEqual(config.items.football, config.items.basketball);
   assert.equal(config.provider, "thesportsdb");
+});
+
+test("sports V2 converte timestamp absoluto para o fuso configurado", () => {
+  const now = new Date("2026-10-24T12:00:00Z");
+  assert.equal(formatSportsEventTime("2026-10-24T21:30:00Z", { timeZone:"America/Fortaleza", now }), "HOJE ÀS 18h30");
+  assert.equal(formatSportsEventTime("2026-10-25T02:30:00Z", { timeZone:"America/Fortaleza", now }), "HOJE ÀS 23h30");
+  assert.equal(formatSportsEventTime("", { timeZone:"America/Fortaleza", now }), "HORÁRIO A DEFINIR");
+});
+
+test("sports V2 preserva fuso padrão e renderer não corta a string de horário", () => {
+  assert.equal(normalizeSportsV2Config({}).timeZone, "America/Fortaleza");
+  assert.equal(normalizeSportsV2Config({ timeZone:"America/Sao_Paulo" }).timeZone, "America/Sao_Paulo");
+  const cards=readFileSync(new URL("../src/templates-v2/sports-v2/cards/SportsCards.jsx",import.meta.url),"utf8");
+  assert.match(cards,/formatSportsEventTime/);
+  assert.doesNotMatch(cards,/split\("T"\)/);
+  const functions=readFileSync(new URL("../functions/index.js",import.meta.url),"utf8");
+  assert.match(functions,/event\.strTimestamp/);
 });
 
 test("rotation timing distributes the full template duration", () => {

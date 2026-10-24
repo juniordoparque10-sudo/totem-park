@@ -2,8 +2,13 @@ import test from "node:test";
 import assert from "node:assert/strict";
 import { Buffer } from "node:buffer";
 import { readFileSync } from "node:fs";
-import { buildSportsDataCacheContext, buildTemplateDataCacheKey, clearTemplateDataMemoryCacheForTests, createSportsDataFingerprintConfig, mergeSportsLastKnown, readNewsEditorialDynamicCache, readSportsTemplateDataCache, readTemplateDataCache, writeNewsEditorialDynamicCache, writeSportsTemplateDataCache, writeTemplateDataCache } from "../src/templates-v2/offline-data-cache.js";
+import { buildSportsDataCacheContext, buildTemplateDataCacheKey, clearTemplateDataMemoryCacheForTests, createNewsDataFingerprintConfig, createSportsDataFingerprintConfig, mergeSportsLastKnown, readNewsEditorialDynamicCache, readSportsTemplateDataCache, readTemplateDataCache, writeNewsEditorialDynamicCache, writeSportsTemplateDataCache, writeTemplateDataCache } from "../src/templates-v2/offline-data-cache.js";
 import { clearTemplateAssetMemoryCacheForTests, collectTemplateAssetUrls, createOfflineSafeTemplate, fetchTemplateAssetResponse, prepareTemplateAssets, refreshTemplateAsset, selectTemplateAssetRenderSource, shouldUsePersistentTemplateAssetCache } from "../src/templates-v2/offline-asset-cache.js";
+
+test("cache RSS Editorial usa geração do parser para não ressuscitar texto corrompido antigo", () => {
+  const config = createNewsDataFingerprintConfig({ newsFeedUrl:"https://example.com/feed.xml" });
+  assert.equal(config.parserGeneration, 2);
+});
 import { shouldRevealTemplateImmediately } from "../src/templates-v2/offline-readiness.js";
 import { prepareTemplateV2CriticalImage } from "../src/templates-v2/player-preload.js";
 import { getNextTemplateToPrepare } from "../src/templates-v2/offline-preload.js";

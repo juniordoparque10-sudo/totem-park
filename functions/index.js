@@ -49,7 +49,7 @@ function sportsV2TeamEvent(event = {}, sport, assumedStatus, competition) {
     sport,
     competition: { id: competition?.id || clean(event.idLeague), name: competition?.name || clean(event.strLeague) || "Competição", region: competition?.region || "" },
     status: sportsV2Status(event, assumedStatus),
-    startTime: [clean(event.dateEvent), clean(event.strTime, 8)].filter(Boolean).join("T"),
+    startTime: clean(event.strTimestamp, 40) || ([clean(event.dateEvent), clean(event.strTime, 8)].filter(Boolean).join("T") + (event.dateEvent && event.strTime ? "Z" : "")),
     venue: clean(event.strVenue || event.strCircuit, 160),
     home: { name: clean(event.strHomeTeam || event.strPlayer || event.strEvent, 120), logo: clean(event.strHomeTeamBadge || event.strThumb, 500) },
     away: { name: clean(event.strAwayTeam, 120), logo: clean(event.strAwayTeamBadge, 500) },
