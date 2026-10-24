@@ -168,6 +168,13 @@ test("Player carrega os segmentos editoriais e do feed dinâmico, não apenas mo
   assert.match(app, /!dynamicNewsPlayerConfig/);
 });
 
+test("Player atualiza Notícias Editorial dinâmica pelo timer compartilhado de notícias", () => {
+  const app = fs.readFileSync(new URL("../src/App.jsx", import.meta.url), "utf8");
+  assert.match(app, /if \(dynamicNewsPlayerConfig && modules\.includes\("news"\)\) \{[\s\S]*?tasks\.push\([\s\S]*?loadTemplateV2DynamicData\(dynamicNewsPlayerConfig[\s\S]*?writeNewsEditorialDynamicCache/);
+  assert.match(app, /setInterval\(\(\) => load\("timer", \["weather","news"\]\), 10 \* 60 \* 1000\)/);
+  assert.doesNotMatch(app, /if \(!dynamicNewsPlayerConfig\) return undefined;[\s\S]*?loadTemplateV2DynamicData\(dynamicNewsPlayerConfig/);
+});
+
 test("editor específico oferece fontes independentes e clima multi-cidade", () => {
   const editor = fs.readFileSync(new URL("../src/templates-v2/news-editorial-dynamic/NewsEditorialDynamicEditorFields.jsx", import.meta.url), "utf8");
   assert.match(editor, /Notícias editoriais/);

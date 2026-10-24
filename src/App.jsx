@@ -14298,20 +14298,6 @@ function TemplateV2LivePreview({ template, sourceTemplate = template, compact = 
   const [dynamicData, setDynamicData] = useState(initialDynamicData);
   const dynamicKey = JSON.stringify({ weather:weatherCacheConfig, enabledWeather:weatherConfig.enabled, news:newsCacheConfig, enabledNews:newsConfig.enabled, dynamicNews:dynamicNewsPlayerConfig?.dynamicNews || null, sports:sportsConfig });
 
-  useEffect(() => {
-    if (!dynamicNewsPlayerConfig) return undefined;
-    let cancelled = false;
-    loadTemplateV2DynamicData(dynamicNewsPlayerConfig, { loadWeather:loadTemplateV2Weather, loadNews:loadTemplateV2News })
-      .then((data) => {
-        writeNewsEditorialDynamicCache(scope, originalConfig.dynamicNews, data, { source:"rss" });
-        if (!cancelled) setDynamicData((previous) => ({ ...(previous || {}), ...data }));
-      })
-      .catch(() => {});
-    return () => { cancelled = true; };
-  // The serialized dynamic key is the complete refresh boundary.
-  // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [dynamicKey]);
-
   useLayoutEffect(() => {
     logTemplatesV2Diagnostic("T1_RENDERER_MOUNTED", { templateId: template.id || template.templateId || "", templateType: template.identity?.templateType || template.templateType || template.type || "", playbackExecutionId });
   }, [template.id, template.templateId, template.identity?.templateType, template.templateType, template.type, playbackExecutionId]);
@@ -14345,6 +14331,13 @@ function TemplateV2LivePreview({ template, sourceTemplate = template, compact = 
               writeTemplateDataCache({ ...scope, module:"weather", config:weatherConfig }, weather, { source:"open-meteo" });
               return { weather };
             })));
+      }
+      if (dynamicNewsPlayerConfig && modules.includes("news")) {
+        tasks.push(loadTemplateV2DynamicData(dynamicNewsPlayerConfig, { loadWeather:loadTemplateV2Weather, loadNews:loadTemplateV2News })
+          .then((data) => {
+            writeNewsEditorialDynamicCache(scope, originalConfig.dynamicNews, data, { source:"rss" });
+            return data;
+          }));
       }
       if (newsConfig.enabled && !dynamicNewsPlayerConfig && modules.includes("news")) {
         const fetchNews = async () => {
