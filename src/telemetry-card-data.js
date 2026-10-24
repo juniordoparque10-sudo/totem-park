@@ -1,3 +1,5 @@
+import { isOperationalHeartbeatFresh } from "./operational-telemetry.js";
+
 const SOURCE_GROUPS = Object.freeze({
   LOCAL:{ key:"local", label:"Local (cache)", className:"local" },
   REMOTE:{ key:"remote", label:"Internet", className:"internet" },
@@ -16,12 +18,21 @@ export function formatSessionStartedAt(value) {
   return date.toLocaleString("pt-BR", { day:"2-digit", month:"2-digit", year:"numeric", hour:"2-digit", minute:"2-digit", second:"2-digit" });
 }
 
-function nativeVersion(screen = {}) {
+function nativeVersion(screen = {}, now = Date.now()) {
   screen = screen || {};
-  const versionName = screen.playerVersionName || screen.versionName || screen.nativeAppVersion
-    || screen?.telemetry?.app?.versionName || screen.appVersion || screen.playerAppVersion
-    || screen?.telemetry?.session?.appVersion || null;
-  const rawCode = screen.playerVersionCode ?? screen.versionCode ?? screen?.telemetry?.app?.versionCode;
+  const telemetryVersionName = screen?.telemetry?.app?.versionName || null;
+  const telemetryVersionCode = screen?.telemetry?.app?.versionCode;
+  const hasTelemetryVersion = Boolean(telemetryVersionName) || numeric(telemetryVersionCode);
+  const useFreshTelemetry = hasTelemetryVersion && isOperationalHeartbeatFresh(screen.telemetry, now);
+  const legacyVersionName = screen.playerVersionName || screen.versionName || screen.nativeAppVersion
+    || screen.appVersion || screen.playerAppVersion || null;
+  const legacyVersionCode = screen.playerVersionCode ?? screen.versionCode;
+  const versionName = useFreshTelemetry
+    ? telemetryVersionName
+    : legacyVersionName || telemetryVersionName || screen?.telemetry?.session?.appVersion || null;
+  const rawCode = useFreshTelemetry
+    ? telemetryVersionCode
+    : legacyVersionCode ?? telemetryVersionCode;
   const versionCode = numeric(rawCode) ? Number(rawCode) : null;
   return { versionName:versionName ? String(versionName) : null, versionCode };
 }
@@ -50,9 +61,9 @@ function compareVersionInfo(left, right) {
   return String(left.versionName || "").localeCompare(String(right.versionName || ""), "pt-BR", { numeric:true });
 }
 
-export const reportedAppVersion = (screen = {}) => {
+export const reportedAppVersion = (screen = {}, now = Date.now()) => {
   screen = screen || {};
-  const { versionName, versionCode } = nativeVersion(screen);
+  const { versionName, versionCode } = nativeVersion(screen, now);
   if (versionName) return versionCode !== null ? `${versionName} (${versionCode})` : versionName;
   return versionCode !== null ? `VersionCode ${versionCode}` : null;
 };

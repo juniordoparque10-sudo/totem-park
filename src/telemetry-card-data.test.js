@@ -46,6 +46,34 @@ test("latest and most installed versions are independent", () => {
   assert.equal(getTelemetryCardData([{}]).latestVersionScreen, null);
 });
 
+test("fresh operational telemetry version outranks stale legacy screen version", () => {
+  const now = Date.parse("2026-10-24T15:00:00.000Z");
+  const screen = {
+    playerVersionName:"1.0.0-v63-experimental",
+    playerVersionCode:63,
+    telemetry:{
+      schemaVersion:4,
+      session:{ lastHeartbeatAt:"2026-10-24T14:59:45.000Z" },
+      app:{ versionName:"1.0.0-v65-lite-recovery-r1", versionCode:65 },
+    },
+  };
+  assert.equal(reportedAppVersion(screen, now), "1.0.0-v65-lite-recovery-r1 (65)");
+});
+
+test("stale operational telemetry remains historical and does not replace legacy version", () => {
+  const now = Date.parse("2026-10-24T15:00:00.000Z");
+  const screen = {
+    playerVersionName:"1.0.0-v63-experimental",
+    playerVersionCode:63,
+    telemetry:{
+      schemaVersion:4,
+      session:{ lastHeartbeatAt:"2026-10-24T14:50:00.000Z" },
+      app:{ versionName:"1.0.0-v65-lite-recovery-r1", versionCode:65 },
+    },
+  };
+  assert.equal(reportedAppVersion(screen, now), "1.0.0-v63-experimental (63)");
+});
+
 test("schema 4 aggregation preserves absence and excludes stale screens", () => {
   const valid = { portalStatus:"ONLINE", telemetry:{ schemaVersion:4, traffic:{ networkMeasurementSupported:true, appInternetReceivedBytes:100, mediaDownloadedBytes:20, localMediaReusedBytes:80, trafficAvoidedBytes:80, cachePlaybackHits:158, remotePlaybackCount:1, fallbackPlaybackCount:1 } } };
   const absent = { portalStatus:"ONLINE", telemetry:{ schemaVersion:4, traffic:{ networkMeasurementSupported:true, appInternetReceivedBytes:null } } };
