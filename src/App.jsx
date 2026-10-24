@@ -178,7 +178,11 @@ import { buildPlayerVisibleLayers } from "./player-visible-layers";
 import { captureVideoTransitionFrame } from "./video-transition-frame";
 import { shouldShowPlayerEmptyState } from "./player-startup-state";
 import { getBlackoutToggleCommand, getPlaylistNavigationCapability, getPlaylistNavigationCommand } from "./player-remote-capability";
-import { getAdjacentPlaylistIndex } from "./player-playlist-navigation";
+import {
+  getAdjacentPlaylistIndex,
+  getStablePlayerItemIdentity,
+  reconcilePlaylistPlaybackIdentity,
+} from "./player-playlist-navigation";
 import { executePlaylistNavigationCommand } from "./player-remote-command";
 import { getActivePlaylistListenerDependencies } from "./active-playlist-listener";
 import {
@@ -17151,17 +17155,6 @@ function PlayerPage() {
     return getTemplatePlaybackReadyKey(getPlayerItemKey(item,index), executionId, isTemplateV2(item));
   }
 
-  function getStablePlayerItemIdentity(item = {}) {
-    return [
-      item.playerItemType || "",
-      item.mediaId || item.sourceMediaId || item.templateId || item.id || "",
-      item.storagePath || "",
-      item.remotePreview || item.preview || item.imageUrl || "",
-      item.title || item.name || "",
-      item.templateType || item.type || "",
-    ].join("|");
-  }
-
   function goToNextMedia(reason = "UNKNOWN", requestedIndex = null) {
     operationalPlayerErrorRef.current = false;
     const previousItem = playerItems[mediaIndex >= playerItems.length ? 0 : mediaIndex];
@@ -18614,27 +18607,21 @@ function PlayerPage() {
 
     if (items.length === 0) return;
 
-    setMediaIndex((prev) => {
-      const previousIdentity = lastPlaybackItemIdentityRef.current;
-
-      if (previousIdentity) {
-        const preservedIndex = items.findIndex(
-          (item) => getStablePlayerItemIdentity(item) === previousIdentity
-        );
-
-        if (preservedIndex >= 0) return preservedIndex;
-      }
-
-      if (prev >= items.length) return 0;
-      return prev;
+    const reconciled = reconcilePlaylistPlaybackIdentity({
+      items,
+      currentIndex: mediaIndex,
+      currentIdentity: lastPlaybackItemIdentityRef.current,
     });
+
+    lastPlaybackItemIdentityRef.current = reconciled.identity;
+    if (reconciled.index !== mediaIndex) setMediaIndex(reconciled.index);
   }, [activePlaylist?.id, activeItemsKey]);
 
   useEffect(() => {
     const currentItem = playerItems[mediaIndex] || playerItems[0];
     if (!currentItem) return;
     lastPlaybackItemIdentityRef.current = getStablePlayerItemIdentity(currentItem);
-  }, [activeItemsKey, mediaIndex]);
+  }, [mediaIndex]);
 
   useEffect(() => {
     const reason = maintenanceMode
