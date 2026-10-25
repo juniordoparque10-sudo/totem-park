@@ -9,6 +9,15 @@ test("cache RSS Editorial usa geração do parser para não ressuscitar texto co
   const config = createNewsDataFingerprintConfig({ newsFeedUrl:"https://example.com/feed.xml" });
   assert.equal(config.parserGeneration, 2);
 });
+
+test("invalidação RSS geração 2 é seletiva e não remove outros registros Local First", () => {
+  const values=new Map();const storage={getItem:(key)=>values.get(key)??null,setItem:(key,value)=>values.set(key,value)};
+  const scope={clientId:"client",screenId:"screen",templateId:"news"};
+  writeTemplateDataCache({...scope,module:"news-editorial-editorial",config:{newsSource:"",newsFeedUrl:"https://example.com/feed.xml",selectedNewsSources:[]}},[{title:"Not�cia antiga"}],{storage});
+  storage.setItem("totempark.media-cache.guard","video-cache-preserved");
+  assert.equal(readNewsEditorialDynamicCache(scope,{editorial:{enabled:true,newsFeedUrl:"https://example.com/feed.xml"},feed:{enabled:false}},storage),null);
+  assert.equal(storage.getItem("totempark.media-cache.guard"),"video-cache-preserved");
+});
 import { shouldRevealTemplateImmediately } from "../src/templates-v2/offline-readiness.js";
 import { prepareTemplateV2CriticalImage } from "../src/templates-v2/player-preload.js";
 import { getNextTemplateToPrepare } from "../src/templates-v2/offline-preload.js";

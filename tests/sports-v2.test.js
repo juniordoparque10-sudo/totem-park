@@ -4,7 +4,7 @@ import { readFileSync } from "node:fs";
 import { createSportsV2Config, distributeSportsV2Timing, getSportsV2Timing, normalizeSportsV2Config, SPORTS_V2_TYPES } from "../src/templates-v2/sports-v2/config.js";
 import * as sportsConfig from "../src/templates-v2/sports-v2/config.js";
 import { createTemplateV2Draft, SPORTS_PREMIUM_TYPE } from "../src/templates-v2/schema.js";
-import { formatSportsEventTime } from "../src/templates-v2/sports-v2/event-time.js";
+import { formatSportsEventTime, normalizeSportsProviderTimestamp } from "../src/templates-v2/sports-v2/event-time.js";
 
 test("sports V2 provides six isolated expandable sport objects", () => {
   const config = createSportsV2Config();
@@ -18,6 +18,15 @@ test("sports V2 converte timestamp absoluto para o fuso configurado", () => {
   assert.equal(formatSportsEventTime("2026-10-24T21:30:00Z", { timeZone:"America/Fortaleza", now }), "HOJE ÀS 18h30");
   assert.equal(formatSportsEventTime("2026-10-25T02:30:00Z", { timeZone:"America/Fortaleza", now }), "HOJE ÀS 23h30");
   assert.equal(formatSportsEventTime("", { timeZone:"America/Fortaleza", now }), "HORÁRIO A DEFINIR");
+});
+
+test("sports V2 trata timestamp sem offset da TheSportsDB como UTC sem converter duas vezes", () => {
+  const now = new Date("2026-10-24T12:00:00Z");
+  assert.equal(normalizeSportsProviderTimestamp("2026-10-24T22:30:00"), "2026-10-24T22:30:00Z");
+  assert.equal(normalizeSportsProviderTimestamp("2026-10-24T22:30:00-03:00"), "2026-10-24T22:30:00-03:00");
+  assert.equal(formatSportsEventTime("2026-10-24T22:30:00", { timeZone:"America/Fortaleza", now }), "HOJE ÀS 19h30");
+  assert.equal(formatSportsEventTime("2026-10-25T14:00:00", { timeZone:"America/Fortaleza", now }), "AMANHÃ ÀS 11h00");
+  assert.equal(formatSportsEventTime("2026-10-27T14:00:00", { timeZone:"America/Fortaleza", now }), "27/10 ÀS 11h00");
 });
 
 test("sports V2 preserva fuso padrão e renderer não corta a string de horário", () => {
