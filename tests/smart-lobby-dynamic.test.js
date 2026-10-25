@@ -62,3 +62,16 @@ test("Smart Lobby compartilha controles e escalas entre preview e Player sem aco
   assert.match(css, /var\(--smart-lobby-secondary-fluid,\.9cqw\)/);
   assert.match(css, /background:rgba\(5,18,36,var\(--tpv2-panel-alpha,.86\)\)/);
 });
+
+test("Smart Lobby aplica a escala configurada também aos textos médios e longos", () => {
+  const css = fs.readFileSync(new URL("../src/templates-v2/dynamic-collections/collection-renderer.css",import.meta.url),"utf8");
+  const renderer = fs.readFileSync(new URL("../src/templates-v2/dynamic-collections/CollectionRenderer.jsx",import.meta.url),"utf8");
+  assert.match(css, /featured p\.copy-medium\{font-size:var\(--smart-lobby-primary-medium-landscape\)/);
+  assert.match(css, /featured p\.copy-long\{font-size:var\(--smart-lobby-primary-long-landscape\)/);
+  assert.match(css, /secondary p\.copy-medium\{font-size:var\(--smart-lobby-secondary-medium-landscape\)/);
+  assert.match(css, /secondary p\.copy-long\{font-size:var\(--smart-lobby-secondary-long-landscape\)/);
+  assert.match(css, /is-portrait \.featured p\.copy-medium\{font-size:var\(--smart-lobby-primary-medium-portrait\)/);
+  assert.match(css, /is-portrait \.secondary p\.copy-long\{font-size:var\(--smart-lobby-secondary-long-portrait\)/);
+  assert.match(renderer, /--smart-lobby-primary-medium-landscape/);
+  assert.match(renderer, /--smart-lobby-secondary-long-portrait/);
+});
