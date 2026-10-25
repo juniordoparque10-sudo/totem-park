@@ -8,5 +8,5 @@ const app = fs.readFileSync(new URL("../src/App.jsx", import.meta.url), "utf8");
 test("publicação dinâmica valida telas das playlists já atribuídas", () => {
   assert.match(editor, /getDynamicPublicationCapability/);
   assert.match(editor, /Nenhuma publicação foi alterada/);
-  assert.match(app, /screens=\{screens\}/);
+  assert.match(app, /screens=\{attachActivePlayerBindings\(screens, playerBindings, client\.id\)\}/);
 });
