@@ -170,6 +170,7 @@ import {
 import { readCachedPlayerDocument } from "./player-local-first";
 import { getPlaybackRemainingAfterWake, subscribePlayerRuntimeWake } from "./player-runtime-recovery";
 import { buildPlayerVisibleLayers } from "./player-visible-layers";
+import { captureVideoTransitionFrame } from "./video-transition-frame";
 import { shouldShowPlayerEmptyState } from "./player-startup-state";
 import { getBlackoutToggleCommand, getPlaylistNavigationCapability, getPlaylistNavigationCommand } from "./player-remote-capability";
 import { getAdjacentPlaylistIndex } from "./player-playlist-navigation";
@@ -15813,6 +15814,8 @@ function PlayerPage() {
   const [mediaIndex, setMediaIndex] = useState(0);
   const [previousMediaIndex, setPreviousMediaIndex] = useState(null);
   const previousMediaIndexRef = useRef(null);
+  const videoTransitionFrameRef = useRef(null);
+  const [videoTransitionFrameVisible, setVideoTransitionFrameVisible] = useState(false);
   const playbackExecutionCounterRef = useRef(1);
   const [currentPlaybackExecutionId, setCurrentPlaybackExecutionId] = useState(1);
   const currentPlaybackExecutionIdRef = useRef(1);
@@ -17144,6 +17147,8 @@ function PlayerPage() {
     if (singleDecoderTransition) {
       clearTimeout(transitionCleanupRef.current);
       const oldVideo = document.querySelector(".player-transition-layer.is-current video.player-media");
+      const frameCaptured = captureVideoTransitionFrame(oldVideo, videoTransitionFrameRef.current);
+      setVideoTransitionFrameVisible(frameCaptured);
       recordJumpEvent("DECODER_RELEASE_START", {
         reason,
         fromIndex: mediaIndex,
@@ -17158,6 +17163,8 @@ function PlayerPage() {
       setPreviousMediaIndex(null);
       previousPlaybackExecutionIdRef.current = null;
       setPreviousPlaybackExecutionId(null);
+    } else {
+      setVideoTransitionFrameVisible(false);
     }
 
     const safePrev = mediaIndex >= items.length ? 0 : mediaIndex;
@@ -17261,12 +17268,14 @@ function PlayerPage() {
     setPreviousMediaIndex(null);
     previousPlaybackExecutionIdRef.current = null;
     setPreviousPlaybackExecutionId(null);
+    setVideoTransitionFrameVisible(false);
     transitionInProgressRef.current = false;
   }
 
   function skipFailedMedia() {
     recordTransitionDiagnostic("PLAYER_ERROR_ADVANCE", { reason:"MEDIA_ERROR" });
     transitionInProgressRef.current = false;
+    setVideoTransitionFrameVisible(false);
     setReadyMediaKey("");
     goToNextMedia("ERROR");
   }
@@ -18773,6 +18782,13 @@ function PlayerPage() {
       )}
 
       {demoPlayerOverlay}
+
+      <canvas
+        ref={videoTransitionFrameRef}
+        className="player-video-transition-frame"
+        hidden={!videoTransitionFrameVisible}
+        aria-hidden="true"
+      />
 
       {visibleLayers.map(({ item, index, state, executionId }) => (
         <div

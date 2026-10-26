@@ -6027,7 +6027,7 @@ video.player-media::-webkit-media-controls-start-playback-button {
   inset: 0 !important;
   width: 100% !important;
   height: 100% !important;
-  background: #000000 !important;
+  background: transparent !important;
   overflow: hidden !important;
   --tp-transition-duration: 0.45s;
   will-change: auto;
@@ -6758,6 +6758,16 @@ video.player-media::-webkit-media-controls-start-playback-button {
   z-index: 1 !important;
   animation: none !important;
   opacity: 1 !important;
+}
+
+.player-video-transition-frame {
+  position: absolute !important;
+  inset: 0 !important;
+  z-index: 1 !important;
+  width: 100% !important;
+  height: 100% !important;
+  background: transparent !important;
+  pointer-events: none !important;
 }
 
 .player-buffer-layer.is-current {
