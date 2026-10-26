@@ -7,7 +7,7 @@ test("Android usa o proxy RSS HTTPS permanente com a fonte configurada", () => {
   assert.equal(typeof endpointModule?.buildRssProxyUrl, "function");
   assert.equal(
     endpointModule.buildRssProxyUrl("https://g1.globo.com/rss/g1/", { native:true }),
-    "https://totem-park-homologacao.vercel.app/api/rss?url=https%3A%2F%2Fg1.globo.com%2Frss%2Fg1%2F",
+    "https://totem-park-rss.vercel.app/api/rss?url=https%3A%2F%2Fg1.globo.com%2Frss%2Fg1%2F",
   );
 });
 
