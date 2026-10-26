@@ -1,19 +1,13 @@
-import logo from "../assets/logo.png";
+import maintenanceArtwork from "../assets/player-v59/maintenance-reference.png";
 import "./maintenance-screen.css";
 
 export default function MaintenanceScreen({ orientation = "landscape" }) {
   return (
     <section className={`player-screen maintenance-screen maintenance-screen--${orientation}`}>
-      <div className="maintenance-screen__glow maintenance-screen__glow--left" />
-      <div className="maintenance-screen__glow maintenance-screen__glow--right" />
-      <main className="maintenance-screen__content">
-        <img className="maintenance-screen__logo" src={logo} alt="Totem Park" />
-        <div className="maintenance-screen__gear" aria-hidden="true"><i /></div>
-        <h1>MODO DE <span>MANUTENÇÃO</span></h1>
-        <p>Estamos aplicando ajustes e preparando sua experiência.</p>
-        <div className="maintenance-screen__progress" aria-label="Manutenção em andamento"><i /></div>
-        <footer><i />Desenvolvido por Park Solutions<i /></footer>
-      </main>
+      <img className="maintenance-screen__artwork" src={maintenanceArtwork} alt="Totem Park — Modo de Manutenção" />
+      <i className="maintenance-screen__gear-glow" aria-hidden="true" />
+      <i className="maintenance-screen__progress-glow" aria-hidden="true" />
+      <span className="maintenance-screen__accessible-copy">MODO DE MANUTENÇÃO. Estamos aplicando ajustes e preparando sua experiência. Desenvolvido por Park Solutions.</span>
     </section>
   );
 }

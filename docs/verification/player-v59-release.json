@@ -1,0 +1,14 @@
+{
+  "status": "PASS_LOCAL",
+  "baseCommit": "b8a89710f7aab4efb6d3ddbb5136ce34f8786eeb",
+  "artifact": "artifacts/Totem Park Player V59.apk",
+  "packageName": "br.com.parksolutions.totempark.player.rcsecurelink",
+  "activity": "br.com.parksolutions.totempark.MainActivity",
+  "versionCode": 59,
+  "versionName": "1.0.0-v59-experimental",
+  "certificateSha256": "72e6e078aa690a678e8ed2854b348c402762f9d980ec1cdf7e1261bb5f7409a7",
+  "apkSha256": "25937fa113c5bffd34c7e847aeb804d361815f8e509633c34421c50ae4980fa5",
+  "debuggable": false,
+  "firebaseRules": "V59_EXTENSION_EMULATOR_TESTED_NOT_DEPLOYED",
+  "installed": false
+}

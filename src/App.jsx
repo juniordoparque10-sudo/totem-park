@@ -200,6 +200,7 @@ import {
 } from "./player-identity";
 import { attemptInitialSecureBinding } from "./player-initial-binding";
 import MaintenanceScreen from "./player/MaintenanceScreen";
+import PlayerStartupSplash from "./player/PlayerStartupSplash";
 import { deleteStoredAsset, getStorageAssetVersionMetadata, uploadStorageAsset } from "./storage-service";
 import {
   createUploadPreviewLifecycle,
@@ -3778,18 +3779,7 @@ const IS_PLAYER_PHASE_B_BUILD = APP_BUILD_MODE === "playerPhaseB";
 const IS_PLAYER_LINK_FIX_BUILD = APP_BUILD_MODE === "playerLinkFix";
 
 function PlayerOnlySplash({ overlay = false }) {
-  return (
-    <div className={`player-only-splash${overlay ? " is-overlay" : ""}`}>
-      <div className="player-only-splash-card">
-        <img src={logo} alt="Totem Park Player" />
-        <span>Totem Park Player</span>
-        <strong>Preparando player da TV</strong>
-        <div className="player-only-splash-loader" aria-label="Preparando reprodução" role="progressbar">
-          <i />
-        </div>
-      </div>
-    </div>
-  );
+  return <PlayerStartupSplash overlay={overlay} />;
 }
 
 function PlayerOnlyOrientationChoice({ screenRotation, onScreenRotationChange, onContinue }) {
