@@ -24,19 +24,19 @@ function Row({ transparency }) {
   const config = makeConfig(transparency);
   return <section className="comparison">
     <h2>{transparency}%</h2>
-    <div><strong>Prévia ampliada</strong><Stage config={config} scale={0.3}/></div>
-    <div><strong>Publicado com zoom</strong><Stage config={config} scale={0.15} layoutZoom/></div>
-    <div><strong>Hotfix: redução fiel</strong><Stage config={config} scale={0.15}/></div>
+    <div data-role="preview"><strong>Preview</strong><Stage config={config} scale={0.18}/></div>
+    <div data-role="catalog"><strong>Miniatura do catálogo</strong><Stage config={config} scale={0.18} catalog/></div>
   </section>;
 }
 
-function Stage({ config,scale,layoutZoom=false }) {
-  return <div className="manual-frame" style={{ width:1920*scale,height:1080*scale }}><div className="manual-logical" style={{ transform:layoutZoom?undefined:`scale(${scale})`,zoom:layoutZoom?scale:undefined }}><TemplateV2Renderer template={template} config={config} orientation="Paisagem" mode="thumbnail"/></div></div>;
+function Stage({ config,scale,catalog=false }) {
+  const stage=<div className="manual-frame" style={{ width:1920*scale,height:1080*scale }}><div className="manual-logical" style={{ transform:`scale(${scale})` }}><TemplateV2Renderer template={template} config={config} orientation="Paisagem" mode="thumbnail"/></div></div>;
+  return catalog?<div className="tpv2-published-strip"><article>{stage}</article></div>:stage;
 }
 
 function App() { return <main><h1>Smart Lobby — fidelidade da miniatura</h1>{[0,35,50,100].map((value)=><Row key={value} transparency={value}/>)}</main>; }
 createRoot(document.getElementById("root")).render(<App/>);
 
 const style=document.createElement("style");
-style.textContent=`body{margin:0;background:#09111f;color:#fff;font:16px Arial}main{padding:24px}.comparison{display:grid;grid-template-columns:70px 288px 288px;gap:18px;align-items:start;margin:24px 0;padding:18px;background:#111c2e;border-radius:16px}.comparison h2{grid-row:1/3;margin:28px 0}.comparison>div:first-of-type{grid-column:2/4}.comparison strong{display:block;margin:0 0 8px}.comparison>div{min-width:0;overflow:hidden}.manual-frame{position:relative;overflow:hidden;background:#050b14}.manual-logical{position:absolute;inset:0;width:1920px;height:1080px;transform-origin:top left}.manual-logical>.tpv2-root{width:1920px;height:1080px}`;
+style.textContent=`body{margin:0;background:#09111f;color:#fff;font:16px Arial}main{padding:24px}.comparison{display:grid;grid-template-columns:70px 346px 346px;gap:18px;align-items:start;margin:24px 0;padding:18px;background:#111c2e;border-radius:16px}.comparison h2{margin:28px 0}.comparison strong{display:block;margin:0 0 8px}.comparison>div{min-width:0;overflow:hidden}.comparison .tpv2-published-strip{display:block;margin:0}.comparison .tpv2-published-strip>article{width:max-content}.manual-frame{position:relative;overflow:hidden;background:#050b14}.manual-logical{position:absolute;inset:0;width:1920px;height:1080px;transform-origin:top left}.manual-logical>.tpv2-root{width:1920px;height:1080px}`;
 document.head.append(style);

@@ -85,3 +85,9 @@ test("miniatura Smart Lobby preserva o mesmo palco lógico e tipografia da prév
   assert.doesNotMatch(scaledStage, /\bzoom:/);
   assert.match(scaledStage, /transform:\s*`scale\(\$\{geometry\.scale\}\)`/);
 });
+
+test("catálogo não sobrescreve a transparência dos cards internos da Smart Lobby", () => {
+  const editorCss = fs.readFileSync(new URL("../src/templates-v2/editor/template-v2-editor.css",import.meta.url),"utf8");
+  assert.match(editorCss, /\.tpv2-published-strip \.tpv2-collection-smart-lobby article\{[^}]*background:rgba\(5,18,36,var\(--tpv2-panel-alpha,\.86\)\)/);
+  assert.match(editorCss, /\.tpv2-published-strip \.tpv2-collection-smart-lobby article\{[^}]*border:1px solid color-mix\(in srgb,var\(--tpv2-primary\) 65%,transparent\)/);
+});

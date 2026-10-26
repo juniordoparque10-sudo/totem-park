@@ -134,6 +134,7 @@
 .tpv2-published-strip{grid-template-columns:repeat(auto-fit,minmax(min(100%,260px),1fr));justify-content:start}
 .tpv2-editor-section input[type="range"]:disabled{opacity:.4;cursor:not-allowed}
 .tpv2-published-strip article>.tpv2-created-thumbnail,.tpv2-library-live-thumbnail>.tpv2-created-thumbnail{width:100%;aspect-ratio:16/9;background:#050b14}
+.tpv2-published-strip .tpv2-collection-smart-lobby article{box-sizing:border-box;overflow:hidden;background:rgba(5,18,36,var(--tpv2-panel-alpha,.86));border:1px solid color-mix(in srgb,var(--tpv2-primary) 65%,transparent);border-radius:1.6cqw}
 .tpv2-published-strip article.portrait>.tpv2-created-thumbnail,.tpv2-published-strip article.portrait .tpv2-library-live-thumbnail>.tpv2-created-thumbnail{width:min(100%,260px);aspect-ratio:9/16;margin:0 auto}
 .tpv2-created-thumbnail .template-scaled-stage{box-shadow:none}
 .tpv2-published-strip article{cursor:pointer}
