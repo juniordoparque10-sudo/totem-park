@@ -29,14 +29,19 @@ export function getWebPlayerV2Capabilities(deviceId = "") {
 
 export const V58_EXPERIMENTAL_PACKAGE = "br.com.parksolutions.totempark.player.rcsecurelink";
 const SUPPORTED_EXPERIMENTAL_VERSION_CODES = new Set([58, 59, 60, 61, 62, 63, 64, 65, 66]);
+export const CONSOLIDATED_CANDIDATE_PACKAGE = "br.com.parksolutions.totempark";
+export const CONSOLIDATED_CANDIDATE_VERSION_CODE = 67;
 
 export function getAndroidPlayerV2Capabilities(deviceId = "", appInfo = {}) {
   const versionCode = Number(appInfo.versionCode || 0);
-  if (String(appInfo.packageName || "") !== V58_EXPERIMENTAL_PACKAGE || !SUPPORTED_EXPERIMENTAL_VERSION_CODES.has(versionCode)) return null;
+  const packageName = String(appInfo.packageName || "");
+  const isSecureLinkExperiment = packageName === V58_EXPERIMENTAL_PACKAGE && SUPPORTED_EXPERIMENTAL_VERSION_CODES.has(versionCode);
+  const isConsolidatedCandidate = packageName === CONSOLIDATED_CANDIDATE_PACKAGE && versionCode === CONSOLIDATED_CANDIDATE_VERSION_CODE;
+  if (!isSecureLinkExperiment && !isConsolidatedCandidate) return null;
   return {
     deviceId:String(deviceId),
     platform:"ANDROID",
-    packageName:V58_EXPERIMENTAL_PACKAGE,
+    packageName,
     versionCode,
     playlistItemNavigation:true,
     templatesV2:true,
