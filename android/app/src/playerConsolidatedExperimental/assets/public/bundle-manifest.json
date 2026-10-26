@@ -1,0 +1,217 @@
+{
+  "schemaVersion": 1,
+  "files": [
+    {
+      "path": "assets/index-CgTBovmv.js",
+      "sha256": "b5a22ca1cd5f5447229a11d34274a95aa930b815988a0fc236775ef89e3c4200"
+    },
+    {
+      "path": "assets/index-D5E3iNgD.css",
+      "sha256": "49c3a6b27580a351e3ad060cf09304bb2bbe8563f192ee7995624891c3df95bb"
+    },
+    {
+      "path": "assets/inter-cyrillic-ext-wght-normal-BOeWTOD4.woff2",
+      "sha256": "ca157063339ac4ad418f214f3abfed119b0798ab4d377386ce5c9e5a7a435ebd"
+    },
+    {
+      "path": "assets/inter-cyrillic-wght-normal-DqGufNeO.woff2",
+      "sha256": "71d5ee93cc1e9f1d520a3a8b66456de18c7879d8df09d57fcd2eaff75fef0075"
+    },
+    {
+      "path": "assets/inter-greek-ext-wght-normal-DlzME5K_.woff2",
+      "sha256": "6e9e020a25f9b56d418f2c085b1d3c09725a4da23fe693a5b463064606732190"
+    },
+    {
+      "path": "assets/inter-greek-wght-normal-CkhJZR-_.woff2",
+      "sha256": "1be3448e292fbf05ffe176fe1e43f135013d50b1e7d324ad1a558f623d3bb6f6"
+    },
+    {
+      "path": "assets/inter-latin-ext-wght-normal-DO1Apj_S.woff2",
+      "sha256": "34b9c504cab7a73e37b746343a449132e56cf7b5481af2cb81dc74dcff25c956"
+    },
+    {
+      "path": "assets/inter-latin-wght-normal-Dx4kXJAl.woff2",
+      "sha256": "3100e775e8616cd2611beecfa23a4263d7037586789b43f035236a2e6fbd4c62"
+    },
+    {
+      "path": "assets/inter-vietnamese-wght-normal-CBcvBZtf.woff2",
+      "sha256": "5c66f9e07e90c6d4ac4922cc68d60de26c17b1858e677fb5e603fce3952b3ff2"
+    },
+    {
+      "path": "assets/isotipo-CyxucZNq.png",
+      "sha256": "0d50b438035fd0f60a2e8eb1e1f8acfe1a5a495f5a1f6f9248a78576b0962725"
+    },
+    {
+      "path": "assets/loading-reference-DMvC1KOc.png",
+      "sha256": "efe7afcd57392eba65cf2f8814dc472c00498620ffb08cde34662aebcae518a5"
+    },
+    {
+      "path": "assets/logo-Bro8an85.png",
+      "sha256": "f272b0e3d2c9822dc5d8ff7517da2ec0650d689d9a1ac85b81d10cb4c8f0694c"
+    },
+    {
+      "path": "assets/maintenance-reference-C4-uNiad.png",
+      "sha256": "a11a219e03025f80312f8461e4d5cd15d1350307c72d0b42930f1e5e9f184683"
+    },
+    {
+      "path": "assets/web-BjKL51lK-C_2XryqK.js",
+      "sha256": "55b48477ae3dae55568709d6a0e03d74ef194c48347115cca051c8e8cd51b2ab"
+    },
+    {
+      "path": "assets/web-CtByIakb.js",
+      "sha256": "c359459520b23bd6f97899701aa2e64f27f1ad5d0fda0c24a2a938e5f440a31a"
+    },
+    {
+      "path": "favicon.png",
+      "sha256": "8ddd39eb941e645fcc59a658b086bb6ccc8de1b00e5b0a929f7aa5cb2d33ac8d"
+    },
+    {
+      "path": "favicon.svg",
+      "sha256": "61bc9a161de58248288e6905425d7180f0624c2865007b97d763fdac12043a66"
+    },
+    {
+      "path": "icons.svg",
+      "sha256": "7ca2d67c9c3aebf50cdc8709ee8aacf8cdb8cc7ea6325ea94939caef5da1c53d"
+    },
+    {
+      "path": "icons/icon-192.png",
+      "sha256": "b16e02a7187f7496a460965dfbf077207befd645612ba3e4c519733e8192b970"
+    },
+    {
+      "path": "icons/icon-32.png",
+      "sha256": "8ddd39eb941e645fcc59a658b086bb6ccc8de1b00e5b0a929f7aa5cb2d33ac8d"
+    },
+    {
+      "path": "icons/icon-512.png",
+      "sha256": "ecaa7f5d1595a23cbd798f241ba4bdccd24062c86a5d86768bd7d98bd658a930"
+    },
+    {
+      "path": "icons/site-icon-128.png",
+      "sha256": "bfbb0471d3078969127b20e02f31dd42715a10a834e66a2fc74a110fd87918af"
+    },
+    {
+      "path": "icons/site-icon-144.png",
+      "sha256": "a4bb6b1bdccf8ab585fc8e32eb10fca66d397bec50bc29787ac67b514b029c3b"
+    },
+    {
+      "path": "icons/site-icon-180.png",
+      "sha256": "42922aa7477dc37e2e3ab7e50aa901c00bdf5cc31283ba580cfceec3fec238a3"
+    },
+    {
+      "path": "icons/site-icon-192.png",
+      "sha256": "b16e02a7187f7496a460965dfbf077207befd645612ba3e4c519733e8192b970"
+    },
+    {
+      "path": "icons/site-icon-256.png",
+      "sha256": "21b90bb937a16c900cd067080c581428f3ec697208d236d940bbb80bb5a76e05"
+    },
+    {
+      "path": "icons/site-icon-32.png",
+      "sha256": "8ddd39eb941e645fcc59a658b086bb6ccc8de1b00e5b0a929f7aa5cb2d33ac8d"
+    },
+    {
+      "path": "icons/site-icon-384.png",
+      "sha256": "26b122ee287d893b63aca27a51a5dd11231d1cb83e9a9051624d415eeae68a6b"
+    },
+    {
+      "path": "icons/site-icon-48.png",
+      "sha256": "651c1546d6fd02bd29f692d85db8e86d573e27f4a5089ae2405f73543d8ba7d2"
+    },
+    {
+      "path": "icons/site-icon-512.png",
+      "sha256": "ecaa7f5d1595a23cbd798f241ba4bdccd24062c86a5d86768bd7d98bd658a930"
+    },
+    {
+      "path": "icons/site-icon-72.png",
+      "sha256": "4cd877e9fc7f37f91ed79c5555656af210bef3a32a357715b600568d659cec37"
+    },
+    {
+      "path": "icons/site-icon-96.png",
+      "sha256": "008bdc48a140d24a750d5f8a3c6a466da458c095136dde1481fbc8e7ad3eda7f"
+    },
+    {
+      "path": "icons/site-maskable-512.png",
+      "sha256": "9846c7833a4337c85a2cd9e3968cea67b6ba1fe0ee5a75db4b5ceb6f303f6340"
+    },
+    {
+      "path": "icons/site-tv-card-640x360.png",
+      "sha256": "8869eb8e1abad13224f2a2c66cc7fabf99b922a6dea5fa542b4487b7aeacf9d6"
+    },
+    {
+      "path": "icons/tv-icon-128.png",
+      "sha256": "051eacc9e3970390d06b12516810b246d524cfde19dc56eb8a15a366b56cf865"
+    },
+    {
+      "path": "icons/tv-icon-144.png",
+      "sha256": "982dacea29cfb141b18aab54adf754dfca947584efe2aa7d6b0ad1abc505e70c"
+    },
+    {
+      "path": "icons/tv-icon-180.png",
+      "sha256": "6d2089119e16b861072785c4a7f1d553119bd1e3f11178ab0a40e0d1d6502c99"
+    },
+    {
+      "path": "icons/tv-icon-192.png",
+      "sha256": "6afad82cafa3f3b956881d85fde5c9817fae9c8eff812e4326e253a834f58a6f"
+    },
+    {
+      "path": "icons/tv-icon-256.png",
+      "sha256": "2c266edd1f7464cea37e88eda88e825502784c4a13ab9f1c8fea3a5cbfdf1c7e"
+    },
+    {
+      "path": "icons/tv-icon-32.png",
+      "sha256": "aa4b1585983a8ede72375bc4f9d631a242f1d7e0bec6b9e1887164a8729bc7a2"
+    },
+    {
+      "path": "icons/tv-icon-384.png",
+      "sha256": "a7e60c12477cc776e7f842df6e07fb59f76adaba63192c0c480430ce60f02263"
+    },
+    {
+      "path": "icons/tv-icon-48.png",
+      "sha256": "a6dbc13e52085dbf9ce1d572c70b71e93db08c638aa4ba811d20d2d69c0a6994"
+    },
+    {
+      "path": "icons/tv-icon-512.png",
+      "sha256": "4a2ce41a1816d481d90cd61328220c6794ead0c7d4f58cdba401b900cebb5fcf"
+    },
+    {
+      "path": "icons/tv-icon-72.png",
+      "sha256": "b2bbc5fd5326c5ee1fc77d1b5bd6a691f970d7f81d160e8922cba3b3125a58ec"
+    },
+    {
+      "path": "icons/tv-icon-96.png",
+      "sha256": "d90461c648ca2b50d9375a3fcb2727285c72d61dec343ebe9903c4270f7f881d"
+    },
+    {
+      "path": "icons/tv-maskable-512.png",
+      "sha256": "e462fe79b1287f7603ee0df94902b9009b2ba4340974fb8f3fe360b50a97f606"
+    },
+    {
+      "path": "icons/tv-tv-card-640x360.png",
+      "sha256": "bd8f75db1b73bc261f6e64edfb9e28af548ec85e9436519159f305dbbada83a7"
+    },
+    {
+      "path": "index.html",
+      "sha256": "dc8f6a45af9ccdeb1d2e1a807de10061a676e1bfa319889f37f091a2492127c5"
+    },
+    {
+      "path": "isotipo.png",
+      "sha256": "0d50b438035fd0f60a2e8eb1e1f8acfe1a5a495f5a1f6f9248a78576b0962725"
+    },
+    {
+      "path": "logo.png",
+      "sha256": "0d50b438035fd0f60a2e8eb1e1f8acfe1a5a495f5a1f6f9248a78576b0962725"
+    },
+    {
+      "path": "manifest-tv.webmanifest",
+      "sha256": "cdd369ae4ee0ac2dc47671f43c57c9e8a5c6defd059998121ea1092e2b6bd459"
+    },
+    {
+      "path": "manifest.webmanifest",
+      "sha256": "b9f9b943d61993586d7c4f73c092eaf922f0f229cfbb500dd391c0e28f1e893d"
+    },
+    {
+      "path": "sw.js",
+      "sha256": "24b1ecb71e04cf765d6dec56756c414fcd462f80da348e41e06c48c5f80ff360"
+    }
+  ]
+}
