@@ -228,6 +228,7 @@ import { getTemplateV2ForecastRequestDays, normalizeTemplateV2ForecastDays } fro
 import { normalizeDynamicNewsItems } from "./templates-v2/news-editorial-dynamic/data";
 import { loadTemplateV2DynamicData } from "./templates-v2/editor/template-v2-dynamic-loader";
 import { normalizeRssText } from "./rss-text";
+import { buildRssProxyUrl } from "./rss-endpoint";
 import { getAndroidPlayerV2Capabilities, getTemplatesV2ScreenCapability, getWebPlayerV2Capabilities } from "./templates-v2/player-capability";
 import { getDynamicPlaylistCapability } from "./templates-v2/playlist-capability";
 import logo from "./assets/logo.png";
@@ -1792,10 +1793,7 @@ async function fetchNewsFromRss(feedUrl) {
     const beautyItems = await fetchBeautyPostsFromWordPress(url);
     if (beautyItems.length) return beautyItems;
 
-    let response = await fetch(`/api/rss?url=${encodeURIComponent(url)}`);
-    if (!response.ok) {
-      response = await fetch(`https://api.rss2json.com/v1/api.json?rss_url=${encodeURIComponent(url)}`);
-    }
+    const response = await fetch(buildRssProxyUrl(url, { native:isNativeApp() }));
     if (!response.ok) throw new Error(`RSS HTTP ${response.status}`);
     const data = await response.json();
     if (data?.status && data.status !== "ok") throw new Error(data.message || "RSS indisponível");
