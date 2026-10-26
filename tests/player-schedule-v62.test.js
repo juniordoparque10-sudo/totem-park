@@ -1,7 +1,11 @@
 import test from "node:test";
 import assert from "node:assert/strict";
 import {
+  buildScheduleSnapshot,
+  consumeScheduleNotice,
   getNextScheduleBoundaryDelay,
+  getScheduleNotice,
+  getScheduleOccurrenceKey,
   getScheduleTransition,
   selectActiveScheduledPlaylist,
 } from "../src/player-schedule-v62.js";
@@ -58,4 +62,61 @@ test("avisos são emitidos somente nas transições previstas", () => {
 test("reconexão durante janela ativa não fabrica aviso de início", () => {
   const playlist = scheduled();
   assert.equal(getScheduleTransition({ previous:null, current:playlist, bootstrapping:true }), null);
+});
+
+test("os quatro avisos usam o contrato visual e textual aprovado", () => {
+  const playlist = scheduled();
+  assert.deepEqual(getScheduleNotice("created", playlist), {
+    type:"created",
+    title:"Programação agendada criada",
+    description:'Playlist "Jornal da manhã" adicionada com sucesso.',
+    durationMs:3500,
+  });
+  assert.deepEqual(getScheduleNotice("active", playlist), {
+    type:"active",
+    title:"Programação ativa",
+    description:'Iniciando playlist agendada: "Jornal da manhã".',
+    durationMs:4000,
+  });
+  assert.deepEqual(getScheduleNotice("ended", playlist), {
+    type:"ended",
+    title:"Programação encerrada",
+    description:"Retornando à programação normal.",
+    durationMs:2500,
+  });
+  assert.deepEqual(getScheduleNotice("updated", playlist), {
+    type:"updated",
+    title:"Programação agendada atualizada",
+    description:"Alterações aplicadas com sucesso.",
+    durationMs:3500,
+  });
+});
+
+test("snapshot separa criação de atualização sem inventar evento no bootstrap", () => {
+  const initial = buildScheduleSnapshot([scheduled()], "screen-1");
+  assert.deepEqual(initial.notice, null);
+
+  const created = buildScheduleSnapshot([scheduled(), scheduled({ id:"scheduled-2", name:"Jornal da tarde" })], "screen-1", initial.snapshot);
+  assert.equal(created.notice?.type, "created");
+  assert.equal(created.notice?.playlist.id, "scheduled-2");
+
+  const updated = buildScheduleSnapshot([
+    scheduled({ endTime:"10:02" }),
+    scheduled({ id:"scheduled-2", name:"Jornal da tarde" }),
+  ], "screen-1", created.snapshot);
+  assert.equal(updated.notice?.type, "updated");
+  assert.equal(updated.notice?.playlist.id, "scheduled-1");
+});
+
+test("ledger persistente consome cada alteração e cada ocorrência uma única vez", () => {
+  const playlist = scheduled({ startTime:"10:00:15", endTime:"10:01:20" });
+  const occurrenceKey = getScheduleOccurrenceKey(playlist, new Date(2026, 9, 21, 10, 0, 30), "screen-1");
+  assert.equal(occurrenceKey, "scheduled-1|2026-10-21T10:00:15.000");
+
+  const first = consumeScheduleNotice([], `active|${occurrenceKey}`);
+  assert.equal(first.shouldShow, true);
+  const reconnect = consumeScheduleNotice(first.seenKeys, `active|${occurrenceKey}`);
+  assert.equal(reconnect.shouldShow, false);
+  const ended = consumeScheduleNotice(reconnect.seenKeys, `ended|${occurrenceKey}`);
+  assert.equal(ended.shouldShow, true);
 });

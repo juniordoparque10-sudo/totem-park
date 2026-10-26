@@ -71,6 +71,15 @@ export function getNewsEditorialAppearanceStyle(value = {}, orientation = "Paisa
   };
 }
 
+export function getNewsEditorialTextFrame({ orientation = "Paisagem", secondaryCount = 3 } = {}) {
+  const count = Math.max(1, Math.min(3, Number(secondaryCount) || 1));
+  return {
+    featuredTitleLines:count === 1 ? 6 : 5,
+    featuredSummaryLines:count === 1 && orientation !== "Retrato" ? 5 : 4,
+    secondaryTitleLines:count === 1 ? 6 : count === 2 ? 4 : 3,
+  };
+}
+
 export function buildNewsEditorialFeedItems(news = [], weather = []) {
   const headlines = (Array.isArray(news) ? news : []).map((item) => String(item?.title || item?.headline || "").trim()).filter(Boolean).map((title) => ({ title, kind:"news" }));
   const forecasts = (Array.isArray(weather) ? weather : []).flatMap((item) => {

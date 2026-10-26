@@ -1,4 +1,5 @@
 import { normalizeSportsV2Config } from "./sports-v2/config.js";
+import { normalizeNewsEditorialDynamicConfig } from "./news-editorial-dynamic/config.js";
 
 const DATA_PREFIX = "totempark.template-data.v1";
 const memoryCache = new Map();
@@ -66,6 +67,37 @@ export function createNewsDataFingerprintConfig(value = {}) {
     newsFeedUrl:String(value.newsFeedUrl || "").trim(),
     selectedNewsSources:(value.selectedNewsSources || []).map((item) => String(item).trim()).filter(Boolean),
   };
+}
+
+function buildNewsEditorialSegmentContext(scope, segment, config) {
+  return { ...scope, module:`news-editorial-${segment}`, config:createNewsDataFingerprintConfig(config) };
+}
+
+export function readNewsEditorialDynamicCache(scope, value, storage) {
+  const config = normalizeNewsEditorialDynamicConfig(value);
+  const segments = [
+    ["editorial", "editorialNews", config.editorial],
+    ["feed", "feedNews", config.feed.news],
+  ];
+  const data = {};
+  segments.forEach(([segment, key, segmentConfig]) => {
+    if (!segmentConfig?.enabled) return;
+    const record = readTemplateDataCache(buildNewsEditorialSegmentContext(scope, segment, segmentConfig), storage);
+    if (Array.isArray(record?.payload) && record.payload.length) data[key] = record.payload;
+  });
+  return Object.keys(data).length ? data : null;
+}
+
+export function writeNewsEditorialDynamicCache(scope, value, payload = {}, options = {}) {
+  const config = normalizeNewsEditorialDynamicConfig(value);
+  const records = [];
+  if (config.editorial.enabled && Array.isArray(payload.editorialNews) && payload.editorialNews.length) {
+    records.push(writeTemplateDataCache(buildNewsEditorialSegmentContext(scope, "editorial", config.editorial), payload.editorialNews, { ...options, source:"rss" }));
+  }
+  if (config.feed.enabled && config.feed.news.enabled && Array.isArray(payload.feedNews) && payload.feedNews.length) {
+    records.push(writeTemplateDataCache(buildNewsEditorialSegmentContext(scope, "feed", config.feed.news), payload.feedNews, { ...options, source:"rss" }));
+  }
+  return records.filter(Boolean);
 }
 
 export async function refreshTemplateDataIfNeeded(context, { ttlMs, fetcher, now = Date.now(), storage, online = true, source = "remote", isUsable = (payload) => payload != null } = {}) {

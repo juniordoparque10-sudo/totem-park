@@ -11,7 +11,7 @@ test("exige capacidade dinâmica explícita e não infere por versionCode", () =
   assert.equal(supportsDynamicTemplatesV2({ connectedDeviceId:"android-b", capabilities: { deviceId:"web-a", platform:"WEB", templatesV2DynamicPhase1: true } }), false);
 });
 
-test("reconhece Android V58 a V62 legítimo somente na tela canário com binding ACTIVE", () => {
+test("reconhece Android V58 a V63 legítimo somente na tela canário com binding ACTIVE", () => {
   const capability = {
     deviceId:"device-v58",
     platform:"ANDROID",
@@ -52,6 +52,10 @@ test("reconhece Android V58 a V62 legítimo somente na tela canário com binding
   assert.equal(supportsDynamicTemplatesV2({
     ...canary,
     capabilities:{ ...capability, versionCode:62 },
+  }), true);
+  assert.equal(supportsDynamicTemplatesV2({
+    ...canary,
+    capabilities:{ ...capability, versionCode:63 },
   }), true);
   assert.equal(supportsDynamicTemplatesV2({ ...canary, id:"other-screen", playerBinding:{ ...binding, screenId:"other-screen" } }), false);
   assert.equal(supportsDynamicTemplatesV2({ ...canary, clientId:"other-client", playerBinding:{ ...binding, clientId:"other-client" } }), false);

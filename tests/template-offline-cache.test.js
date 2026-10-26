@@ -2,7 +2,7 @@ import test from "node:test";
 import assert from "node:assert/strict";
 import { Buffer } from "node:buffer";
 import { readFileSync } from "node:fs";
-import { buildSportsDataCacheContext, buildTemplateDataCacheKey, clearTemplateDataMemoryCacheForTests, createSportsDataFingerprintConfig, mergeSportsLastKnown, readSportsTemplateDataCache, readTemplateDataCache, writeSportsTemplateDataCache, writeTemplateDataCache } from "../src/templates-v2/offline-data-cache.js";
+import { buildSportsDataCacheContext, buildTemplateDataCacheKey, clearTemplateDataMemoryCacheForTests, createSportsDataFingerprintConfig, mergeSportsLastKnown, readNewsEditorialDynamicCache, readSportsTemplateDataCache, readTemplateDataCache, writeNewsEditorialDynamicCache, writeSportsTemplateDataCache, writeTemplateDataCache } from "../src/templates-v2/offline-data-cache.js";
 import { clearTemplateAssetMemoryCacheForTests, collectTemplateAssetUrls, createOfflineSafeTemplate, fetchTemplateAssetResponse, prepareTemplateAssets, refreshTemplateAsset, selectTemplateAssetRenderSource, shouldUsePersistentTemplateAssetCache } from "../src/templates-v2/offline-asset-cache.js";
 import { shouldRevealTemplateImmediately } from "../src/templates-v2/offline-readiness.js";
 import { prepareTemplateV2CriticalImage } from "../src/templates-v2/player-preload.js";
@@ -37,6 +37,34 @@ test("cache de dados separa cliente, tela, template, módulo e configuração", 
   assert.equal(record.source, "open-meteo");
   assert.deepEqual(record.payload, { temperature:28 });
   assert.equal(readTemplateDataCache(otherScreen, storage), null);
+});
+
+test("cold boot restaura cards e ticker Editorial V2 do cache persistente", () => {
+  const storage = new MemoryStorage();
+  const scope = { clientId:"c1", screenId:"s1", templateId:"news-1" };
+  const dynamicNews = {
+    editorial:{ enabled:true, newsFeedUrl:"https://news.example/editorial.xml" },
+    feed:{ enabled:true, news:{ enabled:true, newsFeedUrl:"https://news.example/ticker.xml" } },
+  };
+  const payload = {
+    editorialNews:[{ title:"Manchete real", image:"https://cdn.example/hero.jpg" }],
+    feedNews:[{ title:"Ticker real" }],
+  };
+  writeNewsEditorialDynamicCache(scope, dynamicNews, payload, { storage, now:123 });
+  clearTemplateDataMemoryCacheForTests();
+  assert.deepEqual(readNewsEditorialDynamicCache(scope, dynamicNews, storage), payload);
+});
+
+test("cache Editorial V2 não mistura mudança de fonte nem grava respostas vazias", () => {
+  const storage = new MemoryStorage();
+  const scope = { clientId:"c1", screenId:"s1", templateId:"news-1" };
+  const first = { editorial:{ enabled:true, newsFeedUrl:"https://news.example/a.xml" }, feed:{ enabled:false } };
+  const changed = { editorial:{ enabled:true, newsFeedUrl:"https://news.example/b.xml" }, feed:{ enabled:false } };
+  writeNewsEditorialDynamicCache(scope, first, { editorialNews:[{ title:"Fonte A" }] }, { storage });
+  writeNewsEditorialDynamicCache(scope, first, { editorialNews:[] }, { storage });
+  clearTemplateDataMemoryCacheForTests();
+  assert.deepEqual(readNewsEditorialDynamicCache(scope, first, storage)?.editorialNews, [{ title:"Fonte A" }]);
+  assert.equal(readNewsEditorialDynamicCache(scope, changed, storage), null);
 });
 
 test("cold boot usa logo e background persistidos sem fetch remoto", async () => {

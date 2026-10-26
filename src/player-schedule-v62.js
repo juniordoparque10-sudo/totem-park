@@ -78,6 +78,45 @@ export function getScheduleTransition({ previous, current, changed, endingSoon =
   return null;
 }
 
+export function getScheduleNotice(type, playlist) {
+  const name = String(playlist?.name || "Programação").trim() || "Programação";
+  const notices = {
+    created:{ type:"created", title:"Programação agendada criada", description:`Playlist "${name}" adicionada com sucesso.`, durationMs:3500 },
+    active:{ type:"active", title:"Programação ativa", description:`Iniciando playlist agendada: "${name}".`, durationMs:4000 },
+    ended:{ type:"ended", title:"Programação encerrada", description:"Retornando à programação normal.", durationMs:2500 },
+    updated:{ type:"updated", title:"Programação agendada atualizada", description:"Alterações aplicadas com sucesso.", durationMs:3500 },
+  };
+  return notices[type] || null;
+}
+
 export function getScheduleFingerprint(playlist) {
-  return [playlist?.scheduleEnabled, playlist?.startDate, playlist?.endDate, playlist?.startTime, playlist?.endTime, ...(playlist?.targetScreenIds || [])].join("|");
+  return [playlist?.scheduleEnabled, playlist?.name, playlist?.startDate, playlist?.endDate, playlist?.startTime, playlist?.endTime, ...(playlist?.targetScreenIds || [])].join("|");
+}
+
+export function buildScheduleSnapshot(playlists, screenId, previousSnapshot) {
+  const applicable = (playlists || []).filter((playlist) => playlist?.scheduleEnabled
+    && (!playlist.targetScreenIds?.length || playlist.targetScreenIds.includes(screenId)));
+  const snapshot = Object.fromEntries(applicable.map((playlist) => [playlist.id, getScheduleFingerprint(playlist)]));
+  if (!previousSnapshot) return { snapshot, notice:null };
+  const created = applicable.find((playlist) => !Object.hasOwn(previousSnapshot, playlist.id));
+  if (created) return { snapshot, notice:{ type:"created", playlist:created } };
+  const updated = applicable.find((playlist) => previousSnapshot[playlist.id] !== snapshot[playlist.id]);
+  return { snapshot, notice:updated ? { type:"updated", playlist:updated } : null };
+}
+
+export function getScheduleOccurrenceKey(playlist, now = new Date(), screenId = "") {
+  const window = getPlaylistScheduleWindow(playlist, now, screenId);
+  if (!window) return "";
+  const localTimestamp = [
+    window.start.getFullYear(),
+    String(window.start.getMonth() + 1).padStart(2, "0"),
+    String(window.start.getDate()).padStart(2, "0"),
+  ].join("-") + `T${String(window.start.getHours()).padStart(2, "0")}:${String(window.start.getMinutes()).padStart(2, "0")}:${String(window.start.getSeconds()).padStart(2, "0")}.000`;
+  return `${playlist?.id || ""}|${localTimestamp}`;
+}
+
+export function consumeScheduleNotice(seenKeys, eventKey, limit = 64) {
+  const current = Array.isArray(seenKeys) ? seenKeys.filter(Boolean) : [];
+  if (!eventKey || current.includes(eventKey)) return { shouldShow:false, seenKeys:current };
+  return { shouldShow:true, seenKeys:[...current, eventKey].slice(-limit) };
 }

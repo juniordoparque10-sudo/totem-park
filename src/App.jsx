@@ -25,13 +25,14 @@ import { resolveSportsDataProvider } from "./templates-v2/sports-v2/data/SportsD
 import { withSportsV2ReadinessTimeout } from "./templates-v2/sports-v2/readiness";
 import { clearTemplateV2BackgroundOnlineRetry, getTemplateV2CriticalImageState, getTemplateV2CriticalImageUrl, getTemplateV2ReadinessFingerprint, localizeTemplateV2Assets, markTemplateV2BackgroundForOnlineRetry, prepareTemplateV2CriticalImage, preloadImageForPaint, suppressTemplateV2CriticalImage, takeTemplateV2BackgroundOnlineRetries } from "./templates-v2/player-preload";
 import { collectTemplateAssetUrls, createOfflineSafeTemplate, prepareTemplateAssets, refreshTemplateAssets, releaseRetiredTemplateAssetUrls, selectTemplateAssetRenderSource, shouldUsePersistentTemplateAssetCache } from "./templates-v2/offline-asset-cache";
-import { buildSportsDataCacheContext, buildTemplateDataCacheKey, createNewsDataFingerprintConfig, createWeatherDataFingerprintConfig, hasUsableSportsPayload, mergeSportsLastKnown, readSportsTemplateDataCache, readTemplateDataCache, refreshTemplateDataIfNeeded, writeSportsTemplateDataCache, writeTemplateDataCache } from "./templates-v2/offline-data-cache";
+import { buildSportsDataCacheContext, buildTemplateDataCacheKey, createNewsDataFingerprintConfig, createWeatherDataFingerprintConfig, hasUsableSportsPayload, mergeSportsLastKnown, readNewsEditorialDynamicCache, readSportsTemplateDataCache, readTemplateDataCache, refreshTemplateDataIfNeeded, writeNewsEditorialDynamicCache, writeSportsTemplateDataCache, writeTemplateDataCache } from "./templates-v2/offline-data-cache";
 import { shouldRevealTemplateImmediately } from "./templates-v2/offline-readiness";
 import { getNextTemplateToPrepare } from "./templates-v2/offline-preload";
 import { confirmTemplateImageForPaint, getTemplateBackgroundSuppressionKey, getTemplatePlaybackLayerKey, getTemplatePlaybackReadyKey, isCurrentPlaybackExecution, nextPlaybackExecutionId, shouldReleaseTemplateAfterPreload } from "./templates-v2/player-execution";
 import { deriveMediaCacheState, finalizeCompletedMediaCache } from "./player-cache-state";
 import { formatScheduledPlaylistSummary } from "./portal-schedule-presentation";
-import { getNextScheduleBoundaryDelay, getScheduleEndingDelay, getScheduleFingerprint, getScheduleTransition, selectActiveScheduledPlaylist } from "./player-schedule-v62";
+import { buildScheduleSnapshot, consumeScheduleNotice, getNextScheduleBoundaryDelay, getScheduleEndingDelay, getScheduleFingerprint, getScheduleNotice, getScheduleOccurrenceKey, selectActiveScheduledPlaylist } from "./player-schedule-v62";
+import PlayerScheduleNotice from "./PlayerScheduleNotice";
 import { getClientDashboardDestination, shouldShowClientDashboardCardsInitially } from "./client-dashboard-navigation";
 import { filterTemplateResources, isPlaybackMedia } from "./media-library-purpose";
 import { getTemplateResourceUsage } from "./template-resource-usage";
@@ -14239,9 +14240,10 @@ function TemplateV2LivePreview({ template, sourceTemplate = template, compact = 
   const initialDynamicData = () => {
     const weather = weatherConfig.enabled ? readModule("weather", weatherCacheConfig) : null;
     const news = newsConfig.enabled && !dynamicNewsPlayerConfig ? readModule("news", newsCacheConfig) : null;
+    const dynamicNews = dynamicNewsPlayerConfig ? readNewsEditorialDynamicCache(scope, originalConfig.dynamicNews) : null;
     const sports = sportsConfig?.provider ? readSportsTemplateDataCache(scope, sportsConfig) : null;
-    [["weather",weather],["news",news],["sports",sports]].forEach(([module,record]) => logTemplateOffline(record ? "TEMPLATE_DATA_CACHE_HIT" : "TEMPLATE_DATA_CACHE_MISS", { templateId, module }));
-    return { ...(weather ? { weather:weather.payload } : {}), ...(news ? { news:news.payload } : {}), ...(sports ? sports.payload : {}) };
+    [["weather",weather],["news",news],["dynamic-news",dynamicNews],["sports",sports]].forEach(([module,record]) => logTemplateOffline(record ? "TEMPLATE_DATA_CACHE_HIT" : "TEMPLATE_DATA_CACHE_MISS", { templateId, module }));
+    return { ...(weather ? { weather:weather.payload } : {}), ...(news ? { news:news.payload } : {}), ...(dynamicNews || {}), ...(sports ? sports.payload : {}) };
   };
   const config = template.published;
   const [dynamicData, setDynamicData] = useState(initialDynamicData);
@@ -14251,7 +14253,10 @@ function TemplateV2LivePreview({ template, sourceTemplate = template, compact = 
     if (!dynamicNewsPlayerConfig) return undefined;
     let cancelled = false;
     loadTemplateV2DynamicData(dynamicNewsPlayerConfig, { loadWeather:loadTemplateV2Weather, loadNews:loadTemplateV2News })
-      .then((data) => { if (!cancelled) setDynamicData((previous) => ({ ...(previous || {}), ...data })); })
+      .then((data) => {
+        writeNewsEditorialDynamicCache(scope, originalConfig.dynamicNews, data, { source:"rss" });
+        if (!cancelled) setDynamicData((previous) => ({ ...(previous || {}), ...data }));
+      })
       .catch(() => {});
     return () => { cancelled = true; };
   // The serialized dynamic key is the complete refresh boundary.
@@ -15807,6 +15812,7 @@ function PlayerPage() {
     isNativeApp() && Boolean(localStorage.getItem("totempark-screen-rotation"));
   const offlineStorageKey = `totempark-offline-assets-${clientId}-${codigo}`;
   const offlineReadyMessageKey = `totempark-offline-ready-shown-${clientId}-${codigo}`;
+  const scheduleNoticeStorageKey = `totempark-schedule-notices-v63-${clientId}-${codigo}`;
   const offlineScope = `${clientId}-${String(codigo || "tv").toLowerCase()}`;
   const [screen, setScreen] = useState(null);
   const [playerClient, setPlayerClient] = useState(null);
@@ -15884,6 +15890,7 @@ function PlayerPage() {
   const scheduleNoticeTimerRef = useRef(null);
   const activeScheduledPlaylistRef = useRef(undefined);
   const scheduleSnapshotRef = useRef(null);
+  const scheduleNoticeSeenKeysRef = useRef([]);
   const playbackTimingKeyRef = useRef("");
   const playbackRemainingRef = useRef(0);
   const playbackStartedAtRef = useRef(0);
@@ -16102,6 +16109,25 @@ function PlayerPage() {
     clearTimeout(scheduleNoticeTimerRef.current);
     setScheduleNotice(notice);
     scheduleNoticeTimerRef.current = setTimeout(() => setScheduleNotice(null), notice.durationMs);
+  }
+
+  function persistScheduleNoticeState() {
+    try {
+      localStorage.setItem(scheduleNoticeStorageKey, JSON.stringify({
+        snapshot:scheduleSnapshotRef.current || {},
+        seenKeys:scheduleNoticeSeenKeysRef.current,
+      }));
+    } catch {
+      // O aviso é auxiliar; falha de armazenamento não interfere na reprodução.
+    }
+  }
+
+  function showScheduleNoticeOnce(notice, eventKey) {
+    if (!notice) return;
+    const consumed = consumeScheduleNotice(scheduleNoticeSeenKeysRef.current, eventKey);
+    scheduleNoticeSeenKeysRef.current = consumed.seenKeys;
+    persistScheduleNoticeState();
+    if (consumed.shouldShow) showScheduleNotice(notice);
   }
 
   function updateLocalMediaCacheMap(results = {}) {
@@ -18005,20 +18031,30 @@ function PlayerPage() {
           id: playlistDoc.id,
           ...playlistDoc.data(),
         }));
-        const nextScheduleSnapshot = new Map(list.map((playlist) => [playlist.id, getScheduleFingerprint(playlist)]));
-        if (scheduleSnapshotRef.current) {
-          const changed = list.find((playlist) => playlist.scheduleEnabled
-            && (!playlist.targetScreenIds?.length || playlist.targetScreenIds.includes(screen?.id))
-            && scheduleSnapshotRef.current.get(playlist.id) !== nextScheduleSnapshot.get(playlist.id));
-          if (changed) showScheduleNotice(getScheduleTransition({ changed }));
+        if (!scheduleSnapshotRef.current) {
+          try {
+            const stored = JSON.parse(localStorage.getItem(scheduleNoticeStorageKey) || "null");
+            scheduleSnapshotRef.current = stored?.snapshot || null;
+            scheduleNoticeSeenKeysRef.current = Array.isArray(stored?.seenKeys) ? stored.seenKeys : [];
+          } catch {
+            scheduleSnapshotRef.current = null;
+            scheduleNoticeSeenKeysRef.current = [];
+          }
         }
-        scheduleSnapshotRef.current = nextScheduleSnapshot;
+        const result = buildScheduleSnapshot(list, screen?.id, scheduleSnapshotRef.current);
+        scheduleSnapshotRef.current = result.snapshot;
+        if (result.notice) {
+          const { type, playlist } = result.notice;
+          showScheduleNoticeOnce(getScheduleNotice(type, playlist), `${type}|${playlist.id}|${getScheduleFingerprint(playlist)}`);
+        } else {
+          persistScheduleNoticeState();
+        }
         setAllPlaylists(list);
       }
     );
 
     return () => unsubscribe();
-  }, [clientId, screen?.id]);
+  }, [clientId, screen?.id, scheduleNoticeStorageKey]);
 
   useEffect(() => {
     if (!clientId || !screen?.id) return;
@@ -18145,7 +18181,10 @@ function PlayerPage() {
     setActiveMode(selected.mode);
 
     if (previousScheduled !== undefined && previousScheduled?.id !== currentScheduled?.id) {
-      showScheduleNotice(getScheduleTransition({ previous:previousScheduled, current:currentScheduled }));
+      const occurrenceKey = currentScheduled ? getScheduleOccurrenceKey(currentScheduled, now, screen?.id) : "";
+      if (currentScheduled && occurrenceKey) {
+        showScheduleNoticeOnce(getScheduleNotice("active", currentScheduled), `active|${occurrenceKey}`);
+      }
     }
     activeScheduledPlaylistRef.current = currentScheduled;
 
@@ -18177,7 +18216,8 @@ function PlayerPage() {
     const delay = getScheduleEndingDelay(activePlaylist, new Date(), screen?.id);
     if (delay === null) return undefined;
     scheduleEndingTimerRef.current = setTimeout(() => {
-      showScheduleNotice(getScheduleTransition({ previous:activePlaylist, current:activePlaylist, endingSoon:true }));
+      const occurrenceKey = getScheduleOccurrenceKey(activePlaylist, new Date(), screen?.id);
+      if (occurrenceKey) showScheduleNoticeOnce(getScheduleNotice("ended", activePlaylist), `ended|${occurrenceKey}`);
     }, delay);
     return () => clearTimeout(scheduleEndingTimerRef.current);
   }, [activeMode, activePlaylist?.id, activePlaylist?.startDate, activePlaylist?.endDate, activePlaylist?.startTime, activePlaylist?.endTime, screen?.id]);
@@ -18752,7 +18792,7 @@ function PlayerPage() {
         </div>
       )}
 
-      {scheduleNotice && <div className={`player-schedule-label notice-${scheduleNotice.type}`}>{scheduleNotice.message}</div>}
+      {!remoteOverlay && !pauseMode && scheduleNotice && <PlayerScheduleNotice notice={scheduleNotice}/>}
 
       {demoPlayerOverlay}
 
