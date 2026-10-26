@@ -31,6 +31,7 @@ import { getNextTemplateToPrepare } from "./templates-v2/offline-preload";
 import { confirmTemplateImageForPaint, getTemplateBackgroundSuppressionKey, getTemplatePlaybackLayerKey, getTemplatePlaybackReadyKey, isCurrentPlaybackExecution, nextPlaybackExecutionId, shouldReleaseTemplateAfterPreload } from "./templates-v2/player-execution";
 import { deriveMediaCacheState, finalizeCompletedMediaCache } from "./player-cache-state";
 import { formatScheduledPlaylistSummary } from "./portal-schedule-presentation";
+import { getNextScheduleBoundaryDelay, getScheduleEndingDelay, getScheduleFingerprint, getScheduleTransition, selectActiveScheduledPlaylist } from "./player-schedule-v62";
 import { getClientDashboardDestination, shouldShowClientDashboardCardsInitially } from "./client-dashboard-navigation";
 import { filterTemplateResources, isPlaybackMedia } from "./media-library-purpose";
 import { getTemplateResourceUsage } from "./template-resource-usage";
@@ -15819,6 +15820,7 @@ function PlayerPage() {
   const [playlistResolved, setPlaylistResolved] = useState(false);
   const [activeTemplate, setActiveTemplate] = useState(null);
   const [activeMode, setActiveMode] = useState("default");
+  const [scheduleNotice, setScheduleNotice] = useState(null);
   const [mediaIndex, setMediaIndex] = useState(0);
   const [previousMediaIndex, setPreviousMediaIndex] = useState(null);
   const previousMediaIndexRef = useRef(null);
@@ -15877,6 +15879,11 @@ function PlayerPage() {
   const fallbackMediaKeysRef = useRef(new Set());
   const lastCacheStatusPayloadRef = useRef("");
   const playbackTimerRef = useRef(null);
+  const scheduleBoundaryTimerRef = useRef(null);
+  const scheduleEndingTimerRef = useRef(null);
+  const scheduleNoticeTimerRef = useRef(null);
+  const activeScheduledPlaylistRef = useRef(undefined);
+  const scheduleSnapshotRef = useRef(null);
   const playbackTimingKeyRef = useRef("");
   const playbackRemainingRef = useRef(0);
   const playbackStartedAtRef = useRef(0);
@@ -16065,6 +16072,9 @@ function PlayerPage() {
       clearTimeout(offlineStatusTimerRef.current);
       clearTimeout(returnToTvTimerRef.current);
       clearTimeout(playbackTimerRef.current);
+      clearTimeout(scheduleBoundaryTimerRef.current);
+      clearTimeout(scheduleEndingTimerRef.current);
+      clearTimeout(scheduleNoticeTimerRef.current);
       mediaCacheObjectUrlsRef.current.forEach((url) => {
         if (String(url).startsWith("blob:")) URL.revokeObjectURL(url);
       });
@@ -16072,96 +16082,11 @@ function PlayerPage() {
     };
   }, []);
 
-  useEffect(() => {
-    const clock = setInterval(() => {
-      setNow(new Date());
-    }, 15000);
-
-    return () => clearInterval(clock);
-  }, []);
-
-  function timeToMinutes(time) {
-    if (!time) return 0;
-
-    const [hours, minutes] = time.split(":").map(Number);
-
-    return hours * 60 + minutes;
-  }
-
-  function getTodayValue(date) {
-    const year = date.getFullYear();
-    const month = String(date.getMonth() + 1).padStart(2, "0");
-    const day = String(date.getDate()).padStart(2, "0");
-
-    return `${year}-${month}-${day}`;
-  }
-
-  function isPlaylistInSchedule(currentPlaylist) {
-    if (!currentPlaylist?.scheduleEnabled) {
-      return false;
-    }
-
-    if (
-      currentPlaylist.targetScreenIds &&
-      currentPlaylist.targetScreenIds.length > 0 &&
-      screen?.id &&
-      !currentPlaylist.targetScreenIds.includes(screen.id)
-    ) {
-      return false;
-    }
-
-    const today = getTodayValue(now);
-
-    if (
-      currentPlaylist.startDate &&
-      today < currentPlaylist.startDate
-    ) {
-      return false;
-    }
-
-    if (
-      currentPlaylist.endDate &&
-      today > currentPlaylist.endDate
-    ) {
-      return false;
-    }
-
-    const currentMinutes =
-      now.getHours() * 60 + now.getMinutes();
-
-    const startMinutes = timeToMinutes(currentPlaylist.startTime);
-    const endMinutes = timeToMinutes(currentPlaylist.endTime);
-
-    if (startMinutes === endMinutes) {
-      return true;
-    }
-
-    if (startMinutes < endMinutes) {
-      return (
-        currentMinutes >= startMinutes &&
-        currentMinutes <= endMinutes
-      );
-    }
-
-    return (
-      currentMinutes >= startMinutes ||
-      currentMinutes <= endMinutes
-    );
-  }
-
   function chooseActivePlaylist() {
-    const scheduledPlaylists = allPlaylists
-      .filter((playlist) => isPlaylistInSchedule(playlist))
-      .sort((a, b) => {
-        const aDate = `${a.startDate || ""} ${a.startTime || ""}`;
-        const bDate = `${b.startDate || ""} ${b.startTime || ""}`;
-
-        return bDate.localeCompare(aDate);
-      });
-
-    if (scheduledPlaylists.length > 0) {
+    const scheduledPlaylist = selectActiveScheduledPlaylist(allPlaylists, now, screen?.id);
+    if (scheduledPlaylist) {
       return {
-        playlist: scheduledPlaylists[0],
+        playlist: scheduledPlaylist,
         mode: "scheduled",
       };
     }
@@ -16170,6 +16095,13 @@ function PlayerPage() {
       playlist: defaultPlaylist,
       mode: "default",
     };
+  }
+
+  function showScheduleNotice(notice) {
+    if (!notice) return;
+    clearTimeout(scheduleNoticeTimerRef.current);
+    setScheduleNotice(notice);
+    scheduleNoticeTimerRef.current = setTimeout(() => setScheduleNotice(null), notice.durationMs);
   }
 
   function updateLocalMediaCacheMap(results = {}) {
@@ -18073,13 +18005,20 @@ function PlayerPage() {
           id: playlistDoc.id,
           ...playlistDoc.data(),
         }));
-
+        const nextScheduleSnapshot = new Map(list.map((playlist) => [playlist.id, getScheduleFingerprint(playlist)]));
+        if (scheduleSnapshotRef.current) {
+          const changed = list.find((playlist) => playlist.scheduleEnabled
+            && (!playlist.targetScreenIds?.length || playlist.targetScreenIds.includes(screen?.id))
+            && scheduleSnapshotRef.current.get(playlist.id) !== nextScheduleSnapshot.get(playlist.id));
+          if (changed) showScheduleNotice(getScheduleTransition({ changed }));
+        }
+        scheduleSnapshotRef.current = nextScheduleSnapshot;
         setAllPlaylists(list);
       }
     );
 
     return () => unsubscribe();
-  }, [clientId]);
+  }, [clientId, screen?.id]);
 
   useEffect(() => {
     if (!clientId || !screen?.id) return;
@@ -18199,12 +18138,23 @@ function PlayerPage() {
 
     const previousId = activePlaylist?.id;
     const nextId = selected.playlist?.id || "";
+    const previousScheduled = activeScheduledPlaylistRef.current;
+    const currentScheduled = selected.mode === "scheduled" ? selected.playlist : null;
 
     setActivePlaylist(selected.playlist || null);
     setActiveMode(selected.mode);
 
-    if (nextId && nextId !== previousId) {
+    if (previousScheduled !== undefined && previousScheduled?.id !== currentScheduled?.id) {
+      showScheduleNotice(getScheduleTransition({ previous:previousScheduled, current:currentScheduled }));
+    }
+    activeScheduledPlaylistRef.current = currentScheduled;
+
+    if (nextId !== (previousId || "")) {
       recordTransitionDiagnostic("PLAYLIST_RESET", { previousPlaylistId:previousId || "", nextPlaylistId:nextId });
+      clearTimeout(playbackTimerRef.current);
+      playbackTimerRef.current = null;
+      playbackTimingKeyRef.current = "";
+      advancingRef.current = false;
       transitionInProgressRef.current = false;
       previousMediaIndexRef.current = null;
       setPreviousMediaIndex(null);
@@ -18212,6 +18162,25 @@ function PlayerPage() {
       setMediaIndex(0);
     }
   }, [allPlaylists, defaultPlaylist, now, screen?.id, screen?.playlistId]);
+
+  useEffect(() => {
+    clearTimeout(scheduleBoundaryTimerRef.current);
+    const delay = getNextScheduleBoundaryDelay(allPlaylists, new Date(), screen?.id);
+    if (delay === null) return undefined;
+    scheduleBoundaryTimerRef.current = setTimeout(() => setNow(new Date()), delay + 5);
+    return () => clearTimeout(scheduleBoundaryTimerRef.current);
+  }, [allPlaylists, now, screen?.id]);
+
+  useEffect(() => {
+    clearTimeout(scheduleEndingTimerRef.current);
+    if (activeMode !== "scheduled" || !activePlaylist) return undefined;
+    const delay = getScheduleEndingDelay(activePlaylist, new Date(), screen?.id);
+    if (delay === null) return undefined;
+    scheduleEndingTimerRef.current = setTimeout(() => {
+      showScheduleNotice(getScheduleTransition({ previous:activePlaylist, current:activePlaylist, endingSoon:true }));
+    }, delay);
+    return () => clearTimeout(scheduleEndingTimerRef.current);
+  }, [activeMode, activePlaylist?.id, activePlaylist?.startDate, activePlaylist?.endDate, activePlaylist?.startTime, activePlaylist?.endTime, screen?.id]);
 
   useEffect(() => {
     const items = playerItems;
@@ -18783,11 +18752,7 @@ function PlayerPage() {
         </div>
       )}
 
-      {activeMode === "scheduled" && activePlaylist && (
-        <div className="player-schedule-label">
-          Programação ativa: {activePlaylist.name}
-        </div>
-      )}
+      {scheduleNotice && <div className={`player-schedule-label notice-${scheduleNotice.type}`}>{scheduleNotice.message}</div>}
 
       {demoPlayerOverlay}
 

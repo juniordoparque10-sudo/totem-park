@@ -156,6 +156,9 @@ test("renderer usa dados editoriais e feed separados e reserva a faixa", () => {
   assert.match(css, /\.tpv2-news-dynamic\.is-landscape \.featured h2\{[^}]*-webkit-line-clamp/);
   assert.match(css, /\.tpv2-news-dynamic\.is-landscape \.featured p\{[^}]*-webkit-line-clamp/);
   assert.match(css, /\.tpv2-news-dynamic\.has-news-ticker\{/);
+  assert.match(css, /--news-editorial-stage-bottom/);
+  assert.match(css, /\.tpv2-news-dynamic\.has-news-ticker\{[^}]*padding-bottom:var\(--news-editorial-stage-bottom\)/);
+  assert.doesNotMatch(css, /\.tpv2-news-dynamic\.has-news-ticker\.ticker-(?:compact|large)\{[^}]*padding-bottom/);
 });
 
 test("Player carrega os segmentos editoriais e do feed dinâmico, não apenas modules.news", () => {
