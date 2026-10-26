@@ -1,7 +1,7 @@
 import { useEffect, useMemo, useRef, useState } from "react";
 import { getTemplateStageGeometry } from "./template-stage-geometry";
 
-export default function TemplateScaledStage({ orientation = "Paisagem", logicalWidth, logicalHeight, zoom = 1, className = "", children, compositeBeforeScale = false }) {
+export default function TemplateScaledStage({ orientation = "Paisagem", logicalWidth, logicalHeight, zoom = 1, className = "", children }) {
   const areaRef = useRef(null);
   const [frame, setFrame] = useState({ width: 0, height: 0 });
   const logical = logicalWidth > 0 && logicalHeight > 0
@@ -33,7 +33,7 @@ export default function TemplateScaledStage({ orientation = "Paisagem", logicalW
 
   return <div ref={areaRef} className={`template-scaled-area ${className}`.trim()}>
     {geometry.scale > 0 && <div className="template-scaled-stage" style={{ width: geometry.width, height: geometry.height }}>
-      <div className="template-logical-stage" style={{ width: logical.width, height: logical.height, transform:compositeBeforeScale ? undefined : `scale(${geometry.scale})`, zoom:compositeBeforeScale ? geometry.scale : undefined }}>
+      <div className="template-logical-stage" style={{ width: logical.width, height: logical.height, transform: `scale(${geometry.scale})` }}>
         {children}
       </div>
     </div>}

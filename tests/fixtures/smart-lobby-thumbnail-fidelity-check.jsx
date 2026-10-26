@@ -17,7 +17,7 @@ const makeConfig = (panelTransparency) => ({
   media:{ primary:{ type:"image",url:"/src/assets/hero.png" } },
   visibility:{ showContent:true,showHeadline:true,showSubtitle:true,showServices:true },
   display:{ duration:15,defaultOrientation:"Paisagem" },
-  smartLobby:{ layout:"A",secondarySlots:2,items,typography:{ titleScale:100,primaryTextScale:100,secondaryTextScale:100 },rotation:{ intervalSeconds:10 } },
+  smartLobby:{ layout:"A",secondarySlots:2,items,typography:{ titleScale:140,primaryTextScale:140,secondaryTextScale:140 },rotation:{ intervalSeconds:10 } },
 });
 
 function Row({ transparency }) {
@@ -25,13 +25,13 @@ function Row({ transparency }) {
   return <section className="comparison">
     <h2>{transparency}%</h2>
     <div><strong>Prévia ampliada</strong><Stage config={config} scale={0.3}/></div>
-    <div><strong>Redução anterior</strong><Stage config={config} scale={0.15}/></div>
-    <div><strong>Miniatura corrigida</strong><Stage config={config} scale={0.15} composite/></div>
+    <div><strong>Publicado com zoom</strong><Stage config={config} scale={0.15} layoutZoom/></div>
+    <div><strong>Hotfix: redução fiel</strong><Stage config={config} scale={0.15}/></div>
   </section>;
 }
 
-function Stage({ config,scale,composite=false }) {
-  return <div className="manual-frame" style={{ width:1920*scale,height:1080*scale }}><div className="manual-logical" style={{ transform:composite?undefined:`scale(${scale})`,zoom:composite?scale:undefined }}><TemplateV2Renderer template={template} config={config} orientation="Paisagem" mode="thumbnail"/></div></div>;
+function Stage({ config,scale,layoutZoom=false }) {
+  return <div className="manual-frame" style={{ width:1920*scale,height:1080*scale }}><div className="manual-logical" style={{ transform:layoutZoom?undefined:`scale(${scale})`,zoom:layoutZoom?scale:undefined }}><TemplateV2Renderer template={template} config={config} orientation="Paisagem" mode="thumbnail"/></div></div>;
 }
 
 function App() { return <main><h1>Smart Lobby — fidelidade da miniatura</h1>{[0,35,50,100].map((value)=><Row key={value} transparency={value}/>)}</main>; }

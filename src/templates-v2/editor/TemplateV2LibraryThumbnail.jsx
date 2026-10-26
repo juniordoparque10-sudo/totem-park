@@ -1,5 +1,5 @@
 import { useEffect, useRef, useState } from "react";
-import { SMART_LOBBY_TYPE, SPORTS_PREMIUM_TYPE } from "../schema";
+import { SPORTS_PREMIUM_TYPE } from "../schema";
 import TemplateV2DynamicStage from "./TemplateV2DynamicStage";
 import TemplateV2ScaledStage from "./TemplateV2ScaledStage";
 
@@ -14,7 +14,6 @@ export default function TemplateV2LibraryThumbnail({ template, config, orientati
   const rootRef = useRef(null);
   const [isVisible, setIsVisible] = useState(() => typeof globalThis.IntersectionObserver !== "function");
   const hasTicker = hasTemplateV2NewsTicker(template, config);
-  const type = template?.identity?.templateType || template?.templateType || "";
 
   useEffect(() => {
     if (!hasTicker) return undefined;
@@ -25,7 +24,7 @@ export default function TemplateV2LibraryThumbnail({ template, config, orientati
     return () => observer.disconnect();
   }, [hasTicker]);
 
-  const stageProps = { className:"tpv2-created-thumbnail", template, config, orientation, mode:"thumbnail", compositeBeforeScale:type === SMART_LOBBY_TYPE };
+  const stageProps = { className:"tpv2-created-thumbnail", template, config, orientation, mode:"thumbnail" };
   return <div ref={rootRef} className={`tpv2-library-live-thumbnail ${isVisible && hasTicker ? "is-visible" : ""}`}>
     {isVisible && hasTicker
       ? <TemplateV2DynamicStage {...stageProps} loadWeather={loadWeather} loadNews={loadNews}/>

@@ -76,13 +76,12 @@ test("Smart Lobby aplica a escala configurada também aos textos médios e longo
   assert.match(renderer, /--smart-lobby-secondary-long-portrait/);
 });
 
-test("miniatura Smart Lobby compõe o palco antes de reduzir sem alterar outras templates", () => {
+test("miniatura Smart Lobby preserva o mesmo palco lógico e tipografia da prévia", () => {
   const libraryThumbnail = fs.readFileSync(new URL("../src/templates-v2/editor/TemplateV2LibraryThumbnail.jsx",import.meta.url),"utf8");
   const scaledV2Stage = fs.readFileSync(new URL("../src/templates-v2/editor/TemplateV2ScaledStage.jsx",import.meta.url),"utf8");
   const scaledStage = fs.readFileSync(new URL("../src/TemplateScaledStage.jsx",import.meta.url),"utf8");
-  assert.match(libraryThumbnail, /SMART_LOBBY_TYPE/);
-  assert.match(libraryThumbnail, /compositeBeforeScale:type === SMART_LOBBY_TYPE/);
-  assert.match(scaledV2Stage, /compositeBeforeScale/);
-  assert.match(scaledStage, /zoom:\s*compositeBeforeScale\s*\?\s*geometry\.scale\s*:\s*undefined/);
-  assert.match(scaledStage, /transform:\s*compositeBeforeScale\s*\?\s*undefined\s*:\s*`scale\(\$\{geometry\.scale\}\)`/);
+  assert.doesNotMatch(libraryThumbnail, /compositeBeforeScale/);
+  assert.doesNotMatch(scaledV2Stage, /compositeBeforeScale/);
+  assert.doesNotMatch(scaledStage, /\bzoom:/);
+  assert.match(scaledStage, /transform:\s*`scale\(\$\{geometry\.scale\}\)`/);
 });
