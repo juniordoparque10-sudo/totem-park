@@ -26,6 +26,8 @@
     "build:player-rc": "vite build --mode playerRc",
     "build:player-rc-secure-link": "vite build --mode playerRcSecureLinkExperiment --outDir dist-player-rc-secure-link",
     "prepare:player-rc-secure-link": "node scripts/prepare-player-rc-secure-link-assets.mjs",
+    "build:player-consolidated": "vite build --mode playerConsolidatedExperimental --outDir dist-player-consolidated",
+    "prepare:player-consolidated": "node scripts/prepare-player-consolidated-assets.mjs",
     "build:player-phase-b": "vite build --mode playerPhaseB",
     "build:player-link-fix": "vite build --mode playerLinkFix",
     "build:player-loop-audit": "vite build --mode playerLoopAudit",
