@@ -169,6 +169,7 @@ import {
 import { readCachedPlayerDocument } from "./player-local-first";
 import { getPlaybackRemainingAfterWake, subscribePlayerRuntimeWake } from "./player-runtime-recovery";
 import { buildPlayerVisibleLayers } from "./player-visible-layers";
+import { shouldShowPlayerEmptyState } from "./player-startup-state";
 import { getBlackoutToggleCommand, getPlaylistNavigationCapability, getPlaylistNavigationCommand } from "./player-remote-capability";
 import { getAdjacentPlaylistIndex } from "./player-playlist-navigation";
 import { executePlaylistNavigationCommand } from "./player-remote-command";
@@ -222,7 +223,7 @@ import { getPublishedTemplateV2View, isTemplateV2 } from "./templates-v2/schema"
 import { getTemplateV2Orientation } from "./templates-v2/orientation";
 import { getTemplateV2ForecastRequestDays, normalizeTemplateV2ForecastDays } from "./templates-v2/dynamic-data";
 import { normalizeDynamicNewsItems } from "./templates-v2/news-editorial-dynamic/data";
-import { getTemplatesV2ScreenCapability, getWebPlayerV2Capabilities } from "./templates-v2/player-capability";
+import { getAndroidPlayerV2Capabilities, getTemplatesV2ScreenCapability, getWebPlayerV2Capabilities } from "./templates-v2/player-capability";
 import { getDynamicPlaylistCapability } from "./templates-v2/playlist-capability";
 import logo from "./assets/logo.png";
 import isotipo from "./assets/isotipo.png";
@@ -3771,6 +3772,7 @@ const firebaseConfig = {
 };
 
 const APP_BUILD_MODE = import.meta.env.VITE_APP_MODE || "web";
+const PLAYER_CAPABILITY_RETRY_INTERVAL_MS = 5 * 60 * 1000;
 const IS_PLAYER_BUILD = ["player", "playerLab", "playerCanary", "playerRc", "playerPhaseB", "playerLinkFix", "playerLoopAudit", "playerTelemetry", "playerJumpDiag", "playerDecoderExperiment"].includes(APP_BUILD_MODE);
 const IS_PLAYER_LAB_BUILD = APP_BUILD_MODE === "playerLab";
 const IS_PLAYER_CANARY_BUILD = APP_BUILD_MODE === "playerCanary";
@@ -15812,6 +15814,7 @@ function PlayerPage() {
   const [clientTemplatesResolvedScope, setClientTemplatesResolvedScope] = useState("");
   const [screenTemplates, setScreenTemplates] = useState([]);
   const [activePlaylist, setActivePlaylist] = useState(null);
+  const [playlistResolved, setPlaylistResolved] = useState(false);
   const [activeTemplate, setActiveTemplate] = useState(null);
   const [activeMode, setActiveMode] = useState("default");
   const [mediaIndex, setMediaIndex] = useState(0);
@@ -15895,6 +15898,7 @@ function PlayerPage() {
   const transitionDiagnosticRescueRef = useRef(null);
   const playerBindingRef = useRef(null);
   const playerIdentityStateRef = useRef(PLAYER_IDENTITY_STATES.UNAVAILABLE);
+  const capabilitySyncRef = useRef({ fingerprint:"", attemptedAt:0 });
   const operationalSnapshotRef = useRef(null);
   const operationalPlayerErrorRef = useRef(false);
   const [operationalAppInfo, setOperationalAppInfo] = useState(() => normalizeNativeAppInfo({}, {
@@ -17643,12 +17647,14 @@ function PlayerPage() {
           lastSeenAt: serverTimestamp(),
         };
 
-        if (!isNativeApp()
-          && binding?.status === "ACTIVE"
+        let capabilities = null;
+        if (binding?.status === "ACTIVE"
           && binding.clientId === clientId
           && binding.screenId === screen.id
           && binding.deviceId === localDeviceId) {
-          heartbeatPayload.capabilities = getWebPlayerV2Capabilities(localDeviceId);
+          capabilities = isNativeApp()
+            ? getAndroidPlayerV2Capabilities(localDeviceId, operationalAppInfo)
+            : getWebPlayerV2Capabilities(localDeviceId);
         }
 
         if (canSyncTelemetry) {
@@ -17657,6 +17663,20 @@ function PlayerPage() {
         }
 
         await updateDoc(screenDocRef, heartbeatPayload);
+
+        if (capabilities) {
+          const fingerprint = JSON.stringify(capabilities);
+          const capabilitySync = capabilitySyncRef.current;
+          const retryDue = Date.now() - capabilitySync.attemptedAt >= PLAYER_CAPABILITY_RETRY_INTERVAL_MS;
+          if (capabilitySync.fingerprint !== fingerprint || retryDue) {
+            capabilitySyncRef.current = { fingerprint, attemptedAt:Date.now() };
+            try {
+              await updateDoc(screenDocRef, { capabilities });
+            } catch (error) {
+              console.log("Capabilities do Player aguardando autorização compatível:", error);
+            }
+          }
+        }
 
         const pendingTransitionDiagnostic = transitionDiagnosticsRef.current.pending();
         const canSyncTransitionDiagnostic = pendingTransitionDiagnostic
@@ -17726,7 +17746,7 @@ function PlayerPage() {
       window.removeEventListener("online", sendHeartbeat);
       document.removeEventListener("visibilitychange", onVisible);
     };
-  }, [screen?.id, clientId, maintenanceMode, blackoutMode, takeoverMessage]);
+  }, [screen?.id, screen?.templatesV2TestMode, clientId, maintenanceMode, blackoutMode, takeoverMessage, operationalAppInfo]);
 
   useEffect(() => {
     if (!screen?.id || !clientId) return;
@@ -18077,6 +18097,10 @@ function PlayerPage() {
         setClientTemplates(list);
         setClientTemplatesResolvedScope(`${clientId}|${screen.id}`);
         setScreenTemplates(screenScopedTemplates);
+      },
+      (error) => {
+        console.log("Erro ao acompanhar templates do player:", error);
+        setClientTemplatesResolvedScope(`${clientId}|${screen.id}`);
       }
     );
 
@@ -18092,11 +18116,13 @@ function PlayerPage() {
   useEffect(() => {
     if (!activePlaylistId || !clientId) {
       setDefaultPlaylist(null);
+      setPlaylistResolved(true);
       return;
     }
 
     let cancelled = false;
     let unsubscribe = null;
+    setPlaylistResolved(false);
     const playlistRef = doc(db, "clients", clientId, "playlists", activePlaylistId);
 
     async function restorePlaylistThenSubscribe() {
@@ -18106,7 +18132,10 @@ function PlayerPage() {
         expectedId: activePlaylistId,
       });
       if (cancelled) return;
-      if (cachedPlaylist) setDefaultPlaylist({ id: cachedPlaylist.id, ...cachedPlaylist.data() });
+      if (cachedPlaylist) {
+        setDefaultPlaylist({ id: cachedPlaylist.id, ...cachedPlaylist.data() });
+        setPlaylistResolved(true);
+      }
       unsubscribe = onSnapshot(
         playlistRef,
         (playlistDoc) => {
@@ -18115,10 +18144,12 @@ function PlayerPage() {
           } else {
             setDefaultPlaylist(null);
           }
+          setPlaylistResolved(true);
         },
         (error) => {
           console.log("Erro ao acompanhar playlist ativa:", error);
           setDefaultPlaylist((current) => current);
+          setPlaylistResolved(true);
         }
       );
     }
@@ -18381,6 +18412,11 @@ function PlayerPage() {
     );
   }
 
+  const templatesResolved = clientTemplatesResolvedScope === `${clientId}|${screen?.id || ""}`;
+  if (!playlistResolved || !templatesResolved) {
+    return <div className="player-screen">Carregando player...</div>;
+  }
+
   if (!screen) {
     const validationMessage = {
       [LINK_STATES.OFFLINE]: "Offline. Vínculo preservado; aguardando reconexão.",
@@ -18426,7 +18462,14 @@ function PlayerPage() {
     );
   }
 
-  if ((!activePlaylist || !activePlaylist.items || activePlaylist.items.length === 0) && screenTemplates.length === 0) {
+  if (shouldShowPlayerEmptyState({
+    loading,
+    clientLoading,
+    playlistResolved,
+    templatesResolved,
+    activePlaylist,
+    screenTemplates,
+  })) {
     return (
       <div className="player-screen">
         <div className="player-empty">

@@ -27,6 +27,22 @@ export function getWebPlayerV2Capabilities(deviceId = "") {
   };
 }
 
+export const V58_EXPERIMENTAL_PACKAGE = "br.com.parksolutions.totempark.player.rcsecurelink";
+
+export function getAndroidPlayerV2Capabilities(deviceId = "", appInfo = {}) {
+  const versionCode = Number(appInfo.versionCode || 0);
+  if (String(appInfo.packageName || "") !== V58_EXPERIMENTAL_PACKAGE || versionCode !== 58) return null;
+  return {
+    deviceId:String(deviceId),
+    platform:"ANDROID",
+    packageName:V58_EXPERIMENTAL_PACKAGE,
+    versionCode,
+    playlistItemNavigation:true,
+    templatesV2:true,
+    templatesV2DynamicPhase1:true,
+  };
+}
+
 export function getPlayerVersionLabel(screen = {}) {
   return String(
     screen?.telemetry?.session?.appVersion
