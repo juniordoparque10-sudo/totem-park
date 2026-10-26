@@ -3801,13 +3801,16 @@ const IS_PLAYER_DECODER_LIFECYCLE_BUILD = IS_PLAYER_RC_BUILD || IS_PLAYER_DECODE
 const IS_PLAYER_PHASE_B_BUILD = APP_BUILD_MODE === "playerPhaseB";
 const IS_PLAYER_LINK_FIX_BUILD = APP_BUILD_MODE === "playerLinkFix";
 
-function PlayerOnlySplash() {
+function PlayerOnlySplash({ overlay = false }) {
   return (
-    <div className="player-only-splash">
+    <div className={`player-only-splash${overlay ? " is-overlay" : ""}`}>
       <div className="player-only-splash-card">
         <img src={logo} alt="Totem Park Player" />
         <span>Totem Park Player</span>
         <strong>Preparando player da TV</strong>
+        <div className="player-only-splash-loader" aria-label="Preparando reprodução" role="progressbar">
+          <i />
+        </div>
       </div>
     </div>
   );
@@ -3897,13 +3900,12 @@ function PlayerOnlyApp() {
   const navigate = useNavigate();
   const [savedTvConnection] = useState(() => readTvConnection());
   const [screenRotation, setScreenRotation] = useState(getSavedScreenRotation);
-  const [showSplash, setShowSplash] = useState(() => !IS_SECURE_LINK_SPLASH_BUILD);
+  const [showSplash, setShowSplash] = useState(true);
   const [orientationReady, setOrientationReady] = useState(() =>
     Boolean(localStorage.getItem("totempark-screen-rotation")) || Boolean(savedTvConnection)
   );
 
   useEffect(() => {
-    if (IS_SECURE_LINK_SPLASH_BUILD) return undefined;
     const timeoutId = setTimeout(() => setShowSplash(false), 900);
     return () => clearTimeout(timeoutId);
   }, []);
@@ -3966,7 +3968,8 @@ function PlayerOnlyApp() {
   return (
     <div className={`native-rotation-shell player-only-shell rotation-${screenRotation}`}>
       <div className="native-rotation-content">
-        {showSplash ? <PlayerOnlySplash /> : routes}
+        {routes}
+        {showSplash && <PlayerOnlySplash overlay />}
       </div>
     </div>
   );
@@ -18378,7 +18381,7 @@ function PlayerPage() {
   const visibleOfflineCacheStatus = offlineCacheStatus === "downloading" && !hasRealCacheWork ? "" : offlineCacheStatus;
 
   if (loading || clientLoading) {
-    return <div className="player-screen">Carregando player...</div>;
+    return <PlayerOnlySplash />;
   }
 
   if (playerClient && !playerPlanAccess.canShowTvContent) {
@@ -18414,7 +18417,7 @@ function PlayerPage() {
 
   const templatesResolved = clientTemplatesResolvedScope === `${clientId}|${screen?.id || ""}`;
   if (!playlistResolved || !templatesResolved) {
-    return <div className="player-screen">Carregando player...</div>;
+    return <PlayerOnlySplash />;
   }
 
   if (!screen) {

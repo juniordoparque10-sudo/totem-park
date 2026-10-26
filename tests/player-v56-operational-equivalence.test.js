@@ -40,7 +40,7 @@ test("Player restores cached playlist, reconciles wake and cancels superseded ca
   assert.match(app, /readCachedPlayerDocument\([\s\S]*?expectedId:\s*activePlaylistId/);
   assert.match(app, /selectFallbackTemplates\(activePlaylistItems, screenTemplates, IS_STRICT_PLAYLIST_EXPERIMENT\)/);
   assert.match(app, /getPlaybackRemainingAfterWake\(/);
-  assert.match(app, /useState\(\(\) => !IS_SECURE_LINK_SPLASH_BUILD\)/);
+  assert.match(app, /useState\(true\)/);
   assert.match(cache, /options\.shouldContinue\?\.\(\) === false[\s\S]*?superseded = true/);
 });
 
