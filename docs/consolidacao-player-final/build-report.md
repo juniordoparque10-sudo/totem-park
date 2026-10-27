@@ -5,7 +5,7 @@
 - Node: `v24.16.0`
 - npm: `11.13.0`
 - Vite: `8.0.16`
-- Java disponível para Gradle: Android Studio JBR `25.0.3`
+- Java usado no build Gradle: Eclipse Adoptium `21.0.12`
 - Modo Vite: `playerConsolidatedExperimental`
 - Saída Web: `dist-player-consolidated`
 - Source set isolado: `android/app/src/playerConsolidatedExperimental/assets/public`
@@ -23,3 +23,5 @@ A busca nos dois diretórios finais não encontrou identificadores de Tempo V2.1
 O Vite emitiu apenas avisos não impeditivos já conhecidos: dois módulos esportivos são importados tanto estática quanto dinamicamente, e o chunk principal excede 500 kB. Nenhuma otimização/refatoração foi feita, conforme a restrição de preservar comportamentos aprovados.
 
 Nenhum comando de deploy, Firebase, Vercel ou ADB install foi executado. A consulta ADB usada para obter a identidade V51 foi somente leitura e o `pull` copiou sua APK para comparação local.
+
+O JBR 25 do Android Studio foi rejeitado pelo Gradle 8.14.3 (`Unsupported class file major version 69`). O build foi repetido sem alteração de produto com o JDK 21 já instalado e terminou com sucesso (190 tarefas). Arquivos Gradle derivados do Capacitor foram regenerados/restaurados localmente a partir das mesmas dependências; eles são ignorados pelo Git e não fazem parte do artefato Web selado.
