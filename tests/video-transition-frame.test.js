@@ -1,7 +1,7 @@
 import assert from "node:assert/strict";
 import test from "node:test";
 
-import { captureVideoTransitionFrame } from "../src/video-transition-frame.js";
+import { captureVideoTransitionFrame, shouldPrimeVideoTransitionFrame } from "../src/video-transition-frame.js";
 
 test("captures the visible video frame into the retained transition canvas", () => {
   const operations = [];
@@ -34,4 +34,11 @@ test("does not expose a blank frame when the decoder has no drawable image", () 
   const canvas = { clientWidth: 1920, clientHeight: 1080, getContext() { throw new Error("must not draw"); } };
   assert.equal(captureVideoTransitionFrame({ videoWidth: 0, videoHeight: 0, readyState: 0 }, canvas), false);
   assert.equal(captureVideoTransitionFrame(null, canvas), false);
+});
+
+test("primes one real frame before ended invalidates the Android decoder surface", () => {
+  assert.equal(shouldPrimeVideoTransitionFrame({ duration: 15, currentTime: 13.7 }, false), true);
+  assert.equal(shouldPrimeVideoTransitionFrame({ duration: 15, currentTime: 13.7 }, true), false);
+  assert.equal(shouldPrimeVideoTransitionFrame({ duration: 15, currentTime: 10 }, false), false);
+  assert.equal(shouldPrimeVideoTransitionFrame({ duration: 15, currentTime: 15 }, false), false);
 });

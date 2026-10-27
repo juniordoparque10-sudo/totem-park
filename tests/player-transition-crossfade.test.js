@@ -10,5 +10,6 @@ test("Fade Suave overlaps the retained frame without a black transition layer", 
   assert.doesNotMatch(css, /\.player-transition-layer\s*\{[^}]*background:\s*#000(?:000)?\s*!important;/s);
   assert.match(css, /\.player-video-transition-frame\s*\{[^}]*z-index:\s*1/s);
   assert.match(app, /captureVideoTransitionFrame\(oldVideo,\s*videoTransitionFrameRef\.current\)/);
+  assert.match(app, /shouldPrimeVideoTransitionFrame\(video,\s*videoTransitionFrameExecutionRef\.current === executionId\)/);
   assert.match(app, /<canvas[^>]*className="player-video-transition-frame"/s);
 });

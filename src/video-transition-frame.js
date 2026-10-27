@@ -32,3 +32,11 @@ export function captureVideoTransitionFrame(video, canvas) {
     return false;
   }
 }
+
+export function shouldPrimeVideoTransitionFrame(video, alreadyCaptured = false) {
+  if (alreadyCaptured) return false;
+  const duration = Number(video?.duration || 0);
+  const currentTime = Number(video?.currentTime || 0);
+  const remaining = duration - currentTime;
+  return Number.isFinite(duration) && Number.isFinite(currentTime) && duration > 0 && remaining > 0.1 && remaining <= 1.5;
+}

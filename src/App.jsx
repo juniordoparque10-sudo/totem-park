@@ -175,7 +175,7 @@ import { resolveClientDirectConfirmation, resolveClientSnapshot } from "./player
 import { getPlaybackRemainingAfterWake, subscribePlayerRuntimeWake } from "./player-runtime-recovery";
 import { createDecoderTransitionDiagnostics, describePlayerDiagnosticItem, installPlayerGlobalErrorDiagnostics, playerRuntimeDiagnostics } from "./player-runtime-diagnostics";
 import { buildPlayerVisibleLayers } from "./player-visible-layers";
-import { captureVideoTransitionFrame } from "./video-transition-frame";
+import { captureVideoTransitionFrame, shouldPrimeVideoTransitionFrame } from "./video-transition-frame";
 import { shouldShowPlayerEmptyState } from "./player-startup-state";
 import { getBlackoutToggleCommand, getPlaylistNavigationCapability, getPlaylistNavigationCommand } from "./player-remote-capability";
 import {
@@ -15891,6 +15891,7 @@ function PlayerPage() {
   const [previousMediaIndex, setPreviousMediaIndex] = useState(null);
   const previousMediaIndexRef = useRef(null);
   const videoTransitionFrameRef = useRef(null);
+  const videoTransitionFrameExecutionRef = useRef(null);
   const [videoTransitionFrameVisible, setVideoTransitionFrameVisible] = useState(false);
   const playbackExecutionCounterRef = useRef(1);
   const [currentPlaybackExecutionId, setCurrentPlaybackExecutionId] = useState(1);
@@ -17213,7 +17214,8 @@ function PlayerPage() {
     if (singleDecoderTransition) {
       clearTimeout(transitionCleanupRef.current);
       const oldVideo = document.querySelector(".player-transition-layer.is-current video.player-media");
-      const frameCaptured = captureVideoTransitionFrame(oldVideo, videoTransitionFrameRef.current);
+      const hasPrimedFrame = videoTransitionFrameExecutionRef.current === currentPlaybackExecutionIdRef.current;
+      const frameCaptured = hasPrimedFrame || captureVideoTransitionFrame(oldVideo, videoTransitionFrameRef.current);
       setVideoTransitionFrameVisible(frameCaptured);
       const diagnosticExecutionId = nextPlaybackExecutionId(playbackExecutionCounterRef.current);
       const existingDiagnostic = decoderDiagnosticTransitionRef.current;
@@ -17414,6 +17416,7 @@ function PlayerPage() {
     previousPlaybackExecutionIdRef.current = null;
     setPreviousPlaybackExecutionId(null);
     setVideoTransitionFrameVisible(false);
+    videoTransitionFrameExecutionRef.current = null;
     transitionInProgressRef.current = false;
   }
 
@@ -17421,6 +17424,7 @@ function PlayerPage() {
     recordTransitionDiagnostic("PLAYER_ERROR_ADVANCE", { reason:"MEDIA_ERROR" });
     transitionInProgressRef.current = false;
     setVideoTransitionFrameVisible(false);
+    videoTransitionFrameExecutionRef.current = null;
     setReadyMediaKey("");
     goToNextMedia("ERROR");
   }
@@ -19070,7 +19074,18 @@ function PlayerPage() {
           onCanPlayThrough={(event) => captureVideoEvent("canplaythrough", event)}
           onDurationChange={(event) => captureVideoEvent("durationchange", event)}
           onRateChange={(event) => captureVideoEvent("ratechange", event)}
-          onTimeUpdate={(event) => recordVideoEvent("timeupdate", event.currentTarget, { ...jumpContext, expectedTransition: !isCurrent || transitionInProgressRef.current })}
+          onTimeUpdate={(event) => {
+            const video = event.currentTarget;
+            recordVideoEvent("timeupdate", video, { ...jumpContext, expectedTransition: !isCurrent || transitionInProgressRef.current });
+            if (
+              isCurrent &&
+              isCurrentPlaybackExecution(executionId,currentPlaybackExecutionIdRef.current) &&
+              shouldPrimeVideoTransitionFrame(video, videoTransitionFrameExecutionRef.current === executionId) &&
+              captureVideoTransitionFrame(video, videoTransitionFrameRef.current)
+            ) {
+              videoTransitionFrameExecutionRef.current = executionId;
+            }
+          }}
           onSeeking={(event) => captureVideoEvent("seeking", event)}
           onSeeked={(event) => captureVideoEvent("seeked", event)}
           onSuspend={(event) => captureVideoEvent("suspend", event)}
