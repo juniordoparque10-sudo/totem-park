@@ -3,7 +3,7 @@
 ## Identidade da candidata
 
 - Arquivo: `Totem-Park-Player-Consolidado-Experimental.apk`
-- SHA-256: `144265925A2363401351D9857755D04977E5C0B6F214D68329155DCE2D4D74AC`
+- SHA-256: `0094ABE604CC79DB2365D6D80C77B65CBD094B887A008943F0D0088D33EFCACE`
 - Package: `br.com.parksolutions.totempark.player.rcsecurelink`
 - versionCode: `68`
 - versionName: `1.0.0-v67.1-splash-hotfix-experimental`
@@ -24,7 +24,7 @@ A referência foi obtida do Chromecast por `adb shell dumpsys package`, `pm path
 ## Base e reconstrução
 
 - Base limpa: `ad8e6cd045d3afddc1a4dc890fb141c15c4cb261`.
-- Commit-fonte/asset selado da APK corrigida: `003155a3b78ddfe46429b02ab257dd0322712693`.
+- Commit-fonte/asset selado da APK corrigida: `766a8d82da2ca1f7d8089c643b04dc0dc69ac6e7`.
 - Inventário completo, evidências e decisão por commit: `docs/consolidacao-player-final/commit-inventory.md`, `evidence-index.md` e `decision-matrix.md`.
 - Matriz funcional: `docs/consolidacao-player-final/functional-traceability.md`.
 
