@@ -36,7 +36,7 @@ import PlayerScheduleNotice from "./PlayerScheduleNotice";
 import { getClientDashboardDestination, shouldShowClientDashboardCardsInitially } from "./client-dashboard-navigation";
 import { filterTemplateResources, isPlaybackMedia } from "./media-library-purpose";
 import { getTemplateResourceUsage } from "./template-resource-usage";
-import { createUnavailableWeather, getWeatherConditionLabel, getWeatherIconSafe } from "./weather-presentation";
+import { createUnavailableWeather, getWeatherConditionLabel, getWeatherIconSafe, hasUsableWeatherTemperature, mergeLegacyLiveContent } from "./weather-presentation";
 import { selectRealNewsState } from "./template-news-state";
 import { findNextReadyMediaIndex, getCanonicalPlaylistMediaEntries, getNativeOfflineQueueUrls, getPlaylistMediaPreparation } from "./media-download-readiness";
 import { localizeOfflineAssetFields } from "./offline-asset-localization";
@@ -3738,11 +3738,12 @@ function primeTemplateLiveContent(template = {}, options = {}) {
 
   const promise = fetchTemplateLiveContent(template)
     .then((data) => {
+      const mergedData = mergeLegacyLiveContent(cached?.data || {}, data);
       templateLiveContentCache.set(cacheKey, {
         cachedAt: Date.now(),
-        data,
+        data:mergedData,
       });
-      return data;
+      return mergedData;
     })
     .catch((error) => {
       templateLiveContentCache.delete(cacheKey);
@@ -14439,7 +14440,9 @@ function LegacyTemplateVisualPreview({ template, sourceTemplate = template, comp
     let cancelled = false;
 
     function applyLiveContent(data = {}) {
-      if (data.weather) setWeather(data.weather);
+      if (Object.hasOwn(data, "weather")) {
+        setWeather((current) => mergeLegacyLiveContent({ weather:current }, data).weather || current);
+      }
       if (Object.hasOwn(data, "news")) setNews((current) => selectRealNewsState({ cached:current, fetched:data.news }));
       if (Object.hasOwn(data, "sportsData")) setRealSportsData(data.sportsData);
       if (Object.hasOwn(data, "tideForecast")) setRealTideForecast(data.tideForecast);
@@ -14447,7 +14450,7 @@ function LegacyTemplateVisualPreview({ template, sourceTemplate = template, comp
 
     function persistRealLiveContent(data = {}) {
       const real = {};
-      if (data.weather && data.weather.temperature !== "--") real.weather = data.weather;
+      if (hasUsableWeatherTemperature(data.weather)) real.weather = data.weather;
       if (Array.isArray(data.news) && data.news.length && JSON.stringify(data.news) !== JSON.stringify(DEFAULT_NEWS_ITEMS)) real.news = data.news;
       if (data.sportsData) real.sportsData = data.sportsData;
       if (data.tideForecast) real.tideForecast = data.tideForecast;
@@ -14470,17 +14473,6 @@ function LegacyTemplateVisualPreview({ template, sourceTemplate = template, comp
         }
       } catch (error) {
         console.log(error);
-
-        if (isWeatherLiveTemplate(template.templateType || template.type) && !cancelled) {
-          setWeather({
-            city: getTemplateWeatherCity(activeTemplate) || "Sua cidade",
-            temperature: "--",
-            sensation: "--",
-            humidity: "--",
-            wind: "--",
-            source: "Aguardando atualização",
-          });
-        }
 
         if ((template.templateType || template.type) === "resultados_esportivos_premium" && !cancelled) {
           setRealSportsData(null);

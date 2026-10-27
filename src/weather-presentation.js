@@ -9,6 +9,19 @@ export function createUnavailableWeather(city) {
   return { city, temperature:"--", sensation:"--", humidity:"--", wind:"--", weatherCode:null, daily:null, source:"Aguardando atualização" };
 }
 
+export function hasUsableWeatherTemperature(weather) {
+  const value = weather?.temperature;
+  return value !== null && value !== "" && value !== "--" && Number.isFinite(Number(value));
+}
+
+export function mergeLegacyLiveContent(previous = {}, candidate = {}) {
+  const next = { ...previous, ...candidate };
+  if (hasUsableWeatherTemperature(candidate.weather)) next.weather = candidate.weather;
+  else if (hasUsableWeatherTemperature(previous.weather)) next.weather = previous.weather;
+  else delete next.weather;
+  return next;
+}
+
 export function getWeatherConditionLabel(code, referenceDate = new Date()) {
   if (!hasWeatherCode(code)) return "Tempo indisponível";
   const value = Number(code);
