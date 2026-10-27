@@ -5,6 +5,7 @@ import { createSportsV2Config, distributeSportsV2Timing, getSportsV2Timing, norm
 import * as sportsConfig from "../src/templates-v2/sports-v2/config.js";
 import { createTemplateV2Draft, SPORTS_PREMIUM_TYPE } from "../src/templates-v2/schema.js";
 import { formatSportsEventTime, normalizeSportsProviderTimestamp } from "../src/templates-v2/sports-v2/event-time.js";
+import { getSportsV2LayoutPolicy } from "../src/templates-v2/sports-v2/layout-policy.js";
 
 test("sports V2 provides six isolated expandable sport objects", () => {
   const config = createSportsV2Config();
@@ -25,8 +26,31 @@ test("sports V2 trata timestamp sem offset da TheSportsDB como UTC sem converter
   assert.equal(normalizeSportsProviderTimestamp("2026-10-24T22:30:00"), "2026-10-24T22:30:00Z");
   assert.equal(normalizeSportsProviderTimestamp("2026-10-24T22:30:00-03:00"), "2026-10-24T22:30:00-03:00");
   assert.equal(formatSportsEventTime("2026-10-24T22:30:00", { timeZone:"America/Fortaleza", now }), "HOJE ÀS 19h30");
-  assert.equal(formatSportsEventTime("2026-10-25T14:00:00", { timeZone:"America/Fortaleza", now }), "AMANHÃ ÀS 11h00");
+  assert.equal(formatSportsEventTime("2026-10-25T14:00:00", { timeZone:"America/Fortaleza", now }), "Amanhã às 11h00");
   assert.equal(formatSportsEventTime("2026-10-27T14:00:00", { timeZone:"America/Fortaleza", now }), "27/10 ÀS 11h00");
+});
+
+test("sports V2 defines explicit non-overlapping density for one through four sports", () => {
+  assert.deepEqual(getSportsV2LayoutPolicy({ count:1, type:"football", index:0 }), {
+    density:"detailed", featured:true, visibleModules:["results","upcoming","standings"], eventLimit:5, standingsLimit:8,
+  });
+  assert.deepEqual(getSportsV2LayoutPolicy({ count:2, type:"football", index:0 }), {
+    density:"compact", featured:true, visibleModules:["results","upcoming","standings"], eventLimit:2, standingsLimit:4,
+  });
+  assert.deepEqual(getSportsV2LayoutPolicy({ count:3, type:"football", index:0 }), {
+    density:"compact", featured:true, visibleModules:["results","upcoming","standings"], eventLimit:2, standingsLimit:4,
+  });
+  assert.deepEqual(getSportsV2LayoutPolicy({ count:4, type:"football", index:0 }), {
+    density:"compact", featured:true, visibleModules:["results","upcoming"], eventLimit:2, standingsLimit:0,
+  });
+  assert.equal(getSportsV2LayoutPolicy({ count:4, type:"basketball", index:1 }).featured, false);
+});
+
+test("sports preview and Player share the same density renderer contract", () => {
+  const renderer=readFileSync(new URL("../src/templates-v2/sports-v2/SportsPremiumRenderer.jsx",import.meta.url),"utf8");
+  assert.match(renderer,/getSportsV2LayoutPolicy/);
+  assert.match(renderer,/layoutPolicy=/);
+  assert.doesNotMatch(renderer,/mode\s*===\s*["']player["'].*compact/);
 });
 
 test("sports V2 preserva fuso padrão e renderer não corta a string de horário", () => {
