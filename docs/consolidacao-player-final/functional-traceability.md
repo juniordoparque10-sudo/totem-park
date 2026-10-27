@@ -1,6 +1,7 @@
 # Matriz de rastreabilidade funcional — Player Android consolidado
 
-Base limpa: `ad8e6cd045d3afddc1a4dc890fb141c15c4cb261`  
+Base limpa: `ad8e6cd045d3afddc1a4dc890fb141c15c4cb261`
+
 Branch candidata: `codex/player-android-consolidacao-final`
 
 Esta matriz registra o estado reconstruído. “Integrado” significa que o código independente reaplicado possui prova automatizada local; não significa nova homologação física. A instalação no Chromecast permanece como etapa posterior.

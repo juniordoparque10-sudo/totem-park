@@ -75,4 +75,3 @@ Total inventariado: **69 commits**, em ordem original. `6fccc71` não pertence a
 | 67 | `ed0b1ba` | fix(portal): preserve Smart Lobby thumbnail fidelity |
 | 68 | `5aa85a0` | fix(portal): restore faithful Smart Lobby thumbnail scale |
 | 69 | `b7dd9ce` | fix(portal): preserve Smart Lobby card transparency in thumbnails |
-

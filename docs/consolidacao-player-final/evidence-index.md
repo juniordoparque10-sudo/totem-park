@@ -27,4 +27,3 @@
 - Dependências Functions: 252 pacotes; engine declarada Node 22, runtime local Node 24.16.0; 10 vulnerabilidades preexistentes.
 - Suite local sem emulador: 471 testes, 464 aprovados, 7 falhas preexistentes. Log: `.superpowers/sdd/2026-10-26-player-android-consolidacao-final/baseline-local-tests.log`.
 - Suites `integration`/`*.rules.*` exigem emuladores; o comando genérico aguardou serviço externo e foi interrompido sem alterar produto.
-
