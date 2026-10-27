@@ -2,12 +2,12 @@
   "schemaVersion": 1,
   "files": [
     {
-      "path": "assets/index-C70h0-yG.js",
-      "sha256": "569c84ce32789268ee5aa283b33668ce485b97cc989a7e6414257203550f87f7"
-    },
-    {
       "path": "assets/index-D5E3iNgD.css",
       "sha256": "49c3a6b27580a351e3ad060cf09304bb2bbe8563f192ee7995624891c3df95bb"
+    },
+    {
+      "path": "assets/index-DGqdBUWw.js",
+      "sha256": "4c6602e847eab36fa936575cbb83b39352d34b22f0e94e47a753bccaaf3792ac"
     },
     {
       "path": "assets/inter-cyrillic-ext-wght-normal-BOeWTOD4.woff2",
@@ -54,12 +54,12 @@
       "sha256": "a11a219e03025f80312f8461e4d5cd15d1350307c72d0b42930f1e5e9f184683"
     },
     {
-      "path": "assets/web-7qE18-Yu.js",
-      "sha256": "4d404571a8dbad9ac74553599dd9a249ee55914957418fe8ec1236cc37ec52e5"
+      "path": "assets/web-BjKL51lK-DXimPG6X.js",
+      "sha256": "20931f6ce0e0aa7076f98d6233291f4bc15b1d2c6b7c7ffb556d1a3d3fabf216"
     },
     {
-      "path": "assets/web-BjKL51lK-B06iM5lZ.js",
-      "sha256": "b7f4f81937425d8b6ec1cecb3d41b75ced555bd68ac52fb4d2c771759e18924b"
+      "path": "assets/web-CwCPB8h4.js",
+      "sha256": "3ef9cfd4491cdaf774cea345bf9cb4b61931ac5bbd55bdfc32358e8c9266d556"
     },
     {
       "path": "favicon.png",
@@ -191,7 +191,7 @@
     },
     {
       "path": "index.html",
-      "sha256": "c4877db003afe8df7b8b0186aa12ed89828de3f78283061ce98d0536373f8892"
+      "sha256": "0f74ca0beddb9ff6cf873adadbabb8b6b1bed561a8786d2b0a321de303743ed6"
     },
     {
       "path": "isotipo.png",
