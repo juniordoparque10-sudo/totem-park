@@ -26,4 +26,6 @@ Nenhum comando de deploy, Firebase, Vercel ou ADB install foi executado. As cons
 
 Após a correção do alvo para `br.com.parksolutions.totempark.player.rcsecurelink`, os dois builds Web foram repetidos e continuaram reproduzíveis (53/53 hashes). O source set foi substituído e conferido (53/53); a APK corrigida contém 54/54 arquivos idênticos, incluindo `bundle-manifest.json`. A V66 instalada e a candidata V67 possuem o mesmo fingerprint de certificado.
 
+No hotfix do splash, os dois builds Web foram novamente repetidos após a correção de bootstrap/capability e permaneceram idênticos (53/53). A APK versionCode 68 contém 54/54 assets idênticos ao source set, usa o mesmo package `rcsecurelink` e o mesmo fingerprint da V66/V67.
+
 O JBR 25 do Android Studio foi rejeitado pelo Gradle 8.14.3 (`Unsupported class file major version 69`). O build foi repetido sem alteração de produto com o JDK 21 já instalado e terminou com sucesso (190 tarefas). Arquivos Gradle derivados do Capacitor foram regenerados/restaurados localmente a partir das mesmas dependências; eles são ignorados pelo Git e não fazem parte do artefato Web selado.

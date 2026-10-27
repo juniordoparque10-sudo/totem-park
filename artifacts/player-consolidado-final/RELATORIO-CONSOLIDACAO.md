@@ -3,10 +3,10 @@
 ## Identidade da candidata
 
 - Arquivo: `Totem-Park-Player-Consolidado-Experimental.apk`
-- SHA-256: `AA06646F19DECA839ADC743F34D4DCC0DD740492F7748D05FFA839600833E00E`
+- SHA-256: `144265925A2363401351D9857755D04977E5C0B6F214D68329155DCE2D4D74AC`
 - Package: `br.com.parksolutions.totempark.player.rcsecurelink`
-- versionCode: `67`
-- versionName: `1.0.0-v67-consolidated-experimental`
+- versionCode: `68`
+- versionName: `1.0.0-v67.1-splash-hotfix-experimental`
 - minSdk / targetSdk / compileSdk: `24 / 36 / 36`
 - Label: `Totem Park Player CONSOLIDADO EXP`
 - Certificado SHA-256: `72e6e078aa690a678e8ed2854b348c402762f9d980ec1cdf7e1261bb5f7409a7`
@@ -18,13 +18,13 @@ A referência foi obtida do Chromecast por `adb shell dumpsys package`, `pm path
 
 - V66 RC2 instalada: package `br.com.parksolutions.totempark.player.rcsecurelink`, versionCode `66`, versionName `1.0.0-v66-rc2`.
 - Fingerprint V66: `72e6e078aa690a678e8ed2854b348c402762f9d980ec1cdf7e1261bb5f7409a7`.
-- Resultado: package idêntico, certificado idêntico e versionCode crescente (`67 > 66`). A candidata satisfaz os requisitos Android de atualização in-place; sem desinstalação, o diretório de dados do package — incluindo cache e vínculo — é preservado.
+- Resultado: package idêntico, certificado idêntico e versionCode crescente (`68 > 67 > 66`). A candidata satisfaz os requisitos Android de atualização in-place sobre a V67 defeituosa; sem desinstalação, o diretório de dados do package — incluindo cache e vínculo — é preservado.
 - A V51 permanece separada no package `br.com.parksolutions.totempark` e não é alvo desta APK.
 
 ## Base e reconstrução
 
 - Base limpa: `ad8e6cd045d3afddc1a4dc890fb141c15c4cb261`.
-- Commit-fonte/asset selado da APK corrigida: `6090367da544429d6b3b1a16cfb8b991b4734a49`.
+- Commit-fonte/asset selado da APK corrigida: `003155a3b78ddfe46429b02ab257dd0322712693`.
 - Inventário completo, evidências e decisão por commit: `docs/consolidacao-player-final/commit-inventory.md`, `evidence-index.md` e `decision-matrix.md`.
 - Matriz funcional: `docs/consolidacao-player-final/functional-traceability.md`.
 
