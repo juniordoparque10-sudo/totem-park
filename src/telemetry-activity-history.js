@@ -1,4 +1,4 @@
-const ACTIVITY_STATES = new Set(["ACTIVE", "OFFLINE", "ATTENTION", "IDLE", "INTERRUPTED", "RECOVERED"]);
+const ACTIVITY_STATES = new Set(["ACTIVE", "ONLINE", "OFFLINE", "ATTENTION", "IDLE", "INTERRUPTED", "RECOVERED"]);
 const ACTIVE_STATES = new Set(["ACTIVE", "RECOVERED"]);
 const OFFLINE_STATES = new Set(["OFFLINE", "INTERRUPTED"]);
 const ATTENTION_STATES = new Set(["ATTENTION", "IDLE"]);
@@ -38,6 +38,7 @@ export function normalizeTelemetryActivityEvents(screen = {}, range = {}) {
       state,
       atMs,
       description: typeof event.description === "string" ? event.description : "",
+      domain: event.domain === "connection" ? "connection" : "playback",
     })];
   }).sort((left, right) => left.atMs - right.atMs || left.id.localeCompare(right.id)).slice(0, 500);
 }
@@ -50,7 +51,8 @@ export function buildTelemetryActivityPeriods(events = [], range = {}) {
   const periods = [];
   for (let index = 0; index < ordered.length - 1; index += 1) {
     const current = ordered[index];
-    const next = ordered[index + 1];
+    const next = ordered.slice(index + 1).find((candidate) => candidate.screenId === current.screenId && (candidate.domain || "playback") === (current.domain || "playback"));
+    if (!next) continue;
     if (!current.screenId || current.screenId !== next.screenId || next.atMs <= current.atMs || !ACTIVITY_STATES.has(current.state)) continue;
     periods.push(Object.freeze({
       id: `${current.id}:${next.id}`,
@@ -60,9 +62,10 @@ export function buildTelemetryActivityPeriods(events = [], range = {}) {
       endMs: next.atMs,
       durationMs: next.atMs - current.atMs,
       description: current.description || "",
+      domain: current.domain || "playback",
     }));
   }
-  return periods;
+  return periods.sort((left, right) => left.startMs - right.startMs || left.id.localeCompare(right.id));
 }
 
 export function summarizeTelemetryActivity(periods = []) {
@@ -71,9 +74,13 @@ export function summarizeTelemetryActivity(periods = []) {
     totalOfflineMs: 0,
     totalAttentionMs: 0,
     totalKnownMs: 0,
+    totalOnlineMs: 0,
+    totalInterruptedMs: 0,
     activePeriods: 0,
     offlinePeriods: 0,
     attentionPeriods: 0,
+    onlinePeriods: 0,
+    interruptedPeriods: 0,
     firstActivationAtMs: null,
     lastDeactivationAtMs: null,
   };
@@ -81,7 +88,18 @@ export function summarizeTelemetryActivity(periods = []) {
     const durationMs = Number(period?.durationMs);
     if (!Number.isFinite(durationMs) || durationMs < 0) continue;
     summary.totalKnownMs += durationMs;
-    if (ACTIVE_STATES.has(period.state)) {
+    if (period.domain === "connection" && period.state === "ONLINE") {
+      summary.totalOnlineMs += durationMs;
+      summary.onlinePeriods += 1;
+    } else if (period.domain === "connection" && period.state === "OFFLINE") {
+      summary.totalOfflineMs += durationMs;
+      summary.offlinePeriods += 1;
+      if (summary.lastDeactivationAtMs === null || period.startMs > summary.lastDeactivationAtMs) summary.lastDeactivationAtMs = period.startMs;
+    } else if (period.state === "INTERRUPTED") {
+      summary.totalInterruptedMs += durationMs;
+      summary.interruptedPeriods += 1;
+      if (summary.lastDeactivationAtMs === null || period.startMs > summary.lastDeactivationAtMs) summary.lastDeactivationAtMs = period.startMs;
+    } else if (ACTIVE_STATES.has(period.state)) {
       summary.totalActiveMs += durationMs;
       summary.activePeriods += 1;
       if (summary.firstActivationAtMs === null || period.startMs < summary.firstActivationAtMs) summary.firstActivationAtMs = period.startMs;

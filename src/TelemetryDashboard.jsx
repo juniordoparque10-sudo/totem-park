@@ -44,8 +44,8 @@ const mediaCounters = (screen) => {
     estimatedTrafficSaved: traffic.trafficAvoidedBytes,
     cacheHits: traffic.cachePlaybackHits,
     cacheMisses: Number(traffic.remotePlaybackCount || 0) + Number(traffic.fallbackPlaybackCount || 0),
-    playbackErrors: 0,
-    downloadTimeouts: 0,
+    playbackErrors: null,
+    downloadTimeouts: null,
     displayTimeMs: null,
   };
   return null;
@@ -73,7 +73,9 @@ const activityStateLabel = (state) => ({ ACTIVE:"Ativa", RECOVERED:"Ativa", OFFL
 const activityTone = (state) => ["ACTIVE", "RECOVERED"].includes(state) ? "active" : ["OFFLINE", "INTERRUPTED"].includes(state) ? "offline" : "attention";
 
 function MetricCard({ icon, title, value, detail, tone = "blue" }) {
-  return <article className={`telemetry-metric-card tone-${tone}`}><div className="telemetry-metric-icon">{icon}</div><div><span>{title}</span><strong>{value}</strong><small>{detail}</small></div></article>;
+  const measuredValue = title === "Falhas de mídia" ? EMPTY : value;
+  const measuredDetail = title === "Falhas de mídia" ? "Não instrumentado" : detail;
+  return <article className={`telemetry-metric-card tone-${tone}`}><div className="telemetry-metric-icon">{icon}</div><div><span>{title}</span><strong>{measuredValue}</strong><small>{measuredDetail}</small></div></article>;
 }
 
 function Donut({ segments, centerValue, caption }) {
@@ -237,7 +239,7 @@ export default function TelemetryDashboard({ focusScreen }) {
   };
 
   if (loading) return <section className="telemetry-page"><div className="telemetry-state">Carregando telemetria…</div></section>;
-  return <section className="telemetry-page telemetry-v2">
+  return <section className="telemetry-page telemetry-v2" onClickCapture={(event) => { if (selected && !event.target.closest(".telemetry-detail")) { event.stopPropagation(); setSelectedKey(null); } }}>
     <header className="telemetry-v2-header"><div><span>MONITORAMENTO OPERACIONAL</span><h1>Telemetria das Telas</h1><p>Acompanhe em tempo real o desempenho, rede, cache e reprodução das suas telas.</p></div><div className="telemetry-v2-header-actions"><div className="telemetry-report-controls"><select aria-label="Escopo do relatório" value={reportScope} onChange={(event) => { setReportScope(event.target.value); setReportTarget(""); }}><option value="general">Relatório geral</option><option value="client">Por cliente</option><option value="screen">Por tela</option></select>{reportScope === "client" && <select aria-label="Cliente do relatório" value={reportTarget} onChange={(event) => setReportTarget(event.target.value)}><option value="">Selecione o cliente</option>{clients.map((item) => <option key={item.id} value={item.id}>{item.name}</option>)}</select>}{reportScope === "screen" && <select aria-label="Tela do relatório" value={reportTarget} onChange={(event) => setReportTarget(event.target.value)}><option value="">Selecione a tela</option>{[...enriched].sort((left, right) => compareTelemetryScreens(left, right, now)).map((item) => <option key={`${item.clientId}-${item.id}`} value={`${item.clientId}:${item.id}`}>{item.name || item.code || item.id} - {item.clientName}</option>)}</select>}<button onClick={generatePdfReport}><FileText size={17} />Gerar PDF</button></div><select value={period} onChange={(event) => setPeriod(event.target.value)}><option value="today">Hoje</option><option value="7d">Últimos 7 dias</option><option value="30d">Últimos 30 dias</option></select><b><i />Atualização em tempo real</b></div></header>
     {error && <div className="telemetry-state error"><strong>Erro de leitura</strong><span>{error}</span></div>}
     <div className="telemetry-main-filters"><select value={clientId} onChange={(event) => { setClientId(event.target.value); setScreenId("all"); }}><option value="all">Todos os clientes</option>{clients.map((item) => <option key={item.id} value={item.id}>{item.name}</option>)}</select><select value={screenId} onChange={(event) => setScreenId(event.target.value)}><option value="all">Todas as telas</option>{enriched.filter((item) => clientId === "all" || item.clientId === clientId).map((item) => <option key={`${item.clientId}-${item.id}`} value={item.id}>{item.name || item.code || item.id}</option>)}</select><select value={source} onChange={(event) => setSource(event.target.value)}><option value="all">Todas as origens</option><option value="local">Local (cache)</option><option value="remote">Internet</option><option value="fallback">Fallback</option><option value="template">Template</option><option value="mixed">Misto</option><option value="unknown">Sem informação</option></select><select value={version} onChange={(event) => setVersion(event.target.value)}><option value="all">Todas as versões</option>{versions.map((item) => <option key={item}>{item}</option>)}</select></div>
@@ -254,7 +256,7 @@ export default function TelemetryDashboard({ focusScreen }) {
         <label><span>Período</span><select value={activityPeriod} onChange={(event) => setActivityPeriod(event.target.value)}><option value="day">Dia</option><option value="week">Semana</option><option value="month">Mês</option></select></label>
         <label><span>Data</span><input type="date" value={activityDate} onChange={(event) => setActivityDate(event.target.value)} /></label>
       </div>
-      <div className="telemetry-v2-activity-summary"><article><span>Telas com atividade</span><strong>{activityPeriods.length ? new Set(activityPeriods.map((item) => item.screenId)).size : EMPTY}</strong></article><article><span>Tempo ligado comprovado</span><strong>{activityPeriods.length ? fmtDuration(activitySummary.totalActiveMs) : EMPTY}</strong></article><article><span>Tempo desligado comprovado</span><strong>{activityPeriods.length ? fmtDuration(activitySummary.totalOfflineMs) : EMPTY}</strong></article><article><span>Última desativação</span><strong>{activitySummary.lastDeactivationAtMs ? new Date(activitySummary.lastDeactivationAtMs).toLocaleTimeString("pt-BR", { hour:"2-digit", minute:"2-digit" }) : EMPTY}</strong></article></div>
+      <div className="telemetry-v2-activity-summary"><article><span>Reprodução comprovada</span><strong>{activityPeriods.length ? fmtDuration(activitySummary.totalActiveMs) : EMPTY}</strong></article><article><span>Tempo online comprovado</span><strong>{activitySummary.onlinePeriods ? fmtDuration(activitySummary.totalOnlineMs) : EMPTY}</strong></article><article><span>Tempo offline comprovado</span><strong>{activitySummary.offlinePeriods ? fmtDuration(activitySummary.totalOfflineMs) : EMPTY}</strong></article><article><span>Última interrupção</span><strong>{activitySummary.lastDeactivationAtMs ? new Date(activitySummary.lastDeactivationAtMs).toLocaleTimeString("pt-BR", { hour:"2-digit", minute:"2-digit" }) : EMPTY}</strong></article></div>
       {!activityPeriods.length ? <div className="telemetry-v2-activity-empty"><Activity /><strong>Aguardando dados da Telemetria V2-A</strong><span>O histórico será exibido quando existirem eventos reais e fechados no período selecionado.</span></div> : activityExpanded && <div className="telemetry-v2-activity-details">
         <div className="telemetry-v2-activity-legend"><span><i className="active" />Ativa</span><span><i className="offline" />Desligada</span><span><i className="attention" />Atenção</span></div>
         <div className="telemetry-v2-activity-timeline-scroll"><div className="telemetry-v2-activity-timeline">{activityPeriods.map((item) => <i key={item.id} className={activityTone(item.state)} style={{ width:`${Math.max(1.5, item.durationMs * 100 / Math.max(1, activityRange.endMs - activityRange.startMs))}%` }} title={`${activityStateLabel(item.state)} · ${fmtDuration(item.durationMs)}`} />)}</div></div>

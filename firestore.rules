@@ -163,6 +163,25 @@ service cloud.firestore {
         && telemetry.session.deviceId == playerBinding().data.deviceId;
     }
 
+    function playerActivityChanged() {
+      return request.resource.data.get("telemetry", {}).get("activity", {}) != resource.data.get("telemetry", {}).get("activity", {});
+    }
+
+    function isAllowedPlayerActivityUpdate(clientId, screenId) {
+      let activity = request.resource.data.telemetry.activity;
+      return hasActivePlayerBinding(clientId, screenId)
+        && request.resource.data.diff(resource.data).affectedKeys().hasOnly(["telemetry"])
+        && request.resource.data.telemetry.diff(resource.data.telemetry).affectedKeys().hasOnly(["activity"])
+        && activity is map
+        && activity.keys().hasOnly(["schemaVersion", "events"])
+        && activity.schemaVersion == 1
+        && activity.events is list
+        && activity.events.size() > 0
+        && activity.events.size() <= 200
+        && activity.events[0].screenId == screenId
+        && activity.events[activity.events.size() - 1].screenId == screenId;
+    }
+
     function isAllowedPlayerTelemetryUpdate(clientId, screenId) {
       return hasActivePlayerBinding(clientId, screenId)
         && request.resource.data.diff(resource.data).affectedKeys().hasOnly([
@@ -191,7 +210,7 @@ service cloud.firestore {
         && request.resource.data.connectedDeviceId == playerBinding().data.deviceId
         && request.resource.data.status == "online"
         && request.resource.data.capabilities is map
-        && (
+        && ((request.resource.data.capabilities.platform == "WEB" && (
           request.resource.data.capabilities.keys().hasOnly([
             "deviceId",
             "platform",
@@ -212,9 +231,22 @@ service cloud.firestore {
             && request.resource.data.capabilities.templatesV2 == true
             && request.resource.data.capabilities.templatesV2DynamicPhase1 == true
           )
-        )
+        )) || (request.resource.data.capabilities.platform == "ANDROID"
+          && request.resource.data.capabilities.keys().hasOnly([
+            "deviceId",
+            "platform",
+            "packageName",
+            "versionCode",
+            "playlistItemNavigation",
+            "templatesV2",
+            "templatesV2DynamicPhase1"
+          ])
+          && request.resource.data.capabilities.packageName == "br.com.parksolutions.totempark.player.rcsecurelink"
+          && request.resource.data.capabilities.versionCode in [58, 59, 60, 61, 62, 63, 64, 65, 66, 67, 68, 69]
+          && request.resource.data.capabilities.templatesV2 == true
+          && request.resource.data.capabilities.templatesV2DynamicPhase1 == true
+        ))
         && request.resource.data.capabilities.deviceId == playerBinding().data.deviceId
-        && request.resource.data.capabilities.platform == "WEB"
         && request.resource.data.capabilities.playlistItemNavigation == true;
     }
 
@@ -256,7 +288,9 @@ service cloud.firestore {
           || ((isClientOwner(clientId)
             || isAllowedPublicScreenUpdate()
             || isAllowedPlayerTelemetryUpdate(clientId, screenId)
-            || isAllowedPlayerCapabilityUpdate(clientId, screenId))
+            || isAllowedPlayerCapabilityUpdate(clientId, screenId)
+            || isAllowedPlayerActivityUpdate(clientId, screenId))
+            && (!playerActivityChanged() || isAllowedPlayerActivityUpdate(clientId, screenId))
             && !request.resource.data.diff(resource.data).affectedKeys().hasAny([
               "templatesV2TestMode",
               "templatesV2TestModeUpdatedAt",

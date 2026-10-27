@@ -199,7 +199,7 @@ import {
   restartSingleVideo,
 } from "./single-item-loop";
 import { createPlayerTelemetry, readPlayerTelemetryReport, TELEMETRY_DEFAULT_CONFIG } from "./player-telemetry";
-import { createPlayerActivityTelemetry } from "./player-activity-telemetry";
+import { PLAYER_ACTIVITY_SYNC_ENABLED, createPlayerActivityTelemetry, syncPlayerActivityBatch } from "./player-activity-telemetry";
 import { buildOperationalSnapshot, normalizeNativeAppInfo, normalizeOperationalMediaSource, OPERATIONAL_HEARTBEAT_INTERVAL_MS } from "./operational-telemetry";
 import { createTrafficTelemetry } from "./traffic-telemetry";
 import { createPortalScreenOrderTracker, getPortalLastSignalMs, getPortalScreenPage, getPortalScreenStatus, sortClientsAlphabetically } from "./portal-status";
@@ -3786,6 +3786,7 @@ function logTemplatesV2Diagnostic(event, payload = {}) {
 }
 const IS_PLAYER_TELEMETRY_BUILD = APP_BUILD_MODE === "playerTelemetry";
 const IS_OPERATIONAL_TELEMETRY_BUILD = IS_PLAYER_RC_BUILD || IS_PLAYER_TELEMETRY_BUILD;
+const IS_V69_OPERATIONAL_TELEMETRY_BUILD = import.meta.env.VITE_PLAYER_OPERATIONAL_TELEMETRY === "1";
 const IS_SECURE_LINK_SPLASH_BUILD = import.meta.env.VITE_PLAYER_SECURE_LINK_SPLASH === "1";
 const IS_STRICT_PLAYLIST_EXPERIMENT = import.meta.env.VITE_PLAYER_STRICT_PLAYLIST === "1";
 const IS_PLAYER_JUMP_DIAG_BUILD = APP_BUILD_MODE === "playerJumpDiag";
@@ -15991,6 +15992,7 @@ function PlayerPage() {
         deviceId: getTotemDeviceId(),
         platform: isNativeApp() ? "ANDROID" : "WEB",
       },
+      alwaysEnabled:IS_V69_OPERATIONAL_TELEMETRY_BUILD,
     });
   }
   if (!activityTelemetryRef.current) {
@@ -17913,6 +17915,23 @@ function PlayerPage() {
             } catch (error) {
               console.log("Capabilities do Player aguardando autorização compatível:", error);
             }
+          }
+        }
+
+        if (PLAYER_ACTIVITY_SYNC_ENABLED
+          && binding?.status === "ACTIVE"
+          && binding.clientId === clientId
+          && binding.screenId === screen.id
+          && binding.deviceId === localDeviceId) {
+          const activityEvents = activityTelemetryRef.current.drainBatch(20);
+          if (activityEvents.length > 0) {
+            const activityResult = await syncPlayerActivityBatch({
+              screenRef:screenDocRef,
+              existingEvents:screenData.telemetry?.activity?.events || [],
+              events:activityEvents,
+              updateDoc,
+            });
+            if (activityResult.status === "synced") activityTelemetryRef.current.acknowledge(activityResult.acknowledgedIds);
           }
         }
 

@@ -21,7 +21,7 @@ test("connection is independent from real playback for video, image and template
   telemetry.startPlayback({ id: "i1", type: "image" });
   telemetry.finishPlayback("DURATION_COMPLETE");
   telemetry.startPlayback({ id: "t1", type: "template" });
-  assert.deepEqual(telemetry.drainBatch(20).map((event) => event.mediaType).filter(Boolean), ["video", "video", "image", "image", "template"]);
+  assert.deepEqual(telemetry.drainBatch(20).filter((event) => event.domain === "playback").map((event) => event.mediaType).filter(Boolean), ["video", "video", "image", "image", "template"]);
 });
 
 test("heartbeat, uptime and repeated starts create no inferred or duplicate events", () => {
@@ -75,5 +75,20 @@ test("PlayerPage wires V2-A only to authoritative lifecycle events", () => {
   assert.match(source, /activityTelemetryRef\.current\.setConnection\("ONLINE"\)/);
   assert.match(source, /activityTelemetryRef\.current\.setConnection\("OFFLINE"\)/);
   const heartbeatBody = source.slice(source.indexOf("async function sendHeartbeat"), source.indexOf("sendHeartbeat();", source.indexOf("async function sendHeartbeat")));
-  assert.doesNotMatch(heartbeatBody, /activityTelemetryRef/);
+  assert.match(heartbeatBody, /syncPlayerActivityBatch/);
+  assert.match(heartbeatBody, /activityTelemetryRef\.current\.acknowledge/);
+});
+
+test("connection transitions are explicit and remain separate from playback", () => {
+  let nowMs = 6_000;
+  const telemetry = createPlayerActivityTelemetry({ storage: memoryStorage(), now: () => nowMs++, identity: { screenId:"s1" } });
+  telemetry.startPlayback({ id:"v1", type:"video" });
+  telemetry.setConnection("OFFLINE");
+  telemetry.setConnection("ONLINE");
+  const events = telemetry.drainBatch(20);
+  assert.deepEqual(events.map(({ domain,state }) => ({ domain,state })), [
+    { domain:"playback", state:"ACTIVE" },
+    { domain:"connection", state:"OFFLINE" },
+    { domain:"connection", state:"ONLINE" },
+  ]);
 });

@@ -48,7 +48,7 @@ function load(storage, identity, nowMs, monotonicMs) {
 
 function save(state, storage) { getStorage(storage).setItem(STORAGE_KEY, JSON.stringify(state)); }
 
-export function createPlayerTelemetry({ identity = {}, storage, now = () => Date.now(), monotonicNow = () => globalThis.performance?.now?.() ?? Date.now() } = {}) {
+export function createPlayerTelemetry({ identity = {}, storage, now = () => Date.now(), monotonicNow = () => globalThis.performance?.now?.() ?? Date.now(), alwaysEnabled = false } = {}) {
   let state = load(storage, identity, now(), monotonicNow());
   let enabled = false;
   let syncIntervalMs = SYNC_INTERVAL_MS;
@@ -63,7 +63,7 @@ export function createPlayerTelemetry({ identity = {}, storage, now = () => Date
     ...(state.traffic ? { traffic:{...state.traffic} } : {}),
   });
   return {
-    configure(config = {}) { enabled = isTelemetryAllowed(config, state.session); syncIntervalMs = Math.max(60_000, numeric(config.syncIntervalMs) || SYNC_INTERVAL_MS); return enabled; },
+    configure(config = {}) { enabled = alwaysEnabled || isTelemetryAllowed(config, state.session); syncIntervalMs = Math.max(60_000, numeric(config.syncIntervalMs) || SYNC_INTERVAL_MS); return enabled; },
     isEnabled: () => enabled,
     updateIdentity(next = {}) { state.session = { ...state.session, ...next }; persist(); },
     updateOperational(next = {}) {

@@ -1,10 +1,15 @@
 import test from "node:test";
 import assert from "node:assert/strict";
-import { getTemplatesV2ScreenCapability, getWebPlayerV2Capabilities, supportsTemplatesV2 } from "../src/templates-v2/player-capability.js";
+import { getAndroidPlayerV2Capabilities, getTemplatesV2ScreenCapability, getWebPlayerV2Capabilities, supportsTemplatesV2 } from "../src/templates-v2/player-capability.js";
 
 test("V16 remains protected while V17 supports Templates V2", () => {
   assert.equal(supportsTemplatesV2({ telemetry:{ session:{ appVersion:"1.0.0-v16-field-release-candidate" } } }), false);
   assert.equal(supportsTemplatesV2({ telemetry:{ session:{ appVersion:"1.0.0-v17-templates-v2-rc1" } } }), true);
+});
+
+test("V69 advertises the installed rcsecurelink Android contract", () => {
+  assert.equal(getAndroidPlayerV2Capabilities("device", { packageName:"br.com.parksolutions.totempark.player.rcsecurelink", versionCode:69 })?.versionCode, 69);
+  assert.equal(getAndroidPlayerV2Capabilities("device", { packageName:"br.com.parksolutions.totempark", versionCode:69 }), null);
 });
 
 test("explicit capability takes precedence and unknown players stay protected", () => {

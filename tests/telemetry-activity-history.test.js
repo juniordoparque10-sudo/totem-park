@@ -34,7 +34,7 @@ test("normalizes only valid V2-A events for the selected screen and interval", (
     { id: "b", state: "OFFLINE" },
     { id: "f", state: "RECOVERED" },
   ]);
-  assert.deepEqual(Object.keys(events[0]), ["id", "screenId", "state", "atMs", "description"]);
+  assert.deepEqual(Object.keys(events[0]), ["id", "screenId", "state", "atMs", "description", "domain"]);
   assert.equal(events[0].description, "");
 });
 
@@ -70,12 +70,16 @@ test("summarizes proved durations and activation/deactivation marks", () => {
   ];
   assert.deepEqual(summarizeTelemetryActivity(periods), {
     totalActiveMs: 5000,
-    totalOfflineMs: 4000,
+    totalOfflineMs: 3000,
     totalAttentionMs: 2000,
     totalKnownMs: 11000,
+    totalOnlineMs: 0,
+    totalInterruptedMs: 1000,
     activePeriods: 2,
-    offlinePeriods: 2,
+    offlinePeriods: 1,
     attentionPeriods: 1,
+    onlinePeriods: 0,
+    interruptedPeriods: 1,
     firstActivationAtMs: 1000,
     lastDeactivationAtMs: 11000,
   });
@@ -94,4 +98,21 @@ test("a single event or equal timestamps cannot create inferred or negative dura
   assert.deepEqual(buildTelemetryActivityPeriods(one, { startMs: 0, endMs: 5000 }), []);
   const equal = [...one, { id: "b", screenId: "screen-a", state: "OFFLINE", atMs: 1000, description: "" }];
   assert.deepEqual(buildTelemetryActivityPeriods(equal, { startMs: 0, endMs: 5000 }), []);
+});
+
+test("connection and playback periods never close each other", () => {
+  const events = [
+    { id:"p1",screenId:"screen-a",domain:"playback",state:"ACTIVE",atMs:1000 },
+    { id:"c1",screenId:"screen-a",domain:"connection",state:"ONLINE",atMs:2000 },
+    { id:"p2",screenId:"screen-a",domain:"playback",state:"IDLE",atMs:5000 },
+    { id:"c2",screenId:"screen-a",domain:"connection",state:"OFFLINE",atMs:8000 },
+  ];
+  const periods = buildTelemetryActivityPeriods(events, { startMs:0,endMs:9000 });
+  assert.deepEqual(periods.map(({ domain,durationMs }) => ({ domain,durationMs })), [
+    { domain:"playback",durationMs:4000 },
+    { domain:"connection",durationMs:6000 },
+  ]);
+  const summary = summarizeTelemetryActivity(periods);
+  assert.equal(summary.totalActiveMs, 4000);
+  assert.equal(summary.totalOnlineMs, 6000);
 });

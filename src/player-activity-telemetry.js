@@ -1,5 +1,5 @@
 const STORAGE_KEY = "totempark-player-activity-v2a";
-export const PLAYER_ACTIVITY_SYNC_ENABLED = false;
+export const PLAYER_ACTIVITY_SYNC_ENABLED = true;
 
 function safeParse(value) {
   try { return JSON.parse(value || "null"); } catch { return null; }
@@ -22,7 +22,7 @@ export function createPlayerActivityTelemetry({ storage = globalThis.localStorag
     events: Array.isArray(stored?.events) ? stored.events.slice(-maxEvents) : [],
   };
   const persist = () => storage?.setItem?.(STORAGE_KEY, JSON.stringify({ ...state, sequence }));
-  const emit = (type, activityState, item = {}, reason = "") => {
+  const emit = (type, activityState, item = {}, reason = "", domain = "playback") => {
     sequence += 1;
     const media = normalizeItem(item);
     const atMs = Number(now());
@@ -35,6 +35,7 @@ export function createPlayerActivityTelemetry({ storage = globalThis.localStorag
       mediaId: media.mediaId,
       mediaType: media.mediaType,
       reason: String(reason || ""),
+      domain: domain === "connection" ? "connection" : "playback",
     };
     state.events = [...state.events, event].slice(-maxEvents);
     persist();
@@ -46,6 +47,7 @@ export function createPlayerActivityTelemetry({ storage = globalThis.localStorag
       const next = status === "OFFLINE" ? "OFFLINE" : "ONLINE";
       if (next === state.connectionStatus) return false;
       state.connectionStatus = next;
+      emit("CONNECTION_CHANGE", next, {}, "", "connection");
       persist();
       return true;
     },
@@ -107,6 +109,7 @@ function sanitizeActivityEvent(event = {}) {
     mediaId: String(event.mediaId || ""),
     mediaType: String(event.mediaType || ""),
     reason: String(event.reason || ""),
+    domain: event.domain === "connection" ? "connection" : "playback",
   };
 }
 

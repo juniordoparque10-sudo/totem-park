@@ -3,11 +3,12 @@ import assert from "node:assert/strict";
 import { aggregateCurrentPlaybackOrigins, aggregateSchema4Traffic, getCurrentSourceGroup, getTelemetryCardData, isSchema4Traffic, reportedAppVersion } from "./telemetry-card-data.js";
 
 test("V5 active time follows checkpoints without treating legacy display time as active time", () => {
-  const v5 = { telemetry: { schemaVersion: 3, session: { uptimeSeconds: 60 } } };
+  const now = Date.parse("2026-10-24T15:00:00.000Z");
+  const v5 = { portalStatus:"ONLINE", telemetry: { schemaVersion: 3, session: { uptimeSeconds: 60, lastHeartbeatAt:"2026-10-24T14:59:50.000Z" } } };
   const legacy = { telemetry: { schemaVersion: 2, counters: { displayTimeMs: 900_000 } } };
-  assert.equal(getTelemetryCardData([v5, legacy]).activeTimeMs, 60_000);
+  assert.equal(getTelemetryCardData([v5, legacy], now).activeTimeMs, 60_000);
   v5.telemetry.session.uptimeSeconds = 120;
-  assert.equal(getTelemetryCardData([v5, legacy]).activeTimeMs, 120_000);
+  assert.equal(getTelemetryCardData([v5, legacy], now).activeTimeMs, 120_000);
   assert.equal(getTelemetryCardData([legacy]).activeScreens, 0);
 });
 
@@ -72,6 +73,22 @@ test("stale operational telemetry remains historical and does not replace legacy
     },
   };
   assert.equal(reportedAppVersion(screen, now), "1.0.0-v63-experimental (63)");
+});
+
+test("Android capability is the final version fallback but never outranks fresh telemetry", () => {
+  const now = Date.parse("2026-10-24T15:00:00.000Z");
+  const capability = { platform:"ANDROID", packageName:"br.com.parksolutions.totempark.player.rcsecurelink", versionCode:69 };
+  assert.equal(reportedAppVersion({ capabilities:capability }, now), "VersionCode 69");
+  assert.equal(reportedAppVersion({ capabilities:{ ...capability, packageName:"wrong" } }, now), null);
+  assert.equal(reportedAppVersion({ capabilities:capability, telemetry:{ schemaVersion:4, session:{ lastHeartbeatAt:"2026-10-24T14:59:50.000Z" }, app:{ versionName:"fresh", versionCode:70 } } }, now), "fresh (70)");
+});
+
+test("active time accepts only a fresh online schema 4 session", () => {
+  const now = Date.parse("2026-10-24T15:00:00.000Z");
+  const fresh = { portalStatus:"ONLINE", telemetry:{ schemaVersion:4, session:{ uptimeSeconds:600, lastHeartbeatAt:"2026-10-24T14:59:50.000Z" } } };
+  const stale = { portalStatus:"ONLINE", telemetry:{ schemaVersion:4, session:{ uptimeSeconds:9999, lastHeartbeatAt:"2026-10-24T14:00:00.000Z" } } };
+  const offline = { portalStatus:"OFFLINE", telemetry:{ schemaVersion:4, session:{ uptimeSeconds:9999, lastHeartbeatAt:"2026-10-24T14:59:50.000Z" } } };
+  assert.deepEqual(getTelemetryCardData([fresh,stale,offline], now).activeTimeMs, 600_000);
 });
 
 test("schema 4 aggregation preserves absence and excludes stale screens", () => {

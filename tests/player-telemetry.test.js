@@ -13,6 +13,12 @@ test("telemetry is off by default and requires an allowlist match", () => {
   assert.equal(isTelemetryAllowed({ enabled:true, screenIds:["A"] }, { screenId:"A" }), true);
 });
 
+test("the V69 build gate enables operational telemetry without changing its interval", () => {
+  const telemetry = createPlayerTelemetry({ identity:{ screenId:"A" }, storage:memoryStorage(), alwaysEnabled:true });
+  assert.equal(telemetry.configure({ enabled:false, screenIds:[] }), true);
+  assert.equal(telemetry.heartbeat()?.due, true);
+});
+
 test("one app execution keeps the same session between heartbeats and monotonic uptime grows", () => {
   let wall = Date.parse("2026-10-01T12:00:00.000Z");
   let monotonic = 1000;

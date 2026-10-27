@@ -27,12 +27,16 @@ function nativeVersion(screen = {}, now = Date.now()) {
   const legacyVersionName = screen.playerVersionName || screen.versionName || screen.nativeAppVersion
     || screen.appVersion || screen.playerAppVersion || null;
   const legacyVersionCode = screen.playerVersionCode ?? screen.versionCode;
+  const capabilityVersionCode = screen?.capabilities?.platform === "ANDROID"
+    && screen?.capabilities?.packageName === "br.com.parksolutions.totempark.player.rcsecurelink"
+    ? screen.capabilities.versionCode
+    : null;
   const versionName = useFreshTelemetry
     ? telemetryVersionName
     : legacyVersionName || telemetryVersionName || screen?.telemetry?.session?.appVersion || null;
   const rawCode = useFreshTelemetry
     ? telemetryVersionCode
-    : legacyVersionCode ?? telemetryVersionCode;
+    : legacyVersionCode ?? capabilityVersionCode ?? telemetryVersionCode;
   const versionCode = numeric(rawCode) ? Number(rawCode) : null;
   return { versionName:versionName ? String(versionName) : null, versionCode };
 }
@@ -123,7 +127,7 @@ export function aggregateSchema4Traffic(screens = []) {
   return totals;
 }
 
-export function getTelemetryCardData(screens = []) {
+export function getTelemetryCardData(screens = [], now = Date.now()) {
   let activeTimeMs = 0;
   let activeScreens = 0;
   let cacheItems = 0;
@@ -134,7 +138,8 @@ export function getTelemetryCardData(screens = []) {
 
   for (const screen of screens) {
     const active = Number(screen?.telemetry?.session?.uptimeSeconds) * 1000;
-    if (Number(screen?.telemetry?.schemaVersion) >= 3 && screen?.telemetry?.session?.uptimeSeconds != null && Number.isFinite(active)) {
+    if (Number(screen?.telemetry?.schemaVersion) >= 3 && screen?.telemetry?.session?.uptimeSeconds != null && Number.isFinite(active)
+      && isCurrentTelemetryScreen(screen) && isOperationalHeartbeatFresh(screen.telemetry, now)) {
       activeTimeMs += Math.max(0, active); activeScreens += 1;
     }
     const cacheStatus = String(screen?.cacheStatus || "").toLowerCase();

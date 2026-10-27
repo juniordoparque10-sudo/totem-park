@@ -5,8 +5,8 @@ import { PLAYER_ACTIVITY_SYNC_ENABLED, syncPlayerActivityBatch } from "../src/pl
 
 const events = [{ id:"s1:1:1", screenId:"s1", type:"PLAYBACK_START", state:"ACTIVE", atMs:1, mediaId:"m1", mediaType:"video", reason:"" }];
 
-test("production sync remains disabled until the Rules gate is authorized", () => {
-  assert.equal(PLAYER_ACTIVITY_SYNC_ENABLED, false);
+test("production sync is enabled only with the bound Rules contract", () => {
+  assert.equal(PLAYER_ACTIVITY_SYNC_ENABLED, true);
 });
 
 test("empty outbox performs no write", async () => {
@@ -21,7 +21,7 @@ test("bounded batch writes only sanitized activity and acknowledges confirmed id
   const result = await syncPlayerActivityBatch({ screenRef:{ path:"screen" }, events, updateDoc:async (_ref, value) => { payload = value; } });
   assert.equal(result.status, "synced");
   assert.deepEqual(result.acknowledgedIds, ["s1:1:1"]);
-  assert.deepEqual(payload["telemetry.activity"].events, events);
+  assert.deepEqual(payload["telemetry.activity"].events, events.map((event) => ({ ...event, domain:"playback" })));
   assert.equal(payload["telemetry.activity"].schemaVersion, 1);
 });
 

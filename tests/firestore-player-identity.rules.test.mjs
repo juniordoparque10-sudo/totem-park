@@ -61,7 +61,7 @@ test("active binding can write its own screen", async () => {
   await assertSucceeds(setDoc(doc(db, sessionPath()), telemetry()));
 });
 
-test("active binding can announce only the supported Web capabilities", async () => {
+test("active binding can announce only supported Web or rcsecurelink Android capabilities", async () => {
   const bound = env.authenticatedContext("player-a").firestore();
   const unbound = env.authenticatedContext("unbound").firestore();
   const revoked = env.authenticatedContext("revoked").firestore();
@@ -91,8 +91,11 @@ test("active binding can announce only the supported Web capabilities", async ()
   await assertFails(updateDoc(doc(bound, screenPath()), {
     capabilities: { ...capability, deviceId: "other-device" },
   }));
+  await assertSucceeds(updateDoc(doc(bound, screenPath()), {
+    capabilities: { ...capability, platform:"ANDROID", packageName:"br.com.parksolutions.totempark.player.rcsecurelink", versionCode:69 },
+  }));
   await assertFails(updateDoc(doc(bound, screenPath()), {
-    capabilities: { ...capability, platform: "ANDROID" },
+    capabilities: { ...capability, platform:"ANDROID", packageName:"br.com.parksolutions.totempark", versionCode:69 },
   }));
   await assertFails(updateDoc(doc(bound, screenPath()), {
     capabilities: { ...capability, arbitraryCapability: true },

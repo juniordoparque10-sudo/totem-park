@@ -1,12 +1,12 @@
 import fs from "node:fs/promises";
 import test, { after, before } from "node:test";
-import { assertSucceeds, initializeTestEnvironment } from "@firebase/rules-unit-testing";
+import { assertFails, assertSucceeds, initializeTestEnvironment } from "@firebase/rules-unit-testing";
 import { doc, setDoc, updateDoc } from "firebase/firestore";
 
 const projectId = "demo-totem-v56-telemetry";
 let env;
 const screenPath = (screen = "screen-a") => `clients/client-a/screens/${screen}`;
-const activity = (screenId = "screen-a") => ({ schemaVersion:1, events:[{ id:`${screenId}:1:1`, screenId, type:"PLAYBACK_START", state:"ACTIVE", atMs:1, mediaId:"m1", mediaType:"video", reason:"" }] });
+const activity = (screenId = "screen-a", atMs = 1) => ({ schemaVersion:1, events:[{ id:`${screenId}:${atMs}:1`, screenId, type:"PLAYBACK_START", state:"ACTIVE", atMs, mediaId:"m1", mediaType:"video", reason:"", domain:"playback" }] });
 const telemetry = (screenId = "screen-a", deviceId = "device-a") => ({ schemaVersion:4, session:{ sessionId:"session-1", clientId:"client-a", screenId, deviceId }, activity:activity(screenId) });
 
 before(async () => {
@@ -24,14 +24,14 @@ after(async () => env?.cleanup());
 
 test("active bound player can append its own activity batch", async () => {
   const db = env.authenticatedContext("player-a").firestore();
-  await assertSucceeds(updateDoc(doc(db, screenPath()), { "telemetry.activity":activity() }));
+  await assertSucceeds(updateDoc(doc(db, screenPath()), { "telemetry.activity":activity("screen-a", 2) }));
 });
 
-test("gate documents that current public screen updates do not isolate activity writes", async () => {
+test("activity writes require the active binding for the exact screen", async () => {
   const unbound = env.authenticatedContext("unbound").firestore();
   const revoked = env.authenticatedContext("revoked").firestore();
   const bound = env.authenticatedContext("player-a").firestore();
-  await assertSucceeds(updateDoc(doc(unbound, screenPath()), { "telemetry.activity":activity() }));
-  await assertSucceeds(updateDoc(doc(revoked, screenPath()), { "telemetry.activity":activity() }));
-  await assertSucceeds(updateDoc(doc(bound, screenPath("screen-b")), { "telemetry.activity":activity("screen-b") }));
+  await assertFails(updateDoc(doc(unbound, screenPath()), { "telemetry.activity":activity("screen-a", 3) }));
+  await assertFails(updateDoc(doc(revoked, screenPath()), { "telemetry.activity":activity("screen-a", 3) }));
+  await assertFails(updateDoc(doc(bound, screenPath("screen-b")), { "telemetry.activity":activity("screen-b", 3) }));
 });

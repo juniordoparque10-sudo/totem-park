@@ -28,7 +28,7 @@ export function getWebPlayerV2Capabilities(deviceId = "") {
 }
 
 export const V58_EXPERIMENTAL_PACKAGE = "br.com.parksolutions.totempark.player.rcsecurelink";
-const SUPPORTED_EXPERIMENTAL_VERSION_CODES = new Set([58, 59, 60, 61, 62, 63, 64, 65, 66, 67, 68]);
+const SUPPORTED_EXPERIMENTAL_VERSION_CODES = new Set([58, 59, 60, 61, 62, 63, 64, 65, 66, 67, 68, 69]);
 
 export function getAndroidPlayerV2Capabilities(deviceId = "", appInfo = {}) {
   const versionCode = Number(appInfo.versionCode || 0);
