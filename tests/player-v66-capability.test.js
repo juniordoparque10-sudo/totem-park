@@ -38,16 +38,16 @@ test("V66 experimental announces its real capabilities and passes the canary pub
   assert.equal(supportsDynamicTemplatesV2(player), true);
 });
 
-test("consolidated V67 and splash-hotfix V68 retain the rcsecurelink capability contract", () => {
-  for (const versionCode of [67, 68]) {
+test("consolidated V67 through V69 retain the rcsecurelink capability contract", () => {
+  for (const versionCode of [67, 68, 69]) {
     const player = boundCanary(versionCode);
     assert.equal(player.capabilities?.versionCode, versionCode);
     assert.equal(supportsDynamicTemplatesV2(player), true);
   }
 });
 
-test("unknown V69 remains outside the experimental capability contract", () => {
-  const player = boundCanary(69);
+test("unknown V70 remains outside the experimental capability contract", () => {
+  const player = boundCanary(70);
   assert.equal(player.capabilities, null);
   assert.equal(supportsDynamicTemplatesV2(player), false);
 });
