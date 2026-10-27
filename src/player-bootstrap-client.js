@@ -27,6 +27,7 @@ export function resolveClientSnapshot({ snapshot, currentClient = null }) {
       client:currentClient,
       metadata,
       serverConfirmed:false,
+      needsServerConfirmation:metadata.fromCache && !metadata.hasPendingWrites && !currentClient,
     };
   }
 
@@ -37,6 +38,7 @@ export function resolveClientSnapshot({ snapshot, currentClient = null }) {
     client:currentClient,
     metadata,
     serverConfirmed:false,
+    needsServerConfirmation:true,
   };
 }
 

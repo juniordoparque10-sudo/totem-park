@@ -56,6 +56,31 @@ test("callback positivo posterior recupera integralmente o cliente", () => {
   assert.deepEqual(result.client, { id:"client-1", name:"Cliente", plan:"Profissional" });
 });
 
+test("cliente sem cache solicita confirmação remota antes de liberar o gate", () => {
+  const cacheMiss = resolveClientSnapshot({
+    snapshot:firestoreSnapshot({ id:"client-1", exists:false, fromCache:true }),
+    currentClient:null,
+  });
+
+  assert.equal(cacheMiss.status, "waiting");
+  assert.equal(cacheMiss.resolved, false);
+  assert.equal(cacheMiss.needsServerConfirmation, true);
+
+  const confirmed = resolveClientDirectConfirmation({
+    snapshot:firestoreSnapshot({
+      id:"client-1",
+      exists:true,
+      fromCache:false,
+      data:{ name:"Cliente", plan:"Profissional" },
+    }),
+    currentClient:cacheMiss.client,
+  });
+
+  assert.equal(confirmed.serverConfirmed, true);
+  assert.equal(confirmed.resolved, true);
+  assert.equal(confirmed.client.id, "client-1");
+});
+
 test("negativo remoto do cliente exige confirmação direta antes de limpar estado", () => {
   const currentClient = { id:"client-1", name:"Cliente" };
   const result = resolveClientSnapshot({

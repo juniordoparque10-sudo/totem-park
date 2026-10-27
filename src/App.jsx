@@ -17816,7 +17816,7 @@ function PlayerPage() {
           });
           if (result.status === "available") clientAbsenceConfirmationRef.current.observeAvailable(clientScope);
           applyClientResult(result, source);
-          if (result.status === "confirming") void confirmClientAbsence();
+          if (result.needsServerConfirmation) void confirmClientAbsence();
         },
         (error) => {
           console.log("Erro ao carregar cliente do player:", error);

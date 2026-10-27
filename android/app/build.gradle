@@ -88,8 +88,8 @@ android {
         playerConsolidatedExperimental {
             dimension "appMode"
             applicationIdSuffix ".player.rcsecurelink"
-            versionCode 67
-            versionName "1.0.0-v67-consolidated-experimental"
+            versionCode 68
+            versionName "1.0.0-v67.1-splash-hotfix-experimental"
             signingConfig signingConfigs.debug
             manifestPlaceholders = [
                 appLabel: "Totem Park Player CONSOLIDADO EXP",

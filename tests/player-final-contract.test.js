@@ -32,9 +32,9 @@ test("existing documents tolerate unknown fields without losing their known cont
 test("the consolidated Android candidate is accepted by the capability contract", () => {
   const capability = getAndroidPlayerV2Capabilities("chromecast", {
     packageName: "br.com.parksolutions.totempark.player.rcsecurelink",
-    versionCode: 67,
+    versionCode: 68,
   });
   assert.equal(capability?.templatesV2, true);
-  assert.equal(capability?.versionCode, 67);
+  assert.equal(capability?.versionCode, 68);
   assert.equal(supportsTemplatesV2(capability), true);
 });
