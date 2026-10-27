@@ -40,7 +40,7 @@ export function supportsDynamicTemplatesV2(player = {}) {
     && matchingConnectedDevice
     && capabilities?.platform === "ANDROID"
     && capabilities?.packageName === V58_EXPERIMENTAL_PACKAGE
-    && [58, 59, 60, 61, 62, 63, 64, 65, 66].includes(Number(capabilities?.versionCode))
+    && [58, 59, 60, 61, 62, 63, 64, 65, 66, 67, 68].includes(Number(capabilities?.versionCode))
     && player?.id === V58_CANARY_SCREEN_ID
     && player?.clientId === V58_CANARY_CLIENT_ID
     && player?.templatesV2TestMode === true
