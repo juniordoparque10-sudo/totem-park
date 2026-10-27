@@ -22,6 +22,8 @@ A busca nos dois diretórios finais não encontrou identificadores de Tempo V2.1
 
 O Vite emitiu apenas avisos não impeditivos já conhecidos: dois módulos esportivos são importados tanto estática quanto dinamicamente, e o chunk principal excede 500 kB. Nenhuma otimização/refatoração foi feita, conforme a restrição de preservar comportamentos aprovados.
 
-Nenhum comando de deploy, Firebase, Vercel ou ADB install foi executado. A consulta ADB usada para obter a identidade V51 foi somente leitura e o `pull` copiou sua APK para comparação local.
+Nenhum comando de deploy, Firebase, Vercel ou ADB install foi executado. As consultas ADB usadas para obter as identidades instaladas foram somente leitura; o `pull` da V66 copiou sua APK apenas para comparação local de package, versão e certificado.
+
+Após a correção do alvo para `br.com.parksolutions.totempark.player.rcsecurelink`, os dois builds Web foram repetidos e continuaram reproduzíveis (53/53 hashes). O source set foi substituído e conferido (53/53); a APK corrigida contém 54/54 arquivos idênticos, incluindo `bundle-manifest.json`. A V66 instalada e a candidata V67 possuem o mesmo fingerprint de certificado.
 
 O JBR 25 do Android Studio foi rejeitado pelo Gradle 8.14.3 (`Unsupported class file major version 69`). O build foi repetido sem alteração de produto com o JDK 21 já instalado e terminou com sucesso (190 tarefas). Arquivos Gradle derivados do Capacitor foram regenerados/restaurados localmente a partir das mesmas dependências; eles são ignorados pelo Git e não fazem parte do artefato Web selado.
