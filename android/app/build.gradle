@@ -87,6 +87,7 @@ android {
         }
         playerConsolidatedExperimental {
             dimension "appMode"
+            applicationIdSuffix ".player.rcsecurelink"
             versionCode 67
             versionName "1.0.0-v67-consolidated-experimental"
             signingConfig signingConfigs.debug
