@@ -46,7 +46,7 @@ export function resolveClientDirectConfirmation({ snapshot = null, error = null,
   if (error) {
     return {
       status:currentClient ? "available" : "unavailable",
-      resolved:true,
+      resolved:Boolean(currentClient),
       replaceClient:false,
       client:currentClient,
       serverConfirmed:false,

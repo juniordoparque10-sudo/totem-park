@@ -110,6 +110,30 @@ test("confirmação direta existente recupera o cliente após negativo contradit
   assert.equal(result.client.id, "client-1");
 });
 
+test("erro remoto sem cliente confirmado mantém o gate fechado", () => {
+  const result = resolveClientDirectConfirmation({
+    error:Object.assign(new Error("offline"), { code:"unavailable" }),
+    currentClient:null,
+  });
+
+  assert.equal(result.status, "unavailable");
+  assert.equal(result.resolved, false);
+  assert.equal(result.replaceClient, false);
+  assert.equal(result.client, null);
+});
+
+test("erro remoto preserva cliente local válido para reprodução offline", () => {
+  const cachedClient = { id:"client-1", name:"Cliente" };
+  const result = resolveClientDirectConfirmation({
+    error:Object.assign(new Error("offline"), { code:"unavailable" }),
+    currentClient:cachedClient,
+  });
+
+  assert.equal(result.status, "available");
+  assert.equal(result.resolved, true);
+  assert.deepEqual(result.client, cachedClient);
+});
+
 test("bootstrap sem cliente nem playlist no cache recupera servidor e chega à reprodução elegível", () => {
   const clientCache = resolveClientSnapshot({
     snapshot:firestoreSnapshot({ id:"client-1", exists:false, fromCache:true }),

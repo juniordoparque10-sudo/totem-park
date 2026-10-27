@@ -17820,7 +17820,7 @@ function PlayerPage() {
         },
         (error) => {
           console.log("Erro ao carregar cliente do player:", error);
-          setClientLoading(false);
+          applyClientResult(resolveClientDirectConfirmation({ error, currentClient }), "listener-error");
           clientStage.failure(error);
         }
       );
