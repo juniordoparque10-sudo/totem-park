@@ -1,7 +1,7 @@
 import test from "node:test";
 import assert from "node:assert/strict";
 import fs from "node:fs";
-import { getSmartLobbyPanelAlpha, normalizeSmartLobbyConfig } from "../src/templates-v2/smart-lobby/config.js";
+import { getSmartLobbyOverlayAlpha, getSmartLobbyPanelAlpha, normalizeSmartLobbyConfig } from "../src/templates-v2/smart-lobby/config.js";
 import { createTemplateV2Draft, SMART_LOBBY_TYPE } from "../src/templates-v2/schema.js";
 
 test("Smart Lobby normaliza cards rotativos e preserva validade", () => {
@@ -39,6 +39,13 @@ test("Smart Lobby interpreta transparência como inverso da opacidade dos cards"
   assert.equal(getSmartLobbyPanelAlpha({ style:{ panelTransparency:100 } }), 0);
   const renderer = fs.readFileSync(new URL("../src/templates-v2/dynamic-collections/CollectionRenderer.jsx",import.meta.url),"utf8");
   assert.match(renderer, /--tpv2-panel-alpha/);
+});
+
+test("Smart Lobby mantém overlay da imagem independente da transparência dos cards", () => {
+  assert.equal(getSmartLobbyOverlayAlpha({ style:{ overlayOpacity:0, panelTransparency:75 } }), 0);
+  assert.equal(getSmartLobbyOverlayAlpha({ style:{ overlayOpacity:50, panelTransparency:75 } }), 0.5);
+  assert.equal(getSmartLobbyOverlayAlpha({ style:{ overlayOpacity:100, panelTransparency:75 } }), 1);
+  assert.equal(getSmartLobbyOverlayAlpha({ style:{ overlayOpacity:125 } }), 1);
 });
 
 test("Smart Lobby normaliza fontes independentes entre 80% e 140% sem alterar templates existentes", () => {

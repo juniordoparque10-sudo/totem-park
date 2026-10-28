@@ -16,8 +16,8 @@ test("sports V2 provides six isolated expandable sport objects", () => {
 
 test("sports V2 converte timestamp absoluto para o fuso configurado", () => {
   const now = new Date("2026-10-24T12:00:00Z");
-  assert.equal(formatSportsEventTime("2026-10-24T21:30:00Z", { timeZone:"America/Fortaleza", now }), "HOJE ÀS 18h30");
-  assert.equal(formatSportsEventTime("2026-10-25T02:30:00Z", { timeZone:"America/Fortaleza", now }), "HOJE ÀS 23h30");
+  assert.equal(formatSportsEventTime("2026-10-24T21:30:00Z", { timeZone:"America/Fortaleza", now }), "Hoje às 18h30");
+  assert.equal(formatSportsEventTime("2026-10-25T02:30:00Z", { timeZone:"America/Fortaleza", now }), "Hoje às 23h30");
   assert.equal(formatSportsEventTime("", { timeZone:"America/Fortaleza", now }), "HORÁRIO A DEFINIR");
 });
 
@@ -25,7 +25,7 @@ test("sports V2 trata timestamp sem offset da TheSportsDB como UTC sem converter
   const now = new Date("2026-10-24T12:00:00Z");
   assert.equal(normalizeSportsProviderTimestamp("2026-10-24T22:30:00"), "2026-10-24T22:30:00Z");
   assert.equal(normalizeSportsProviderTimestamp("2026-10-24T22:30:00-03:00"), "2026-10-24T22:30:00-03:00");
-  assert.equal(formatSportsEventTime("2026-10-24T22:30:00", { timeZone:"America/Fortaleza", now }), "HOJE ÀS 19h30");
+  assert.equal(formatSportsEventTime("2026-10-24T22:30:00", { timeZone:"America/Fortaleza", now }), "Hoje às 19h30");
   assert.equal(formatSportsEventTime("2026-10-25T14:00:00", { timeZone:"America/Fortaleza", now }), "Amanhã às 11h00");
   assert.equal(formatSportsEventTime("2026-10-27T14:00:00", { timeZone:"America/Fortaleza", now }), "27/10 ÀS 11h00");
 });
