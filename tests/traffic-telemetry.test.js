@@ -199,4 +199,9 @@ test("AA-AB: integration reuses the one heartbeat and does not write Firestore p
   assert.match(source, /TotemDevice\.getNetworkStats\(\)/);
   assert.match(source, /setInterval\(\(\) => \{\s*sendHeartbeat\(\);\s*\}, OPERATIONAL_HEARTBEAT_INTERVAL_MS\)/);
   assert.doesNotMatch(source, /recordLocalPlaybackComplete[\s\S]{0,300}(updateDoc|setDoc)\(/);
+  assert.match(source, /createTelemetryHistory/);
+  assert.match(source, /trafficTelemetryRef\.current\.dailySnapshot\(\)/);
+  assert.match(source, /syncTelemetryHistory/);
+  assert.match(source, /historySyncDue \|\| historyHasRelevantEvents/);
+  assert.match(source, /lastTelemetryHistorySyncRef\.current = Date\.now\(\)/);
 });

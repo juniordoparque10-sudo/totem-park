@@ -14,12 +14,35 @@ let env;
 const screenPath = (screen = "screen-a") => `clients/client-a/screens/${screen}`;
 const bindingPath = (uid) => `playerDeviceBindings/${uid}`;
 const sessionPath = (screen = "screen-a") => `${screenPath(screen)}/telemetrySessions/session-1`;
+const dailyPath = (day = "2026-10-28", screen = "screen-a") => `${screenPath(screen)}/telemetryDaily/${day}`;
+const eventPath = (event = "event-1", screen = "screen-a") => `${screenPath(screen)}/telemetryEvents/${event}`;
 
 function telemetry({ clientId = "client-a", screenId = "screen-a", deviceId = "device-a" } = {}) {
   return {
     schemaVersion: 1,
     session: { sessionId: "session-1", clientId, screenId, deviceId },
     current: {}, counters: {}, lastPlayerEvents: [], transitions: [], sequence: 1,
+  };
+}
+
+function daily({ clientId = "client-a", screenId = "screen-a", deviceId = "device-a", sequence = 1, rx = 100 } = {}) {
+  return {
+    schemaVersion:1, dateKey:"2026-10-28", clientId, screenId, deviceId, sequence,
+    internetRxBytes:rx, internetTxBytes:20, mediaDownloadedBytes:10, cacheReusedBytes:30,
+    trafficAvoidedBytes:30, cachePlaybackHits:2, remotePlaybackCount:1, fallbackPlaybackCount:0,
+    cacheablePlaybackCount:3, cacheHitRate:2 / 3, observedUptimeSeconds:60,
+    provedPlaybackSeconds:30, provedOnlineSeconds:20, provedOfflineSeconds:10,
+    sessionIds:["session-1"], sessionCount:1, restartCount:0, failureCount:0,
+    unknownInterruptionCount:0, packageName:"pkg", versionCode:69, versionName:"V69",
+    lastCommunicationAt:"2026-10-28T12:00:00.000Z",
+  };
+}
+
+function activityEvent({ clientId = "client-a", screenId = "screen-a", deviceId = "device-a", reason = "" } = {}) {
+  return {
+    schemaVersion:1, id:"event-1", clientId, screenId, deviceId, sessionId:"session-1",
+    type:"PLAYBACK_START", state:"ACTIVE", domain:"playback", atMs:1,
+    mediaId:"m1", mediaType:"video", reason, expiresAtMs:2, expiresAt:new Date(2),
   };
 }
 
@@ -168,4 +191,22 @@ test("sequence cannot move backwards", async () => {
   const db = env.authenticatedContext("player-a").firestore();
   await assertSucceeds(setDoc(doc(db, sessionPath()), { ...telemetry(), sequence: 5 }));
   await assertFails(setDoc(doc(db, sessionPath()), { ...telemetry(), sequence: 4 }));
+});
+
+test("bound player writes only its own monotonic UTC daily checkpoint", async () => {
+  const bound = env.authenticatedContext("player-a").firestore();
+  const unbound = env.authenticatedContext("unbound").firestore();
+  await assertFails(setDoc(doc(unbound, dailyPath()), daily()));
+  await assertFails(setDoc(doc(bound, dailyPath("2026-10-28", "screen-b")), daily({ screenId:"screen-b" })));
+  await assertSucceeds(setDoc(doc(bound, dailyPath()), daily()));
+  await assertSucceeds(setDoc(doc(bound, dailyPath()), daily({ sequence:2, rx:150 }), { merge:true }));
+  await assertFails(setDoc(doc(bound, dailyPath()), daily({ sequence:3, rx:99 }), { merge:true }));
+});
+
+test("event retry is idempotent while mutation and foreign identity are denied", async () => {
+  const bound = env.authenticatedContext("player-a").firestore();
+  await assertSucceeds(setDoc(doc(bound, eventPath()), activityEvent(), { merge:true }));
+  await assertSucceeds(setDoc(doc(bound, eventPath()), activityEvent(), { merge:true }));
+  await assertFails(setDoc(doc(bound, eventPath()), activityEvent({ reason:"changed" }), { merge:true }));
+  await assertFails(setDoc(doc(bound, eventPath("event-1", "screen-b")), activityEvent({ screenId:"screen-b" }), { merge:true }));
 });

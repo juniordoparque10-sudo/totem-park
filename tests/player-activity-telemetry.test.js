@@ -92,3 +92,12 @@ test("connection transitions are explicit and remain separate from playback", ()
     { domain:"connection", state:"ONLINE" },
   ]);
 });
+
+test("events preserve the runtime session id across local restart", () => {
+  const storage = memoryStorage();
+  const first = createPlayerActivityTelemetry({ storage, now:() => 7_000, identity:{ screenId:"s1", sessionId:"runtime-1" } });
+  first.startPlayback({ id:"v1", type:"video" });
+  const restored = createPlayerActivityTelemetry({ storage, now:() => 8_000, identity:{ screenId:"s1", sessionId:"runtime-2" } });
+  restored.finishPlayback("ERROR");
+  assert.deepEqual(restored.drainBatch(20).map((event) => event.sessionId), ["runtime-1", "runtime-2"]);
+});

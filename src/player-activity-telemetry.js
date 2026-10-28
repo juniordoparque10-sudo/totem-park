@@ -29,6 +29,7 @@ export function createPlayerActivityTelemetry({ storage = globalThis.localStorag
     const event = {
       id: `${state.identity.screenId || "screen"}:${atMs}:${sequence}`,
       screenId: String(state.identity.screenId || ""),
+      sessionId: String(state.identity.sessionId || ""),
       type,
       state: activityState,
       atMs,
@@ -103,6 +104,7 @@ function sanitizeActivityEvent(event = {}) {
   return {
     id: String(event.id || ""),
     screenId: String(event.screenId || ""),
+    sessionId: String(event.sessionId || ""),
     type: String(event.type || ""),
     state: String(event.state || ""),
     atMs: Number(event.atMs || 0),

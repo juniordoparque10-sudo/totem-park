@@ -163,6 +163,78 @@ service cloud.firestore {
         && telemetry.session.deviceId == playerBinding().data.deviceId;
     }
 
+    function historyIdentityMatches(clientId, screenId, payload) {
+      return payload.clientId == clientId
+        && payload.screenId == screenId
+        && payload.deviceId == playerBinding().data.deviceId;
+    }
+
+    function validDailyTelemetry(clientId, screenId, dayId, payload) {
+      return hasActivePlayerBinding(clientId, screenId)
+        && historyIdentityMatches(clientId, screenId, payload)
+        && payload.keys().hasOnly([
+          "schemaVersion", "dateKey", "clientId", "screenId", "deviceId", "sequence",
+          "internetRxBytes", "internetTxBytes", "mediaDownloadedBytes", "cacheReusedBytes",
+          "trafficAvoidedBytes", "cachePlaybackHits", "remotePlaybackCount", "fallbackPlaybackCount",
+          "cacheablePlaybackCount", "cacheHitRate", "observedUptimeSeconds", "provedPlaybackSeconds",
+          "provedOnlineSeconds", "provedOfflineSeconds", "sessionIds", "sessionCount", "restartCount",
+          "failureCount", "unknownInterruptionCount", "packageName", "versionCode", "versionName",
+          "lastCommunicationAt"
+        ])
+        && payload.schemaVersion == 1
+        && payload.dateKey == dayId
+        && payload.sequence is int
+        && payload.internetRxBytes is number
+        && payload.internetTxBytes is number
+        && payload.mediaDownloadedBytes is number
+        && payload.cacheReusedBytes is number
+        && payload.trafficAvoidedBytes is number
+        && payload.observedUptimeSeconds is number
+        && payload.provedPlaybackSeconds is number
+        && payload.internetRxBytes >= 0
+        && payload.internetTxBytes >= 0
+        && payload.mediaDownloadedBytes >= 0
+        && payload.cacheReusedBytes >= 0
+        && payload.trafficAvoidedBytes >= 0
+        && payload.observedUptimeSeconds >= 0
+        && payload.provedPlaybackSeconds >= 0;
+    }
+
+    function dailyTelemetryIsMonotonic(previous, next) {
+      return next.sequence >= previous.sequence
+        && next.internetRxBytes >= previous.internetRxBytes
+        && next.internetTxBytes >= previous.internetTxBytes
+        && next.mediaDownloadedBytes >= previous.mediaDownloadedBytes
+        && next.cacheReusedBytes >= previous.cacheReusedBytes
+        && next.trafficAvoidedBytes >= previous.trafficAvoidedBytes
+        && next.observedUptimeSeconds >= previous.observedUptimeSeconds
+        && next.provedPlaybackSeconds >= previous.provedPlaybackSeconds
+        && next.provedOnlineSeconds >= previous.provedOnlineSeconds
+        && next.provedOfflineSeconds >= previous.provedOfflineSeconds
+        && next.restartCount >= previous.restartCount
+        && next.failureCount >= previous.failureCount
+        && next.unknownInterruptionCount >= previous.unknownInterruptionCount;
+    }
+
+    function validTelemetryEvent(clientId, screenId, eventId, payload) {
+      return hasActivePlayerBinding(clientId, screenId)
+        && historyIdentityMatches(clientId, screenId, payload)
+        && payload.keys().hasOnly([
+          "schemaVersion", "id", "clientId", "screenId", "deviceId", "sessionId", "type", "state",
+          "domain", "atMs", "mediaId", "mediaType", "reason", "expiresAtMs", "expiresAt"
+        ])
+        && payload.schemaVersion == 1
+        && payload.id == eventId
+        && payload.sessionId is string
+        && payload.type is string
+        && payload.state is string
+        && payload.domain in ["playback", "connection"]
+        && payload.atMs is int
+        && payload.expiresAtMs is int
+        && payload.expiresAtMs > payload.atMs
+        && payload.expiresAt is timestamp;
+    }
+
     function playerActivityChanged() {
       return request.resource.data.get("telemetry", {}).get("activity", {}) != resource.data.get("telemetry", {}).get("activity", {});
     }
@@ -308,6 +380,22 @@ service cloud.firestore {
             && request.resource.data.session.sessionId == sessionId
             && request.resource.data.sequence is int
             && request.resource.data.sequence >= resource.data.sequence;
+          allow delete: if isMaster();
+        }
+
+        match /telemetryDaily/{dayId} {
+          allow read: if isMaster() || isClientOwner(clientId);
+          allow create: if validDailyTelemetry(clientId, screenId, dayId, request.resource.data);
+          allow update: if validDailyTelemetry(clientId, screenId, dayId, request.resource.data)
+            && dailyTelemetryIsMonotonic(resource.data, request.resource.data);
+          allow delete: if isMaster();
+        }
+
+        match /telemetryEvents/{eventId} {
+          allow read: if isMaster() || isClientOwner(clientId);
+          allow create: if validTelemetryEvent(clientId, screenId, eventId, request.resource.data);
+          allow update: if validTelemetryEvent(clientId, screenId, eventId, request.resource.data)
+            && request.resource.data == resource.data;
           allow delete: if isMaster();
         }
 

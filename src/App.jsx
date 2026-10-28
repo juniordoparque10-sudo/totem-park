@@ -202,6 +202,8 @@ import { createPlayerTelemetry, readPlayerTelemetryReport, TELEMETRY_DEFAULT_CON
 import { PLAYER_ACTIVITY_SYNC_ENABLED, createPlayerActivityTelemetry, syncPlayerActivityBatch } from "./player-activity-telemetry";
 import { buildOperationalSnapshot, normalizeNativeAppInfo, normalizeOperationalMediaSource, OPERATIONAL_HEARTBEAT_INTERVAL_MS } from "./operational-telemetry";
 import { createTrafficTelemetry } from "./traffic-telemetry";
+import { createTelemetryHistory } from "./telemetry-history";
+import { syncTelemetryHistory } from "./telemetry-history-sync";
 import { createPortalScreenOrderTracker, getPortalLastSignalMs, getPortalScreenPage, getPortalScreenStatus, sortClientsAlphabetically } from "./portal-status";
 import { reportedAppVersion } from "./telemetry-card-data";
 import {
@@ -15961,6 +15963,7 @@ function PlayerPage() {
   const telemetryRef = useRef(null);
   const activityTelemetryRef = useRef(null);
   const trafficTelemetryRef = useRef(null);
+  const telemetryHistoryRef = useRef(null);
   const trafficVideoOccurrencesRef = useRef(new WeakMap());
   const telemetryTransitionRef = useRef("");
   const lastTelemetryHistorySyncRef = useRef(0);
@@ -15990,11 +15993,16 @@ function PlayerPage() {
   }
   if (!activityTelemetryRef.current) {
     activityTelemetryRef.current = createPlayerActivityTelemetry({
-      identity: { clientId, deviceId: getTotemDeviceId() },
+      identity: { clientId, deviceId: getTotemDeviceId(), sessionId:telemetryRef.current.getReport().session.sessionId },
     });
   }
   if (!trafficTelemetryRef.current) {
     trafficTelemetryRef.current = createTrafficTelemetry();
+  }
+  if (!telemetryHistoryRef.current) {
+    telemetryHistoryRef.current = createTelemetryHistory({
+      identity:{ clientId, deviceId:getTotemDeviceId() },
+    });
   }
   if (!transitionDiagnosticsRef.current) {
     transitionDiagnosticRescueRef.current = captureV20TransitionDiagnosticBuffer();
@@ -16050,8 +16058,16 @@ function PlayerPage() {
   }, [clientId, screen?.id, screen?.templatesV2TestMode]);
 
   useEffect(() => {
-    activityTelemetryRef.current.updateIdentity({ clientId, screenId: screen?.id || "", deviceId: getTotemDeviceId() });
+    const sessionId = telemetryRef.current.getReport().session.sessionId;
+    activityTelemetryRef.current.updateIdentity({ clientId, screenId: screen?.id || "", deviceId: getTotemDeviceId(), sessionId });
+    telemetryHistoryRef.current.updateIdentity({ clientId, screenId:screen?.id || "", deviceId:getTotemDeviceId() });
   }, [clientId, screen?.id]);
+
+  useEffect(() => {
+    const confirmSessionEnd = () => telemetryHistoryRef.current.confirmSessionEnd();
+    window.addEventListener("pagehide", confirmSessionEnd);
+    return () => window.removeEventListener("pagehide", confirmSessionEnd);
+  }, []);
 
   useEffect(() => {
     if (!IS_OPERATIONAL_TELEMETRY_BUILD || !screen?.id || !clientId) return undefined;
@@ -17855,6 +17871,16 @@ function PlayerPage() {
           }
         }
         const localDeviceId = getTotemDeviceId();
+        telemetryRef.current.updateOperational(operationalSnapshotRef.current || {});
+        if (isNativeApp()) telemetryRef.current.updateTraffic(trafficTelemetryRef.current.snapshot());
+        const telemetryHeartbeat = telemetryRef.current.heartbeat();
+        const telemetrySnapshot = telemetryHeartbeat?.snapshot;
+        const activityEvents = activityTelemetryRef.current.drainBatch(20);
+        telemetryHistoryRef.current.recordEvents(activityEvents);
+        telemetryHistoryRef.current.checkpoint({
+          trafficDaily:trafficTelemetryRef.current.dailySnapshot(),
+          operational:telemetrySnapshot || telemetryRef.current.getReport(),
+        });
         const currentScreen = await getDoc(screenDocRef);
 
         if (!currentScreen.exists()) return;
@@ -17865,10 +17891,6 @@ function PlayerPage() {
           return;
         }
 
-        telemetryRef.current.updateOperational(operationalSnapshotRef.current || {});
-        if (isNativeApp()) telemetryRef.current.updateTraffic(trafficTelemetryRef.current.snapshot());
-        const telemetryHeartbeat = telemetryRef.current.heartbeat();
-        const telemetrySnapshot = telemetryHeartbeat?.snapshot;
         const binding = playerBindingRef.current;
         const canSyncTelemetry = telemetrySnapshot
           && binding?.status === "ACTIVE"
@@ -17919,7 +17941,6 @@ function PlayerPage() {
           && binding.clientId === clientId
           && binding.screenId === screen.id
           && binding.deviceId === localDeviceId) {
-          const activityEvents = activityTelemetryRef.current.drainBatch(20);
           if (activityEvents.length > 0) {
             const activityResult = await syncPlayerActivityBatch({
               screenRef:screenDocRef,
@@ -17940,15 +17961,23 @@ function PlayerPage() {
         const canRescueTransitionDiagnostic = pendingTransitionDiagnostic
           && IS_TEMPLATES_V2_DIAGNOSTIC_BUILD
           && screen.templatesV2TestMode === true;
-        if (canSyncTelemetry && telemetryHeartbeat?.due && telemetryHeartbeat.outbox.length > 0 && Date.now() - lastTelemetryHistorySyncRef.current >= 15 * 60 * 1000) {
-          const pending = telemetryHeartbeat.outbox.at(-1);
-          await setDoc(
-            doc(db, "clients", clientId, "screens", screen.id, "telemetrySessions", telemetrySnapshot.session.sessionId),
-            { ...pending.payload, sequence: pending.sequence, updatedAt: serverTimestamp() },
-            { merge: true }
-          );
-          telemetryRef.current.acknowledge(pending.sequence);
+        const historySyncDue = Date.now() - lastTelemetryHistorySyncRef.current >= 15 * 60 * 1000;
+        const historyHasRelevantEvents = telemetryHistoryRef.current.pending().events.length > 0;
+        if (canSyncTelemetry && (historySyncDue || historyHasRelevantEvents)) {
+          const historyResult = await syncTelemetryHistory({
+            history:telemetryHistoryRef.current,
+            refs:{
+              daily:(id) => doc(db, "clients", clientId, "screens", screen.id, "telemetryDaily", id),
+              session:(id) => doc(db, "clients", clientId, "screens", screen.id, "telemetrySessions", id),
+              event:(id) => doc(db, "clients", clientId, "screens", screen.id, "telemetryEvents", id),
+            },
+            setDoc,
+          });
           lastTelemetryHistorySyncRef.current = Date.now();
+          if (historyResult.status === "synced") {
+            const pending = telemetryHeartbeat?.outbox?.at(-1);
+            if (pending) telemetryRef.current.acknowledge(pending.sequence);
+          }
         }
 
         if (canRescueTransitionDiagnostic) {
