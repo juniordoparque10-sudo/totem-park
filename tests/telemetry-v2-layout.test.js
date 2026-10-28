@@ -11,7 +11,8 @@ test("imports an isolated Telemetry V2 stylesheet", () => {
 });
 
 test("keeps the approved dashboard composition", () => {
-  assert.equal((dashboard.match(/<MetricCard /g) || []).length, 9);
+  assert.equal((dashboard.match(/<MetricCard /g) || []).length, 14);
+  assert.match(dashboard, /Histórico do período/);
   assert.equal((dashboard.match(/<nav className="telemetry-section-nav">[\s\S]*?<button/g) || []).length, 1);
   assert.equal((dashboard.match(/scrollToTelemetry\(/g) || []).length, 6);
   assert.match(dashboard, /telemetry-overview-grid/);

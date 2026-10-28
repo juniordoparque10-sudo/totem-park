@@ -27,7 +27,7 @@ test("does not add another Firebase read mechanism for activity history", () => 
 });
 
 test("keeps current operational sections", () => {
-  assert.equal((dashboard.match(/<MetricCard /g) || []).length, 9);
+  assert.equal((dashboard.match(/<MetricCard /g) || []).length, 14);
   assert.equal((dashboard.match(/<Donut /g) || []).length, 2);
   assert.match(dashboard, /<TrafficComparison metrics=\{metrics\}/);
   assert.match(dashboard, /renderTelemetryPdfReport/);

@@ -31,3 +31,18 @@ test("missing logo is not invented and data is escaped", () => {
   assert.doesNotMatch(html, /<strong><script>/);
   assert.match(html, /client-monogram/);
 });
+
+test("historical report separates measured totals, cache estimate and missing periods", () => {
+  const html = renderTelemetryPdfReport({
+    rows: [{ name:"Tela 1", clientName:"Cliente", status:"OFFLINE", lastCommunication:"há 1 dia", telemetry:"Tela offline", cache:"Cache pronto", version:"69", origin:"Local", activeTimeMs:null }],
+    clientName:"Cliente", generatedAt:"2026-10-28T12:00:00Z", periodLabel:"2026-10-01 a 2026-10-07",
+    historicalSummary: { internetRxBytes:1000, internetTxBytes:200, internetTotalBytes:1200, mediaDownloadedBytes:300, cacheReusedBytes:400, observedUptimeSeconds:3600, provedPlaybackSeconds:1800, sessionCount:2, failureCount:1, unknownInterruptionCount:1 },
+    missingDateKeys:["2026-10-04"],
+  });
+  assert.match(html, /Histórico do período/);
+  assert.match(html, /RX 1000 B/);
+  assert.match(html, /TX 200 B/);
+  assert.match(html, /Economia estimada pelo cache/);
+  assert.match(html, /2026-10-04/);
+  assert.match(html, /não entram nos totais/i);
+});
