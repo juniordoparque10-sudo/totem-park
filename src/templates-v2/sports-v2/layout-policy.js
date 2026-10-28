@@ -6,8 +6,5 @@ export function getSportsV2LayoutPolicy({ count = 1, type = "football", index = 
   if (total === 1) {
     return { density:"detailed", featured, visibleModules:[...ALL_FOOTBALL_MODULES], eventLimit:5, standingsLimit:8 };
   }
-  const visibleModules = type === "football" && total === 4
-    ? ["results", "upcoming"]
-    : [...ALL_FOOTBALL_MODULES];
-  return { density:"compact", featured, visibleModules, eventLimit:2, standingsLimit:type === "football" && total === 4 ? 0 : 4 };
+  return { density:"compact", featured, visibleModules:[...ALL_FOOTBALL_MODULES], eventLimit:2, standingsLimit:4 };
 }

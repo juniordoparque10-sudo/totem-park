@@ -22,5 +22,5 @@ test("editor oferece campos específicos para notícias e mercado", () => {
 test("Mercado Premium preserva background e overlay configurados", () => {
   assert.match(market, /TemplateMedia/);
   assert.match(market, /config\.media\?\.primary/);
-  assert.match(market, /overlayOpacity/);
+  assert.match(market, /getMarketPremiumAppearance/);
 });

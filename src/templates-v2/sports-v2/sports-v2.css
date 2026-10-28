@@ -6,3 +6,16 @@
 /* Density is selected by the shared renderer for both preview and Player. */
 .sports-v2-split.panels-2{grid-template-columns:1.35fr 1fr}
 .sports-v2-card.sport-football.compact .sports-v2-modular-content>section{display:block}
+.sports-v2-split.panels-2{grid-template-columns:1.35fr 1fr}
+.sports-v2-split.panels-4{grid-template-columns:1.35fr 1fr;grid-template-rows:repeat(3,minmax(0,1fr))}
+.sports-v2-split.panels-4>.sports-v2-card:first-child{grid-row:1/4}
+.sports-v2-card.sport-football.compact .sports-v2-modular-content{grid-template-columns:.85fr .85fr 1.3fr;gap:.55cqw}
+.sports-v2-card.sport-football.compact .sports-v2-modular-content>section{padding:.55cqw}
+.sports-v2-card.sport-football.compact .sports-v2-event-list>div{gap:.25cqw;font-size:.62cqw}
+.sports-v2-card.sport-football.compact .sports-v2-standing{gap:.35cqw}
+.sports-v2-card.sport-football.compact .sports-v2-standing>div{grid-template-columns:1.2cqw minmax(0,1fr) auto;gap:.35cqw;padding:.42cqw .5cqw}
+.sports-v2-card.sport-football.compact .sports-v2-standing>div>b{font-size:.95cqw}
+.sports-v2-card.sport-football.compact .sports-v2-standing span strong{font-size:.72cqw}
+.sports-v2-card.sport-football.compact .sports-v2-standing span small,.sports-v2-card.sport-football.compact .sports-v2-standing em{font-size:.58cqw}
+.sports-v2-card.sport-football.compact .sports-v2-standing>div:nth-child(4){display:grid}
+.sports-v2-card.sport-football.compact .sports-v2-event-list span{min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}

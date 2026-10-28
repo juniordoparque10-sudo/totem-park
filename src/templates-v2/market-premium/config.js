@@ -2,6 +2,12 @@ import { getDynamicRotationFrame, normalizeDynamicRotation } from "../dynamic-la
 
 const cleanText = (value, max) => String(value || "").trim().slice(0, max);
 
+export function getMarketPremiumAppearance(config = {}) {
+  const overlayAlpha = Math.max(0, Math.min(90, Number(config.style?.overlayOpacity ?? 52))) / 100;
+  const panelAlpha = (100 - Math.max(0, Math.min(100, Number(config.style?.panelTransparency ?? 0)))) / 100;
+  return { overlayAlpha, panelAlpha };
+}
+
 export function normalizeMarketPremiumConfig(config = {}) {
   let activeCount = 0;
   const catalog = (Array.isArray(config.catalog) ? config.catalog : []).slice(0, 40).map((item, index) => {

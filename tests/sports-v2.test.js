@@ -41,9 +41,18 @@ test("sports V2 defines explicit non-overlapping density for one through four sp
     density:"compact", featured:true, visibleModules:["results","upcoming","standings"], eventLimit:2, standingsLimit:4,
   });
   assert.deepEqual(getSportsV2LayoutPolicy({ count:4, type:"football", index:0 }), {
-    density:"compact", featured:true, visibleModules:["results","upcoming"], eventLimit:2, standingsLimit:0,
+    density:"compact", featured:true, visibleModules:["results","upcoming","standings"], eventLimit:2, standingsLimit:4,
   });
   assert.equal(getSportsV2LayoutPolicy({ count:4, type:"basketball", index:1 }).featured, false);
+});
+
+test("futebol permanece destacado com classificacao em qualquer grade multiesportes", () => {
+  for (const count of [2, 3, 4]) {
+    const policy = getSportsV2LayoutPolicy({ count, type:"football", index:0 });
+    assert.equal(policy.featured, true);
+    assert.deepEqual(policy.visibleModules, ["results","upcoming","standings"]);
+    assert.equal(policy.standingsLimit, 4);
+  }
 });
 
 test("sports preview and Player share the same density renderer contract", () => {
