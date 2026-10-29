@@ -21,7 +21,7 @@ test("bounded batch writes only sanitized activity and acknowledges confirmed id
   const result = await syncPlayerActivityBatch({ screenRef:{ path:"screen" }, events, updateDoc:async (_ref, value) => { payload = value; } });
   assert.equal(result.status, "synced");
   assert.deepEqual(result.acknowledgedIds, ["s1:1:1"]);
-  assert.deepEqual(payload["telemetry.activity"].events, events.map((event) => ({ ...event, domain:"playback" })));
+  assert.deepEqual(payload["telemetry.activity"].events, events.map((event) => ({ ...event, sessionId:"", domain:"playback" })));
   assert.equal(payload["telemetry.activity"].schemaVersion, 1);
 });
 
