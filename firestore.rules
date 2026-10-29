@@ -392,7 +392,7 @@ service cloud.firestore {
             "templatesV2DynamicPhase1"
           ])
           && request.resource.data.capabilities.packageName == "br.com.parksolutions.totempark.player.rcsecurelink"
-          && request.resource.data.capabilities.versionCode in [58, 59, 60, 61, 62, 63, 64, 65, 66, 67, 68, 69]
+          && request.resource.data.capabilities.versionCode in [58, 59, 60, 61, 62, 63, 64, 65, 66, 67, 68, 69, 70]
           && request.resource.data.capabilities.templatesV2 == true
           && request.resource.data.capabilities.templatesV2DynamicPhase1 == true
         ))
@@ -486,29 +486,41 @@ service cloud.firestore {
       }
 
       match /media/{mediaId} {
-        allow read: if true;
-        allow create: if isMaster() || isClientOwner(clientId);
-        allow update: if isMaster() || isClientOwner(clientId);
-        allow delete: if isMaster() || isClientOwner(clientId);
+        allow read: if isClientOperational(clientId);
+        allow create: if isMaster() || (isClientOperational(clientId) && isClientOwner(clientId));
+        allow update: if isMaster() || (isClientOperational(clientId) && isClientOwner(clientId));
+        allow delete: if isMaster() || (isClientOperational(clientId) && isClientOwner(clientId));
       }
 
       match /playlists/{playlistId} {
-        allow read: if true;
-        allow create, delete: if isMaster() || isClientOwner(clientId);
-        allow update: if isMaster() || isClientOwner(clientId);
+        allow read: if isClientOperational(clientId);
+        allow create, delete: if isMaster() || (isClientOperational(clientId) && isClientOwner(clientId));
+        allow update: if isMaster() || (isClientOperational(clientId) && isClientOwner(clientId));
       }
 
       match /{subcollection}/{documentId} {
-        allow read: if !isFinancialSubcollection(subcollection);
+        allow read: if !isFinancialSubcollection(subcollection) && isClientOperational(clientId);
         allow write: if !isFinancialSubcollection(subcollection)
           && subcollection != "screens"
-          && (isMaster() || isClientOwner(clientId));
+          && (isMaster() || (isClientOperational(clientId) && isClientOwner(clientId)));
       }
     }
 
     match /tv_codes/{code} {
-      allow read: if true;
-      allow write: if isMaster() || signedIn();
+      allow get: if true;
+      allow list: if false;
+      allow create: if isMaster()
+        || (isClientOperational(request.resource.data.clientId)
+          && isClientOwner(request.resource.data.clientId));
+      allow update: if isMaster()
+        || (
+          request.resource.data.clientId == resource.data.clientId
+          && isClientOperational(resource.data.clientId)
+          && isClientOwner(resource.data.clientId)
+        );
+      allow delete: if isMaster()
+        || (isClientOperational(resource.data.clientId)
+          && isClientOwner(resource.data.clientId));
     }
 
     match /settings/{settingId} {

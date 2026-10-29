@@ -67,6 +67,8 @@ before(async () => {
       uid: "revoked", clientId: "client-a", screenId: "screen-a", deviceId: "device-r", status: "REVOKED",
     });
     await setDoc(doc(db, "clients/client-deleting/screens/screen-a"), { name: "Deleting" });
+    await setDoc(doc(db, "clients/client-deleting/media/media-a"), { name: "Deleting media" });
+    await setDoc(doc(db, "clients/client-deleting/playlists/playlist-a"), { name: "Deleting playlist" });
     await setDoc(doc(db, bindingPath("deleting-player")), {
       uid: "deleting-player", clientId: "client-deleting", screenId: "screen-a", deviceId: "device-d", status: "ACTIVE",
     });
@@ -123,6 +125,9 @@ test("active binding can announce only supported Web or rcsecurelink Android cap
   }));
   await assertSucceeds(updateDoc(doc(bound, screenPath()), {
     capabilities: { ...capability, platform:"ANDROID", packageName:"br.com.parksolutions.totempark.player.rcsecurelink", versionCode:69 },
+  }));
+  await assertSucceeds(updateDoc(doc(bound, screenPath()), {
+    capabilities: { ...capability, platform:"ANDROID", packageName:"br.com.parksolutions.totempark.player.rcsecurelink", versionCode:70 },
   }));
   await assertFails(updateDoc(doc(bound, screenPath()), {
     capabilities: { ...capability, platform:"ANDROID", packageName:"br.com.parksolutions.totempark", versionCode:69 },
@@ -272,4 +277,19 @@ test("deletion-pending clients cannot update screens or write historical telemet
   await assertFails(setDoc(doc(player, `${base}/telemetryEvents/event-1`), activityEvent({
     clientId:"client-deleting", deviceId:"device-d",
   })));
+});
+
+test("deployed lifecycle protections remain enforced outside telemetry", async () => {
+  const deletingOwner = env.authenticatedContext("deleting-owner", { email:"deleting@example.com" }).firestore();
+  const activeOwner = env.authenticatedContext("client-owner", { email:"owner@example.com" }).firestore();
+
+  await assertFails(updateDoc(doc(deletingOwner, "clients/client-deleting/media/media-a"), { name:"blocked" }));
+  await assertFails(updateDoc(doc(deletingOwner, "clients/client-deleting/playlists/playlist-a"), { name:"blocked" }));
+  await assertFails(setDoc(doc(deletingOwner, "clients/client-deleting/custom/item-a"), { value:1 }));
+  await assertFails(setDoc(doc(deletingOwner, "tv_codes/deleting-code"), { clientId:"client-deleting" }));
+
+  await assertSucceeds(setDoc(doc(activeOwner, "clients/client-a/media/media-active"), { name:"allowed" }));
+  await assertSucceeds(setDoc(doc(activeOwner, "clients/client-a/playlists/playlist-active"), { name:"allowed" }));
+  await assertSucceeds(setDoc(doc(activeOwner, "clients/client-a/custom/item-active"), { value:1 }));
+  await assertSucceeds(setDoc(doc(activeOwner, "tv_codes/active-code"), { clientId:"client-a" }));
 });
