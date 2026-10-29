@@ -25,24 +25,24 @@ function telemetry({ clientId = "client-a", screenId = "screen-a", deviceId = "d
   };
 }
 
-function daily({ clientId = "client-a", screenId = "screen-a", deviceId = "device-a", sequence = 1, rx = 100 } = {}) {
+function daily({ clientId = "client-a", screenId = "screen-a", deviceId = "device-a", sequence = 1, rx = 100, dateKey = "2026-10-28", ...overrides } = {}) {
   return {
-    schemaVersion:1, dateKey:"2026-10-28", clientId, screenId, deviceId, sequence,
+    schemaVersion:1, dateKey, clientId, screenId, deviceId, sequence,
     internetRxBytes:rx, internetTxBytes:20, mediaDownloadedBytes:10, cacheReusedBytes:30,
     trafficAvoidedBytes:30, cachePlaybackHits:2, remotePlaybackCount:1, fallbackPlaybackCount:0,
     cacheablePlaybackCount:3, cacheHitRate:2 / 3, observedUptimeSeconds:60,
     provedPlaybackSeconds:30, provedOnlineSeconds:20, provedOfflineSeconds:10,
     sessionIds:["session-1"], sessionCount:1, restartCount:0, failureCount:0,
     unknownInterruptionCount:0, packageName:"pkg", versionCode:69, versionName:"V69",
-    lastCommunicationAt:"2026-10-28T12:00:00.000Z",
+    lastCommunicationAt:"2026-10-28T12:00:00.000Z", ...overrides,
   };
 }
 
-function activityEvent({ clientId = "client-a", screenId = "screen-a", deviceId = "device-a", reason = "" } = {}) {
+function activityEvent({ clientId = "client-a", screenId = "screen-a", deviceId = "device-a", reason = "", atMs = 1, expiresAtMs = atMs + 180 * 24 * 60 * 60 * 1000, ...overrides } = {}) {
   return {
     schemaVersion:1, id:"event-1", clientId, screenId, deviceId, sessionId:"session-1",
-    type:"PLAYBACK_START", state:"ACTIVE", domain:"playback", atMs:1,
-    mediaId:"m1", mediaType:"video", reason, expiresAtMs:2, expiresAt:new Date(2),
+    type:"PLAYBACK_START", state:"ACTIVE", domain:"playback", atMs,
+    mediaId:"m1", mediaType:"video", reason, expiresAtMs, expiresAt:new Date(expiresAtMs), ...overrides,
   };
 }
 
@@ -55,6 +55,9 @@ before(async () => {
     const db = context.firestore();
     await setDoc(doc(db, "settings/masterAccess"), { emails: ["master@example.com"] });
     await setDoc(doc(db, "clients/client-a"), { uid: "client-owner", accountStatus: "active" });
+    await setDoc(doc(db, "clients/client-deleting"), {
+      uid: "deleting-owner", accountStatus: "active", lifecycleStatus: "deletion_pending",
+    });
     await setDoc(doc(db, screenPath("screen-a")), { name: "A", status: "online", connectedDeviceId: "device-a" });
     await setDoc(doc(db, screenPath("screen-b")), { name: "B", status: "online" });
     await setDoc(doc(db, bindingPath("player-a")), {
@@ -62,6 +65,10 @@ before(async () => {
     });
     await setDoc(doc(db, bindingPath("revoked")), {
       uid: "revoked", clientId: "client-a", screenId: "screen-a", deviceId: "device-r", status: "REVOKED",
+    });
+    await setDoc(doc(db, "clients/client-deleting/screens/screen-a"), { name: "Deleting" });
+    await setDoc(doc(db, bindingPath("deleting-player")), {
+      uid: "deleting-player", clientId: "client-deleting", screenId: "screen-a", deviceId: "device-d", status: "ACTIVE",
     });
   });
 });
@@ -209,4 +216,60 @@ test("event retry is idempotent while mutation and foreign identity are denied",
   await assertSucceeds(setDoc(doc(bound, eventPath()), activityEvent(), { merge:true }));
   await assertFails(setDoc(doc(bound, eventPath()), activityEvent({ reason:"changed" }), { merge:true }));
   await assertFails(setDoc(doc(bound, eventPath("event-1", "screen-b")), activityEvent({ screenId:"screen-b" }), { merge:true }));
+});
+
+test("daily checkpoint rejects malformed dates, field types, and inconsistent aggregates", async () => {
+  const bound = env.authenticatedContext("player-a").firestore();
+
+  await assertFails(setDoc(doc(bound, dailyPath("2026-1-28")), daily({ dateKey:"2026-1-28" })));
+  await assertFails(setDoc(doc(bound, dailyPath("2026-02-31")), daily({ dateKey:"2026-02-31" })));
+  await assertFails(setDoc(doc(bound, dailyPath("2025-02-29")), daily({ dateKey:"2025-02-29" })));
+  await assertSucceeds(setDoc(doc(bound, dailyPath("2024-02-29")), daily({ dateKey:"2024-02-29" })));
+  await assertFails(setDoc(doc(bound, dailyPath()), daily({ cachePlaybackHits:"2" })));
+  await assertFails(setDoc(doc(bound, dailyPath()), daily({ provedOnlineSeconds:-1 })));
+  await assertFails(setDoc(doc(bound, dailyPath()), daily({ cacheHitRate:1.1 })));
+  await assertFails(setDoc(doc(bound, dailyPath()), daily({ sessionCount:2 })));
+  await assertFails(setDoc(doc(bound, dailyPath()), daily({ versionCode:"69" })));
+});
+
+test("daily checkpoint requires a strictly newer sequence for changed counters", async () => {
+  const bound = env.authenticatedContext("player-a").firestore();
+  const path = dailyPath("2026-10-29");
+  await assertSucceeds(setDoc(doc(bound, path), daily({ dateKey:"2026-10-29", sequence:5, rx:200 })));
+  await assertFails(setDoc(doc(bound, path), daily({ dateKey:"2026-10-29", sequence:5, rx:201 })));
+  await assertFails(setDoc(doc(bound, path), daily({ dateKey:"2026-10-29", sequence:6, rx:200, cachePlaybackHits:1 })));
+  await assertSucceeds(setDoc(doc(bound, path), daily({ dateKey:"2026-10-29", sequence:5, rx:200 })));
+});
+
+test("historical event enforces exact 180-day retention and timestamp coherence", async () => {
+  const bound = env.authenticatedContext("player-a").firestore();
+  await assertFails(setDoc(doc(bound, eventPath("short-retention")), activityEvent({
+    expiresAtMs:1 + 179 * 24 * 60 * 60 * 1000,
+    id:"short-retention",
+  })));
+  await assertFails(setDoc(doc(bound, eventPath("long-retention")), activityEvent({
+    expiresAtMs:1 + 181 * 24 * 60 * 60 * 1000,
+    id:"long-retention",
+  })));
+  await assertFails(setDoc(doc(bound, eventPath("timestamp-mismatch")), activityEvent({
+    id:"timestamp-mismatch",
+    expiresAt:new Date(1 + 179 * 24 * 60 * 60 * 1000),
+  })));
+  await assertFails(setDoc(doc(bound, eventPath("invalid-time")), activityEvent({
+    id:"invalid-time", atMs:-1,
+  })));
+});
+
+test("deletion-pending clients cannot update screens or write historical telemetry", async () => {
+  const owner = env.authenticatedContext("deleting-owner", { email:"deleting@example.com" }).firestore();
+  const player = env.authenticatedContext("deleting-player").firestore();
+  const base = "clients/client-deleting/screens/screen-a";
+
+  await assertFails(updateDoc(doc(owner, base), { name:"Must stay unchanged" }));
+  await assertFails(setDoc(doc(player, `${base}/telemetryDaily/2026-10-28`), daily({
+    clientId:"client-deleting", deviceId:"device-d",
+  })));
+  await assertFails(setDoc(doc(player, `${base}/telemetryEvents/event-1`), activityEvent({
+    clientId:"client-deleting", deviceId:"device-d",
+  })));
 });
