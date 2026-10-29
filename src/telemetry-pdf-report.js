@@ -29,6 +29,10 @@ const reportBytes = (value) => {
   return `${amount.toLocaleString("pt-BR", { maximumFractionDigits:2 })} ${units[unit]}`;
 };
 
+const reportHistoricalSeconds = (value) => value === null || value === undefined
+  ? "Não medido"
+  : formatActiveTime(Number(value) * 1000);
+
 export function renderTelemetryPdfReport({ rows, clientName, clientLogoUrl, totemLogoUrl, totemIconUrl, generatedAt, periodLabel = "", historicalSummary = null, missingDateKeys = [] }) {
   const brandLogo = safeImageUrl(totemLogoUrl);
   const brandIcon = safeImageUrl(totemIconUrl);
@@ -38,7 +42,10 @@ export function renderTelemetryPdfReport({ rows, clientName, clientLogoUrl, tote
   const tableRows = rows.map((row) => {
     const status = { ONLINE: "Online", ATTENTION: "Atenção", OFFLINE: "Offline" }[row.status] || "—";
     const tone = { ONLINE: "online", ATTENTION: "attention", OFFLINE: "offline" }[row.status] || "offline";
-    return `<tr><td class="screen"><strong>${escapeHtml(row.name)}</strong><small>${escapeHtml(row.clientName)}</small></td><td><span class="badge ${tone}"><i></i>${status}</span></td><td>${escapeHtml(row.lastCommunication)}</td><td>${escapeHtml(row.telemetry)}</td><td class="center">—</td><td>${escapeHtml(row.cache)}</td><td class="version">${escapeHtml(row.version)}</td><td>${escapeHtml(row.origin)}</td><td class="time">${escapeHtml(formatActiveTime(row.activeTimeMs))}</td></tr>`;
+    const history = row.history;
+    const traffic = history ? `${reportBytes(history.internetTotalBytes)}<small>RX ${reportBytes(history.internetRxBytes)} · TX ${reportBytes(history.internetTxBytes)}</small>` : "Não medido";
+    const evidence = history ? `${escapeHtml(row.telemetry)}<small>Reprodução ${escapeHtml(reportHistoricalSeconds(history.provedPlaybackSeconds))}<br>Online ${escapeHtml(reportHistoricalSeconds(history.provedOnlineSeconds))} · Offline ${escapeHtml(reportHistoricalSeconds(history.provedOfflineSeconds))}<br>${escapeHtml(history.measurementSource || "Origem não informada")} · ${escapeHtml(history.lastMeasurementAt || "sem horário")}</small>` : `${escapeHtml(row.telemetry)}<small>Histórico: Não medido</small>`;
+    return `<tr><td class="screen"><strong>${escapeHtml(row.name)}</strong><small>${escapeHtml(row.clientName)}</small></td><td><span class="badge ${tone}"><i></i>${status}</span></td><td>${escapeHtml(row.lastCommunication)}</td><td>${evidence}</td><td class="center">${traffic}</td><td>${escapeHtml(row.cache)}</td><td class="version">${escapeHtml(row.version)}</td><td>${escapeHtml(row.origin)}</td><td class="time">${escapeHtml(formatActiveTime(row.activeTimeMs))}</td></tr>`;
   });
   const date = new Date(generatedAt).toLocaleString("pt-BR", { dateStyle: "short", timeStyle: "short" });
   const brand = brandLogo ? `<img src="${escapeHtml(brandLogo)}" alt="Totem Park">` : "Totem Park";

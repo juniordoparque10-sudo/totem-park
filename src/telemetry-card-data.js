@@ -100,14 +100,16 @@ export function aggregateCurrentPlaybackOrigins(screens = []) {
 export function aggregateSchema4Traffic(screens = []) {
   const totals = {
     currentSchema4Screens:0, networkScreens:0, downloadedScreens:0, reusedScreens:0, avoidedScreens:0, cacheRateScreens:0,
-    appInternetReceivedBytes:0, mediaDownloadedBytes:0, localMediaReusedBytes:0, trafficAvoidedBytes:0, cacheHits:0, cacheMisses:0,
+    appInternetReceivedBytes:0, appInternetSentBytes:0, appInternetTotalBytes:0, mediaDownloadedBytes:0, localMediaReusedBytes:0, trafficAvoidedBytes:0, cacheHits:0, cacheMisses:0,
   };
   for (const screen of screens) {
     if (!isCurrentTelemetryScreen(screen) || !isSchema4Traffic(screen)) continue;
     const traffic = screen.telemetry.traffic;
     totals.currentSchema4Screens += 1;
-    if (traffic.networkMeasurementSupported === true && numeric(traffic.appInternetReceivedBytes)) {
-      totals.networkScreens += 1; totals.appInternetReceivedBytes += Number(traffic.appInternetReceivedBytes);
+    if (traffic.networkMeasurementSupported === true && numeric(traffic.appInternetReceivedBytes) && numeric(traffic.appInternetSentBytes)) {
+      totals.networkScreens += 1;
+      totals.appInternetReceivedBytes += Number(traffic.appInternetReceivedBytes);
+      totals.appInternetSentBytes += Number(traffic.appInternetSentBytes);
     }
     if (numeric(traffic.mediaDownloadedBytes)) {
       totals.downloadedScreens += 1; totals.mediaDownloadedBytes += Number(traffic.mediaDownloadedBytes);
@@ -124,6 +126,7 @@ export function aggregateSchema4Traffic(screens = []) {
       totals.cacheMisses += Number(traffic.remotePlaybackCount) + Number(traffic.fallbackPlaybackCount);
     }
   }
+  totals.appInternetTotalBytes = totals.appInternetReceivedBytes + totals.appInternetSentBytes;
   return totals;
 }
 

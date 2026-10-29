@@ -8,7 +8,7 @@ import { aggregateCurrentPlaybackOrigins, aggregateSchema4Traffic, formatSession
 import { renderTelemetryPdfReport } from "./telemetry-pdf-report";
 import { buildTelemetryActivityPeriods, normalizeTelemetryActivityEvents, summarizeTelemetryActivity } from "./telemetry-activity-history";
 import { historicalDateRange } from "./telemetry-history-dashboard";
-import { readTelemetryHistory } from "./telemetry-history-reader";
+import { readTelemetryActivityHistory, readTelemetryHistory } from "./telemetry-history-reader";
 import { formatBytes } from "./format-bytes";
 import totemLogo from "./assets/logo.png";
 import "./telemetry-v2.css";
@@ -24,6 +24,8 @@ const fmtDuration = (value) => {
   if (minutes >= 1440) return `${Math.floor(minutes / 1440)}d ${Math.floor((minutes % 1440) / 60)}h`;
   return minutes >= 60 ? `${Math.floor(minutes / 60)}h ${minutes % 60}min` : `${minutes} min`;
 };
+const measuredBytes = (value) => formatBytes(value, { unavailable:"Não medido" });
+const measuredDuration = (seconds) => seconds === null || seconds === undefined ? "Não medido" : fmtDuration(Number(seconds) * 1000);
 const sourceMeta = (screen) => getCurrentSourceGroup(screen);
 const cacheStatus = (screen) => {
   const status = String(screen?.cacheStatus || "").trim().toLowerCase();
@@ -113,6 +115,7 @@ export default function TelemetryDashboard({ focusScreen }) {
   const [customStart, setCustomStart] = useState(() => isoDate(Date.now()));
   const [customEnd, setCustomEnd] = useState(() => isoDate(Date.now()));
   const [historyState, setHistoryState] = useState({ status:"loading", rows:[], totals:{}, missingDateKeys:[], errors:[], estimatedReads:0 });
+  const [activityHistory, setActivityHistory] = useState({ reads:[] });
   const [clientId, setClientId] = useState("all");
   const [screenId, setScreenId] = useState("all");
   const [status, setStatus] = useState("all");
@@ -171,10 +174,22 @@ export default function TelemetryDashboard({ focusScreen }) {
     .filter((item) => activityClientId === "all" || item.clientId === activityClientId)
     .sort((left, right) => String(left.name || left.code || left.id).localeCompare(String(right.name || right.code || right.id), "pt-BR")), [enriched, activityClientId]);
   const activityRange = useMemo(() => activityRangeFor(activityDate, activityPeriod), [activityDate, activityPeriod]);
+  useEffect(() => {
+    let active = true;
+    const selectedScreens = activityScreens.filter((item) => activityScreenId === "all" || item.id === activityScreenId);
+    readTelemetryActivityHistory(db, selectedScreens, activityRange).then((result) => { if (active) setActivityHistory(result); });
+    return () => { active = false; };
+  }, [activityScreens, activityScreenId, activityRange]);
   const activityPeriods = useMemo(() => activityScreens
     .filter((item) => activityScreenId === "all" || item.id === activityScreenId)
-    .flatMap((item) => buildTelemetryActivityPeriods(normalizeTelemetryActivityEvents(item, activityRange), activityRange))
-    .sort((left, right) => left.startMs - right.startMs || left.id.localeCompare(right.id)), [activityScreens, activityScreenId, activityRange]);
+    .flatMap((item) => {
+      const remote = activityHistory.reads.find((entry) => entry.clientId === item.clientId && entry.screenId === item.id)?.events || [];
+      const events = remote.length
+        ? normalizeTelemetryActivityEvents({ id:item.id, telemetry:{ activity:{ events:remote } } }, activityRange)
+        : normalizeTelemetryActivityEvents(item, activityRange);
+      return buildTelemetryActivityPeriods(events, activityRange);
+    })
+    .sort((left, right) => left.startMs - right.startMs || left.id.localeCompare(right.id)), [activityScreens, activityScreenId, activityRange, activityHistory]);
   const activitySummary = useMemo(() => summarizeTelemetryActivity(activityPeriods), [activityPeriods]);
   const selected = enriched.find((item) => `${item.clientId}/${item.id}` === selectedKey);
   const versions = useMemo(() => [...new Set(enriched.map(appVersion).filter((item) => item !== EMPTY))].sort(), [enriched]);
@@ -198,7 +213,10 @@ export default function TelemetryDashboard({ focusScreen }) {
     });
     return () => { active = false; };
   }, [historicalScreens, historicalRange]);
-  const metrics = useMemo(() => aggregateSchema4Traffic(filtered), [filtered]);
+  const metrics = useMemo(() => {
+    const values = aggregateSchema4Traffic(filtered);
+    return { ...values, appInternetReceivedBytes:values.appInternetTotalBytes };
+  }, [filtered]);
   const historical = historyState.totals || {};
   const cacheTotal = metrics.cacheHits + metrics.cacheMisses;
   const countStatus = (value) => filtered.filter((item) => item.portalStatus === value).length;
@@ -240,6 +258,12 @@ export default function TelemetryDashboard({ focusScreen }) {
       activeTimeMs: item.telemetry?.schemaVersion >= 3 ? Number(item.telemetry?.session?.uptimeSeconds) * 1000 : null,
     }));
     const reportHistory = await readTelemetryHistory(db, ordered, historicalRange);
+    const historyByScreen = new Map(reportHistory.byScreen.map((item) => [`${item.clientId}/${item.screenId}`, item]));
+    rows.forEach((row, index) => {
+      const item = ordered[index];
+      const history = historyByScreen.get(`${item.clientId}/${item.id}`);
+      row.history = history?.hasData ? { ...history.totals, measurementSource:history.measurementSources.join(", ") || "Não informada", lastMeasurementAt:history.lastMeasurementAt } : null;
+    });
     const html = renderTelemetryPdfReport({
       rows,
       clientName: reportClient?.name || (reportScope === "screen" ? ordered[0].clientName : "Todos os clientes"),
@@ -266,6 +290,7 @@ export default function TelemetryDashboard({ focusScreen }) {
     <details className="telemetry-config"><summary>Ativação piloto <b>{config.enabled ? "ATIVA" : "DESATIVADA"}</b></summary><p>A coleta só funciona quando a flag está ativa e o dispositivo corresponde à allowlist.</p><label>Screen IDs piloto<textarea value={configDraft} onChange={(event) => setConfigDraft(event.target.value)} placeholder="Um screenId por linha" /></label><div><button disabled={configSaving} onClick={() => savePilotConfig(config.enabled)}>Salvar allowlist</button><button className={config.enabled ? "danger" : "enable"} disabled={configSaving} onClick={() => savePilotConfig(!config.enabled)}>{config.enabled ? "Desativar telemetria" : "Ativar somente allowlist"}</button></div></details>
     <section className="telemetry-current-session" aria-labelledby="telemetry-current-title"><h2 id="telemetry-current-title">Sessão atual</h2><p>Último estado recebido em tempo real; telas offline podem apresentar o último snapshot conhecido.</p><div className="telemetry-primary-kpis"><MetricCard icon={<Monitor />} title="Telas online" value={`${countStatus("ONLINE")} de ${filtered.length}`} detail={`${countStatus("ATTENTION")} em atenção · ${countStatus("OFFLINE")} offline`} tone="green" /><MetricCard icon={<Wifi />} title="Internet utilizada pelo aplicativo" value={metrics.networkScreens ? formatBytes(metrics.appInternetReceivedBytes) : EMPTY} detail={metrics.networkScreens ? `Snapshot atual de ${metrics.networkScreens} tela(s) schema 4 · inclui Firebase, APIs, downloads, mídia remota e dados dinâmicos` : "Não instrumentado"} /><MetricCard icon={<Download />} title="Tráfego evitado pelo cache" value={metrics.avoidedScreens ? formatBytes(metrics.trafficAvoidedBytes) : EMPTY} detail={metrics.avoidedScreens ? `Dado atual de ${metrics.avoidedScreens} tela(s) online · equivalente ao reutilizado do cache` : "Não instrumentado"} tone="cyan" /><MetricCard icon={<Database />} title="Cache hit rate" value={cacheTotal ? `${Math.round(metrics.cacheHits * 100 / cacheTotal)}%` : EMPTY} detail={cacheTotal ? `${metrics.cacheHits} hits · ${metrics.cacheMisses} misses · ${metrics.cacheRateScreens} tela(s) online` : metrics.cacheRateScreens ? "Nenhuma reprodução cacheável" : "Não instrumentado"} tone="green" /><MetricCard icon={<AlertTriangle />} title="Falhas de mídia" value={metrics.currentSchema4Screens ? "0" : EMPTY} detail={metrics.currentSchema4Screens ? "0 timeouts · offline não é falha de mídia" : "Não instrumentado"} tone="red" /></div></section>
     <section className="telemetry-history-summary" aria-labelledby="telemetry-history-title"><div className="telemetry-history-heading"><div><h2 id="telemetry-history-title">Histórico do período</h2><p>{historicalRange.start} a {historicalRange.end} · resumos diários persistidos, independentes do status online atual.</p></div><small>{historyState.estimatedReads || 0} documento(s) diário(s) lido(s)</small></div>{historyState.status === "loading" ? <div className="telemetry-state">Carregando histórico…</div> : historyState.status === "permission-denied" ? <div className="telemetry-state error"><strong>Permissão insuficiente</strong><span>As Rules atuais não permitem consultar o histórico para este escopo.</span></div> : historyState.status === "error" ? <div className="telemetry-state error"><strong>Erro ao carregar histórico</strong><span>Tente novamente sem alterar os dados atuais.</span></div> : historyState.status === "empty" ? <div className="telemetry-state"><strong>Sem histórico no período</strong><span>Nenhum resumo diário foi encontrado. Isso não representa consumo ou tempo zero.</span></div> : <><div className="telemetry-primary-kpis"><MetricCard icon={<Wifi />} title="Internet histórica (RX + TX)" value={formatBytes(historical.internetTotalBytes)} detail={`RX ${formatBytes(historical.internetRxBytes)} · TX ${formatBytes(historical.internetTxBytes)}`} /><MetricCard icon={<Download />} title="Downloads reais de mídia" value={formatBytes(historical.mediaDownloadedBytes)} detail="Bytes de mídia efetivamente baixados" tone="cyan" /><MetricCard icon={<Database />} title="Economia estimada pelo cache" value={formatBytes(historical.cacheReusedBytes)} detail={historical.cacheHitRate === null ? "Sem reproduções cacheáveis" : `Cache hit rate ${(historical.cacheHitRate * 100).toLocaleString("pt-BR", { maximumFractionDigits:1 })}%`} tone="green" /><MetricCard icon={<Clock3 />} title="Funcionamento observado" value={fmtDuration(historical.observedUptimeSeconds * 1000)} detail={`Reprodução comprovada ${fmtDuration(historical.provedPlaybackSeconds * 1000)}`} /><MetricCard icon={<AlertTriangle />} title="Sessões e interrupções" value={`${historical.sessionCount} sessão(ões)`} detail={`${historical.failureCount} falha(s) · ${historical.unknownInterruptionCount} interrupção(ões) desconhecida(s)`} tone="red" /></div>{historyState.missingScreenDays > 0 && <p className="telemetry-history-gaps"><AlertTriangle size={16} />Há {historyState.missingScreenDays} combinação(ões) de tela/dia sem dados. Dias totalmente ausentes: {historyState.missingDateKeys.join(", ") || "nenhum"}. Esses períodos não entram nos totais.</p>}<div className="telemetry-history-chart" role="img" aria-label="Evolução diária do consumo total de internet">{historyState.rows.map((item) => { const maximum = Math.max(1, ...historyState.rows.map((row) => row.internetRxBytes + row.internetTxBytes)); const total = item.internetRxBytes + item.internetTxBytes; return <div key={`${item.clientId}-${item.screenId}-${item.dateKey}`} title={`${item.dateKey}: ${formatBytes(total)}`}><i style={{ height:`${Math.max(3, total * 100 / maximum)}%` }} /><span>{item.dateKey.slice(5)}</span></div>; })}</div></>}</section>
+    {historyState.status === "ready" && <p className="telemetry-history-gaps">Cobertura: {historyState.measuredScreenDays || 0} de {historyState.totalScreenDays || 0} tela/dia com medição de rede · Última medição: {historyState.lastMeasurementAt ? new Date(historyState.lastMeasurementAt).toLocaleString("pt-BR") : "Não medido"} · RX {measuredBytes(historical.internetRxBytes)} · TX {measuredBytes(historical.internetTxBytes)} · Reprodução {measuredDuration(historical.provedPlaybackSeconds)}</p>}
     <nav className="telemetry-section-nav"><button onClick={() => scrollToTelemetry("telemetry-overview")}>Visão Geral</button><button onClick={() => scrollToTelemetry("telemetry-screens")}>Telas</button><button onClick={() => scrollToTelemetry("telemetry-traffic")}>Consumo de Mídia</button><button onClick={() => scrollToTelemetry("telemetry-cache")}>Cache</button><button onClick={() => scrollToTelemetry("telemetry-status")}>Rede e Conexão</button><button onClick={() => scrollToTelemetry("telemetry-events")}>Eventos e Logs</button></nav>
     <div className="telemetry-overview-grid" id="telemetry-overview"><article className="telemetry-visual-card"><h2>Origem atual reportada pelas telas</h2>{originSample.total ? <Donut segments={originSegments} centerValue={originReported.toLocaleString("pt-BR")} caption="Com origem atual" /> : <div className="telemetry-chart-empty"><Activity /><strong>Nenhuma tela online</strong><span>A origem aparecerá quando uma tela estiver reproduzindo.</span></div>}</article><article className="telemetry-visual-card traffic-chart-card" id="telemetry-traffic"><h2>Resumo de tráfego — schema 4 atual</h2>{metrics.currentSchema4Screens ? <TrafficComparison metrics={metrics} /> : <div className="telemetry-chart-empty"><Activity /><strong>Não instrumentado</strong><span>Nenhuma tela online possui snapshot schema 4 válido.</span></div>}</article><article className="telemetry-visual-card" id="telemetry-status"><h2>Status das telas</h2><Donut segments={statusSegments} centerValue={filtered.length} caption="Telas monitoradas" /></article></div>
     <div className="telemetry-secondary-kpis"><MetricCard icon={<Clock3 />} title="Tempo ativo do Player" value={cardData.activeScreens ? fmtDuration(cardData.activeTimeMs) : EMPTY} detail={cardData.activeScreens ? `${cardData.activeScreens} tela(s) com tempo ativo reportado` : "Não instrumentado"} /><MetricCard icon={<Download />} title="Downloads de mídia acumulados" value={metrics.downloadedScreens ? formatBytes(metrics.mediaDownloadedBytes) : EMPTY} detail={metrics.downloadedScreens ? `${metrics.downloadedScreens} tela(s) schema 4 online · timestamp individual não disponível` : "Último download de mídia: não disponível"} tone="cyan" /><MetricCard icon={<Database />} title="Itens em cache" value={cardData.cacheScreens ? cardData.cacheItems.toLocaleString("pt-BR") : EMPTY} detail={cardData.cacheScreens ? `Último estado conhecido de ${cardData.cacheScreens} tela(s)${cardData.cacheOfflineScreens ? ` · ${cardData.cacheOfflineScreens} offline` : ""}` : "Nenhum dado de cache disponível"} tone="green" /><MetricCard icon={<RefreshCw />} title="Versão mais recente reportada" value={cardData.latestVersionScreen ? appVersion(cardData.latestVersionScreen) : EMPTY} detail={cardData.latestVersionScreen ? `${cardData.versionCount} tela(s) nesta versão · mais instalada: ${cardData.mostInstalledVersion} (${cardData.mostInstalledCount})` : "Versão ainda não informada"} /></div>

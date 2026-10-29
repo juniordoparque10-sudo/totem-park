@@ -92,7 +92,7 @@ test("active time accepts only a fresh online schema 4 session", () => {
 });
 
 test("schema 4 aggregation preserves absence and excludes stale screens", () => {
-  const valid = { portalStatus:"ONLINE", telemetry:{ schemaVersion:4, traffic:{ networkMeasurementSupported:true, appInternetReceivedBytes:100, mediaDownloadedBytes:20, localMediaReusedBytes:80, trafficAvoidedBytes:80, cachePlaybackHits:158, remotePlaybackCount:1, fallbackPlaybackCount:1 } } };
+  const valid = { portalStatus:"ONLINE", telemetry:{ schemaVersion:4, traffic:{ networkMeasurementSupported:true, appInternetReceivedBytes:100, appInternetSentBytes:25, mediaDownloadedBytes:20, localMediaReusedBytes:80, trafficAvoidedBytes:80, cachePlaybackHits:158, remotePlaybackCount:1, fallbackPlaybackCount:1 } } };
   const absent = { portalStatus:"ONLINE", telemetry:{ schemaVersion:4, traffic:{ networkMeasurementSupported:true, appInternetReceivedBytes:null } } };
   const schema3 = { portalStatus:"ONLINE", telemetry:{ schemaVersion:3, traffic:{ appInternetReceivedBytes:999 } } };
   const stale = { portalStatus:"OFFLINE", telemetry:{ schemaVersion:4, traffic:{ networkMeasurementSupported:true, appInternetReceivedBytes:999 } } };
@@ -100,6 +100,8 @@ test("schema 4 aggregation preserves absence and excludes stale screens", () => 
   assert.equal(result.currentSchema4Screens, 2);
   assert.equal(result.networkScreens, 1);
   assert.equal(result.appInternetReceivedBytes, 100);
+  assert.equal(result.appInternetSentBytes, 25);
+  assert.equal(result.appInternetTotalBytes, 125);
   assert.equal(result.cacheHits, 158);
   assert.equal(result.cacheMisses, 2);
 });

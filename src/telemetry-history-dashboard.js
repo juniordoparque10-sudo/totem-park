@@ -7,7 +7,7 @@ const SUM_FIELDS = [
   "remotePlaybackCount", "fallbackPlaybackCount", "cacheablePlaybackCount",
 ];
 
-const finiteNonNegative = (value) => Number.isFinite(Number(value)) && Number(value) >= 0 ? Number(value) : 0;
+const finiteNonNegative = (value) => value !== null && value !== undefined && Number.isFinite(Number(value)) && Number(value) >= 0 ? Number(value) : null;
 const validDateKey = (value) => /^\d{4}-\d{2}-\d{2}$/.test(String(value || ""));
 const dateKey = (value) => new Date(value).toISOString().slice(0, 10);
 const utcStart = (value) => Date.parse(`${String(value).slice(0, 10)}T00:00:00.000Z`);
@@ -33,8 +33,19 @@ export function normalizeHistoricalDaily(raw = {}, identity = {}) {
     versionName: raw.versionName || "",
     versionCode: raw.versionCode ?? null,
     lastCommunicationAt: raw.lastCommunicationAt || null,
+    networkMeasurementSupported: raw.networkMeasurementSupported === true
+      || (raw.networkMeasurementSupported == null && finiteNonNegative(raw.internetRxBytes) !== null && finiteNonNegative(raw.internetTxBytes) !== null),
+    measurementSource: raw.networkMeasurementSource || raw.measurementSource || "",
+    lastMeasurementAt: raw.networkMeasuredAt || raw.lastMeasurementAt || raw.lastCommunicationAt || null,
+    measurementCoverageStartedAt: raw.measurementCoverageStartedAt || null,
+    measurementCoverageEndedAt: raw.measurementCoverageEndedAt || null,
+    sessionIds: Array.isArray(raw.sessionIds) ? raw.sessionIds.map(String).filter(Boolean) : [],
   };
   SUM_FIELDS.forEach((field) => { normalized[field] = finiteNonNegative(raw[field]); });
+  if (!normalized.networkMeasurementSupported) {
+    normalized.internetRxBytes = null;
+    normalized.internetTxBytes = null;
+  }
   normalized.cacheHitRate = normalized.cacheablePlaybackCount
     ? normalized.cachePlaybackHits / normalized.cacheablePlaybackCount
     : null;
@@ -43,9 +54,13 @@ export function normalizeHistoricalDaily(raw = {}, identity = {}) {
 
 export function aggregateHistoricalDaily(rows = [], expectedDateKeys = []) {
   const normalizedRows = rows.map((row) => normalizeHistoricalDaily(row, row));
-  const totals = Object.fromEntries(SUM_FIELDS.map((field) => [field, 0]));
-  normalizedRows.forEach((row) => SUM_FIELDS.forEach((field) => { totals[field] += row[field]; }));
-  totals.internetTotalBytes = totals.internetRxBytes + totals.internetTxBytes;
+  const totals = Object.fromEntries(SUM_FIELDS.map((field) => [field, null]));
+  normalizedRows.forEach((row) => SUM_FIELDS.forEach((field) => {
+    if (row[field] !== null) totals[field] = (totals[field] ?? 0) + row[field];
+  }));
+  const sessionIds = new Set(normalizedRows.flatMap((row) => row.sessionIds));
+  if (sessionIds.size) totals.sessionCount = sessionIds.size;
+  totals.internetTotalBytes = totals.internetRxBytes === null || totals.internetTxBytes === null ? null : totals.internetRxBytes + totals.internetTxBytes;
   totals.cacheHitRate = totals.cacheablePlaybackCount ? totals.cachePlaybackHits / totals.cacheablePlaybackCount : null;
   const present = new Set(normalizedRows.map((row) => row.dateKey).filter(validDateKey));
   return {
@@ -53,6 +68,11 @@ export function aggregateHistoricalDaily(rows = [], expectedDateKeys = []) {
     totals,
     missingDateKeys: expectedDateKeys.filter((key) => !present.has(key)),
     hasData: normalizedRows.length > 0,
+    sessionIds:[...sessionIds],
+    measuredScreenDays:normalizedRows.filter((row) => row.networkMeasurementSupported).length,
+    totalScreenDays:normalizedRows.length,
+    lastMeasurementAt:normalizedRows.map((row) => row.lastMeasurementAt).filter(Boolean).sort().at(-1) || null,
+    measurementSources:[...new Set(normalizedRows.map((row) => row.measurementSource).filter(Boolean))],
   };
 }
 

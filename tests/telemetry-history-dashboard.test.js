@@ -16,9 +16,22 @@ test("historical dashboard stays separate from current session and supports requ
   assert.match(dashboard, /Sem histórico no período/);
 });
 
-test("history reader is read-only and prioritizes daily summaries", () => {
+test("history reader is read-only and connects daily summaries, sessions and events", () => {
   assert.match(reader, /"telemetryDaily"/);
   assert.match(reader, /\bgetDocs\b/);
   assert.doesNotMatch(reader, /\bsetDoc\b|\baddDoc\b|\bupdateDoc\b|\bdeleteDoc\b/);
-  assert.doesNotMatch(reader, /telemetrySessions|telemetryEvents/);
+  assert.match(reader, /telemetrySessions/);
+  assert.match(reader, /telemetryEvents/);
+});
+
+test("history aggregation preserves absence and deduplicates session identifiers", async () => {
+  const { aggregateHistoricalDaily } = await import("../src/telemetry-history-dashboard.js");
+  const result = aggregateHistoricalDaily([
+    { dateKey:"2026-10-28", clientId:"c", screenId:"s", sessionIds:["same"], sessionCount:1 },
+    { dateKey:"2026-10-29", clientId:"c", screenId:"s", sessionIds:["same", "new"], sessionCount:2 },
+  ], ["2026-10-28", "2026-10-29"]);
+  assert.equal(result.totals.sessionCount, 2);
+  assert.equal(result.totals.internetRxBytes, null);
+  assert.equal(result.totals.internetTxBytes, null);
+  assert.equal(result.totals.internetTotalBytes, null);
 });

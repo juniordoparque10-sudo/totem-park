@@ -19,7 +19,7 @@ for (const size of [2, 5, 12]) {
     assert.equal(html.split('<tr><td class="screen">').length - 1, size);
     assert.match(html, /Tempo ativo/);
     assert.match(html, /1h 35min/);
-    assert.match(html, /<td class="center">—<\/td>/);
+    assert.match(html, /<td class="center">Não medido<\/td>/);
     assert.match(html, /real-client-logo\.png/);
     assert.match(html, /real-totem-logo\.png/);
   });
@@ -45,4 +45,18 @@ test("historical report separates measured totals, cache estimate and missing pe
   assert.match(html, /Economia estimada pelo cache/);
   assert.match(html, /2026-10-04/);
   assert.match(html, /não entram nos totais/i);
+});
+
+test("per-screen PDF reports measured history and never invents missing zero", () => {
+  const html = renderTelemetryPdfReport({
+    rows: [
+      { name:"Medida", clientName:"Cliente", status:"OFFLINE", lastCommunication:"há 1 dia", telemetry:"Tela offline", cache:"Cache pronto", version:"70", origin:"Local", activeTimeMs:null, history:{ internetRxBytes:1000, internetTxBytes:200, internetTotalBytes:1200, provedPlaybackSeconds:60, provedOnlineSeconds:120, provedOfflineSeconds:30, measurementSource:"ANDROID_UID_TRAFFIC_STATS", lastMeasurementAt:"2026-10-29T10:00:00.000Z" } },
+      { name:"Sem medição", clientName:"Cliente", status:"OFFLINE", lastCommunication:"—", telemetry:"—", cache:"—", version:"70", origin:"—", activeTimeMs:null, history:null },
+    ], clientName:"Cliente", generatedAt:"2026-10-29T12:00:00Z",
+  });
+  assert.match(html, /RX 1000 B · TX 200 B/);
+  assert.match(html, /Reprodução 1 min/);
+  assert.match(html, /Online 2 min · Offline 0 min/);
+  assert.match(html, /ANDROID_UID_TRAFFIC_STATS/);
+  assert.match(html, /Não medido/);
 });
