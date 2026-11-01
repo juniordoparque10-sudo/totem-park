@@ -158,6 +158,71 @@ service cloud.firestore {
       ]);
     }
 
+    function cacheFailureDiagnosticsChanged() {
+      return request.resource.data.diff(resource.data).affectedKeys().hasAny([
+        "cacheFailureMode",
+        "cacheFailureCount",
+        "cacheFailureCodes"
+      ]);
+    }
+
+    function isValidCacheFailureCodeAt(codes, index) {
+      return codes.size() <= index
+        || (codes[index] is string
+          && codes[index].size() > 0
+          && codes[index].size() <= 64
+          && codes[index].matches("^[A-Z0-9_]+$"));
+    }
+
+    function hasValidCacheFailureDiagnostics() {
+      let mode = request.resource.data.cacheFailureMode;
+      let count = request.resource.data.cacheFailureCount;
+      let codes = request.resource.data.cacheFailureCodes;
+      let total = request.resource.data.totalCacheableItems;
+      return mode is string
+        && mode in ["none", "item", "pipeline"]
+        && count is int
+        && count >= 0
+        && total is int
+        && total >= 0
+        && count <= total
+        && codes is list
+        && codes.size() <= 5
+        && isValidCacheFailureCodeAt(codes, 0)
+        && isValidCacheFailureCodeAt(codes, 1)
+        && isValidCacheFailureCodeAt(codes, 2)
+        && isValidCacheFailureCodeAt(codes, 3)
+        && isValidCacheFailureCodeAt(codes, 4)
+        && ((mode == "none" && count == 0 && codes.size() == 0)
+          || (mode in ["item", "pipeline"] && count > 0 && codes.size() > 0));
+    }
+
+    function isAllowedPlayerCacheDiagnosticUpdate(clientId, screenId) {
+      return hasActivePlayerBinding(clientId, screenId)
+        && resource.data.get("connectedDeviceId", "") == playerBinding().data.deviceId
+        && request.resource.data.diff(resource.data).affectedKeys().hasOnly([
+          "activePlaylistWeightBytes",
+          "cacheDownloadedItems",
+          "cacheFailureCodes",
+          "cacheFailureCount",
+          "cacheFailureMode",
+          "cacheManifestItems",
+          "cacheManifestKey",
+          "cacheManifestSizeBytes",
+          "cacheRemovedItems",
+          "cacheSizeBytes",
+          "cacheStatus",
+          "cacheUpdatedAt",
+          "cachedItems",
+          "estimatedMonthlyTrafficBytes",
+          "failedCacheItems",
+          "lastMediaDownloadAt",
+          "lastMediaDownloadBytes",
+          "totalCacheableItems"
+        ])
+        && hasValidCacheFailureDiagnostics();
+    }
+
     function playerBinding() {
       return get(/databases/$(database)/documents/playerDeviceBindings/$(request.auth.uid));
     }
@@ -216,7 +281,14 @@ service cloud.firestore {
         && payload.packageName is string
         && (payload.versionCode == null || payload.versionCode is int)
         && payload.versionName is string
-        && payload.lastCommunicationAt is string;
+        && payload.lastCommunicationAt is string
+        && (!("networkMeasurementSupported" in payload) || payload.networkMeasurementSupported is bool)
+        && (!("networkMeasurementSource" in payload) || payload.networkMeasurementSource is string)
+        && (!("networkMeasuredAt" in payload) || payload.networkMeasuredAt == null || payload.networkMeasuredAt is string)
+        && (!("measurementCoverageStartedAt" in payload) || payload.measurementCoverageStartedAt == null || payload.measurementCoverageStartedAt is string)
+        && (!("measurementCoverageEndedAt" in payload) || payload.measurementCoverageEndedAt == null || payload.measurementCoverageEndedAt is string)
+        && (!("unattributedBoundaryRxBytes" in payload) || payload.unattributedBoundaryRxBytes is int)
+        && (!("unattributedBoundaryTxBytes" in payload) || payload.unattributedBoundaryTxBytes is int);
     }
 
     function validDailyTelemetryValues(payload) {
@@ -241,6 +313,8 @@ service cloud.firestore {
         && payload.restartCount >= 0
         && payload.failureCount >= 0
         && payload.unknownInterruptionCount >= 0
+        && (!("unattributedBoundaryRxBytes" in payload) || payload.unattributedBoundaryRxBytes >= 0)
+        && (!("unattributedBoundaryTxBytes" in payload) || payload.unattributedBoundaryTxBytes >= 0)
         && (payload.versionCode == null || payload.versionCode >= 0);
     }
 
@@ -255,7 +329,9 @@ service cloud.firestore {
           "cacheablePlaybackCount", "cacheHitRate", "observedUptimeSeconds", "provedPlaybackSeconds",
           "provedOnlineSeconds", "provedOfflineSeconds", "sessionIds", "sessionCount", "restartCount",
           "failureCount", "unknownInterruptionCount", "packageName", "versionCode", "versionName",
-          "lastCommunicationAt"
+          "lastCommunicationAt", "networkMeasurementSupported", "networkMeasurementSource",
+          "networkMeasuredAt", "measurementCoverageStartedAt", "measurementCoverageEndedAt",
+          "unattributedBoundaryRxBytes", "unattributedBoundaryTxBytes"
         ])
         && validDailyTelemetryTypes(payload)
         && validDailyTelemetryValues(payload)
@@ -267,6 +343,8 @@ service cloud.firestore {
       return next.sequence > previous.sequence
         && next.internetRxBytes >= previous.internetRxBytes
         && next.internetTxBytes >= previous.internetTxBytes
+        && (!("unattributedBoundaryRxBytes" in previous) || next.unattributedBoundaryRxBytes >= previous.unattributedBoundaryRxBytes)
+        && (!("unattributedBoundaryTxBytes" in previous) || next.unattributedBoundaryTxBytes >= previous.unattributedBoundaryTxBytes)
         && next.mediaDownloadedBytes >= previous.mediaDownloadedBytes
         && next.cacheReusedBytes >= previous.cacheReusedBytes
         && next.trafficAvoidedBytes >= previous.trafficAvoidedBytes
@@ -391,8 +469,12 @@ service cloud.firestore {
             "templatesV2",
             "templatesV2DynamicPhase1"
           ])
-          && request.resource.data.capabilities.packageName == "br.com.parksolutions.totempark.player.rcsecurelink"
-          && request.resource.data.capabilities.versionCode in [58, 59, 60, 61, 62, 63, 64, 65, 66, 67, 68, 69, 70]
+          && (
+            (request.resource.data.capabilities.packageName == "br.com.parksolutions.totempark.player.rcsecurelink"
+              && request.resource.data.capabilities.versionCode in [58, 59, 60, 61, 62, 63, 64, 65, 66, 67, 68, 69, 70])
+            || (request.resource.data.capabilities.packageName == "br.com.parksolutions.totempark"
+              && request.resource.data.capabilities.versionCode == 70)
+          )
           && request.resource.data.capabilities.templatesV2 == true
           && request.resource.data.capabilities.templatesV2DynamicPhase1 == true
         ))
@@ -435,11 +517,14 @@ service cloud.firestore {
         allow read: if isClientOperational(clientId);
         allow create, delete: if isMaster() || (isClientOperational(clientId) && isClientOwner(clientId));
         allow update: if isMaster()
-          || (isClientOperational(clientId) && (isClientOwner(clientId)
-            || isAllowedPublicScreenUpdate()
-            || isAllowedPlayerTelemetryUpdate(clientId, screenId)
-            || isAllowedPlayerCapabilityUpdate(clientId, screenId)
-            || isAllowedPlayerActivityUpdate(clientId, screenId))
+          || (isClientOperational(clientId) && (
+            isAllowedPlayerCacheDiagnosticUpdate(clientId, screenId)
+            || (!cacheFailureDiagnosticsChanged() && (isClientOwner(clientId)
+              || isAllowedPublicScreenUpdate()
+              || isAllowedPlayerTelemetryUpdate(clientId, screenId)
+              || isAllowedPlayerCapabilityUpdate(clientId, screenId)
+              || isAllowedPlayerActivityUpdate(clientId, screenId)))
+          )
             && (!playerActivityChanged() || isAllowedPlayerActivityUpdate(clientId, screenId))
             && !request.resource.data.diff(resource.data).affectedKeys().hasAny([
               "templatesV2TestMode",

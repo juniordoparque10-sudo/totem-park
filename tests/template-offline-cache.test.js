@@ -3,7 +3,7 @@ import assert from "node:assert/strict";
 import { Buffer } from "node:buffer";
 import { readFileSync } from "node:fs";
 import { buildSportsDataCacheContext, buildTemplateDataCacheKey, clearTemplateDataMemoryCacheForTests, createNewsDataFingerprintConfig, createSportsDataFingerprintConfig, mergeSportsLastKnown, readNewsEditorialDynamicCache, readSportsTemplateDataCache, readTemplateDataCache, writeNewsEditorialDynamicCache, writeSportsTemplateDataCache, writeTemplateDataCache } from "../src/templates-v2/offline-data-cache.js";
-import { clearTemplateAssetMemoryCacheForTests, collectTemplateAssetUrls, createOfflineSafeTemplate, fetchTemplateAssetResponse, prepareTemplateAssets, refreshTemplateAsset, selectTemplateAssetRenderSource, shouldUsePersistentTemplateAssetCache } from "../src/templates-v2/offline-asset-cache.js";
+import { TEMPLATE_ASSET_URL_ONLY_TTL_MS, clearTemplateAssetMemoryCacheForTests, collectTemplateAssetUrls, createOfflineSafeTemplate, fetchTemplateAssetResponse, prepareTemplateAssets, refreshTemplateAsset, refreshTemplateAssets, selectTemplateAssetRenderSource, shouldUsePersistentTemplateAssetCache } from "../src/templates-v2/offline-asset-cache.js";
 
 test("cache RSS Editorial usa geração do parser para não ressuscitar texto corrompido antigo", () => {
   const config = createNewsDataFingerprintConfig({ newsFeedUrl:"https://example.com/feed.xml" });
@@ -30,8 +30,8 @@ class MemoryStorage {
 
 class MemoryCache {
   values = new Map();
-  async match(key) { return this.values.get(String(key)); }
-  async put(key, value) { this.values.set(String(key), value); }
+  async match(key) { return this.values.get(String(key))?.clone(); }
+  async put(key, value) { this.values.set(String(key), value.clone()); }
 }
 
 const cacheStorage = (cache = new MemoryCache()) => ({ cache, open:async () => cache });
@@ -93,6 +93,90 @@ test("cold boot usa logo e background persistidos sem fetch remoto", async () =>
   assert.equal(result.hits, 2);
   assert.match(result.template.published.content.logo.url, /^blob:local-/);
   assert.match(result.template.published.media.primary.url, /^blob:local-/);
+});
+
+test("rotação Android reutiliza asset com identidade forte sem download redundante", async () => {
+  clearTemplateAssetMemoryCacheForTests();
+  const remote = "https://cdn.example/rotation-background.jpg";
+  const storage = cacheStorage();
+  await storage.cache.put(remote, new Response(new Blob(["cached-background"]), {
+    status:200,
+    headers:{
+      "Content-Type":"image/jpeg",
+      "x-totempark-asset-identity":"hash:background-v1",
+      "x-totempark-asset-validated-at":"1000",
+    },
+  }));
+  const template = { published:{ media:{ primary:{ type:"image", url:remote, fileHash:"background-v1" } } } };
+  let nativeDownloads = 0;
+  const options = {
+    cachePolicyEnabled:true,
+    cacheStorage:storage,
+    capacitor:nativeCapacitor,
+    capacitorHttp:{ get:async () => { nativeDownloads += 1; throw new Error("download redundante"); } },
+    createObjectURL:() => "blob:cached-background",
+    now:10_000,
+  };
+
+  const prepared = await prepareTemplateAssets(template, options);
+  const refreshed = await refreshTemplateAssets(template, options);
+
+  assert.equal(prepared.hits, 1);
+  assert.deepEqual(refreshed.map(({ status }) => status), ["fresh"]);
+  assert.equal(nativeDownloads, 0);
+});
+
+test("asset identificado somente pela URL respeita TTL e atualiza uma vez após expirar", async () => {
+  clearTemplateAssetMemoryCacheForTests();
+  const remote = "https://cdn.example/url-only.png";
+  const storage = cacheStorage();
+  await storage.cache.put(remote, new Response(new Blob(["cached-url-only"]), {
+    status:200,
+    headers:{
+      "Content-Type":"image/png",
+      "x-totempark-asset-identity":`url:${remote}`,
+      "x-totempark-asset-validated-at":"1000",
+    },
+  }));
+  let nativeDownloads = 0;
+  const options = {
+    cachePolicyEnabled:true,
+    cacheStorage:storage,
+    capacitor:nativeCapacitor,
+    capacitorHttp:{ get:async () => {
+      nativeDownloads += 1;
+      return { status:200, data:base64("updated-url-only"), headers:{ "Content-Type":"image/png" } };
+    } },
+  };
+
+  assert.equal((await refreshTemplateAsset(remote, { ...options, now:1_000 + TEMPLATE_ASSET_URL_ONLY_TTL_MS - 1 })).status, "fresh");
+  assert.equal(nativeDownloads, 0);
+  assert.equal((await refreshTemplateAsset(remote, { ...options, now:1_000 + TEMPLATE_ASSET_URL_ONLY_TTL_MS })).status, "updated");
+  assert.equal(nativeDownloads, 1);
+});
+
+test("reinicialização offline restaura asset persistido e falha remota não apaga last-known", async () => {
+  clearTemplateAssetMemoryCacheForTests();
+  const remote = "https://cdn.example/offline-restart.jpg";
+  const storage = cacheStorage();
+  await storage.cache.put(remote, new Response(new Blob(["last-known-image"]), { status:200, headers:{ "Content-Type":"image/jpeg" } }));
+  const template = { published:{ media:{ primary:{ type:"image", url:remote } } } };
+
+  const restored = await prepareTemplateAssets(template, { cacheStorage:storage, createObjectURL:() => "blob:last-known" });
+  const failedRefresh = await refreshTemplateAssets(template, {
+    cachePolicyEnabled:true,
+    cacheStorage:storage,
+    capacitor:nativeCapacitor,
+    capacitorHttp:{ get:async () => { throw new Error("offline"); } },
+    now:TEMPLATE_ASSET_URL_ONLY_TTL_MS + 1,
+  });
+  clearTemplateAssetMemoryCacheForTests();
+  const restarted = await prepareTemplateAssets(template, { cacheStorage:storage, createObjectURL:() => "blob:after-restart" });
+
+  assert.equal(restored.hits, 1);
+  assert.deepEqual(failedRefresh.map(({ status }) => status), ["preserved"]);
+  assert.equal(restarted.hits, 1);
+  assert.equal(await (await storage.cache.match(remote)).text(), "last-known-image");
 });
 
 test("template sem asset local nasce com fallback e não mantém URL remota", () => {

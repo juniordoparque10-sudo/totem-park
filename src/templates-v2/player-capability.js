@@ -28,13 +28,15 @@ export function getWebPlayerV2Capabilities(deviceId = "") {
 }
 
 export const V58_EXPERIMENTAL_PACKAGE = "br.com.parksolutions.totempark.player.rcsecurelink";
-const SUPPORTED_EXPERIMENTAL_VERSION_CODES = new Set([58, 59, 60, 61, 62, 63, 64, 65, 66, 67, 68, 69]);
+export const V70_OFFICIAL_PACKAGE = "br.com.parksolutions.totempark";
+const SUPPORTED_EXPERIMENTAL_VERSION_CODES = new Set([58, 59, 60, 61, 62, 63, 64, 65, 66, 67, 68, 69, 70]);
 
 export function getAndroidPlayerV2Capabilities(deviceId = "", appInfo = {}) {
   const versionCode = Number(appInfo.versionCode || 0);
   const packageName = String(appInfo.packageName || "");
-  const isSecureLinkExperiment = packageName === V58_EXPERIMENTAL_PACKAGE && SUPPORTED_EXPERIMENTAL_VERSION_CODES.has(versionCode);
-  if (!isSecureLinkExperiment) return null;
+  const isApprovedPlayer = (packageName === V58_EXPERIMENTAL_PACKAGE && SUPPORTED_EXPERIMENTAL_VERSION_CODES.has(versionCode))
+    || (packageName === V70_OFFICIAL_PACKAGE && versionCode === 70);
+  if (!isApprovedPlayer) return null;
   return {
     deviceId:String(deviceId),
     platform:"ANDROID",

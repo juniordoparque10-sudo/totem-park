@@ -34,6 +34,14 @@ test("playlist navigation stays disabled unless the Player reports explicit supp
     capabilities:{ platform:"ANDROID", packageName:"br.com.parksolutions.totempark.player.rcsecurelink", versionCode:69, deviceId:"android-device", playlistItemNavigation:true, templatesV2:true, templatesV2DynamicPhase1:true },
   };
   assert.deepEqual(getPlaylistNavigationCommand("previous", androidV69), { type:"previousMedia" });
+  assert.deepEqual(getPlaylistNavigationCommand("next", {
+    ...androidV69,
+    capabilities:{ ...androidV69.capabilities, versionCode:70 },
+  }), { type:"nextMedia" });
+  assert.deepEqual(getPlaylistNavigationCommand("next", {
+    ...androidV69,
+    capabilities:{ ...androidV69.capabilities, packageName:"br.com.parksolutions.totempark", versionCode:70 },
+  }), { type:"nextMedia" });
 });
 
 test("Mercado and shared collections constrain logo slots and keep background behind content", async () => {

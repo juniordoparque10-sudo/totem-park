@@ -1,6 +1,8 @@
 import { getMarketPreloadImageUrls } from "./market-premium/config.js";
 
 const decodedImagePromises = new Map();
+const failedImageCooldowns = new Map();
+const DEFAULT_IMAGE_FAILURE_COOLDOWN_MS = 5 * 60 * 1000;
 
 export function markTemplateV2BackgroundForOnlineRetry(retryKeys, key, online = globalThis.navigator?.onLine !== false) {
   if (!retryKeys || !key || online) return false;
@@ -136,11 +138,25 @@ export async function prepareTemplateV2CriticalImage(item, ImageClass = globalTh
   if (!state.configured && !essentialUrls.length) return { status: "no-background", attempts: 0, url: "" };
   if (state.configured && !state.url) return { status: "asset-unresolved", attempts: 0, url: "" };
 
+  const now = typeof options.now === "function" ? options.now : Date.now;
+  const currentTime = now();
+  const coolingUrl = essentialUrls.find((url) => Number(failedImageCooldowns.get(url) || 0) > currentTime);
+  if (coolingUrl) {
+    return {
+      status: "cooldown",
+      attempts: 0,
+      url: state.url || essentialUrls[0],
+      urls:essentialUrls,
+      retryAt:failedImageCooldowns.get(coolingUrl),
+    };
+  }
+
   const maxAttempts = Math.max(1, Number(options.maxAttempts) || 2);
   let lastError = null;
   for (let attempt = 1; attempt <= maxAttempts; attempt += 1) {
     try {
       await Promise.all(essentialUrls.map((url) => preloadImageForPaint(url, ImageClass, options)));
+      essentialUrls.forEach((url) => failedImageCooldowns.delete(url));
       return { status: "ready", attempts: attempt, url: state.url || essentialUrls[0], urls:essentialUrls };
     } catch (error) {
       lastError = error;
@@ -148,6 +164,9 @@ export async function prepareTemplateV2CriticalImage(item, ImageClass = globalTh
     }
   }
 
+  const failureCooldownMs = Math.max(1, Number(options.failureCooldownMs) || DEFAULT_IMAGE_FAILURE_COOLDOWN_MS);
+  const retryAt = now() + failureCooldownMs;
+  essentialUrls.forEach((url) => failedImageCooldowns.set(url, retryAt));
   return { status: "failed", attempts: maxAttempts, url: state.url || essentialUrls[0], urls:essentialUrls, error: lastError };
 }
 

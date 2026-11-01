@@ -40,6 +40,13 @@ function createDaily(previous, dateKey, nowIso) {
       lastNativeTx: Number.isFinite(previous.lastNativeTx) ? previous.lastNativeTx : null,
       appInternetReceivedBytes: number(previous.appInternetReceivedBytes),
       appInternetSentBytes: number(previous.appInternetSentBytes),
+      networkMeasurementSupported: previous.networkMeasurementSupported === true,
+      networkMeasurementSource: previous.networkMeasurementSource || "",
+      networkMeasuredAt: previous.networkMeasuredAt || null,
+      measurementCoverageStartedAt: previous.measurementCoverageStartedAt || null,
+      measurementCoverageEndedAt: previous.measurementCoverageEndedAt || null,
+      unattributedBoundaryRxBytes: number(previous.unattributedBoundaryRxBytes),
+      unattributedBoundaryTxBytes: number(previous.unattributedBoundaryTxBytes),
       ...Object.fromEntries(COUNTER_KEYS.map((key) => [key, number(previous[key])])),
       dedup: boundedUnique(previous.dedup),
     };
@@ -52,6 +59,13 @@ function createDaily(previous, dateKey, nowIso) {
     lastNativeTx: null,
     appInternetReceivedBytes: 0,
     appInternetSentBytes: 0,
+    networkMeasurementSupported: false,
+    networkMeasurementSource: "",
+    networkMeasuredAt: null,
+    measurementCoverageStartedAt: null,
+    measurementCoverageEndedAt: null,
+    unattributedBoundaryRxBytes: 0,
+    unattributedBoundaryTxBytes: 0,
     ...emptyCounters(),
     dedup: [],
   };
@@ -139,6 +153,10 @@ export function createTrafficTelemetry({ storage = globalThis.localStorage, now 
 
   return {
     recordNetworkStats(stats = {}) {
+      const measuredAtMs = Number.isFinite(Number(stats.measuredAt)) ? Number(stats.measuredAt) : now();
+      const previousDailyKey = daily.dateKey;
+      const previousDailyRx = daily.lastNativeRx;
+      const previousDailyTx = daily.lastNativeTx;
       const supported = stats.supported === true
         && Number.isFinite(Number(stats.uidRxBytes))
         && Number.isFinite(Number(stats.uidTxBytes));
@@ -151,6 +169,7 @@ export function createTrafficTelemetry({ storage = globalThis.localStorage, now 
       }
       const rx = number(stats.uidRxBytes);
       const tx = number(stats.uidTxBytes);
+      const measuredAtIso = iso(measuredAtMs);
       session.networkMeasurementSupported = true;
       if (session.sessionBaselineRx === null) {
         session.sessionBaselineRx = rx;
@@ -165,12 +184,23 @@ export function createTrafficTelemetry({ storage = globalThis.localStorage, now 
         session.lastNativeRx = rx;
         session.lastNativeTx = tx;
       }
-      rotateDaily();
-      if (daily.lastNativeRx !== null) daily.appInternetReceivedBytes += rx >= daily.lastNativeRx ? rx - daily.lastNativeRx : 0;
-      if (daily.lastNativeTx !== null) daily.appInternetSentBytes += tx >= daily.lastNativeTx ? tx - daily.lastNativeTx : 0;
+      rotateDaily(measuredAtMs);
+      const crossedUtcDay = previousDailyKey !== daily.dateKey;
+      if (crossedUtcDay) {
+        if (previousDailyRx !== null && rx >= previousDailyRx) daily.unattributedBoundaryRxBytes += rx - previousDailyRx;
+        if (previousDailyTx !== null && tx >= previousDailyTx) daily.unattributedBoundaryTxBytes += tx - previousDailyTx;
+      } else {
+        if (daily.lastNativeRx !== null) daily.appInternetReceivedBytes += rx >= daily.lastNativeRx ? rx - daily.lastNativeRx : 0;
+        if (daily.lastNativeTx !== null) daily.appInternetSentBytes += tx >= daily.lastNativeTx ? tx - daily.lastNativeTx : 0;
+      }
       daily.lastNativeRx = rx;
       daily.lastNativeTx = tx;
-      persist();
+      daily.networkMeasurementSupported = true;
+      daily.networkMeasurementSource = "ANDROID_UID_TRAFFIC_STATS";
+      daily.networkMeasuredAt = measuredAtIso;
+      daily.measurementCoverageStartedAt ||= measuredAtIso;
+      daily.measurementCoverageEndedAt = measuredAtIso;
+      persist(measuredAtMs);
     },
     recordDownloadComplete({ operationId, bytes, classification, status } = {}) {
       const value = number(bytes);

@@ -135,17 +135,21 @@ test("background que falha offline volta a ser elegível no evento online", asyn
   const url = "https://cdn/recovery.jpg";
   let online = false;
   let attempts = 0;
+  let clock = 1_000;
   class RecoveringImage {
     set src(_value) { attempts += 1; queueMicrotask(() => online ? this.onload() : this.onerror()); }
     async decode() {}
   }
   const item = { published:{ media:{ primary:{ type:"image", url } } } };
-  const failed = await prepareTemplateV2CriticalImage(item, RecoveringImage, { maxAttempts:1 });
+  const options = { maxAttempts:1, failureCooldownMs:30_000, now:() => clock };
+  const failed = await prepareTemplateV2CriticalImage(item, RecoveringImage, options);
   assert.equal(failed.status, "failed");
   assert.equal(markTemplateV2BackgroundForOnlineRetry(retryKeys, "template-1", online), true);
   online = true;
   assert.deepEqual(takeTemplateV2BackgroundOnlineRetries(retryKeys), ["template-1"]);
-  const recovered = await prepareTemplateV2CriticalImage(item, RecoveringImage, { maxAttempts:1 });
+  assert.equal((await prepareTemplateV2CriticalImage(item, RecoveringImage, options)).status, "cooldown");
+  clock += 30_000;
+  const recovered = await prepareTemplateV2CriticalImage(item, RecoveringImage, options);
   assert.equal(recovered.status, "ready");
   clearTemplateV2BackgroundOnlineRetry(retryKeys, "template-1");
   assert.equal(attempts, 2);
@@ -162,4 +166,41 @@ test("background válido permanece no cache e não gera novo download", async ()
   await preloadImageForPaint(url, ReadyImage);
   await preloadImageForPaint(url, ReadyImage);
   assert.equal(attempts, 1);
+});
+
+test("background com falha entra em cooldown e rotações não repetem o download", async () => {
+  const url = "https://cdn/cooldown-rotation.jpg";
+  let attempts = 0;
+  let clock = 1_000;
+  class FailingImage {
+    set src(_value) { attempts += 1; queueMicrotask(() => this.onerror()); }
+  }
+  const item = { published:{ media:{ primary:{ type:"image", url } } } };
+  const options = { maxAttempts:1, failureCooldownMs:60_000, now:() => clock };
+
+  assert.equal((await prepareTemplateV2CriticalImage(item, FailingImage, options)).status, "failed");
+  assert.equal((await prepareTemplateV2CriticalImage(item, FailingImage, options)).status, "cooldown");
+  assert.equal((await prepareTemplateV2CriticalImage(item, FailingImage, options)).status, "cooldown");
+  assert.equal(attempts, 1);
+});
+
+test("background volta a carregar automaticamente após o cooldown", async () => {
+  const url = "https://cdn/cooldown-recovery.jpg";
+  let attempts = 0;
+  let clock = 5_000;
+  let available = false;
+  class RecoveringImage {
+    set src(_value) { attempts += 1; queueMicrotask(() => available ? this.onload() : this.onerror()); }
+    async decode() {}
+  }
+  const item = { published:{ media:{ primary:{ type:"image", url } } } };
+  const options = { maxAttempts:1, failureCooldownMs:30_000, now:() => clock };
+
+  assert.equal((await prepareTemplateV2CriticalImage(item, RecoveringImage, options)).status, "failed");
+  clock += 29_999;
+  available = true;
+  assert.equal((await prepareTemplateV2CriticalImage(item, RecoveringImage, options)).status, "cooldown");
+  clock += 1;
+  assert.equal((await prepareTemplateV2CriticalImage(item, RecoveringImage, options)).status, "ready");
+  assert.equal(attempts, 2);
 });

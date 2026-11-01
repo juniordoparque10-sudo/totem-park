@@ -20,6 +20,13 @@ function emptyDay(key, identity) {
     ...identity,
     internetRxBytes:0,
     internetTxBytes:0,
+    networkMeasurementSupported:false,
+    networkMeasurementSource:"",
+    networkMeasuredAt:null,
+    measurementCoverageStartedAt:null,
+    measurementCoverageEndedAt:null,
+    unattributedBoundaryRxBytes:0,
+    unattributedBoundaryTxBytes:0,
     mediaDownloadedBytes:0,
     cacheReusedBytes:0,
     trafficAvoidedBytes:0,
@@ -180,6 +187,15 @@ export function createTelemetryHistory({ storage = globalThis.localStorage, now 
         if (value !== null) day[field] = Math.max(day[field], value);
       }
       day.cacheablePlaybackCount = day.cachePlaybackHits + day.remotePlaybackCount + day.fallbackPlaybackCount;
+      if (trafficDaily?.networkMeasurementSupported === true) {
+        day.networkMeasurementSupported = true;
+        day.networkMeasurementSource = String(trafficDaily.networkMeasurementSource || "ANDROID_UID_TRAFFIC_STATS");
+        day.networkMeasuredAt = trafficDaily.networkMeasuredAt || day.networkMeasuredAt;
+        day.measurementCoverageStartedAt ||= trafficDaily.measurementCoverageStartedAt || null;
+        day.measurementCoverageEndedAt = trafficDaily.measurementCoverageEndedAt || day.measurementCoverageEndedAt;
+      }
+      day.unattributedBoundaryRxBytes = Math.max(day.unattributedBoundaryRxBytes || 0, numeric(trafficDaily?.unattributedBoundaryRxBytes) || 0);
+      day.unattributedBoundaryTxBytes = Math.max(day.unattributedBoundaryTxBytes || 0, numeric(trafficDaily?.unattributedBoundaryTxBytes) || 0);
       day.cacheHitRate = day.cacheablePlaybackCount > 0 ? day.cachePlaybackHits / day.cacheablePlaybackCount : null;
       day.packageName = String(operational?.app?.packageName || day.packageName || "");
       day.versionCode = numeric(operational?.app?.versionCode) ?? day.versionCode;

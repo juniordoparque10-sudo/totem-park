@@ -9,6 +9,7 @@ test("V16 remains protected while V17 supports Templates V2", () => {
 
 test("V69 advertises the installed rcsecurelink Android contract", () => {
   assert.equal(getAndroidPlayerV2Capabilities("device", { packageName:"br.com.parksolutions.totempark.player.rcsecurelink", versionCode:69 })?.versionCode, 69);
+  assert.equal(getAndroidPlayerV2Capabilities("device", { packageName:"br.com.parksolutions.totempark.player.rcsecurelink", versionCode:70 })?.versionCode, 70);
   assert.equal(getAndroidPlayerV2Capabilities("device", { packageName:"br.com.parksolutions.totempark", versionCode:69 }), null);
 });
 

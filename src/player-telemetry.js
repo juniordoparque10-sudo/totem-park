@@ -18,6 +18,18 @@ export function isTelemetryAllowed(config = {}, identity = {}) {
   return matches(config.clientIds, identity.clientId) || matches(config.screenIds, identity.screenId) || matches(config.deviceIds, identity.deviceId);
 }
 
+export function buildOperationalTelemetryUpdate(snapshot = {}) {
+  return Object.fromEntries([
+    ["schemaVersion", snapshot.schemaVersion],
+    ["session", snapshot.session],
+    ["app", snapshot.app],
+    ["player", snapshot.player],
+    ["current", snapshot.current],
+    ["cache", snapshot.cache],
+    ["traffic", snapshot.traffic],
+  ].filter(([, value]) => value !== undefined).map(([field, value]) => [`telemetry.${field}`, value]));
+}
+
 function blank(identity, nowMs, monotonicMs) {
   return {
     schemaVersion:OPERATIONAL_TELEMETRY_SCHEMA_VERSION,

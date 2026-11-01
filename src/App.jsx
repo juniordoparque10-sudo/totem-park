@@ -39,6 +39,7 @@ import { getTemplateResourceUsage } from "./template-resource-usage";
 import { createUnavailableWeather, getWeatherConditionLabel, getWeatherIconSafe, hasUsableWeatherTemperature, mergeLegacyLiveContent } from "./weather-presentation";
 import { selectRealNewsState } from "./template-news-state";
 import { findNextReadyMediaIndex, getCanonicalPlaylistMediaEntries, getNativeOfflineQueueUrls, getPlaylistMediaPreparation } from "./media-download-readiness";
+import { createCacheFailureDiagnostic } from "./cache-failure-diagnostics";
 import { localizeOfflineAssetFields } from "./offline-asset-localization";
 import { linkedAtForScreen, telemetryStatus } from "./telemetry-v1";
 import { createTransitionDiagnostics } from "./transition-diagnostics";
@@ -198,12 +199,12 @@ import {
   isSingleVideoPlaylist,
   restartSingleVideo,
 } from "./single-item-loop";
-import { createPlayerTelemetry, readPlayerTelemetryReport, TELEMETRY_DEFAULT_CONFIG } from "./player-telemetry";
+import { buildOperationalTelemetryUpdate, createPlayerTelemetry, readPlayerTelemetryReport, TELEMETRY_DEFAULT_CONFIG } from "./player-telemetry";
 import { PLAYER_ACTIVITY_SYNC_ENABLED, createPlayerActivityTelemetry, syncPlayerActivityBatch } from "./player-activity-telemetry";
 import { buildOperationalSnapshot, normalizeNativeAppInfo, normalizeOperationalMediaSource, OPERATIONAL_HEARTBEAT_INTERVAL_MS } from "./operational-telemetry";
 import { createTrafficTelemetry } from "./traffic-telemetry";
 import { createTelemetryHistory } from "./telemetry-history";
-import { syncTelemetryHistory } from "./telemetry-history-sync";
+import { nextTelemetryHistorySyncState, shouldAttemptTelemetryHistorySync, syncTelemetryHistory } from "./telemetry-history-sync";
 import { createPortalScreenOrderTracker, getPortalLastSignalMs, getPortalScreenPage, getPortalScreenStatus, sortClientsAlphabetically } from "./portal-status";
 import { reportedAppVersion } from "./telemetry-card-data";
 import {
@@ -3772,6 +3773,7 @@ const firebaseConfig = {
 
 const APP_BUILD_MODE = import.meta.env.VITE_APP_MODE || "web";
 const PLAYER_CAPABILITY_RETRY_INTERVAL_MS = 5 * 60 * 1000;
+const TELEMETRY_HISTORY_REMOTE_SYNC_ENABLED = false;
 const IS_PLAYER_BUILD = ["player", "playerLab", "playerCanary", "playerRc", "playerPhaseB", "playerLinkFix", "playerLoopAudit", "playerTelemetry", "playerJumpDiag", "playerDecoderExperiment"].includes(APP_BUILD_MODE);
 const IS_PLAYER_LAB_BUILD = APP_BUILD_MODE === "playerLab";
 const IS_PLAYER_CANARY_BUILD = APP_BUILD_MODE === "playerCanary";
@@ -15966,7 +15968,8 @@ function PlayerPage() {
   const telemetryHistoryRef = useRef(null);
   const trafficVideoOccurrencesRef = useRef(new WeakMap());
   const telemetryTransitionRef = useRef("");
-  const lastTelemetryHistorySyncRef = useRef(0);
+  const nextTelemetryHistorySyncAtRef = useRef(0);
+  const telemetryHistorySyncFailureCountRef = useRef(0);
   const transitionDiagnosticsRef = useRef(null);
   const transitionDiagnosticRecorderRef = useRef(null);
   const transitionDiagnosticTimersRef = useRef([]);
@@ -16399,6 +16402,9 @@ function PlayerPage() {
       cacheManifestSizeBytes: Number(payload.cacheManifestSizeBytes || 0),
       cacheDownloadedItems: Number(payload.cacheDownloadedItems || 0),
       cacheRemovedItems: Number(payload.cacheRemovedItems || 0),
+      cacheFailureMode: ["item", "pipeline"].includes(payload.cacheFailureMode) ? payload.cacheFailureMode : "none",
+      cacheFailureCount: Number(payload.cacheFailureCount || 0),
+      cacheFailureCodes: Array.isArray(payload.cacheFailureCodes) ? payload.cacheFailureCodes.slice(0, 5) : [],
     };
     const signature = JSON.stringify(normalized);
 
@@ -16664,7 +16670,7 @@ function PlayerPage() {
     if (!nextItem || !isTemplateV2(nextItem)) return undefined;
     let active = true;
     const templateId = nextItem.templateId || nextItem.id || "";
-    prepareTemplateAssets(nextItem).then((result) => {
+    prepareTemplateAssets(nextItem, templateAssetCacheOptions).then((result) => {
       if (!active) return;
       logTemplateOffline(result.hits ? "TEMPLATE_PRELOAD_LOCAL_READY" : "TEMPLATE_ASSET_CACHE_MISS", { templateId, hits:result.hits, misses:result.misses, fromType:playerItems[safeIndex]?.type || playerItems[safeIndex]?.playerItemType || "" });
     }).catch(() => {});
@@ -16681,7 +16687,7 @@ function PlayerPage() {
       logTemplateOffline(record ? "TEMPLATE_DATA_CACHE_HIT" : "TEMPLATE_DATA_CACHE_MISS", { templateId, module, preload:true });
     });
     if (navigator.onLine !== false) {
-      refreshTemplateAssets(nextItem).then((results) => {
+      refreshTemplateAssets(nextItem, templateAssetCacheOptions).then((results) => {
         if (!active) return;
         const failed = results.filter((result) => result.status === "failed").length;
         logTemplateOffline(failed ? "TEMPLATE_REMOTE_REFRESH_FAILED" : "TEMPLATE_REMOTE_REFRESH_COMPLETED", { templateId, type:"preload-assets", failed });
@@ -16921,6 +16927,11 @@ function PlayerPage() {
           currentMediaSource:result.mediaDownloaded > 0 ? "mixed" : "internet",
           activePlaylistWeightBytes,
           estimatedMonthlyTrafficBytes,
+          ...createCacheFailureDiagnostic(
+            result.mediaFailed > 0 ? "item" : "none",
+            result.mediaFailed,
+            result.mediaFailureCodes,
+          ),
         };
 
         if (result.mediaDownloaded > 0) {
@@ -16979,6 +16990,11 @@ function PlayerPage() {
             currentMediaSource: "internet",
             activePlaylistWeightBytes,
             estimatedMonthlyTrafficBytes,
+            ...createCacheFailureDiagnostic(
+              "pipeline",
+              Object.keys(offlinePlaylistMediaByUrl).length,
+              [error],
+            ),
           };
 
           setPlayerCacheStatus((previous) => ({
@@ -17897,6 +17913,10 @@ function PlayerPage() {
           && binding.clientId === clientId
           && binding.screenId === screen.id
           && binding.deviceId === localDeviceId;
+        const canSyncTelemetryHistory = binding?.status === "ACTIVE"
+          && binding.clientId === clientId
+          && binding.screenId === screen.id
+          && binding.deviceId === localDeviceId;
         const heartbeatPayload = {
           connectedDeviceId: localDeviceId,
           activeDeviceId: deleteField(),
@@ -17916,7 +17936,7 @@ function PlayerPage() {
         }
 
         if (canSyncTelemetry) {
-          heartbeatPayload.telemetry = telemetrySnapshot;
+          Object.assign(heartbeatPayload, buildOperationalTelemetryUpdate(telemetrySnapshot));
           heartbeatPayload.telemetryUpdatedAt = serverTimestamp();
         }
 
@@ -17961,9 +17981,16 @@ function PlayerPage() {
         const canRescueTransitionDiagnostic = pendingTransitionDiagnostic
           && IS_TEMPLATES_V2_DIAGNOSTIC_BUILD
           && screen.templatesV2TestMode === true;
-        const historySyncDue = Date.now() - lastTelemetryHistorySyncRef.current >= 15 * 60 * 1000;
-        const historyHasRelevantEvents = telemetryHistoryRef.current.pending().events.length > 0;
-        if (canSyncTelemetry && (historySyncDue || historyHasRelevantEvents)) {
+        const historyPending = telemetryHistoryRef.current.pending();
+        const historyHasPendingRecords = Boolean(historyPending.days.length || historyPending.sessions.length || historyPending.events.length);
+        const historySyncNow = Date.now();
+        if (TELEMETRY_HISTORY_REMOTE_SYNC_ENABLED
+          && canSyncTelemetryHistory
+          && shouldAttemptTelemetryHistorySync({
+          now:historySyncNow,
+          nextAttemptAt:nextTelemetryHistorySyncAtRef.current,
+          hasPending:historyHasPendingRecords,
+        })) {
           const historyResult = await syncTelemetryHistory({
             history:telemetryHistoryRef.current,
             refs:{
@@ -17973,7 +18000,15 @@ function PlayerPage() {
             },
             setDoc,
           });
-          lastTelemetryHistorySyncRef.current = Date.now();
+          const historySchedule = nextTelemetryHistorySyncState(historyResult, {
+            now:historySyncNow,
+            failureCount:telemetryHistorySyncFailureCountRef.current,
+          });
+          nextTelemetryHistorySyncAtRef.current = historySchedule.nextAttemptAt;
+          telemetryHistorySyncFailureCountRef.current = historySchedule.failureCount;
+          if (historyResult.failure) {
+            console.warn("TELEMETRY_HISTORY_SYNC_FAILED", historyResult.failure);
+          }
           if (historyResult.status === "synced") {
             const pending = telemetryHeartbeat?.outbox?.at(-1);
             if (pending) telemetryRef.current.acknowledge(pending.sequence);

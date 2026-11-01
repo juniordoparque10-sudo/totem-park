@@ -194,6 +194,23 @@ test("X-Z: schema 3 is not instrumented, schema 4 requires traffic, and zero rem
   assert.equal(formatBytes(0), "0 B");
 });
 
+test("UTC rollover preserves the crossing delta as measured but unattributed", () => {
+  let clock = Date.parse("2026-10-28T23:59:50.000Z");
+  const telemetry = createTrafficTelemetry({ storage:memoryStorage(), now:() => clock });
+  telemetry.recordNetworkStats({ supported:true, uidRxBytes:1000, uidTxBytes:100, measuredAt:clock });
+  clock = Date.parse("2026-10-29T00:00:10.000Z");
+  telemetry.recordNetworkStats({ supported:true, uidRxBytes:1300, uidTxBytes:140, measuredAt:clock });
+  const daily = telemetry.dailySnapshot();
+  assert.equal(daily.dateKey, "2026-10-29");
+  assert.equal(daily.appInternetReceivedBytes, 0);
+  assert.equal(daily.appInternetSentBytes, 0);
+  assert.equal(daily.unattributedBoundaryRxBytes, 300);
+  assert.equal(daily.unattributedBoundaryTxBytes, 40);
+  assert.equal(daily.networkMeasurementSupported, true);
+  assert.equal(daily.networkMeasurementSource, "ANDROID_UID_TRAFFIC_STATS");
+  assert.equal(daily.networkMeasuredAt, "2026-10-29T00:00:10.000Z");
+});
+
 test("AA-AB: integration reuses the one heartbeat and does not write Firestore per playback", () => {
   const source = fs.readFileSync(new URL("../src/App.jsx", import.meta.url), "utf8");
   assert.match(source, /TotemDevice\.getNetworkStats\(\)/);
@@ -202,6 +219,20 @@ test("AA-AB: integration reuses the one heartbeat and does not write Firestore p
   assert.match(source, /createTelemetryHistory/);
   assert.match(source, /trafficTelemetryRef\.current\.dailySnapshot\(\)/);
   assert.match(source, /syncTelemetryHistory/);
-  assert.match(source, /historySyncDue \|\| historyHasRelevantEvents/);
-  assert.match(source, /lastTelemetryHistorySyncRef\.current = Date\.now\(\)/);
+  assert.match(source, /shouldAttemptTelemetryHistorySync/);
+  assert.match(source, /const TELEMETRY_HISTORY_REMOTE_SYNC_ENABLED = false/);
+  assert.doesNotMatch(source, /historySyncDue \|\| historyHasRelevantEvents/);
+  assert.match(source, /prepareTemplateAssets\(nextItem, templateAssetCacheOptions\)/);
+  assert.match(source, /refreshTemplateAssets\(nextItem, templateAssetCacheOptions\)/);
+  assert.match(source, /nextTelemetryHistorySyncState\(historyResult/);
+  assert.match(source, /const canSyncTelemetryHistory = binding\?\.status === "ACTIVE"/);
+  assert.match(source, /if \(TELEMETRY_HISTORY_REMOTE_SYNC_ENABLED\s*&& canSyncTelemetryHistory\s*&& shouldAttemptTelemetryHistorySync/);
+});
+
+test("V70 consolidated flavor reports one coherent experimental version", () => {
+  const env = fs.readFileSync(new URL("../.env.playerConsolidatedExperimental", import.meta.url), "utf8");
+  const gradle = fs.readFileSync(new URL("../android/app/build.gradle", import.meta.url), "utf8");
+  assert.match(env, /VITE_APP_VERSION=1\.0\.0-v70-experimental/);
+  assert.match(env, /VITE_PLAYER_OPERATIONAL_TELEMETRY=1/);
+  assert.match(gradle, /playerConsolidatedExperimental[\s\S]*applicationIdSuffix "\.player\.rcsecurelink"[\s\S]*versionCode 70[\s\S]*versionName "1\.0\.0-v70-experimental"/);
 });

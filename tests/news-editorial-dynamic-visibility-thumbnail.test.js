@@ -17,6 +17,7 @@ test("renderer aplica logo, conteúdo, headline, subtítulo e cards ao preview",
   assert.match(renderer, /visibility\.showHeadline/);
   assert.match(renderer, /visibility\.showSubtitle/);
   assert.match(renderer, /visibility\.showServices/);
+  assert.match(renderer, /<TemplateLogo className="news-dynamic-logo"/);
 });
 
 test("visibilidade persiste ao salvar e reabrir a configuração", () => {

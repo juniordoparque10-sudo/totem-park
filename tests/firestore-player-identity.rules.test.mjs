@@ -7,6 +7,7 @@ import {
   initializeTestEnvironment,
 } from "@firebase/rules-unit-testing";
 import { doc, getDoc, setDoc, updateDoc } from "firebase/firestore";
+import { createTelemetryHistory } from "../src/telemetry-history.js";
 
 const projectId = "demo-totem-identity";
 let env;
@@ -34,7 +35,10 @@ function daily({ clientId = "client-a", screenId = "screen-a", deviceId = "devic
     provedPlaybackSeconds:30, provedOnlineSeconds:20, provedOfflineSeconds:10,
     sessionIds:["session-1"], sessionCount:1, restartCount:0, failureCount:0,
     unknownInterruptionCount:0, packageName:"pkg", versionCode:69, versionName:"V69",
-    lastCommunicationAt:"2026-10-28T12:00:00.000Z", ...overrides,
+    lastCommunicationAt:"2026-10-28T12:00:00.000Z", networkMeasurementSupported:true,
+    networkMeasurementSource:"ANDROID_UID_TRAFFIC_STATS", networkMeasuredAt:"2026-10-28T12:00:00.000Z",
+    measurementCoverageStartedAt:"2026-10-28T11:00:00.000Z", measurementCoverageEndedAt:"2026-10-28T12:00:00.000Z",
+    unattributedBoundaryRxBytes:0, unattributedBoundaryTxBytes:0, ...overrides,
   };
 }
 
@@ -128,6 +132,9 @@ test("active binding can announce only supported Web or rcsecurelink Android cap
   }));
   await assertSucceeds(updateDoc(doc(bound, screenPath()), {
     capabilities: { ...capability, platform:"ANDROID", packageName:"br.com.parksolutions.totempark.player.rcsecurelink", versionCode:70 },
+  }));
+  await assertSucceeds(updateDoc(doc(bound, screenPath()), {
+    capabilities: { ...capability, platform:"ANDROID", packageName:"br.com.parksolutions.totempark", versionCode:70 },
   }));
   await assertFails(updateDoc(doc(bound, screenPath()), {
     capabilities: { ...capability, platform:"ANDROID", packageName:"br.com.parksolutions.totempark", versionCode:69 },
@@ -263,6 +270,47 @@ test("historical event enforces exact 180-day retention and timestamp coherence"
   await assertFails(setDoc(doc(bound, eventPath("invalid-time")), activityEvent({
     id:"invalid-time", atMs:-1,
   })));
+});
+
+test("payload real do acumulador histórico é aceito para daily, session e event", async () => {
+  const atMs = Date.parse("2026-10-30T12:00:00.000Z");
+  const storage = new Map();
+  const history = createTelemetryHistory({
+    identity:{ clientId:"client-a", screenId:"screen-a", deviceId:"device-a" },
+    now:() => atMs,
+    storage:{
+      getItem:(key) => storage.get(key) ?? null,
+      setItem:(key, value) => storage.set(key, value),
+    },
+  });
+  history.checkpoint({
+    trafficDaily:{
+      dateKey:"2026-10-30", appInternetReceivedBytes:100, appInternetSentBytes:20,
+      mediaDownloadedBytes:10, localMediaReusedBytes:30, cachePlaybackHits:2,
+      remotePlaybackCount:1, fallbackPlaybackCount:0,
+    },
+    operational:{
+      session:{ sessionId:"real-session", sessionStartedAt:"2026-10-30T11:59:00.000Z", uptimeSeconds:60 },
+      app:{ packageName:"br.com.parksolutions.totempark.player.rcsecurelink", versionCode:69, versionName:"V69" },
+      current:{ networkStatus:"ONLINE", playerState:"playing" },
+    },
+  });
+  history.recordEvents([{
+    id:"real-event", screenId:"screen-a", sessionId:"real-session", type:"PLAYBACK_START",
+    state:"ACTIVE", domain:"playback", atMs, mediaId:"media-1", mediaType:"video",
+  }]);
+  const pending = history.pending();
+  const bound = env.authenticatedContext("player-a").firestore();
+  const day = pending.days.find(({ id }) => id === "2026-10-30");
+  const session = pending.sessions.find(({ id }) => id === "real-session");
+  const event = pending.events.find(({ id }) => id === "real-event");
+
+  await assertSucceeds(setDoc(doc(bound, dailyPath(day.id)), day.data, { merge:true }));
+  await assertSucceeds(setDoc(doc(bound, `${screenPath()}/telemetrySessions/${session.id}`), session.data, { merge:true }));
+  await assertSucceeds(setDoc(doc(bound, eventPath(event.id)), {
+    ...event.data,
+    expiresAt:new Date(event.data.expiresAtMs),
+  }, { merge:true }));
 });
 
 test("deletion-pending clients cannot update screens or write historical telemetry", async () => {

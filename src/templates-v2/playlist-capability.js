@@ -3,6 +3,7 @@ export const DYNAMIC_TEMPLATE_TYPES = new Set(["news-editorial-dynamic", "market
 export const V58_CANARY_CLIENT_ID = "eCd1q9Dq1SMr9D5FlKN8";
 export const V58_CANARY_SCREEN_ID = "wKJY9pGe2U4p2QtehHTW";
 const V58_EXPERIMENTAL_PACKAGE = "br.com.parksolutions.totempark.player.rcsecurelink";
+const V70_OFFICIAL_PACKAGE = "br.com.parksolutions.totempark";
 
 export function isDynamicTemplateV2Type(type = "") { return DYNAMIC_TEMPLATE_TYPES.has(String(type)); }
 
@@ -39,8 +40,9 @@ export function supportsDynamicTemplatesV2(player = {}) {
     && capabilities?.playlistItemNavigation === true
     && matchingConnectedDevice
     && capabilities?.platform === "ANDROID"
-    && capabilities?.packageName === V58_EXPERIMENTAL_PACKAGE
-    && [58, 59, 60, 61, 62, 63, 64, 65, 66, 67, 68, 69].includes(Number(capabilities?.versionCode))
+    && ((capabilities?.packageName === V58_EXPERIMENTAL_PACKAGE
+      && [58, 59, 60, 61, 62, 63, 64, 65, 66, 67, 68, 69, 70].includes(Number(capabilities?.versionCode)))
+      || (capabilities?.packageName === V70_OFFICIAL_PACKAGE && Number(capabilities?.versionCode) === 70))
     && player?.id === V58_CANARY_SCREEN_ID
     && player?.clientId === V58_CANARY_CLIENT_ID
     && player?.templatesV2TestMode === true

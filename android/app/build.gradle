@@ -68,8 +68,8 @@ android {
         }
         playerRc {
             dimension "appMode"
-            versionCode 40
-            versionName "1.0.0-v40-cache-safety-hotfix-rc"
+            versionCode 70
+            versionName "1.0.0-v70-official-candidate"
             manifestPlaceholders = [
                 appLabel: "Totem Park Player",
                 tvLauncherEnabled: "true"
@@ -88,8 +88,8 @@ android {
         playerConsolidatedExperimental {
             dimension "appMode"
             applicationIdSuffix ".player.rcsecurelink"
-            versionCode 69
-            versionName "1.0.0-v69-experimental"
+            versionCode 70
+            versionName "1.0.0-v70-experimental"
             signingConfig signingConfigs.debug
             manifestPlaceholders = [
                 appLabel: "Totem Park Player CONSOLIDADO EXP",

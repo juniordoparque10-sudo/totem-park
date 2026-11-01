@@ -1,6 +1,8 @@
 import test from "node:test";
 import assert from "node:assert/strict";
-import { createPlayerTelemetry, isTelemetryAllowed } from "../src/player-telemetry.js";
+import * as playerTelemetry from "../src/player-telemetry.js";
+
+const { createPlayerTelemetry, isTelemetryAllowed } = playerTelemetry;
 
 function memoryStorage() {
   const values = new Map();
@@ -73,6 +75,29 @@ test("history outbox remains bounded and acknowledged independently from heartbe
   assert.match(first.outbox[0].id, /:1$/);
   telemetry.acknowledge(1);
   assert.equal(telemetry.getReport().outbox.length, 0);
+});
+
+test("V70 heartbeat updates only operational field paths without transporting legacy activity", () => {
+  assert.equal(typeof playerTelemetry.buildOperationalTelemetryUpdate, "function");
+  const snapshot = {
+    schemaVersion:4,
+    session:{ sessionId:"v70", clientId:"client-a", screenId:"screen-a", deviceId:"device-a" },
+    app:{ packageName:"br.com.parksolutions.totempark.player.rcsecurelink", versionCode:70, versionName:"1.0.0-v70-experimental" },
+    player:{ state:"playing" }, current:{ playerState:"playing" },
+    cache:{ cacheStatus:"pronto" }, traffic:{ networkMeasurementSupported:true },
+  };
+  const update = playerTelemetry.buildOperationalTelemetryUpdate(snapshot);
+  assert.deepEqual(update, {
+    "telemetry.schemaVersion":4,
+    "telemetry.session":snapshot.session,
+    "telemetry.app":snapshot.app,
+    "telemetry.player":snapshot.player,
+    "telemetry.current":snapshot.current,
+    "telemetry.cache":snapshot.cache,
+    "telemetry.traffic":snapshot.traffic,
+  });
+  assert.equal("telemetry" in update, false);
+  assert.equal("telemetry.activity" in update, false);
 });
 
 test("READY finaliza loading mesmo sem token de transição", () => {

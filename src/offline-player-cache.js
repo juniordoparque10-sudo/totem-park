@@ -21,6 +21,7 @@ import { buildNativeIdentityRecord, classifyLegacyIdentityRecord, getNativeIdent
 import { isRemoteDownloadSource } from "./android-media-source.js";
 import { getNativeCacheJournalEntry, updateNativeCacheJournal } from "./native-cache-journal.js";
 import { promoteNativeCachePartial } from "./native-cache-transaction.js";
+import { getCacheFailureCode } from "./cache-failure-diagnostics.js";
 
 const MEDIA_CACHE_NAME = "totempark-player-media-v1";
 const MEDIA_CACHE_META_KEY = "totempark-player-media-cache-meta";
@@ -599,6 +600,7 @@ export async function cacheOfflineAssets(urls, scope, storageKey, options = {}) 
   let mediaFailed = 0;
   let mediaDownloaded = 0;
   let mediaDownloadedBytes = 0;
+  const mediaFailureCodes = [];
   let superseded = false;
   const sizeByUrl = {};
 
@@ -817,6 +819,7 @@ export async function cacheOfflineAssets(urls, scope, storageKey, options = {}) 
       }
       failed += 1;
       itemFailed = true;
+      if (playlistMedia) mediaFailureCodes.push(getCacheFailureCode(error));
       console.log("Falha ao baixar midia para uso offline:", url, error);
       recordLabEvent("CACHE_ERROR", { ...diagnostic, message: error?.message || "Falha no cache" });
     } finally {
@@ -871,6 +874,7 @@ export async function cacheOfflineAssets(urls, scope, storageKey, options = {}) 
     mediaFailed,
     mediaDownloaded,
     mediaDownloadedBytes,
+    mediaFailureCodes,
     superseded,
     urlMap,
   };

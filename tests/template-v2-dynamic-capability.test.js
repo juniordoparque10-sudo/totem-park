@@ -64,6 +64,7 @@ test("reconhece Android V58 a V63 legítimo somente na tela canário com binding
   assert.equal(supportsDynamicTemplatesV2({ ...canary, playerBinding:{ ...binding, deviceId:"other-device" } }), false);
   assert.equal(supportsDynamicTemplatesV2({ ...canary, connectedDeviceId:"other-device" }), false);
   assert.equal(supportsDynamicTemplatesV2({ ...canary, capabilities:{ ...capability, packageName:"br.com.parksolutions.totempark" } }), false);
+  assert.equal(supportsDynamicTemplatesV2({ ...canary, capabilities:{ ...capability, packageName:"br.com.parksolutions.totempark", versionCode:70 } }), true);
   assert.equal(supportsDynamicTemplatesV2({ ...canary, capabilities:{ ...capability, versionCode:57 } }), false);
   assert.equal(supportsDynamicTemplatesV2({ ...canary, capabilities:{ ...capability, templatesV2:false } }), false);
 });

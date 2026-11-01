@@ -1,8 +1,9 @@
 export function getPlaylistNavigationCapability(screen = {}) {
   const capability = screen.capabilities;
   const supportedAndroid = capability?.platform === "ANDROID"
-    && capability?.packageName === "br.com.parksolutions.totempark.player.rcsecurelink"
-    && [58, 59, 60, 61, 62, 63, 64, 65, 66, 67, 68, 69].includes(Number(capability?.versionCode))
+    && ((capability?.packageName === "br.com.parksolutions.totempark.player.rcsecurelink"
+      && [58, 59, 60, 61, 62, 63, 64, 65, 66, 67, 68, 69, 70].includes(Number(capability?.versionCode)))
+      || (capability?.packageName === "br.com.parksolutions.totempark" && Number(capability?.versionCode) === 70))
     && capability?.templatesV2 === true
     && capability?.templatesV2DynamicPhase1 === true;
   const supported = capability?.playlistItemNavigation === true
