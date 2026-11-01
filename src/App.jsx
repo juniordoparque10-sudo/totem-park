@@ -42,6 +42,7 @@ import { findNextReadyMediaIndex, getCanonicalPlaylistMediaEntries, getNativeOff
 import { createCacheFailureDiagnostic } from "./cache-failure-diagnostics";
 import { createPlayerScreenSnapshotStore, getPlayerScreenScopeKey } from "./player-screen-snapshot";
 import { createPlayerCapabilitySyncState } from "./player-capability-sync-state";
+import { createNowPlayingSyncGuard } from "./player-now-playing-sync";
 import { localizeOfflineAssetFields } from "./offline-asset-localization";
 import { linkedAtForScreen, telemetryStatus } from "./telemetry-v1";
 import { createTransitionDiagnostics } from "./transition-diagnostics";
@@ -15981,6 +15982,7 @@ function PlayerPage() {
   const playerIdentityStateRef = useRef(PLAYER_IDENTITY_STATES.UNAVAILABLE);
   const playerScreenSnapshotRef = useRef(null);
   const capabilitySyncRef = useRef(null);
+  const nowPlayingSyncRef = useRef(null);
   const operationalSnapshotRef = useRef(null);
   const operationalPlayerErrorRef = useRef(false);
   const [operationalAppInfo, setOperationalAppInfo] = useState(() => normalizeNativeAppInfo({}, {
@@ -16004,6 +16006,9 @@ function PlayerPage() {
     capabilitySyncRef.current = createPlayerCapabilitySyncState({
       retryIntervalMs: PLAYER_CAPABILITY_RETRY_INTERVAL_MS,
     });
+  }
+  if (!nowPlayingSyncRef.current) {
+    nowPlayingSyncRef.current = createNowPlayingSyncGuard();
   }
   if (!activityTelemetryRef.current) {
     activityTelemetryRef.current = createPlayerActivityTelemetry({
@@ -18362,35 +18367,43 @@ function PlayerPage() {
       "screens",
       screen.id
     );
+    const nowPlayingScope = getPlayerScreenScopeKey(clientId, screen.id);
+    const nowPlayingPayload = {
+      nowPlayingTitle: currentItem.title || currentItem.name || "",
+      nowPlayingType:
+        currentItem.playerItemType === "template"
+          ? `Template ${currentItem.type || ""}`
+          : currentItem.type || "",
+      nowPlayingDuration: Number(currentItem.duration || 10),
+      nowPlayingPreview: currentItem.remotePreview || currentItem.preview || "",
+      nowPlayingOrientation: getPreviewOrientation(currentItem),
+      nowPlayingAspectRatio: currentItem.aspectRatio || "",
+      nowPlayingWidth: currentItem.width || null,
+      nowPlayingHeight: currentItem.height || null,
+      nowPlayingTemplateType: currentItem.templateType || "",
+      nowPlayingItemType: currentItem.playerItemType || "",
+      nowPlayingSound: currentItem.sound || false,
+      currentMediaSource: normalizeOperationalMediaSource(currentItem.currentMediaSource, {
+        template:currentItem.playerItemType === "template" || Boolean(currentItem.templateType),
+      }),
+      nowPlayingIndex: safeIndex + 1,
+      nowPlayingTotal: items.length,
+      currentPlaylistId: activePlaylist.id || "",
+      currentPlaylistName: activePlaylist.name || "",
+      currentPlaylistMode: activeMode,
+    };
 
     async function updateNowPlaying() {
+      if (!nowPlayingSyncRef.current.shouldSync(nowPlayingScope, nowPlayingPayload)) return;
+      nowPlayingSyncRef.current.markAttempt(nowPlayingScope, nowPlayingPayload);
       try {
         await updateDoc(screenDocRef, {
-          nowPlayingTitle: currentItem.title || currentItem.name || "",
-          nowPlayingType:
-            currentItem.playerItemType === "template"
-              ? `Template ${currentItem.type || ""}`
-              : currentItem.type || "",
-          nowPlayingDuration: Number(currentItem.duration || 10),
-          nowPlayingPreview: currentItem.remotePreview || currentItem.preview || "",
-          nowPlayingOrientation: getPreviewOrientation(currentItem),
-          nowPlayingAspectRatio: currentItem.aspectRatio || "",
-          nowPlayingWidth: currentItem.width || null,
-          nowPlayingHeight: currentItem.height || null,
-          nowPlayingTemplateType: currentItem.templateType || "",
-          nowPlayingItemType: currentItem.playerItemType || "",
-          nowPlayingSound: currentItem.sound || false,
-          currentMediaSource: normalizeOperationalMediaSource(currentItem.currentMediaSource, {
-            template:currentItem.playerItemType === "template" || Boolean(currentItem.templateType),
-          }),
-          nowPlayingIndex: safeIndex + 1,
-          nowPlayingTotal: items.length,
-          currentPlaylistId: activePlaylist.id || "",
-          currentPlaylistName: activePlaylist.name || "",
-          currentPlaylistMode: activeMode,
+          ...nowPlayingPayload,
           lastMediaUpdateAt: serverTimestamp(),
         });
+        nowPlayingSyncRef.current.markSuccess(nowPlayingScope, nowPlayingPayload);
       } catch (error) {
+        nowPlayingSyncRef.current.markFailure(nowPlayingScope, nowPlayingPayload);
         console.log(error);
       }
     }
