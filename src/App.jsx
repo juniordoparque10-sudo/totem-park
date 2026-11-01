@@ -40,6 +40,7 @@ import { createUnavailableWeather, getWeatherConditionLabel, getWeatherIconSafe,
 import { selectRealNewsState } from "./template-news-state";
 import { findNextReadyMediaIndex, getCanonicalPlaylistMediaEntries, getNativeOfflineQueueUrls, getPlaylistMediaPreparation } from "./media-download-readiness";
 import { createCacheFailureDiagnostic } from "./cache-failure-diagnostics";
+import { createPlayerScreenSnapshotStore, getPlayerScreenScopeKey } from "./player-screen-snapshot";
 import { localizeOfflineAssetFields } from "./offline-asset-localization";
 import { linkedAtForScreen, telemetryStatus } from "./telemetry-v1";
 import { createTransitionDiagnostics } from "./transition-diagnostics";
@@ -15977,6 +15978,7 @@ function PlayerPage() {
   const transitionDiagnosticRescueRef = useRef(null);
   const playerBindingRef = useRef(null);
   const playerIdentityStateRef = useRef(PLAYER_IDENTITY_STATES.UNAVAILABLE);
+  const playerScreenSnapshotRef = useRef(null);
   const capabilitySyncRef = useRef({ fingerprint:"", attemptedAt:0 });
   const operationalSnapshotRef = useRef(null);
   const operationalPlayerErrorRef = useRef(false);
@@ -15993,6 +15995,9 @@ function PlayerPage() {
       },
       alwaysEnabled:IS_V69_OPERATIONAL_TELEMETRY_BUILD,
     });
+  }
+  if (!playerScreenSnapshotRef.current) {
+    playerScreenSnapshotRef.current = createPlayerScreenSnapshotStore();
   }
   if (!activityTelemetryRef.current) {
     activityTelemetryRef.current = createPlayerActivityTelemetry({
@@ -17519,6 +17524,12 @@ function PlayerPage() {
       if (cancelled) return;
       if (exitingTvRef.current) return;
 
+      const resolvedSource = source === "remote" && screenDoc.metadata
+        ? (screenDoc.metadata.fromCache || screenDoc.metadata.hasPendingWrites
+          ? "listener-cache"
+          : "listener-server")
+        : source;
+
       if (!screenDoc.exists()) {
         scheduleValidationTimeout("screen-document-not-confirmed");
         return;
@@ -17527,6 +17538,11 @@ function PlayerPage() {
       clearTimeout(returnToTvTimerRef.current);
 
       const screenData = { id: screenDoc.id, ...screenDoc.data() };
+      const screenScope = getPlayerScreenScopeKey(clientId, screenDoc.id);
+      playerScreenSnapshotRef.current.activate(screenScope);
+      playerScreenSnapshotRef.current.observe(screenScope, screenData, {
+        authoritative: resolvedSource === "remote" || resolvedSource === "listener-server",
+      });
       const connectedDeviceId = screenData.connectedDeviceId || "";
       const lastSeenMs = getTimestampMs(screenData.lastSeenAt);
       const recentlyOnline = lastSeenMs > 0 && Date.now() - lastSeenMs <= 60000;
@@ -17555,11 +17571,11 @@ function PlayerPage() {
         screenId: screenDoc.id,
       });
       setLinkValidationState(LINK_STATES.VALIDATED);
-      logLinkEvent(LINK_STATES.VALIDATED, { screenId: screenDoc.id, source });
+      logLinkEvent(LINK_STATES.VALIDATED, { screenId: screenDoc.id, source:resolvedSource });
       setScreen(screenData);
       setLoading(false);
-      screenStage.success({ screenId:screenDoc.id, source });
-      runtimeDiagnostics.emit("PLAYER_GATE", { gate:"loading", released:true, source }, { dedupeKey:"gate-loading" });
+      screenStage.success({ screenId:screenDoc.id, source:resolvedSource });
+      runtimeDiagnostics.emit("PLAYER_GATE", { gate:"loading", released:true, source:resolvedSource }, { dedupeKey:"gate-loading" });
     }
 
     function subscribeToScreenRef(screenRef) {
@@ -17666,6 +17682,8 @@ function PlayerPage() {
       cancelled = true;
       clearTimeout(returnToTvTimerRef.current);
       unsubscribeScreen?.();
+      const activeScreenId = readTvConnection()?.screenId || "";
+      playerScreenSnapshotRef.current.clear(getPlayerScreenScopeKey(clientId, activeScreenId));
       window.removeEventListener("online", retryValidation);
       window.removeEventListener("offline", markOffline);
     };
@@ -17874,6 +17892,8 @@ function PlayerPage() {
       "screens",
       screen.id
     );
+    const screenScope = getPlayerScreenScopeKey(clientId, screen.id);
+    playerScreenSnapshotRef.current.activate(screenScope);
 
     async function sendHeartbeat() {
       if (exitingTvRef.current) return;
@@ -17897,13 +17917,11 @@ function PlayerPage() {
           trafficDaily:trafficTelemetryRef.current.dailySnapshot(),
           operational:telemetrySnapshot || telemetryRef.current.getReport(),
         });
-        const currentScreen = await getDoc(screenDocRef);
+        const currentScreenSnapshot = playerScreenSnapshotRef.current.read(screenScope);
+        const screenData = currentScreenSnapshot?.data || {};
 
-        if (!currentScreen.exists()) return;
-
-        const screenData = currentScreen.data();
-
-        if (isCurrentSessionExitCommand(screenData.remoteCommand, screenData.commandStatus)) {
+        if (currentScreenSnapshot?.authoritative
+          && isCurrentSessionExitCommand(screenData.remoteCommand, screenData.commandStatus)) {
           return;
         }
 
