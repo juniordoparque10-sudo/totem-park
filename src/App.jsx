@@ -41,6 +41,7 @@ import { selectRealNewsState } from "./template-news-state";
 import { findNextReadyMediaIndex, getCanonicalPlaylistMediaEntries, getNativeOfflineQueueUrls, getPlaylistMediaPreparation } from "./media-download-readiness";
 import { createCacheFailureDiagnostic } from "./cache-failure-diagnostics";
 import { createPlayerScreenSnapshotStore, getPlayerScreenScopeKey } from "./player-screen-snapshot";
+import { createPlayerCapabilitySyncState } from "./player-capability-sync-state";
 import { localizeOfflineAssetFields } from "./offline-asset-localization";
 import { linkedAtForScreen, telemetryStatus } from "./telemetry-v1";
 import { createTransitionDiagnostics } from "./transition-diagnostics";
@@ -15979,7 +15980,7 @@ function PlayerPage() {
   const playerBindingRef = useRef(null);
   const playerIdentityStateRef = useRef(PLAYER_IDENTITY_STATES.UNAVAILABLE);
   const playerScreenSnapshotRef = useRef(null);
-  const capabilitySyncRef = useRef({ fingerprint:"", attemptedAt:0 });
+  const capabilitySyncRef = useRef(null);
   const operationalSnapshotRef = useRef(null);
   const operationalPlayerErrorRef = useRef(false);
   const [operationalAppInfo, setOperationalAppInfo] = useState(() => normalizeNativeAppInfo({}, {
@@ -15998,6 +15999,11 @@ function PlayerPage() {
   }
   if (!playerScreenSnapshotRef.current) {
     playerScreenSnapshotRef.current = createPlayerScreenSnapshotStore();
+  }
+  if (!capabilitySyncRef.current) {
+    capabilitySyncRef.current = createPlayerCapabilitySyncState({
+      retryIntervalMs: PLAYER_CAPABILITY_RETRY_INTERVAL_MS,
+    });
   }
   if (!activityTelemetryRef.current) {
     activityTelemetryRef.current = createPlayerActivityTelemetry({
@@ -17543,6 +17549,9 @@ function PlayerPage() {
       playerScreenSnapshotRef.current.observe(screenScope, screenData, {
         authoritative: resolvedSource === "remote" || resolvedSource === "listener-server",
       });
+      if (source === "remote" || source === "listener-server") {
+        capabilitySyncRef.current.observeRemote(screenData.capabilities);
+      }
       const connectedDeviceId = screenData.connectedDeviceId || "";
       const lastSeenMs = getTimestampMs(screenData.lastSeenAt);
       const recentlyOnline = lastSeenMs > 0 && Date.now() - lastSeenMs <= 60000;
@@ -17961,14 +17970,14 @@ function PlayerPage() {
         await updateDoc(screenDocRef, heartbeatPayload);
 
         if (capabilities) {
-          const fingerprint = JSON.stringify(capabilities);
           const capabilitySync = capabilitySyncRef.current;
-          const retryDue = Date.now() - capabilitySync.attemptedAt >= PLAYER_CAPABILITY_RETRY_INTERVAL_MS;
-          if (capabilitySync.fingerprint !== fingerprint || retryDue) {
-            capabilitySyncRef.current = { fingerprint, attemptedAt:Date.now() };
+          if (capabilitySync.shouldSync(capabilities, Date.now())) {
+            capabilitySync.markAttempt(capabilities);
             try {
               await updateDoc(screenDocRef, { capabilities });
+              capabilitySync.markSuccess(capabilities);
             } catch (error) {
+              capabilitySync.markFailure(capabilities, Date.now());
               console.log("Capabilities do Player aguardando autorização compatível:", error);
             }
           }
@@ -18073,12 +18082,16 @@ function PlayerPage() {
     const onVisible = () => {
       if (document.visibilityState === "visible") sendHeartbeat();
     };
-    window.addEventListener("online", sendHeartbeat);
+    const onOnline = () => {
+      capabilitySyncRef.current.onReconnect();
+      sendHeartbeat();
+    };
+    window.addEventListener("online", onOnline);
     document.addEventListener("visibilitychange", onVisible);
 
     return () => {
       clearInterval(interval);
-      window.removeEventListener("online", sendHeartbeat);
+      window.removeEventListener("online", onOnline);
       document.removeEventListener("visibilitychange", onVisible);
     };
   }, [screen?.id, screen?.templatesV2TestMode, clientId, maintenanceMode, blackoutMode, takeoverMessage, operationalAppInfo]);
