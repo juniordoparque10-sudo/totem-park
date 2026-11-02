@@ -76,6 +76,10 @@ test("PlayerPage wires V2-A only to authoritative lifecycle events", () => {
   assert.match(source, /activityTelemetryRef\.current\.setConnection\("OFFLINE"\)/);
   const heartbeatBody = source.slice(source.indexOf("async function sendHeartbeat"), source.indexOf("sendHeartbeat();", source.indexOf("async function sendHeartbeat")));
   assert.match(heartbeatBody, /syncPlayerActivityBatch/);
+  assert.match(heartbeatBody, /telemetryActivityBatchingEnabled/);
+  assert.match(heartbeatBody, /syncPlayerActivityBatchDocuments/);
+  assert.match(heartbeatBody, /writeBatch\(db\)/);
+  assert.match(heartbeatBody, /telemetryActivityBatches/);
   assert.match(heartbeatBody, /activityTelemetryRef\.current\.acknowledge/);
 });
 

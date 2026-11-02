@@ -126,6 +126,7 @@ import {
   getDocsFromServer,
   runTransaction,
   deleteField,
+  writeBatch,
 } from "firebase/firestore";
 
 import firebaseApp, { auth, authPersistenceReady, db } from "./firebase";
@@ -203,7 +204,7 @@ import {
   restartSingleVideo,
 } from "./single-item-loop";
 import { buildOperationalTelemetryUpdate, createPlayerTelemetry, readPlayerTelemetryReport, TELEMETRY_DEFAULT_CONFIG } from "./player-telemetry";
-import { PLAYER_ACTIVITY_SYNC_ENABLED, createPlayerActivityTelemetry, syncPlayerActivityBatch } from "./player-activity-telemetry";
+import { PLAYER_ACTIVITY_SYNC_ENABLED, createPlayerActivityTelemetry, syncPlayerActivityBatch, syncPlayerActivityBatchDocuments } from "./player-activity-telemetry";
 import { buildOperationalSnapshot, normalizeNativeAppInfo, normalizeOperationalMediaSource, OPERATIONAL_HEARTBEAT_INTERVAL_MS } from "./operational-telemetry";
 import { createTrafficTelemetry } from "./traffic-telemetry";
 import { createTelemetryHistory } from "./telemetry-history";
@@ -17982,12 +17983,25 @@ function PlayerPage() {
           && binding.screenId === screen.id
           && binding.deviceId === localDeviceId) {
           if (activityEvents.length > 0) {
-            const activityResult = await syncPlayerActivityBatch({
-              screenRef:screenDocRef,
-              existingEvents:screenData.telemetry?.activity?.events || [],
-              events:activityEvents,
-              updateDoc,
-            });
+            const activityResult = screenData.telemetryActivityBatchingEnabled === true
+              ? await syncPlayerActivityBatchDocuments({
+                  clientId,
+                  screenId:screen.id,
+                  deviceId:localDeviceId,
+                  events:activityEvents,
+                  refForBatch:(batchId) => doc(screenDocRef, "telemetryActivityBatches", batchId),
+                  commitBatch:async (writes) => {
+                    const transaction = writeBatch(db);
+                    writes.forEach(({ reference, data }) => transaction.set(reference, data));
+                    await transaction.commit();
+                  },
+                })
+              : await syncPlayerActivityBatch({
+                  screenRef:screenDocRef,
+                  existingEvents:screenData.telemetry?.activity?.events || [],
+                  events:activityEvents,
+                  updateDoc,
+                });
             if (activityResult.status === "synced") activityTelemetryRef.current.acknowledge(activityResult.acknowledgedIds);
           }
         }
