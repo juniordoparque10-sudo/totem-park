@@ -48,6 +48,16 @@ export function selectActiveScheduledPlaylist(playlists, now = new Date(), scree
     .sort((a, b) => b.window.start - a.window.start)[0]?.playlist || null;
 }
 
+export function resolveScheduledPlayback({ playlists, defaultPlaylist, now = new Date(), screenId = "" } = {}) {
+  const scheduledPlaylist = selectActiveScheduledPlaylist(playlists, now, screenId);
+  const playlist = scheduledPlaylist || defaultPlaylist || null;
+  return {
+    playlist,
+    mode:scheduledPlaylist ? "scheduled" : "default",
+    items:Array.isArray(playlist?.items) ? playlist.items : [],
+  };
+}
+
 export function getNextScheduleBoundaryDelay(playlists, now = new Date(), screenId = "") {
   const boundaries = [];
   const today = dayStart(now);
@@ -62,6 +72,29 @@ export function getNextScheduleBoundaryDelay(playlists, now = new Date(), screen
     }
   }
   return boundaries.length ? Math.max(0, Math.min(...boundaries) - now.getTime()) : null;
+}
+
+export function startScheduleRuntime({
+  playlists,
+  screenId = "",
+  onTick,
+  nowFn = () => new Date(),
+  setTimeoutFn = globalThis.setTimeout,
+  clearTimeoutFn = globalThis.clearTimeout,
+  setIntervalFn = globalThis.setInterval,
+  clearIntervalFn = globalThis.clearInterval,
+  fallbackIntervalMs = 1000,
+} = {}) {
+  const boundaryDelay = getNextScheduleBoundaryDelay(playlists, nowFn(), screenId);
+  const boundaryTimer = boundaryDelay === null
+    ? null
+    : setTimeoutFn(() => onTick?.(nowFn()), boundaryDelay + 5);
+  const fallbackTimer = setIntervalFn(() => onTick?.(nowFn()), fallbackIntervalMs);
+
+  return () => {
+    if (boundaryTimer !== null) clearTimeoutFn(boundaryTimer);
+    clearIntervalFn(fallbackTimer);
+  };
 }
 
 export function getScheduleEndingDelay(playlist, now = new Date(), screenId = "", leadMs = 3000) {
@@ -93,11 +126,11 @@ export function getScheduleFingerprint(playlist) {
   return [playlist?.scheduleEnabled, playlist?.name, playlist?.startDate, playlist?.endDate, playlist?.startTime, playlist?.endTime, ...(playlist?.targetScreenIds || [])].join("|");
 }
 
-export function buildScheduleSnapshot(playlists, screenId, previousSnapshot) {
+export function buildScheduleSnapshot(playlists, screenId, previousSnapshot, { bootstrapping = false } = {}) {
   const applicable = (playlists || []).filter((playlist) => playlist?.scheduleEnabled
     && (!playlist.targetScreenIds?.length || playlist.targetScreenIds.includes(screenId)));
   const snapshot = Object.fromEntries(applicable.map((playlist) => [playlist.id, getScheduleFingerprint(playlist)]));
-  if (!previousSnapshot) return { snapshot, notice:null };
+  if (bootstrapping || !previousSnapshot) return { snapshot, notice:null };
   const created = applicable.find((playlist) => !Object.hasOwn(previousSnapshot, playlist.id));
   if (created) return { snapshot, notice:{ type:"created", playlist:created } };
   const updated = applicable.find((playlist) => previousSnapshot[playlist.id] !== snapshot[playlist.id]);

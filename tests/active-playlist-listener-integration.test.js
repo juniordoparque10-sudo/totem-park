@@ -35,5 +35,5 @@ test("erro do listener passa pelo resolvedor e expõe indisponibilidade sem decl
 
 test("seleção e agendamento homologados permanecem intocados pela integração", () => {
   assert.match(app, /const selected = chooseActivePlaylist\(\)/);
-  assert.match(app, /buildScheduleSnapshot\(list, screen\?\.id, scheduleSnapshotRef\.current\)/);
+  assert.match(app, /buildScheduleSnapshot\(list, screen\?\.id, scheduleSnapshotRef\.current,/);
 });

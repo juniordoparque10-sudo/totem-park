@@ -31,7 +31,7 @@ import { getNextTemplateToPrepare } from "./templates-v2/offline-preload";
 import { confirmTemplateImageForPaint, getTemplateBackgroundSuppressionKey, getTemplatePlaybackLayerKey, getTemplatePlaybackReadyKey, isCurrentPlaybackExecution, nextPlaybackExecutionId, shouldReleaseTemplateAfterPreload } from "./templates-v2/player-execution";
 import { deriveMediaCacheState, finalizeCompletedMediaCache } from "./player-cache-state";
 import { formatScheduledPlaylistSummary } from "./portal-schedule-presentation";
-import { buildScheduleSnapshot, consumeScheduleNotice, getNextScheduleBoundaryDelay, getScheduleEndingDelay, getScheduleFingerprint, getScheduleNotice, getScheduleOccurrenceKey, selectActiveScheduledPlaylist } from "./player-schedule-v62";
+import { buildScheduleSnapshot, consumeScheduleNotice, getScheduleEndingDelay, getScheduleFingerprint, getScheduleNotice, getScheduleOccurrenceKey, resolveScheduledPlayback, startScheduleRuntime } from "./player-schedule-v62";
 import PlayerScheduleNotice from "./PlayerScheduleNotice";
 import { getClientDashboardDestination, shouldShowClientDashboardCardsInitially } from "./client-dashboard-navigation";
 import { filterTemplateResources, isPlaybackMedia } from "./media-library-purpose";
@@ -15946,11 +15946,11 @@ function PlayerPage() {
   const fallbackMediaKeysRef = useRef(new Set());
   const lastCacheStatusPayloadRef = useRef("");
   const playbackTimerRef = useRef(null);
-  const scheduleBoundaryTimerRef = useRef(null);
   const scheduleEndingTimerRef = useRef(null);
   const scheduleNoticeTimerRef = useRef(null);
   const activeScheduledPlaylistRef = useRef(undefined);
   const scheduleSnapshotRef = useRef(null);
+  const scheduleListenerBootstrappedRef = useRef(false);
   const scheduleNoticeSeenKeysRef = useRef([]);
   const playbackTimingKeyRef = useRef("");
   const playbackRemainingRef = useRef(0);
@@ -16173,7 +16173,6 @@ function PlayerPage() {
       clearTimeout(offlineStatusTimerRef.current);
       clearTimeout(returnToTvTimerRef.current);
       clearTimeout(playbackTimerRef.current);
-      clearTimeout(scheduleBoundaryTimerRef.current);
       clearTimeout(scheduleEndingTimerRef.current);
       clearTimeout(scheduleNoticeTimerRef.current);
       mediaCacheObjectUrlsRef.current.forEach((url) => {
@@ -16184,18 +16183,7 @@ function PlayerPage() {
   }, []);
 
   function chooseActivePlaylist() {
-    const scheduledPlaylist = selectActiveScheduledPlaylist(allPlaylists, now, screen?.id);
-    if (scheduledPlaylist) {
-      return {
-        playlist: scheduledPlaylist,
-        mode: "scheduled",
-      };
-    }
-
-    return {
-      playlist: defaultPlaylist,
-      mode: "default",
-    };
+    return resolveScheduledPlayback({ playlists:allPlaylists, defaultPlaylist, now, screenId:screen?.id });
   }
 
   function showScheduleNotice(notice) {
@@ -18413,6 +18401,7 @@ function PlayerPage() {
 
   useEffect(() => {
     if (!clientId) return;
+    scheduleListenerBootstrappedRef.current = false;
 
     const unsubscribe = onSnapshot(
       collection(db, "clients", clientId, "playlists"),
@@ -18431,7 +18420,10 @@ function PlayerPage() {
             scheduleNoticeSeenKeysRef.current = [];
           }
         }
-        const result = buildScheduleSnapshot(list, screen?.id, scheduleSnapshotRef.current);
+        const result = buildScheduleSnapshot(list, screen?.id, scheduleSnapshotRef.current, {
+          bootstrapping:!scheduleListenerBootstrappedRef.current,
+        });
+        scheduleListenerBootstrappedRef.current = true;
         scheduleSnapshotRef.current = result.snapshot;
         if (result.notice) {
           const { type, playlist } = result.notice;
@@ -18706,12 +18698,12 @@ function PlayerPage() {
   }, [allPlaylists, defaultPlaylist, now, screen?.id, screen?.playlistId]);
 
   useEffect(() => {
-    clearTimeout(scheduleBoundaryTimerRef.current);
-    const delay = getNextScheduleBoundaryDelay(allPlaylists, new Date(), screen?.id);
-    if (delay === null) return undefined;
-    scheduleBoundaryTimerRef.current = setTimeout(() => setNow(new Date()), delay + 5);
-    return () => clearTimeout(scheduleBoundaryTimerRef.current);
-  }, [allPlaylists, now, screen?.id]);
+    return startScheduleRuntime({
+      playlists:allPlaylists,
+      screenId:screen?.id,
+      onTick:setNow,
+    });
+  }, [allPlaylists, screen?.id]);
 
   useEffect(() => {
     clearTimeout(scheduleEndingTimerRef.current);

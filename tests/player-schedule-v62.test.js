@@ -8,7 +8,9 @@ import {
   getScheduleNotice,
   getScheduleOccurrenceKey,
   getScheduleTransition,
+  resolveScheduledPlayback,
   selectActiveScheduledPlaylist,
+  startScheduleRuntime,
 } from "../src/player-schedule-v62.js";
 
 const scheduled = (overrides = {}) => ({
@@ -49,6 +51,73 @@ test("agenda o próximo limite no milissegundo correto", () => {
   const playlists = [scheduled()];
   assert.equal(getNextScheduleBoundaryDelay(playlists, new Date(2026, 9, 21, 9, 59, 58, 750), "screen-1"), 1250);
   assert.equal(getNextScheduleBoundaryDelay(playlists, new Date(2026, 9, 21, 10, 0, 58, 900), "screen-1"), 1100);
+});
+
+test("entrega ao renderizador os itens agendados no intervalo real da Kimura", () => {
+  const defaultPlaylist = { id:"default", items:[{ id:"default-video" }] };
+  const kimuraSchedule = scheduled({
+    id:"dia-das-criancas",
+    name:"Dia das crianças",
+    startDate:"2026-11-02",
+    endDate:"2026-11-02",
+    startTime:"13:02",
+    endTime:"13:04",
+    items:[
+      { id:"hora-certa-v2", playerItemType:"template", duration:15 },
+      { id:"petit-gourmet-tcl", playerItemType:"media", duration:10 },
+    ],
+  });
+
+  const before = resolveScheduledPlayback({ playlists:[kimuraSchedule], defaultPlaylist, now:new Date(2026, 10, 2, 13, 1, 59), screenId:"screen-1" });
+  const atStart = resolveScheduledPlayback({ playlists:[kimuraSchedule], defaultPlaylist, now:new Date(2026, 10, 2, 13, 2, 0), screenId:"screen-1" });
+  const bootInside = resolveScheduledPlayback({ playlists:[kimuraSchedule], defaultPlaylist, now:new Date(2026, 10, 2, 13, 3, 0), screenId:"screen-1" });
+  const atEnd = resolveScheduledPlayback({ playlists:[kimuraSchedule], defaultPlaylist, now:new Date(2026, 10, 2, 13, 4, 0), screenId:"screen-1" });
+
+  assert.deepEqual(before.items.map((item) => item.id), ["default-video"]);
+  assert.deepEqual(atStart.items.map((item) => item.id), ["hora-certa-v2", "petit-gourmet-tcl"]);
+  assert.deepEqual(bootInside.items.map((item) => item.id), ["hora-certa-v2", "petit-gourmet-tcl"]);
+  assert.equal(atStart.playlist.id, "dia-das-criancas");
+  assert.deepEqual(atEnd.items.map((item) => item.id), ["default-video"]);
+});
+
+test("tick local recupera a ativação mesmo quando o timeout exato é perdido", () => {
+  const defaultPlaylist = { id:"default", items:[{ id:"default-video" }] };
+  const kimuraSchedule = scheduled({
+    id:"dia-das-criancas",
+    startDate:"2026-11-02",
+    endDate:"2026-11-02",
+    startTime:"13:02",
+    endTime:"13:04",
+    items:[{ id:"hora-certa-v2" }, { id:"petit-gourmet-tcl" }],
+  });
+  let currentNow = new Date(2026, 10, 2, 13, 1, 59, 500);
+  let boundaryCallback = null;
+  let fallbackCallback = null;
+  let clearedTimeout = false;
+  let clearedInterval = false;
+  const renderedItemIds = [];
+
+  const cleanup = startScheduleRuntime({
+    playlists:[kimuraSchedule],
+    screenId:"screen-1",
+    nowFn:() => currentNow,
+    onTick:(tickNow) => renderedItemIds.push(resolveScheduledPlayback({
+      playlists:[kimuraSchedule], defaultPlaylist, now:tickNow, screenId:"screen-1",
+    }).items.map((item) => item.id)),
+    setTimeoutFn:(callback) => { boundaryCallback = callback; return 11; },
+    clearTimeoutFn:(id) => { assert.equal(id, 11); clearedTimeout = true; },
+    setIntervalFn:(callback, delay) => { assert.equal(delay, 1000); fallbackCallback = callback; return 22; },
+    clearIntervalFn:(id) => { assert.equal(id, 22); clearedInterval = true; },
+  });
+
+  assert.equal(typeof boundaryCallback, "function");
+  currentNow = new Date(2026, 10, 2, 13, 2, 0, 500);
+  fallbackCallback();
+  assert.deepEqual(renderedItemIds, [["hora-certa-v2", "petit-gourmet-tcl"]]);
+
+  cleanup();
+  assert.equal(clearedTimeout, true);
+  assert.equal(clearedInterval, true);
 });
 
 test("avisos são emitidos somente nas transições previstas", () => {
@@ -114,6 +183,19 @@ test("snapshot separa criação de atualização sem inventar evento no bootstra
   ], "screen-1", created.snapshot);
   assert.equal(updated.notice?.type, "updated");
   assert.equal(updated.notice?.playlist.id, "scheduled-1");
+});
+
+test("bootstrap ignora snapshot persistido vazio e só avisa em mudança remota posterior", () => {
+  const boot = buildScheduleSnapshot([scheduled()], "screen-1", {}, { bootstrapping:true });
+  assert.equal(boot.notice, null);
+  assert.equal(boot.snapshot["scheduled-1"], "true|Jornal da manhã|2026-10-21|2026-10-21|10:00|10:01|screen-1");
+
+  const createdLater = buildScheduleSnapshot([
+    scheduled(),
+    scheduled({ id:"scheduled-2", name:"Jornal da tarde" }),
+  ], "screen-1", boot.snapshot);
+  assert.equal(createdLater.notice?.type, "created");
+  assert.equal(createdLater.notice?.playlist.id, "scheduled-2");
 });
 
 test("ledger persistente consome cada alteração e cada ocorrência uma única vez", () => {
