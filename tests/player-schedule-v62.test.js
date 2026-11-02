@@ -25,15 +25,102 @@ const scheduled = (overrides = {}) => ({
   ...overrides,
 });
 
+const instant = (value) => new Date(value);
+const brasilia = (value) => instant(`${value}-03:00`);
+
+test("interpreta o caso real da TCL no fuso de Brasília mesmo quando o processo está em UTC", () => {
+  const playlist = scheduled({
+    id:"dia-das-criancas",
+    startDate:"2026-11-02",
+    endDate:"2026-11-02",
+    startTime:"14:17",
+    endTime:"14:21",
+  });
+
+  assert.equal(selectActiveScheduledPlaylist([playlist], instant("2026-11-02T17:16:59.999Z"), "screen-1"), null);
+  assert.equal(selectActiveScheduledPlaylist([playlist], instant("2026-11-02T17:17:00.000Z"), "screen-1")?.id, "dia-das-criancas");
+  assert.equal(selectActiveScheduledPlaylist([playlist], instant("2026-11-02T17:20:59.999Z"), "screen-1")?.id, "dia-das-criancas");
+  assert.equal(selectActiveScheduledPlaylist([playlist], instant("2026-11-02T17:21:00.000Z"), "screen-1"), null);
+});
+
+test("mantém uma janela de Brasília que atravessa a meia-noite independente do fuso do processo", () => {
+  const playlist = scheduled({
+    startDate:"2026-11-02",
+    endDate:"2026-11-03",
+    startTime:"23:59:30",
+    endTime:"00:00:30",
+  });
+
+  assert.equal(selectActiveScheduledPlaylist([playlist], instant("2026-11-03T02:59:29.999Z"), "screen-1"), null);
+  assert.equal(selectActiveScheduledPlaylist([playlist], instant("2026-11-03T02:59:30.000Z"), "screen-1")?.id, "scheduled-1");
+  assert.equal(selectActiveScheduledPlaylist([playlist], instant("2026-11-03T03:00:29.999Z"), "screen-1")?.id, "scheduled-1");
+  assert.equal(selectActiveScheduledPlaylist([playlist], instant("2026-11-03T03:00:30.000Z"), "screen-1"), null);
+});
+
+test("aceita timezone IANA explícito no contrato sem exigir migração dos legados", () => {
+  const playlist = scheduled({
+    startDate:"2026-11-02",
+    endDate:"2026-11-02",
+    startTime:"14:17",
+    endTime:"14:21",
+    scheduleTimezone:"America/Manaus",
+  });
+
+  assert.equal(selectActiveScheduledPlaylist([playlist], instant("2026-11-02T18:18:00.000Z"), "screen-1")?.id, "scheduled-1");
+  assert.equal(selectActiveScheduledPlaylist([playlist], instant("2026-11-02T17:18:00.000Z"), "screen-1"), null);
+});
+
+test("não ativa uma ocorrência em horário civil inexistente durante avanço de DST", () => {
+  const playlist = scheduled({
+    startDate:"2026-03-08",
+    endDate:"2026-03-08",
+    startTime:"02:00",
+    endTime:"04:00",
+    scheduleTimezone:"America/New_York",
+  });
+
+  assert.equal(selectActiveScheduledPlaylist([playlist], instant("2026-03-08T06:30:00.000Z"), "screen-1"), null);
+  assert.equal(selectActiveScheduledPlaylist([playlist], instant("2026-03-08T07:30:00.000Z"), "screen-1"), null);
+});
+
+test("preserva ocorrência válida quando o dia seguinte começa com lacuna de DST à meia-noite", () => {
+  const playlist = scheduled({
+    startDate:"2026-03-07",
+    endDate:"2026-03-07",
+    startTime:"20:00",
+    endTime:"22:00",
+    scheduleTimezone:"America/Havana",
+  });
+
+  assert.equal(selectActiveScheduledPlaylist([playlist], instant("2026-03-08T00:59:59.999Z"), "screen-1"), null);
+  assert.equal(selectActiveScheduledPlaylist([playlist], instant("2026-03-08T01:00:00.000Z"), "screen-1")?.id, "scheduled-1");
+  assert.equal(selectActiveScheduledPlaylist([playlist], instant("2026-03-08T02:59:59.999Z"), "screen-1")?.id, "scheduled-1");
+  assert.equal(selectActiveScheduledPlaylist([playlist], instant("2026-03-08T03:00:00.000Z"), "screen-1"), null);
+});
+
+test("timezone explícito participa de atualizações e identidades sem migrar chaves legadas", () => {
+  const legacy = scheduled({ startTime:"10:00:15", endTime:"10:01:20" });
+  const legacySnapshot = buildScheduleSnapshot([legacy], "screen-1");
+  assert.equal(legacySnapshot.snapshot[legacy.id], "true|Jornal da manhã|2026-10-21|2026-10-21|10:00:15|10:01:20|screen-1");
+
+  const explicit = scheduled({ ...legacy, scheduleTimezone:"America/Manaus" });
+  const changed = buildScheduleSnapshot([explicit], "screen-1", legacySnapshot.snapshot);
+  assert.equal(changed.notice?.type, "updated");
+  assert.match(changed.snapshot[explicit.id], /timezone:America\/Manaus/);
+
+  const occurrenceKey = getScheduleOccurrenceKey(explicit, instant("2026-10-21T14:00:30.000Z"), "screen-1");
+  assert.equal(occurrenceKey, "scheduled-1|2026-10-21T10:00:15.000|America/Manaus");
+});
+
 test("inicia no segundo zero e encerra antes do primeiro segundo do minuto final", () => {
-  assert.equal(selectActiveScheduledPlaylist([scheduled()], new Date(2026, 9, 21, 9, 59, 59), "screen-1"), null);
-  assert.equal(selectActiveScheduledPlaylist([scheduled()], new Date(2026, 9, 21, 10, 0, 0), "screen-1")?.id, "scheduled-1");
-  assert.equal(selectActiveScheduledPlaylist([scheduled()], new Date(2026, 9, 21, 10, 0, 59), "screen-1")?.id, "scheduled-1");
-  assert.equal(selectActiveScheduledPlaylist([scheduled()], new Date(2026, 9, 21, 10, 1, 0), "screen-1"), null);
+  assert.equal(selectActiveScheduledPlaylist([scheduled()], brasilia("2026-10-21T09:59:59"), "screen-1"), null);
+  assert.equal(selectActiveScheduledPlaylist([scheduled()], brasilia("2026-10-21T10:00:00"), "screen-1")?.id, "scheduled-1");
+  assert.equal(selectActiveScheduledPlaylist([scheduled()], brasilia("2026-10-21T10:00:59"), "screen-1")?.id, "scheduled-1");
+  assert.equal(selectActiveScheduledPlaylist([scheduled()], brasilia("2026-10-21T10:01:00"), "screen-1"), null);
 });
 
 test("respeita tela alvo, datas completas e prioridade mais recente", () => {
-  const now = new Date(2026, 9, 21, 10, 0, 30);
+  const now = brasilia("2026-10-21T10:00:30");
   assert.equal(selectActiveScheduledPlaylist([scheduled()], now, "other"), null);
   assert.equal(selectActiveScheduledPlaylist([scheduled({ startDate:"2026-10-22" })], now, "screen-1"), null);
   const latest = scheduled({ id:"latest", startTime:"10:00:15" });
@@ -42,15 +129,15 @@ test("respeita tela alvo, datas completas e prioridade mais recente", () => {
 
 test("atravessa meia-noite sem ampliar a data final", () => {
   const playlist = scheduled({ startDate:"2026-10-21", endDate:"2026-10-22", startTime:"23:59:30", endTime:"00:00:30" });
-  assert.equal(selectActiveScheduledPlaylist([playlist], new Date(2026, 9, 21, 23, 59, 45), "screen-1")?.id, "scheduled-1");
-  assert.equal(selectActiveScheduledPlaylist([playlist], new Date(2026, 9, 22, 0, 0, 29), "screen-1")?.id, "scheduled-1");
-  assert.equal(selectActiveScheduledPlaylist([playlist], new Date(2026, 9, 22, 0, 0, 30), "screen-1"), null);
+  assert.equal(selectActiveScheduledPlaylist([playlist], brasilia("2026-10-21T23:59:45"), "screen-1")?.id, "scheduled-1");
+  assert.equal(selectActiveScheduledPlaylist([playlist], brasilia("2026-10-22T00:00:29"), "screen-1")?.id, "scheduled-1");
+  assert.equal(selectActiveScheduledPlaylist([playlist], brasilia("2026-10-22T00:00:30"), "screen-1"), null);
 });
 
 test("agenda o próximo limite no milissegundo correto", () => {
   const playlists = [scheduled()];
-  assert.equal(getNextScheduleBoundaryDelay(playlists, new Date(2026, 9, 21, 9, 59, 58, 750), "screen-1"), 1250);
-  assert.equal(getNextScheduleBoundaryDelay(playlists, new Date(2026, 9, 21, 10, 0, 58, 900), "screen-1"), 1100);
+  assert.equal(getNextScheduleBoundaryDelay(playlists, brasilia("2026-10-21T09:59:58.750"), "screen-1"), 1250);
+  assert.equal(getNextScheduleBoundaryDelay(playlists, brasilia("2026-10-21T10:00:58.900"), "screen-1"), 1100);
 });
 
 test("entrega ao renderizador os itens agendados no intervalo real da Kimura", () => {
@@ -68,10 +155,10 @@ test("entrega ao renderizador os itens agendados no intervalo real da Kimura", (
     ],
   });
 
-  const before = resolveScheduledPlayback({ playlists:[kimuraSchedule], defaultPlaylist, now:new Date(2026, 10, 2, 13, 1, 59), screenId:"screen-1" });
-  const atStart = resolveScheduledPlayback({ playlists:[kimuraSchedule], defaultPlaylist, now:new Date(2026, 10, 2, 13, 2, 0), screenId:"screen-1" });
-  const bootInside = resolveScheduledPlayback({ playlists:[kimuraSchedule], defaultPlaylist, now:new Date(2026, 10, 2, 13, 3, 0), screenId:"screen-1" });
-  const atEnd = resolveScheduledPlayback({ playlists:[kimuraSchedule], defaultPlaylist, now:new Date(2026, 10, 2, 13, 4, 0), screenId:"screen-1" });
+  const before = resolveScheduledPlayback({ playlists:[kimuraSchedule], defaultPlaylist, now:brasilia("2026-11-02T13:01:59"), screenId:"screen-1" });
+  const atStart = resolveScheduledPlayback({ playlists:[kimuraSchedule], defaultPlaylist, now:brasilia("2026-11-02T13:02:00"), screenId:"screen-1" });
+  const bootInside = resolveScheduledPlayback({ playlists:[kimuraSchedule], defaultPlaylist, now:brasilia("2026-11-02T13:03:00"), screenId:"screen-1" });
+  const atEnd = resolveScheduledPlayback({ playlists:[kimuraSchedule], defaultPlaylist, now:brasilia("2026-11-02T13:04:00"), screenId:"screen-1" });
 
   assert.deepEqual(before.items.map((item) => item.id), ["default-video"]);
   assert.deepEqual(atStart.items.map((item) => item.id), ["hora-certa-v2", "petit-gourmet-tcl"]);
@@ -90,7 +177,7 @@ test("tick local recupera a ativação mesmo quando o timeout exato é perdido",
     endTime:"13:04",
     items:[{ id:"hora-certa-v2" }, { id:"petit-gourmet-tcl" }],
   });
-  let currentNow = new Date(2026, 10, 2, 13, 1, 59, 500);
+  let currentNow = brasilia("2026-11-02T13:01:59.500");
   let boundaryCallback = null;
   let fallbackCallback = null;
   let clearedTimeout = false;
@@ -114,15 +201,15 @@ test("tick local recupera a ativação mesmo quando o timeout exato é perdido",
   fallbackCallback();
   assert.deepEqual(renderedItemIds, []);
 
-  currentNow = new Date(2026, 10, 2, 13, 2, 0, 500);
+  currentNow = brasilia("2026-11-02T13:02:00.500");
   fallbackCallback();
   assert.deepEqual(renderedItemIds, [["hora-certa-v2", "petit-gourmet-tcl"]]);
 
-  currentNow = new Date(2026, 10, 2, 13, 3, 0);
+  currentNow = brasilia("2026-11-02T13:03:00");
   fallbackCallback();
   assert.deepEqual(renderedItemIds, [["hora-certa-v2", "petit-gourmet-tcl"]]);
 
-  currentNow = new Date(2026, 10, 2, 13, 4, 0);
+  currentNow = brasilia("2026-11-02T13:04:00");
   fallbackCallback();
   assert.deepEqual(renderedItemIds, [
     ["hora-certa-v2", "petit-gourmet-tcl"],
@@ -214,7 +301,7 @@ test("bootstrap ignora snapshot persistido vazio e só avisa em mudança remota 
 
 test("ledger persistente consome cada alteração e cada ocorrência uma única vez", () => {
   const playlist = scheduled({ startTime:"10:00:15", endTime:"10:01:20" });
-  const occurrenceKey = getScheduleOccurrenceKey(playlist, new Date(2026, 9, 21, 10, 0, 30), "screen-1");
+  const occurrenceKey = getScheduleOccurrenceKey(playlist, brasilia("2026-10-21T10:00:30"), "screen-1");
   assert.equal(occurrenceKey, "scheduled-1|2026-10-21T10:00:15.000");
 
   const first = consumeScheduleNotice([], `active|${occurrenceKey}`);

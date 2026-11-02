@@ -1,8 +1,9 @@
-const DAY_MS = 24 * 60 * 60 * 1000;
+const DEFAULT_SCHEDULE_TIME_ZONE = "America/Sao_Paulo";
+const zonedFormatterCache = new Map();
 
 function parseDate(value) {
   const match = /^(\d{4})-(\d{2})-(\d{2})$/.exec(String(value || ""));
-  return match ? new Date(Number(match[1]), Number(match[2]) - 1, Number(match[3])) : null;
+  return match ? { year:Number(match[1]), month:Number(match[2]), day:Number(match[3]) } : null;
 }
 
 function parseTime(value) {
@@ -14,30 +15,111 @@ function parseTime(value) {
   return hours <= 23 && minutes <= 59 && seconds <= 59 ? { hours, minutes, seconds } : null;
 }
 
-const dayStart = (date) => new Date(date.getFullYear(), date.getMonth(), date.getDate());
-const atTime = (day, time) => new Date(day.getFullYear(), day.getMonth(), day.getDate(), time.hours, time.minutes, time.seconds, 0);
+function getScheduleTimeZone(playlist) {
+  const requested = String(playlist?.scheduleTimezone || DEFAULT_SCHEDULE_TIME_ZONE).trim();
+  try {
+    getZonedFormatter(requested);
+    return requested;
+  } catch {
+    return DEFAULT_SCHEDULE_TIME_ZONE;
+  }
+}
 
-function playlistWindowForDay(playlist, day) {
+function getZonedFormatter(timeZone) {
+  if (!zonedFormatterCache.has(timeZone)) {
+    zonedFormatterCache.set(timeZone, new Intl.DateTimeFormat("en-US", {
+      timeZone,
+      calendar:"gregory",
+      numberingSystem:"latn",
+      hourCycle:"h23",
+      year:"numeric",
+      month:"2-digit",
+      day:"2-digit",
+      hour:"2-digit",
+      minute:"2-digit",
+      second:"2-digit",
+    }));
+  }
+  return zonedFormatterCache.get(timeZone);
+}
+
+function getZonedParts(date, timeZone) {
+  const values = Object.fromEntries(getZonedFormatter(timeZone).formatToParts(date)
+    .filter((part) => part.type !== "literal")
+    .map((part) => [part.type, Number(part.value)]));
+  return {
+    year:values.year,
+    month:values.month,
+    day:values.day,
+    hours:values.hour,
+    minutes:values.minute,
+    seconds:values.second,
+  };
+}
+
+function shiftCivilDate(date, days) {
+  const shifted = new Date(Date.UTC(date.year, date.month - 1, date.day + days));
+  return { year:shifted.getUTCFullYear(), month:shifted.getUTCMonth() + 1, day:shifted.getUTCDate() };
+}
+
+const civilDateValue = (date) => Date.UTC(date.year, date.month - 1, date.day);
+const civilTimeValue = (time) => time.hours * 3600 + time.minutes * 60 + time.seconds;
+
+function atTime(day, time, timeZone) {
+  const desired = Date.UTC(day.year, day.month - 1, day.day, time.hours, time.minutes, time.seconds);
+  let instant = desired;
+  for (let attempt = 0; attempt < 4; attempt += 1) {
+    const observed = getZonedParts(new Date(instant), timeZone);
+    const correction = desired - Date.UTC(
+      observed.year,
+      observed.month - 1,
+      observed.day,
+      observed.hours,
+      observed.minutes,
+      observed.seconds
+    );
+    if (correction === 0) break;
+    instant += correction;
+  }
+  const result = new Date(instant);
+  const observed = getZonedParts(result, timeZone);
+  return observed.year === day.year
+    && observed.month === day.month
+    && observed.day === day.day
+    && observed.hours === time.hours
+    && observed.minutes === time.minutes
+    && observed.seconds === time.seconds
+    ? result
+    : null;
+}
+
+function playlistWindowForDay(playlist, day, timeZone) {
   const startTime = parseTime(playlist?.startTime);
   const endTime = parseTime(playlist?.endTime);
   if (!startTime || !endTime) return null;
   const firstDay = parseDate(playlist.startDate) || day;
   const lastDay = parseDate(playlist.endDate) || firstDay;
-  const candidateDay = dayStart(day);
-  if (candidateDay < dayStart(firstDay) || candidateDay > dayStart(lastDay)) return null;
-  const start = atTime(candidateDay, startTime);
-  const end = atTime(candidateDay, endTime);
-  if (end <= start) end.setDate(end.getDate() + 1);
-  if (end > new Date(lastDay.getFullYear(), lastDay.getMonth(), lastDay.getDate() + 1)) return null;
+  if (civilDateValue(day) < civilDateValue(firstDay) || civilDateValue(day) > civilDateValue(lastDay)) return null;
+  const crossesMidnight = civilTimeValue(endTime) <= civilTimeValue(startTime);
+  const endDay = crossesMidnight ? shiftCivilDate(day, 1) : day;
+  const finalDay = shiftCivilDate(lastDay, 1);
+  if (civilDateValue(endDay) > civilDateValue(finalDay)) return null;
+  if (civilDateValue(endDay) === civilDateValue(finalDay) && civilTimeValue(endTime) > 0) return null;
+  const start = atTime(day, startTime, timeZone);
+  if (!start) return null;
+  const end = atTime(endDay, endTime, timeZone);
+  if (!end) return null;
   return { start, end };
 }
 
 export function getPlaylistScheduleWindow(playlist, now, screenId) {
   if (!playlist?.scheduleEnabled) return null;
   if (playlist.targetScreenIds?.length && (!screenId || !playlist.targetScreenIds.includes(screenId))) return null;
-  const today = dayStart(now);
-  return [today, new Date(today.getTime() - DAY_MS)]
-    .map((day) => playlistWindowForDay(playlist, day))
+  const timeZone = getScheduleTimeZone(playlist);
+  const zonedNow = getZonedParts(now, timeZone);
+  const today = { year:zonedNow.year, month:zonedNow.month, day:zonedNow.day };
+  return [today, shiftCivilDate(today, -1)]
+    .map((day) => playlistWindowForDay(playlist, day, timeZone))
     .find((window) => window && now >= window.start && now < window.end) || null;
 }
 
@@ -60,12 +142,14 @@ export function resolveScheduledPlayback({ playlists, defaultPlaylist, now = new
 
 export function getNextScheduleBoundaryDelay(playlists, now = new Date(), screenId = "") {
   const boundaries = [];
-  const today = dayStart(now);
   for (const playlist of playlists || []) {
     if (!playlist?.scheduleEnabled) continue;
     if (playlist.targetScreenIds?.length && (!screenId || !playlist.targetScreenIds.includes(screenId))) continue;
+    const timeZone = getScheduleTimeZone(playlist);
+    const zonedNow = getZonedParts(now, timeZone);
+    const today = { year:zonedNow.year, month:zonedNow.month, day:zonedNow.day };
     for (let offset = -1; offset <= 370; offset += 1) {
-      const window = playlistWindowForDay(playlist, new Date(today.getTime() + offset * DAY_MS));
+      const window = playlistWindowForDay(playlist, shiftCivilDate(today, offset), timeZone);
       if (!window) continue;
       if (window.start > now) boundaries.push(window.start.getTime());
       if (window.end > now) boundaries.push(window.end.getTime());
@@ -132,7 +216,8 @@ export function getScheduleNotice(type, playlist) {
 }
 
 export function getScheduleFingerprint(playlist) {
-  return [playlist?.scheduleEnabled, playlist?.name, playlist?.startDate, playlist?.endDate, playlist?.startTime, playlist?.endTime, ...(playlist?.targetScreenIds || [])].join("|");
+  const timezone = playlist?.scheduleTimezone ? [`timezone:${getScheduleTimeZone(playlist)}`] : [];
+  return [playlist?.scheduleEnabled, playlist?.name, playlist?.startDate, playlist?.endDate, playlist?.startTime, playlist?.endTime, ...timezone, ...(playlist?.targetScreenIds || [])].join("|");
 }
 
 export function buildScheduleSnapshot(playlists, screenId, previousSnapshot, { bootstrapping = false } = {}) {
@@ -149,12 +234,14 @@ export function buildScheduleSnapshot(playlists, screenId, previousSnapshot, { b
 export function getScheduleOccurrenceKey(playlist, now = new Date(), screenId = "") {
   const window = getPlaylistScheduleWindow(playlist, now, screenId);
   if (!window) return "";
+  const start = getZonedParts(window.start, getScheduleTimeZone(playlist));
   const localTimestamp = [
-    window.start.getFullYear(),
-    String(window.start.getMonth() + 1).padStart(2, "0"),
-    String(window.start.getDate()).padStart(2, "0"),
-  ].join("-") + `T${String(window.start.getHours()).padStart(2, "0")}:${String(window.start.getMinutes()).padStart(2, "0")}:${String(window.start.getSeconds()).padStart(2, "0")}.000`;
-  return `${playlist?.id || ""}|${localTimestamp}`;
+    start.year,
+    String(start.month).padStart(2, "0"),
+    String(start.day).padStart(2, "0"),
+  ].join("-") + `T${String(start.hours).padStart(2, "0")}:${String(start.minutes).padStart(2, "0")}:${String(start.seconds).padStart(2, "0")}.000`;
+  const timezoneSuffix = playlist?.scheduleTimezone ? `|${getScheduleTimeZone(playlist)}` : "";
+  return `${playlist?.id || ""}|${localTimestamp}${timezoneSuffix}`;
 }
 
 export function consumeScheduleNotice(seenKeys, eventKey, limit = 64) {
