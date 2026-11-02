@@ -111,9 +111,23 @@ test("tick local recupera a ativação mesmo quando o timeout exato é perdido",
   });
 
   assert.equal(typeof boundaryCallback, "function");
+  fallbackCallback();
+  assert.deepEqual(renderedItemIds, []);
+
   currentNow = new Date(2026, 10, 2, 13, 2, 0, 500);
   fallbackCallback();
   assert.deepEqual(renderedItemIds, [["hora-certa-v2", "petit-gourmet-tcl"]]);
+
+  currentNow = new Date(2026, 10, 2, 13, 3, 0);
+  fallbackCallback();
+  assert.deepEqual(renderedItemIds, [["hora-certa-v2", "petit-gourmet-tcl"]]);
+
+  currentNow = new Date(2026, 10, 2, 13, 4, 0);
+  fallbackCallback();
+  assert.deepEqual(renderedItemIds, [
+    ["hora-certa-v2", "petit-gourmet-tcl"],
+    ["default-video"],
+  ]);
 
   cleanup();
   assert.equal(clearedTimeout, true);

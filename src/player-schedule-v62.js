@@ -85,11 +85,20 @@ export function startScheduleRuntime({
   clearIntervalFn = globalThis.clearInterval,
   fallbackIntervalMs = 1000,
 } = {}) {
-  const boundaryDelay = getNextScheduleBoundaryDelay(playlists, nowFn(), screenId);
+  const initialNow = nowFn();
+  const boundaryDelay = getNextScheduleBoundaryDelay(playlists, initialNow, screenId);
+  let effectiveScheduleId = selectActiveScheduledPlaylist(playlists, initialNow, screenId)?.id || "";
+  const evaluate = () => {
+    const tickNow = nowFn();
+    const nextScheduleId = selectActiveScheduledPlaylist(playlists, tickNow, screenId)?.id || "";
+    if (nextScheduleId === effectiveScheduleId) return;
+    effectiveScheduleId = nextScheduleId;
+    onTick?.(tickNow);
+  };
   const boundaryTimer = boundaryDelay === null
     ? null
-    : setTimeoutFn(() => onTick?.(nowFn()), boundaryDelay + 5);
-  const fallbackTimer = setIntervalFn(() => onTick?.(nowFn()), fallbackIntervalMs);
+    : setTimeoutFn(evaluate, boundaryDelay + 5);
+  const fallbackTimer = setIntervalFn(evaluate, fallbackIntervalMs);
 
   return () => {
     if (boundaryTimer !== null) clearTimeoutFn(boundaryTimer);
