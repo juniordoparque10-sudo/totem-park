@@ -5275,16 +5275,30 @@
 
 .tv-pause-badge {
   position: fixed;
-  left: 24px;
-  bottom: 24px;
+  right: 18px;
+  bottom: 18px;
   z-index: 9999;
-  padding: 12px 16px;
-  border-radius: 999px;
-  background: rgba(245, 158, 11, 0.18);
+  box-sizing: border-box;
+  width: clamp(160px, 10vw, 200px);
+  min-height: 42px;
+  padding: 6px 8px;
+  border-radius: 9px;
+  background: rgba(4, 18, 42, 0.9);
   color: #fbbf24;
   border: 1px solid rgba(245, 158, 11, 0.35);
-  font-weight: 950;
+  box-shadow: 0 0 22px rgba(245, 158, 11, 0.16), inset 0 0 18px rgba(17, 82, 117, 0.18);
+  font-size: 10px;
+  line-height: 1.15;
+  font-weight: 850;
   backdrop-filter: blur(12px);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  text-align: center;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  pointer-events: none;
 }
 
 .tv-takeover-screen {
@@ -6996,14 +7010,35 @@ video.player-media::-webkit-media-controls-start-playback-button {
   right: 18px;
   bottom: 18px;
   z-index: 40;
-  padding: 8px 12px;
-  border-radius: 999px;
-  background: rgba(2, 6, 23, 0.82);
+  box-sizing: border-box;
+  width: clamp(160px, 10vw, 200px);
+  min-height: 42px;
+  padding: 6px 8px;
+  border-radius: 9px;
+  background: rgba(4, 18, 42, 0.9);
   border: 1px solid rgba(255, 255, 255, 0.18);
+  box-shadow: 0 0 22px rgba(148, 163, 184, 0.14), inset 0 0 18px rgba(17, 82, 117, 0.18);
   color: #e2e8f0;
-  font-size: 11px;
-  font-weight: 800;
+  font-size: 10px;
+  line-height: 1.15;
+  font-weight: 850;
+  backdrop-filter: blur(12px);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  text-align: center;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
   pointer-events: none;
+}
+
+.offline-cache-status ~ .tv-pause-badge {
+  bottom: 68px;
+}
+
+.player-screen.portrait-mode .offline-cache-status ~ .tv-pause-badge {
+  bottom: 147px;
 }
 
 .offline-cache-status.ready {
