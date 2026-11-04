@@ -2,7 +2,7 @@ import test from "node:test";
 import assert from "node:assert/strict";
 import { Buffer } from "node:buffer";
 import { readFileSync } from "node:fs";
-import { buildSportsDataCacheContext, buildTemplateDataCacheKey, clearTemplateDataMemoryCacheForTests, createNewsDataFingerprintConfig, createSportsDataFingerprintConfig, mergeSportsLastKnown, readNewsEditorialDynamicCache, readSportsTemplateDataCache, readTemplateDataCache, writeNewsEditorialDynamicCache, writeSportsTemplateDataCache, writeTemplateDataCache } from "../src/templates-v2/offline-data-cache.js";
+import { buildSportsDataCacheContext, buildTemplateDataCacheKey, clearTemplateDataMemoryCacheForTests, createNewsDataFingerprintConfig, createSportsDataFingerprintConfig, mergeSportsLastKnown, readNewsEditorialDynamicCache, readSportsTemplateDataCache, readTemplateDataCache, refreshTemplateDataIfNeeded, writeNewsEditorialDynamicCache, writeSportsTemplateDataCache, writeTemplateDataCache } from "../src/templates-v2/offline-data-cache.js";
 import { TEMPLATE_ASSET_URL_ONLY_TTL_MS, clearTemplateAssetMemoryCacheForTests, collectTemplateAssetUrls, createOfflineSafeTemplate, fetchTemplateAssetResponse, prepareTemplateAssets, refreshTemplateAsset, refreshTemplateAssets, selectTemplateAssetRenderSource, shouldUsePersistentTemplateAssetCache } from "../src/templates-v2/offline-asset-cache.js";
 
 test("cache RSS Editorial usa geração do parser para não ressuscitar texto corrompido antigo", () => {
@@ -79,6 +79,41 @@ test("cache Editorial V2 não mistura mudança de fonte nem grava respostas vazi
   clearTemplateDataMemoryCacheForTests();
   assert.deepEqual(readNewsEditorialDynamicCache(scope, first, storage)?.editorialNews, [{ title:"Fonte A" }]);
   assert.equal(readNewsEditorialDynamicCache(scope, changed, storage), null);
+});
+
+test("reconexão da Hora Certa V2 ignora a janela de retry e recupera o RSS imediatamente", async () => {
+  const storage = new MemoryStorage();
+  const context = { clientId:"c1", screenId:"s1", templateId:"clock-1", module:"news", config:createNewsDataFingerprintConfig({ newsFeedUrl:"feed.xml" }) };
+  const ttlMs = 10 * 60 * 1000;
+  const first = await refreshTemplateDataIfNeeded(context, {
+    ttlMs,
+    now:1_000,
+    storage,
+    fetcher:async () => [{ title:"Antes da queda" }],
+    isUsable:(items) => items.length > 0,
+  });
+  assert.equal(first.payload[0].title, "Antes da queda");
+
+  const failed = await refreshTemplateDataIfNeeded(context, {
+    ttlMs,
+    now:1_000 + ttlMs + 1,
+    storage,
+    fetcher:async () => { throw new Error("offline"); },
+    isUsable:(items) => items.length > 0,
+  });
+  assert.equal(failed.payload[0].title, "Antes da queda");
+
+  let reconnectCalls = 0;
+  const recovered = await refreshTemplateDataIfNeeded(context, {
+    ttlMs,
+    now:1_000 + ttlMs + 2,
+    storage,
+    force:true,
+    fetcher:async () => { reconnectCalls += 1; return [{ title:"Após reconectar" }]; },
+    isUsable:(items) => items.length > 0,
+  });
+  assert.equal(reconnectCalls, 1);
+  assert.equal(recovered.payload[0].title, "Após reconectar");
 });
 
 test("cold boot usa logo e background persistidos sem fetch remoto", async () => {

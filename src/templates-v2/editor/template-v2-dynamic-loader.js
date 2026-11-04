@@ -8,12 +8,16 @@ const pendingLoads = new Map();
 const segmentCache = new Map();
 const pendingSegments = new Map();
 
-async function loadCachedSegment(key, load) {
+async function loadCachedSegment(key, load, { force = false, isUsable = () => true } = {}) {
   const cached = segmentCache.get(key);
-  if (cached && Date.now() - cached.loadedAt < CACHE_TTL_MS) return cached.data;
+  if (!force && cached && Date.now() - cached.loadedAt < CACHE_TTL_MS) return { data:cached.data, stale:false };
   if (pendingSegments.has(key)) return pendingSegments.get(key);
-  const request = Promise.resolve().then(load).then((data)=>{ segmentCache.set(key,{ data,loadedAt:Date.now() }); return data; }).catch((error)=>{
-    if (cached?.data != null) return cached.data;
+  const request = Promise.resolve().then(load).then((data)=>{
+    if (!isUsable(data)) throw new Error("dynamic-segment-unavailable");
+    segmentCache.set(key,{ data,loadedAt:Date.now() });
+    return { data, stale:false };
+  }).catch((error)=>{
+    if (cached?.data != null) return { data:cached.data, stale:true };
     throw error;
   }).finally(()=>pendingSegments.delete(key));
   pendingSegments.set(key,request);
@@ -27,10 +31,10 @@ export function clearTemplateV2DynamicDataCache() {
   pendingSegments.clear();
 }
 
-export async function loadTemplateV2DynamicData(config, { loadWeather, loadNews } = {}) {
+export async function loadTemplateV2DynamicData(config, { loadWeather, loadNews } = {}, { force = false } = {}) {
   const key = getTemplateV2DynamicDataKey(config);
   const cached = dynamicCache.get(key);
-  if (cached && Date.now() - cached.loadedAt < CACHE_TTL_MS) return cached.data;
+  if (!force && cached && Date.now() - cached.loadedAt < CACHE_TTL_MS) return cached.data;
   if (pendingLoads.has(key)) return pendingLoads.get(key);
 
   const request = (async () => {
@@ -43,15 +47,23 @@ export async function loadTemplateV2DynamicData(config, { loadWeather, loadNews 
     if (weather.enabled && !weatherCity) data.weatherError = "missing-city";
     else if (weather.enabled && loadWeather) tasks.push({ key:"weather", run:()=>loadWeather(weatherCity, normalizeTemplateV2ForecastDays(weather.forecastDays)) });
     if (dynamicNews) {
-      if (dynamicNews.editorial.enabled && loadNews) tasks.push({ key:"editorialNews", run:()=>loadCachedSegment(`editorial:${JSON.stringify(dynamicNews.editorial)}`,()=>loadNews({ ...dynamicNews.editorial, dynamicStrict:true })) });
-      if (dynamicNews.feed.enabled && dynamicNews.feed.news.enabled && loadNews) tasks.push({ key:"feedNews", run:()=>loadCachedSegment(`feed:${JSON.stringify(dynamicNews.feed.news)}`,()=>loadNews({ ...dynamicNews.feed.news, dynamicStrict:true })) });
+      if (dynamicNews.editorial.enabled && loadNews) tasks.push({ key:"editorialNews", segment:true, run:()=>loadCachedSegment(`editorial:${JSON.stringify(dynamicNews.editorial)}`,()=>loadNews({ ...dynamicNews.editorial, dynamicStrict:true }), { force, isUsable:(items)=>Array.isArray(items) && items.length > 0 }) });
+      if (dynamicNews.feed.enabled && dynamicNews.feed.news.enabled && loadNews) tasks.push({ key:"feedNews", segment:true, run:()=>loadCachedSegment(`feed:${JSON.stringify(dynamicNews.feed.news)}`,()=>loadNews({ ...dynamicNews.feed.news, dynamicStrict:true }), { force, isUsable:(items)=>Array.isArray(items) && items.length > 0 }) });
       if (dynamicNews.feed.enabled && dynamicNews.feed.includeWeather && loadWeather && dynamicNews.feed.weatherCities.length) tasks.push({ key:"feedWeather", run:async()=>{
         const results = await Promise.allSettled(dynamicNews.feed.weatherCities.map((city)=>loadCachedSegment(`feed-weather:${city}`,()=>loadWeather(city,3))));
-        return results.filter((result)=>result.status === "fulfilled" && result.value && !result.value.unavailable).map((result)=>result.value);
+        return results.filter((result)=>result.status === "fulfilled" && result.value?.data && !result.value.data.unavailable).map((result)=>result.value.data);
       } });
     } else if (news.enabled && loadNews) tasks.push({ key:"news", run:()=>loadNews(news) });
     const settled = await Promise.allSettled(tasks.map((task)=>task.run()));
-    settled.forEach((result,index)=>{ if (result.status === "fulfilled") data[tasks[index].key] = result.value; else data[`${tasks[index].key}Error`] = true; });
+    let hasStaleSegment = false;
+    settled.forEach((result,index)=>{
+      if (result.status === "fulfilled") {
+        if (tasks[index].segment) {
+          data[tasks[index].key] = result.value.data;
+          hasStaleSegment ||= result.value.stale;
+        } else data[tasks[index].key] = result.value;
+      } else data[`${tasks[index].key}Error`] = true;
+    });
     if (dynamicNews) data.news = data.editorialNews || [];
     if (config.sports?.provider) {
       const [{ normalizeSportsV2Config }, { resolveSportsDataProvider }] = await Promise.all([
@@ -65,7 +77,7 @@ export async function loadTemplateV2DynamicData(config, { loadWeather, loadNews 
       data.sportsErrors = sports.selectedSports.filter((_,index)=>snapshots[index].status==="rejected");
     }
     const hasUnavailableWeather = weather.enabled && (!data.weather || data.weather.unavailable === true);
-    if (!hasUnavailableWeather) dynamicCache.set(key, { data, loadedAt: Date.now() });
+    if (!hasUnavailableWeather && !hasStaleSegment) dynamicCache.set(key, { data, loadedAt: Date.now() });
     return data;
   })().finally(() => pendingLoads.delete(key));
   pendingLoads.set(key, request);

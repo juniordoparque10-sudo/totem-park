@@ -101,13 +101,13 @@ export function writeNewsEditorialDynamicCache(scope, value, payload = {}, optio
   return records.filter(Boolean);
 }
 
-export async function refreshTemplateDataIfNeeded(context, { ttlMs, fetcher, now = Date.now(), storage, online = true, source = "remote", isUsable = (payload) => payload != null } = {}) {
+export async function refreshTemplateDataIfNeeded(context, { ttlMs, fetcher, now = Date.now(), storage, online = true, force = false, source = "remote", isUsable = (payload) => payload != null } = {}) {
   const key = buildTemplateDataCacheKey(context);
   const cached = readTemplateDataCache(context, storage);
-  if (cached?.fetchedAt != null && now - cached.fetchedAt < ttlMs) {
+  if (!force && cached?.fetchedAt != null && now - cached.fetchedAt < ttlMs) {
     return { payload:cached.payload, fetched:false, reason:"fresh", record:cached };
   }
-  if (cached?.refreshAttemptAt != null && now - cached.refreshAttemptAt < ttlMs) {
+  if (!force && cached?.refreshAttemptAt != null && now - cached.refreshAttemptAt < ttlMs) {
     return { payload:cached.payload, fetched:false, reason:"retry-deferred", record:cached };
   }
   if (!online) return { payload:cached?.payload ?? null, fetched:false, reason:"offline", record:cached };

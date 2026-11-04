@@ -26,6 +26,7 @@ import { withSportsV2ReadinessTimeout } from "./templates-v2/sports-v2/readiness
 import { clearTemplateV2BackgroundOnlineRetry, getTemplateV2CriticalImageState, getTemplateV2CriticalImageUrl, getTemplateV2ReadinessFingerprint, localizeTemplateV2Assets, markTemplateV2BackgroundForOnlineRetry, prepareTemplateV2CriticalImage, preloadImageForPaint, suppressTemplateV2CriticalImage, takeTemplateV2BackgroundOnlineRetries } from "./templates-v2/player-preload";
 import { collectTemplateAssetUrls, createOfflineSafeTemplate, prepareTemplateAssets, refreshTemplateAssets, releaseRetiredTemplateAssetUrls, selectTemplateAssetRenderSource, shouldUsePersistentTemplateAssetCache } from "./templates-v2/offline-asset-cache";
 import { buildSportsDataCacheContext, buildTemplateDataCacheKey, createNewsDataFingerprintConfig, createWeatherDataFingerprintConfig, hasUsableSportsPayload, mergeSportsLastKnown, readNewsEditorialDynamicCache, readSportsTemplateDataCache, readTemplateDataCache, refreshTemplateDataIfNeeded, writeNewsEditorialDynamicCache, writeSportsTemplateDataCache, writeTemplateDataCache } from "./templates-v2/offline-data-cache";
+import { useTemplateV2NewsRehydration } from "./templates-v2/news-offline-rehydration";
 import { shouldRevealTemplateImmediately } from "./templates-v2/offline-readiness";
 import { getNextTemplateToPrepare } from "./templates-v2/offline-preload";
 import { confirmTemplateImageForPaint, getTemplateBackgroundSuppressionKey, getTemplatePlaybackLayerKey, getTemplatePlaybackReadyKey, isCurrentPlaybackExecution, nextPlaybackExecutionId, shouldReleaseTemplateAfterPreload } from "./templates-v2/player-execution";
@@ -14312,6 +14313,17 @@ function TemplateV2LivePreview({ template, sourceTemplate = template, compact = 
   const [dynamicData, setDynamicData] = useState(initialDynamicData);
   const dynamicKey = JSON.stringify({ weather:weatherCacheConfig, enabledWeather:weatherConfig.enabled, news:newsCacheConfig, enabledNews:newsConfig.enabled, dynamicNews:dynamicNewsPlayerConfig?.dynamicNews || null, sports:sportsConfig });
 
+  useTemplateV2NewsRehydration({
+    scope,
+    templateType:sourceTemplate.identity?.templateType || sourceTemplate.templateType || sourceTemplate.type || "",
+    dynamicNews:dynamicNewsPlayerConfig ? originalConfig.dynamicNews : null,
+    newsConfig:newsConfig.enabled && !dynamicNewsPlayerConfig ? newsCacheConfig : null,
+    onRestore:(restored) => {
+      setDynamicData((previous) => ({ ...(previous || {}), ...restored }));
+      logTemplateOffline("TEMPLATE_DATA_CACHE_HIT", { templateId, module:"late-news-rehydrate" });
+    },
+  });
+
   useLayoutEffect(() => {
     logTemplatesV2Diagnostic("T1_RENDERER_MOUNTED", { templateId: template.id || template.templateId || "", templateType: template.identity?.templateType || template.templateType || template.type || "", playbackExecutionId });
   }, [template.id, template.templateId, template.identity?.templateType, template.templateType, template.type, playbackExecutionId]);
@@ -14347,7 +14359,7 @@ function TemplateV2LivePreview({ template, sourceTemplate = template, compact = 
             })));
       }
       if (dynamicNewsPlayerConfig && modules.includes("news")) {
-        tasks.push(loadTemplateV2DynamicData(dynamicNewsPlayerConfig, { loadWeather:loadTemplateV2Weather, loadNews:loadTemplateV2News })
+        tasks.push(loadTemplateV2DynamicData(dynamicNewsPlayerConfig, { loadWeather:loadTemplateV2Weather, loadNews:loadTemplateV2News }, { force:reason === "online" })
           .then((data) => {
             writeNewsEditorialDynamicCache(scope, originalConfig.dynamicNews, data, { source:"rss" });
             return data;
@@ -14359,7 +14371,7 @@ function TemplateV2LivePreview({ template, sourceTemplate = template, compact = 
         };
         const isUsableNews = (news) => Boolean(news?.length) && JSON.stringify(news) !== JSON.stringify(DEFAULT_NEWS_ITEMS.slice(0,8));
         tasks.push((IS_TEMPLATE_DATA_FRESHNESS_EXPERIMENT
-          ? refreshTemplateDataIfNeeded({ ...scope, module:"news", config:newsCacheConfig }, { ttlMs:10 * 60 * 1000, fetcher:fetchNews, source:"rss", isUsable:isUsableNews }).then(({ payload }) => payload ? { news:payload } : {})
+          ? refreshTemplateDataIfNeeded({ ...scope, module:"news", config:newsCacheConfig }, { ttlMs:10 * 60 * 1000, fetcher:fetchNews, source:"rss", force:reason === "online", isUsable:isUsableNews }).then(({ payload }) => payload ? { news:payload } : {})
           : fetchNews().then((news) => {
               if (!isUsableNews(news)) return {};
               writeTemplateDataCache({ ...scope, module:"news", config:newsConfig }, news, { source:"rss" });

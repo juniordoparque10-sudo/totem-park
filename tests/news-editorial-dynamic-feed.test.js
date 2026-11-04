@@ -80,6 +80,71 @@ test("falha temporária após o TTL preserva o último feed válido", async () =
   }
 });
 
+test("resposta RSS vazia não apaga Notícias V2 e a reconexão força nova consulta", async () => {
+  clearTemplateV2DynamicDataCache();
+  const originalNow = Date.now;
+  let now = 1_000;
+  Date.now = () => now;
+  const config = {
+    dynamicNews:{
+      editorial:{ enabled:true, newsFeedUrl:"editorial.xml" },
+      feed:{ enabled:true, news:{ enabled:true, newsFeedUrl:"feed.xml" } },
+    },
+  };
+  let phase = "online";
+  const calls = [];
+  const loadNews = async (source) => {
+    calls.push([phase, source.newsFeedUrl]);
+    if (phase === "offline") return [];
+    return [{ title:`${phase}-${source.newsFeedUrl}` }];
+  };
+  try {
+    const online = await loadTemplateV2DynamicData(config, { loadNews });
+    assert.equal(online.editorialNews[0].title, "online-editorial.xml");
+    assert.equal(online.feedNews[0].title, "online-feed.xml");
+
+    now += 10 * 60 * 1000 + 1;
+    phase = "offline";
+    const offline = await loadTemplateV2DynamicData(config, { loadNews });
+    assert.equal(offline.editorialNews[0].title, "online-editorial.xml");
+    assert.equal(offline.feedNews[0].title, "online-feed.xml");
+
+    phase = "reconnected";
+    const recovered = await loadTemplateV2DynamicData(config, { loadNews }, { force:true });
+    assert.equal(recovered.editorialNews[0].title, "reconnected-editorial.xml");
+    assert.equal(recovered.feedNews[0].title, "reconnected-feed.xml");
+    assert.deepEqual(calls.filter(([callPhase]) => callPhase === "reconnected"), [
+      ["reconnected", "editorial.xml"],
+      ["reconnected", "feed.xml"],
+    ]);
+  } finally {
+    Date.now = originalNow;
+    clearTemplateV2DynamicDataCache();
+  }
+});
+
+test("reconexão força somente RSS e preserva o cache de clima do feed", async () => {
+  clearTemplateV2DynamicDataCache();
+  const config = {
+    dynamicNews:{
+      editorial:{ enabled:true, newsFeedUrl:"editorial.xml" },
+      feed:{
+        enabled:true,
+        news:{ enabled:true, newsFeedUrl:"feed.xml" },
+        includeWeather:true,
+        weatherCities:["Natal/RN"],
+      },
+    },
+  };
+  let weatherCalls = 0;
+  const loadWeather = async () => { weatherCalls += 1; return { city:"Natal/RN", temperature:28 }; };
+  const loadNews = async (source) => [{ title:source.newsFeedUrl }];
+  await loadTemplateV2DynamicData(config, { loadNews, loadWeather });
+  await loadTemplateV2DynamicData(config, { loadNews, loadWeather }, { force:true });
+  assert.equal(weatherCalls, 1);
+  clearTemplateV2DynamicDataCache();
+});
+
 test("itens mistos do ticker combinam notícias e clima sem dados fictícios", () => {
   assert.equal(typeof newsConfig.buildNewsEditorialFeedItems, "function");
   const items = newsConfig.buildNewsEditorialFeedItems(
@@ -172,6 +237,8 @@ test("Player atualiza Notícias Editorial dinâmica pelo timer compartilhado de 
   const app = fs.readFileSync(new URL("../src/App.jsx", import.meta.url), "utf8");
   assert.match(app, /if \(dynamicNewsPlayerConfig && modules\.includes\("news"\)\) \{[\s\S]*?tasks\.push\([\s\S]*?loadTemplateV2DynamicData\(dynamicNewsPlayerConfig[\s\S]*?writeNewsEditorialDynamicCache/);
   assert.match(app, /setInterval\(\(\) => load\("timer", \["weather","news"\]\), 10 \* 60 \* 1000\)/);
+  assert.match(app, /loadTemplateV2DynamicData\(dynamicNewsPlayerConfig,[\s\S]*?\{ force:reason === "online" \}/);
+  assert.match(app, /refreshTemplateDataIfNeeded\(\{ \.\.\.scope, module:"news", config:newsCacheConfig \}, \{[^}]*force:reason === "online"/);
   assert.doesNotMatch(app, /if \(!dynamicNewsPlayerConfig\) return undefined;[\s\S]*?loadTemplateV2DynamicData\(dynamicNewsPlayerConfig/);
 });
 
