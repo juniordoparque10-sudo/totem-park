@@ -25,6 +25,8 @@ import { resolveSportsDataProvider } from "./templates-v2/sports-v2/data/SportsD
 import { withSportsV2ReadinessTimeout } from "./templates-v2/sports-v2/readiness";
 import { clearTemplateV2BackgroundOnlineRetry, getTemplateV2CriticalImageState, getTemplateV2CriticalImageUrl, getTemplateV2ReadinessFingerprint, localizeTemplateV2Assets, markTemplateV2BackgroundForOnlineRetry, prepareTemplateV2CriticalImage, preloadImageForPaint, suppressTemplateV2CriticalImage, takeTemplateV2BackgroundOnlineRetries } from "./templates-v2/player-preload";
 import { collectTemplateAssetUrls, createOfflineSafeTemplate, prepareTemplateAssets, refreshTemplateAssets, releaseRetiredTemplateAssetUrls, selectTemplateAssetRenderSource, shouldUsePersistentTemplateAssetCache } from "./templates-v2/offline-asset-cache";
+import { prepareTemplateV2CriticalImageFromCache } from "./templates-v2/offline-critical-asset";
+import { useTemplateV2WeatherRehydration } from "./templates-v2/weather-offline-rehydration";
 import { buildSportsDataCacheContext, buildTemplateDataCacheKey, createNewsDataFingerprintConfig, createWeatherDataFingerprintConfig, hasUsableSportsPayload, mergeSportsLastKnown, readNewsEditorialDynamicCache, readSportsTemplateDataCache, readTemplateDataCache, refreshTemplateDataIfNeeded, writeNewsEditorialDynamicCache, writeSportsTemplateDataCache, writeTemplateDataCache } from "./templates-v2/offline-data-cache";
 import { useTemplateV2NewsRehydration } from "./templates-v2/news-offline-rehydration";
 import { shouldRevealTemplateImmediately } from "./templates-v2/offline-readiness";
@@ -39,6 +41,7 @@ import { filterTemplateResources, isPlaybackMedia } from "./media-library-purpos
 import { getTemplateResourceUsage } from "./template-resource-usage";
 import { createUnavailableWeather, getWeatherConditionLabel, getWeatherIconSafe, hasUsableWeatherTemperature, mergeLegacyLiveContent } from "./weather-presentation";
 import { selectRealNewsState } from "./template-news-state";
+import { useLegacyTemplateLiveContentRehydration } from "./legacy-template-offline-rehydration";
 import { findNextReadyMediaIndex, getCanonicalPlaylistMediaEntries, getNativeOfflineQueueUrls, getPlaylistMediaPreparation } from "./media-download-readiness";
 import { createCacheFailureDiagnostic } from "./cache-failure-diagnostics";
 import { createPlayerScreenSnapshotStore, getPlayerScreenScopeKey } from "./player-screen-snapshot";
@@ -14324,6 +14327,15 @@ function TemplateV2LivePreview({ template, sourceTemplate = template, compact = 
     },
   });
 
+  useTemplateV2WeatherRehydration({
+    scope,
+    weatherConfig:weatherConfig.enabled ? weatherCacheConfig : null,
+    onRestore:(restored) => {
+      setDynamicData((previous) => ({ ...(previous || {}), ...restored }));
+      logTemplateOffline("TEMPLATE_DATA_CACHE_HIT", { templateId, module:"late-weather-rehydrate" });
+    },
+  });
+
   useLayoutEffect(() => {
     logTemplatesV2Diagnostic("T1_RENDERER_MOUNTED", { templateId: template.id || template.templateId || "", templateType: template.identity?.templateType || template.templateType || template.type || "", playbackExecutionId });
   }, [template.id, template.templateId, template.identity?.templateType, template.templateType, template.type, playbackExecutionId]);
@@ -14444,6 +14456,20 @@ function LegacyTemplateVisualPreview({ template, sourceTemplate = template, comp
   const [clockTick, setClockTick] = useState(() => new Date());
   const liveContentKey = getTemplateLiveContentCacheKey(activeTemplate);
 
+  function applyLiveContent(data = {}) {
+    if (Object.hasOwn(data, "weather")) {
+      setWeather((current) => mergeLegacyLiveContent({ weather:current }, data).weather || current);
+    }
+    if (Object.hasOwn(data, "news")) setNews((current) => selectRealNewsState({ cached:current, fetched:data.news }));
+    if (Object.hasOwn(data, "sportsData")) setRealSportsData(data.sportsData);
+    if (Object.hasOwn(data, "tideForecast")) setRealTideForecast(data.tideForecast);
+  }
+
+  useLegacyTemplateLiveContentRehydration({
+    context:legacyDataContext,
+    onRestore:applyLiveContent,
+  });
+
   useEffect(() => {
     const interval = setInterval(() => setClockTick(new Date()), 1000);
     return () => clearInterval(interval);
@@ -14458,15 +14484,6 @@ function LegacyTemplateVisualPreview({ template, sourceTemplate = template, comp
 
   useEffect(() => {
     let cancelled = false;
-
-    function applyLiveContent(data = {}) {
-      if (Object.hasOwn(data, "weather")) {
-        setWeather((current) => mergeLegacyLiveContent({ weather:current }, data).weather || current);
-      }
-      if (Object.hasOwn(data, "news")) setNews((current) => selectRealNewsState({ cached:current, fetched:data.news }));
-      if (Object.hasOwn(data, "sportsData")) setRealSportsData(data.sportsData);
-      if (Object.hasOwn(data, "tideForecast")) setRealTideForecast(data.tideForecast);
-    }
 
     function persistRealLiveContent(data = {}) {
       const real = {};
@@ -16651,7 +16668,8 @@ function PlayerPage() {
       logTemplatesV2Diagnostic("CRITICAL_BACKGROUND_FALLBACK_ACTIVE", { ...diagnosticPayload, CURRENT_VISIBLE:previousMediaIndexRef.current !== null, NEXT_PENDING:true });
       if (!sportsNeedsFinalData) reveal();
     } else {
-      prepareTemplateV2CriticalImage(currentItem, globalThis.Image, {
+      prepareTemplateV2CriticalImageFromCache(currentItem, globalThis.Image, {
+        assetOptions:templateAssetCacheOptions,
         maxAttempts:2,
         timeoutMs:5000,
         onFailure:(error,details)=>{

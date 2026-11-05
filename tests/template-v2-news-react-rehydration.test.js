@@ -188,6 +188,33 @@ test("configuração disponível no primeiro mount não agenda reidratação red
   clearTemplateDataMemoryCacheForTests();
 });
 
+test("Hora Certa V2 reidrata RSS pela configuração real mesmo com identidade provisória", async () => {
+  const storage = new MemoryStorage();
+  const published = {
+    modules:{
+      news:{ enabled:true, newsFeedUrl:"https://news.example/clock.xml", selectedNewsSources:[] },
+    },
+  };
+  const newsConfig = createNewsDataFingerprintConfig(published.modules.news);
+  writeTemplateDataCache({ ...scope, module:"news", config:newsConfig }, [{ title:"RSS real da Hora Certa" }], { storage, now:100 });
+  clearTemplateDataMemoryCacheForTests();
+  let root;
+  await act(async () => {
+    root = create(React.createElement(Harness, { configuration:null, storage, onRender:() => {} }));
+  });
+  await act(async () => {
+    root.update(React.createElement(Harness, {
+      configuration:{ templateType:"", newsConfig },
+      storage,
+      onRender:() => {},
+    }));
+    await Promise.resolve();
+  });
+  assert.match(root.toJSON().children[0], /RSS real da Hora Certa/);
+  await act(async () => { root.unmount(); });
+  clearTemplateDataMemoryCacheForTests();
+});
+
 test("rehydration boundary has no native image preparation side effect", () => {
   assert.equal(typeof rehydration.restoreTemplateV2NewsCachedData, "function");
   assert.doesNotMatch(String(rehydration.useTemplateV2NewsRehydration), /prepareTemplateAssets|refreshTemplateAssets|setInterval/);
