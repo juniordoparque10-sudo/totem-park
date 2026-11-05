@@ -93,3 +93,50 @@ test("cold remount V1 preserva último válido e não atualiza depois do unmount
   await act(async () => { scheduled[0](); });
   assert.equal(rendered.some((value) => value.weather?.temperature === 29), false);
 });
+
+test("falha RSS não apaga o último feed válido ao persistir clima nas nove V1", async () => {
+  assert.equal(typeof rehydration.mergeLegacyLiveContentWithRss, "function");
+  assert.equal(typeof rehydration.buildLegacyLiveContentForPersistence, "function");
+  const fallback = [{ title:"Totem Park fallback" }];
+  const isUsableNews = (items) => Array.isArray(items) && items.length > 0 && items[0]?.title !== "Totem Park fallback";
+
+  for (const [type, hasWeather, hasNews] of cases) {
+    if (!hasNews) continue;
+    const previous = { ...(hasWeather ? { weather } : {}), news };
+    const failedRefresh = { ...(hasWeather ? { weather:{ ...weather, temperature:30 } } : {}), news:fallback };
+    const merged = rehydration.mergeLegacyLiveContentWithRss(previous, failedRefresh, { isUsableNews });
+    const persisted = rehydration.buildLegacyLiveContentForPersistence(previous, failedRefresh, {
+      isUsableNews,
+      isUsableWeather:(value) => Number.isFinite(Number(value?.temperature)),
+    });
+    assert.deepEqual(merged.news, news, `${type} memória`);
+    assert.deepEqual(persisted.news, news, `${type} persistência`);
+  }
+});
+
+test("online offline cold boot V1 restaura RSS real e ignora resposta vazia", async () => {
+  const storage = new MemoryStorage();
+  const context = contextFor("hora_certa_premium");
+  const isUsableNews = (items) => Array.isArray(items) && items.some((item) => item?.title === "RSS persistido");
+  const online = rehydration.buildLegacyLiveContentForPersistence({}, { weather, news }, {
+    isUsableNews,
+    isUsableWeather:(value) => Number.isFinite(Number(value?.temperature)),
+  });
+  writeTemplateDataCache(context, online, { storage, now:100 });
+  const afterFailure = rehydration.buildLegacyLiveContentForPersistence(online, { weather:{ ...weather, temperature:30 }, news:[] }, {
+    isUsableNews,
+    isUsableWeather:(value) => Number.isFinite(Number(value?.temperature)),
+  });
+  writeTemplateDataCache(context, afterFailure, { storage, now:200 });
+  clearTemplateDataMemoryCacheForTests();
+
+  let root;
+  await act(async () => {
+    root = create(React.createElement(Harness, { context, storage }));
+    await Promise.resolve();
+  });
+  const value = JSON.parse(root.toJSON().children[0]);
+  assert.equal(value.weather.temperature, 30);
+  assert.deepEqual(value.news, news);
+  await act(async () => { root.unmount(); });
+});

@@ -41,7 +41,7 @@ import { filterTemplateResources, isPlaybackMedia } from "./media-library-purpos
 import { getTemplateResourceUsage } from "./template-resource-usage";
 import { createUnavailableWeather, getWeatherConditionLabel, getWeatherIconSafe, hasUsableWeatherTemperature, mergeLegacyLiveContent } from "./weather-presentation";
 import { selectRealNewsState } from "./template-news-state";
-import { useLegacyTemplateLiveContentRehydration } from "./legacy-template-offline-rehydration";
+import { buildLegacyLiveContentForPersistence, mergeLegacyLiveContentWithRss, useLegacyTemplateLiveContentRehydration } from "./legacy-template-offline-rehydration";
 import { findNextReadyMediaIndex, getCanonicalPlaylistMediaEntries, getNativeOfflineQueueUrls, getPlaylistMediaPreparation } from "./media-download-readiness";
 import { createCacheFailureDiagnostic } from "./cache-failure-diagnostics";
 import { createPlayerScreenSnapshotStore, getPlayerScreenScopeKey } from "./player-screen-snapshot";
@@ -3749,7 +3749,9 @@ function primeTemplateLiveContent(template = {}, options = {}) {
 
   const promise = fetchTemplateLiveContent(template)
     .then((data) => {
-      const mergedData = mergeLegacyLiveContent(cached?.data || {}, data);
+      const mergedData = mergeLegacyLiveContentWithRss(cached?.data || {}, data, {
+        isUsableNews:(items) => Array.isArray(items) && items.length > 0 && items.some((item) => !isDefaultNewsItem(item)),
+      });
       templateLiveContentCache.set(cacheKey, {
         cachedAt: Date.now(),
         data:mergedData,
@@ -14486,12 +14488,12 @@ function LegacyTemplateVisualPreview({ template, sourceTemplate = template, comp
     let cancelled = false;
 
     function persistRealLiveContent(data = {}) {
-      const real = {};
-      if (hasUsableWeatherTemperature(data.weather)) real.weather = data.weather;
-      if (Array.isArray(data.news) && data.news.length && JSON.stringify(data.news) !== JSON.stringify(DEFAULT_NEWS_ITEMS)) real.news = data.news;
-      if (data.sportsData) real.sportsData = data.sportsData;
-      if (data.tideForecast) real.tideForecast = data.tideForecast;
-      if (Object.keys(real).length) writeTemplateDataCache(legacyDataContext, { ...(persistentLiveContent || {}), ...real }, { source:"legacy-live" });
+      const latestPersisted = readTemplateDataCache(legacyDataContext)?.payload || persistentLiveContent || {};
+      const next = buildLegacyLiveContentForPersistence(latestPersisted, data, {
+        isUsableWeather:hasUsableWeatherTemperature,
+        isUsableNews:(items) => Array.isArray(items) && items.length > 0 && items.some((item) => !isDefaultNewsItem(item)),
+      });
+      if (Object.keys(next).length) writeTemplateDataCache(legacyDataContext, next, { source:"legacy-live" });
     }
 
     async function loadTemplateContent(force = false) {

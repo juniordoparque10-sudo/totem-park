@@ -24,7 +24,6 @@ export function useTemplateV2NewsRehydration({
   schedule = scheduleMicrotask,
 } = {}) {
   const onRestoreRef = useRef(onRestore);
-  const mountedRef = useRef(false);
   const rehydrationKey = JSON.stringify({
     clientId:scope.clientId || "",
     screenId:scope.screenId || "",
@@ -38,10 +37,6 @@ export function useTemplateV2NewsRehydration({
   }, [onRestore]);
 
   useEffect(() => {
-    if (!mountedRef.current) {
-      mountedRef.current = true;
-      return undefined;
-    }
     if (!dynamicNews && !newsConfig) return undefined;
     let active = true;
     schedule(() => {

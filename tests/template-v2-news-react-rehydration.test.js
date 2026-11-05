@@ -30,6 +30,17 @@ class MemoryStorage {
   setItem(key, value) { this.values.set(key, String(value)); }
 }
 
+class FirstReadMissStorage extends MemoryStorage {
+  misses = 1;
+  getItem(key) {
+    if (this.misses > 0) {
+      this.misses -= 1;
+      return null;
+    }
+    return super.getItem(key);
+  }
+}
+
 const scope = { clientId:"client-1", screenId:"screen-1", templateId:"template-1" };
 const dynamicNews = {
   editorial:{ enabled:true, newsFeedUrl:"https://news.example/editorial.xml" },
@@ -169,9 +180,10 @@ test("unmount Android cancela reidratação pendente sem atualizar estado", asyn
   clearTemplateDataMemoryCacheForTests();
 });
 
-test("configuração disponível no primeiro mount não agenda reidratação redundante", async () => {
-  const storage = new MemoryStorage();
+test("Hora Certa V2 repete uma leitura única no primeiro mount quando o cache Android chega tarde", async () => {
+  const storage = new FirstReadMissStorage();
   writeTemplateDataCache({ ...scope, module:"news", config:clockNewsConfig }, [{ title:"Já hidratada" }], { storage, now:100 });
+  clearTemplateDataMemoryCacheForTests();
   const scheduled = [];
   let root;
   await act(async () => {
@@ -182,8 +194,10 @@ test("configuração disponível no primeiro mount não agenda reidratação red
       onRender:() => {},
     }));
   });
+  assert.doesNotMatch(root.toJSON().children[0], /Já hidratada/);
+  assert.equal(scheduled.length, 1);
+  await act(async () => { scheduled[0](); });
   assert.match(root.toJSON().children[0], /Já hidratada/);
-  assert.equal(scheduled.length, 0);
   await act(async () => { root.unmount(); });
   clearTemplateDataMemoryCacheForTests();
 });

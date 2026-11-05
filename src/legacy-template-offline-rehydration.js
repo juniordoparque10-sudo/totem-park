@@ -18,6 +18,27 @@ export function mergeRestoredLegacyLiveContent(current = {}, restored = {}) {
   return merged;
 }
 
+export function mergeLegacyLiveContentWithRss(previous = {}, candidate = {}, { isUsableNews = (items) => Array.isArray(items) && items.length > 0 } = {}) {
+  const merged = mergeLegacyLiveContent(previous, candidate);
+  if (Object.hasOwn(candidate, "news")) {
+    merged.news = isUsableNews(candidate.news) ? candidate.news : previous.news;
+    if (!isUsableNews(merged.news)) delete merged.news;
+  }
+  return merged;
+}
+
+export function buildLegacyLiveContentForPersistence(previous = {}, candidate = {}, {
+  isUsableNews = (items) => Array.isArray(items) && items.length > 0,
+  isUsableWeather = () => false,
+} = {}) {
+  const next = { ...(previous || {}) };
+  if (isUsableWeather(candidate.weather)) next.weather = candidate.weather;
+  if (isUsableNews(candidate.news)) next.news = candidate.news;
+  if (candidate.sportsData) next.sportsData = candidate.sportsData;
+  if (candidate.tideForecast) next.tideForecast = candidate.tideForecast;
+  return next;
+}
+
 export function useLegacyTemplateLiveContentRehydration({
   context = null,
   storage,
