@@ -1,9 +1,25 @@
+.tpv2-template-brand {
+  display: inline-flex;
+  align-items: center;
+  gap: 1.1cqw;
+  min-width: 0;
+}
+
 .tpv2-template-logo {
   display: inline-flex;
   align-items: center;
   justify-content: flex-start;
   min-width: 0;
   min-height: 0;
+}
+
+.tpv2-template-name {
+  min-width: 0;
+  font-size: clamp(13px, 1.35cqw, 24px);
+  line-height: 1.1;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
 }
 
 .tpv2-template-logo__image {

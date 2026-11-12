@@ -7,6 +7,11 @@ const renderer = fs.readFileSync(new URL("../src/templates-v2/TemplateV2Renderer
 const editor = fs.readFileSync(new URL("../src/templates-v2/editor/TemplateV2Editor.jsx", import.meta.url), "utf8");
 const css = fs.readFileSync(new URL("../src/templates-v2/editor/template-v2-editor.css", import.meta.url), "utf8");
 const rendererCss = fs.readFileSync(new URL("../src/templates-v2/template-v2.css", import.meta.url), "utf8");
+const templateLogoCss = fs.readFileSync(new URL("../src/templates-v2/template-logo.css", import.meta.url), "utf8");
+const sportsCss = fs.readFileSync(new URL("../src/templates-v2/sports-v2/sports-v2.css", import.meta.url), "utf8");
+const collectionCss = fs.readFileSync(new URL("../src/templates-v2/dynamic-collections/collection-renderer.css", import.meta.url), "utf8");
+const marketCss = fs.readFileSync(new URL("../src/templates-v2/market-premium/market-premium.css", import.meta.url), "utf8");
+const newsCss = fs.readFileSync(new URL("../src/templates-v2/news-editorial-dynamic/news-editorial-dynamic.css", import.meta.url), "utf8");
 const app = fs.readFileSync(new URL("../src/App.jsx", import.meta.url), "utf8");
 const appCss = fs.readFileSync(new URL("../src/App.css", import.meta.url), "utf8");
 const sportsRenderer = fs.readFileSync(new URL("../src/templates-v2/sports-v2/SportsPremiumRenderer.jsx", import.meta.url), "utf8");
@@ -14,7 +19,7 @@ const telemetryDashboard = fs.readFileSync(new URL("../src/TelemetryDashboard.js
 
 test("Player Web resolves logo assets through the same resolver as backgrounds", () => {
   assert.match(modules, /const assetUrl = getTemplateV2ImageAssetUrl\(asset\)/);
-  assert.match(modules, /assetUrl \? <img src=\{assetUrl\}/);
+  assert.match(modules, /<TemplateBrand src=\{assetUrl\}/);
 });
 
 test("asset resolver accepts persisted remote preview and image URL fields", async () => {
@@ -58,6 +63,27 @@ test("telemetry table uses stable screen ordering instead of heartbeat timestamp
 test("overlay affects the full image in landscape and portrait", () => {
   assert.match(rendererCss, /\.tpv2-media-shade[^}]*linear-gradient\(rgba\(7,17,31,var\(--tpv2-overlay\)\)/);
   assert.match(rendererCss, /\.tpv2-root\.is-portrait \.tpv2-media-shade[^}]*var\(--tpv2-overlay\)/);
+});
+
+test("weather portrait keeps brand together and moves the city below it", () => {
+  assert.match(rendererCss, /\.tpv2-weather-premium\.is-portrait \.tpv2-weather-shell>header\{[^}]*flex-wrap:wrap/);
+  assert.match(rendererCss, /\.tpv2-weather-premium\.is-portrait \.tpv2-weather-shell>header>span:last-child\{[^}]*flex-basis:100%/);
+});
+
+test("all V2 brands use the exact sports logo-to-name spacing", () => {
+  assert.match(templateLogoCss, /\.tpv2-template-brand\s*\{[^}]*gap:\s*1\.1cqw/s);
+  assert.match(sportsCss, /\.sports-v2-brand\{[^}]*gap:1\.1cqw/);
+  assert.match(sportsCss, /\.sports-v2-brand \.tpv2-template-logo\{[^}]*width:3\.2cqw[^}]*height:3\.2cqw/);
+  assert.match(sportsCss, /\.sports-v2-brand \.tpv2-template-name\{[^}]*font-size:1\.7cqw/);
+  assert.match(rendererCss, /\.tpv2-clock-pro header \.tpv2-template-name,\.tpv2-weather-shell header \.tpv2-template-name\{[^}]*font-size:clamp\(18px,2cqw,34px\)/);
+  assert.match(modules, /<TemplateBrand[\s\S]*?showLogo=\{showLogo\}[\s\S]*?showName=\{showName\}/);
+});
+
+test("template names follow the visible logo instead of reserved logo width", () => {
+  assert.match(rendererCss, /\.tpv2-clock-pro header \.tpv2-template-logo__image,\.tpv2-weather-shell header \.tpv2-template-logo__image\{[^}]*width:auto[^}]*max-width:180px[^}]*height:64px/);
+  assert.match(collectionCss, /\.tpv2-collection \.collection-logo\{width:fit-content/);
+  assert.match(marketCss, /\.tpv2-market-premium \.market-logo\{width:fit-content/);
+  assert.match(newsCss, /\.tpv2-news-dynamic \.news-dynamic-logo\{width:fit-content/);
 });
 
 test("client snapshot refresh preserves screen rows instead of rebuilding the list", () => {

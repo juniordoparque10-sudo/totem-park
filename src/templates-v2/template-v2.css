@@ -90,3 +90,17 @@
 .tpv2-forecast-grid{display:grid;grid-template-columns:repeat(5,minmax(0,1fr));gap:clamp(10px,1.2cqw,22px)}.tpv2-forecast-grid article{padding:clamp(12px,1.4cqw,24px);border:1px solid rgba(255,255,255,.2);border-radius:clamp(14px,1.5cqw,26px);display:grid;grid-template-columns:1fr auto;align-items:center;gap:7px;background:rgba(2,6,23,.42);backdrop-filter:blur(18px)}.tpv2-forecast-grid article>span{grid-column:1/-1;font-weight:850}.tpv2-forecast-grid article>b{width:clamp(28px,3cqw,52px);height:clamp(28px,3cqw,52px);display:block}.tpv2-forecast-grid article>b svg{width:100%;height:100%;stroke-width:1.7}.tpv2-forecast-grid article>strong{font-size:clamp(26px,2.7cqw,48px)}.tpv2-forecast-grid article>small{grid-column:2;color:var(--tpv2-muted);font-size:clamp(15px,1.4cqw,24px)}
 .tpv2-weather-loading{margin:auto;display:grid;gap:18px;width:60%}.tpv2-weather-loading i{height:50px;border-radius:15px;background:linear-gradient(90deg,rgba(255,255,255,.08),rgba(255,255,255,.22),rgba(255,255,255,.08));background-size:200% 100%;animation:tpv2-skeleton 1.5s infinite}.tpv2-weather-loading i:first-child{height:150px}.tpv2-weather-unavailable{margin:auto;padding:24px 32px;border-radius:18px;background:rgba(2,6,23,.55);font-size:clamp(18px,2cqw,32px)}@keyframes tpv2-skeleton{to{background-position:-200% 0}}
 .tpv2-clock-pro.is-portrait .tpv2-clock-large{font-size:clamp(150px,25cqw,300px)}.tpv2-weather-premium.is-portrait .tpv2-weather-shell main{flex-direction:column;gap:12px}.tpv2-weather-premium.is-portrait .tpv2-weather-shell main>strong{font-size:clamp(130px,24cqw,240px)}.tpv2-weather-premium.is-portrait .tpv2-forecast-grid{grid-template-columns:1fr;gap:10px}.tpv2-weather-premium.is-portrait .tpv2-forecast-grid article{grid-template-columns:1.4fr auto auto auto}.tpv2-weather-premium.is-portrait .tpv2-forecast-grid article>span{grid-column:auto}.tpv2-weather-premium.is-portrait .tpv2-forecast-grid article>small{grid-column:auto}.tpv2-weather-premium.has-news-ticker .tpv2-weather-shell,.tpv2-clock-pro.has-news-ticker .tpv2-dynamic-panel{padding-bottom:clamp(92px,7cqw,138px)}
+
+/* Rodada 1: agrupamento compacto da marca e fundo independente da previsão. */
+.tpv2-brand{gap:8px}
+.tpv2-clock-pro .tpv2-dynamic-panel>header,.tpv2-weather-shell>header{justify-content:flex-start;gap:10px}
+.tpv2-weather-shell>header>span:last-child{margin-left:auto}
+.tpv2-forecast-grid article{background:rgba(2,6,23,var(--tpv2-forecast-card-alpha,.42))}
+.tpv2-weather-premium.is-portrait .tpv2-weather-shell>header{flex-wrap:wrap}
+.tpv2-weather-premium.is-portrait .tpv2-weather-shell>header>strong{min-width:0;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+
+.tpv2-clock-pro header .tpv2-brand-mark,.tpv2-weather-shell header .tpv2-brand-mark{display:grid}
+.tpv2-clock-pro header .tpv2-template-name,.tpv2-weather-shell header .tpv2-template-name{margin-right:auto;font-size:clamp(18px,2cqw,34px);text-transform:uppercase}
+.tpv2-weather-premium.is-portrait .tpv2-weather-shell .tpv2-template-name{min-width:0;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.tpv2-weather-premium.is-portrait .tpv2-weather-shell>header>span:last-child{flex-basis:100%;margin-left:0;text-align:right}
+.tpv2-clock-pro header .tpv2-template-logo__image,.tpv2-weather-shell header .tpv2-template-logo__image{width:auto;max-width:180px;height:64px}

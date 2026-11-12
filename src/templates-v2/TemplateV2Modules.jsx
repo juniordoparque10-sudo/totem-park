@@ -5,6 +5,7 @@ import { shouldRenderTemplateV2InternalVideo, shouldShowTemplateMediaPlaceholder
 import { getTemplateV2ImageAssetUrl } from "./player-preload";
 import { confirmTemplateImageForPaint } from "./player-execution";
 import { buildTickerContentModel, getTickerDurationSeconds } from "./ticker-speed";
+import TemplateBrand from "./TemplateLogo";
 
 let clockSnapshot = Date.now();
 let clockTimer = null;
@@ -75,9 +76,9 @@ export function TemplateMedia({ asset, fit = "cover", position = "center", mode 
   return <img ref={imageRef} src={assetUrl} alt="" style={{ objectFit:fit, objectPosition:position }} onLoad={(event) => confirmVisualReady(event.currentTarget)} />;
 }
 
-export function TemplateLogo({ asset, name }) {
+export function TemplateLogo({ asset, name, showLogo = true, showName = true }) {
   const assetUrl = getTemplateV2ImageAssetUrl(asset);
-  return <>{assetUrl ? <img src={assetUrl} alt="" /> : <span className="tpv2-brand-mark">TP</span>}<strong>{name}</strong></>;
+  return <TemplateBrand src={assetUrl} name={name} showLogo={showLogo} showName={showName} fallback={<span className="tpv2-brand-mark">TP</span>} />;
 }
 
 export function TemplateCTA({ config = {} }) { return config.enabled ? <span className="tpv2-cta">{config.label || "Saiba mais"}</span> : null; }

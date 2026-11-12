@@ -55,6 +55,17 @@ test("full-background transparency remains independent from image overlay", () =
   assert.equal(draft.style.overlayOpacity, 52);
 });
 
+test("legacy templates receive the approved forecast card transparency without changing other layers", () => {
+  const legacy = createHeroBusinessDraft({ style: { panelTransparency: 75 } });
+  assert.equal(legacy.style.forecastCardTransparency, 58);
+  assert.equal(legacy.style.panelTransparency, 75);
+  assert.equal(legacy.style.overlayOpacity, 52);
+
+  const configured = createHeroBusinessDraft({ style: { forecastCardTransparency: 30 } });
+  assert.equal(configured.style.forecastCardTransparency, 30);
+  assert.equal(configured.style.panelTransparency, 0);
+});
+
 test("asset resolver enumerates stable official media references", () => {
   const config = createHeroBusinessDraft();
   config.media.primary = { mediaId: "media-1", type: "image", url: "https://cdn/image.jpg", storagePath: "clients/c/media/a.jpg", storageProvider: "r2", fileHash: "abc" };

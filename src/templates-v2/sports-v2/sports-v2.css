@@ -14,6 +14,12 @@
 .sports-v2-card.sport-football.compact .sports-v2-event-list>div{gap:.25cqw;font-size:.62cqw}
 .sports-v2-card.sport-football.compact .sports-v2-standing{gap:.35cqw}
 .sports-v2-card.sport-football.compact .sports-v2-standing>div{grid-template-columns:1.2cqw minmax(0,1fr) auto;gap:.35cqw;padding:.42cqw .5cqw}
+
+.sports-v2-brand .tpv2-template-logo{width:3.2cqw;height:3.2cqw}
+.sports-v2-brand .tpv2-template-logo__image{width:100%;height:100%;object-fit:contain}
+.sports-v2-brand .tpv2-brand-mark{width:3.2cqw;height:3.2cqw}
+.sports-v2-brand .tpv2-template-name{font-size:1.7cqw}
+.sports-v2-root.is-portrait .sports-v2-brand .tpv2-template-name{font-size:3cqw}
 .sports-v2-card.sport-football.compact .sports-v2-standing>div>b{font-size:.95cqw}
 .sports-v2-card.sport-football.compact .sports-v2-standing span strong{font-size:.72cqw}
 .sports-v2-card.sport-football.compact .sports-v2-standing span small,.sports-v2-card.sport-football.compact .sports-v2-standing em{font-size:.58cqw}

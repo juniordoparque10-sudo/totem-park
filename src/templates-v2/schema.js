@@ -42,7 +42,7 @@ const HERO_DEFAULTS = {
     ],
     cta: { enabled: true, label: "Conheça nossas soluções", url: "" },
   },
-  visibility: { showLogo:true, showContent:true, showHeadline:true, showSubtitle:true, showCta:true, showServices:true },
+  visibility: { showLogo:true, showName:true, showContent:true, showHeadline:true, showSubtitle:true, showCta:true, showServices:true },
   media: {
     primary: null,
   },
@@ -55,6 +55,7 @@ const HERO_DEFAULTS = {
     mutedTextColor: "#c5d2e3",
     overlayOpacity: 52,
     panelTransparency: 0,
+    forecastCardTransparency: 58,
     mediaLayout: "split",
     mediaFit: "cover",
     mediaPosition: "center",

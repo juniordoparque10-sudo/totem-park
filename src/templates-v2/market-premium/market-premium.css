@@ -10,3 +10,4 @@
 .tpv2-market-premium.is-portrait .market-logo{width:min(28cqw,220px);height:min(10cqw,88px)}
 .tpv2-market-premium .market-featured-copy{background:linear-gradient(90deg,rgb(2 12 27/calc(var(--market-panel-alpha,1)*.96)),rgb(2 12 27/calc(var(--market-panel-alpha,1)*.08)))}
 .tpv2-market-premium aside{background:rgb(2 12 27/calc(var(--market-panel-alpha,1)*.88))}
+.tpv2-market-premium .market-logo{width:fit-content}.tpv2-market-premium .market-logo .tpv2-template-logo__image{width:auto;height:100%}.tpv2-market-premium.is-portrait .market-logo{width:fit-content}

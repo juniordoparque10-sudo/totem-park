@@ -23,21 +23,20 @@ const entries = [
 ];
 
 const VISIBILITY_CONTROLS = {
-  [HERO_BUSINESS_TYPE]: ["showLogo","showContent","showHeadline","showSubtitle","showCta","showServices"],
-  [SMART_LOBBY_TYPE]: ["showLogo","showContent","showHeadline","showSubtitle","showCta","showServices"],
-  [CLOCK_PRO_TYPE]: ["showLogo","showContent"],
-  [WEATHER_PREMIUM_TYPE]: ["showLogo","showContent"],
-  [SMART_LOBBY_TYPE]: ["showLogo","showContent","showHeadline","showSubtitle","showServices"],
-  [AGENDA_INFO_TYPE]: ["showLogo","showContent","showHeadline","showSubtitle","showServices"],
-  [PROMOTION_CAMPAIGN_TYPE]: ["showLogo","showContent","showHeadline","showSubtitle","showCta","showServices"],
-  [DIGITAL_MENU_TYPE]: ["showLogo","showContent","showHeadline","showSubtitle","showServices"],
-  [NEWS_EDITORIAL_DYNAMIC_TYPE]: ["showLogo","showContent","showHeadline","showSubtitle","showServices"],
-  [SPORTS_PREMIUM_TYPE]: ["showLogo","showContent"],
+  [HERO_BUSINESS_TYPE]: ["showLogo","showName","showContent","showHeadline","showSubtitle","showCta","showServices"],
+  [SMART_LOBBY_TYPE]: ["showLogo","showName","showContent","showHeadline","showSubtitle","showCta","showServices"],
+  [CLOCK_PRO_TYPE]: ["showLogo","showName","showContent"],
+  [WEATHER_PREMIUM_TYPE]: ["showLogo","showName","showContent"],
+  [AGENDA_INFO_TYPE]: ["showLogo","showName","showContent","showHeadline","showSubtitle","showServices"],
+  [PROMOTION_CAMPAIGN_TYPE]: ["showLogo","showName","showContent","showHeadline","showSubtitle","showCta","showServices"],
+  [DIGITAL_MENU_TYPE]: ["showLogo","showName","showContent","showHeadline","showSubtitle","showServices"],
+  [NEWS_EDITORIAL_DYNAMIC_TYPE]: ["showLogo","showName","showContent","showHeadline","showSubtitle","showServices"],
+  [SPORTS_PREMIUM_TYPE]: ["showLogo","showName","showContent"],
 };
 
 export const TEMPLATE_V2_REGISTRY = Object.fromEntries(entries.map(([type,label,category,description,preset,modules]) => [type, {
   type, label, category, description, preset, modules, creatable:type !== NEWS_EDITORIAL_TYPE, newsTicker:modules.includes("news"), orientations:["Paisagem","Retrato"], thumbnail:`template-v2-${type}`,
-  visibilityControls: VISIBILITY_CONTROLS[type] || ["showLogo","showContent","showHeadline","showSubtitle","showCta","showServices"],
+  visibilityControls: VISIBILITY_CONTROLS[type] || ["showLogo","showName","showContent","showHeadline","showSubtitle","showCta","showServices"],
   createDraft:(overrides) => createTemplateV2Draft(type, overrides),
 }]));
 
