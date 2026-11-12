@@ -47,6 +47,7 @@ import { createCacheFailureDiagnostic } from "./cache-failure-diagnostics";
 import { createPlayerScreenSnapshotStore, getPlayerScreenScopeKey } from "./player-screen-snapshot";
 import { createPlayerCapabilitySyncState } from "./player-capability-sync-state";
 import { createNowPlayingSyncGuard } from "./player-now-playing-sync";
+import { createCoalescedAsyncRunner } from "./coalesced-async-runner";
 import { localizeOfflineAssetFields } from "./offline-asset-localization";
 import { linkedAtForScreen, telemetryStatus } from "./telemetry-v1";
 import { createTransitionDiagnostics } from "./transition-diagnostics";
@@ -18112,23 +18113,27 @@ function PlayerPage() {
       }
     }
 
-    sendHeartbeat();
+    const heartbeatRunner = createCoalescedAsyncRunner(sendHeartbeat);
+    const requestHeartbeat = () => heartbeatRunner.request();
+
+    requestHeartbeat();
 
     const interval = setInterval(() => {
-      sendHeartbeat();
+      requestHeartbeat();
     }, OPERATIONAL_HEARTBEAT_INTERVAL_MS);
 
     const onVisible = () => {
-      if (document.visibilityState === "visible") sendHeartbeat();
+      if (document.visibilityState === "visible") requestHeartbeat();
     };
     const onOnline = () => {
       capabilitySyncRef.current.onReconnect();
-      sendHeartbeat();
+      requestHeartbeat();
     };
     window.addEventListener("online", onOnline);
     document.addEventListener("visibilitychange", onVisible);
 
     return () => {
+      heartbeatRunner.dispose();
       clearInterval(interval);
       window.removeEventListener("online", onOnline);
       document.removeEventListener("visibilitychange", onVisible);

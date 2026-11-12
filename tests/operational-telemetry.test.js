@@ -51,7 +51,7 @@ test("portal prioritizes screen source while heartbeat is fresh and hides it whe
 test("player RC uses one 15 second operational heartbeat constant", () => {
   assert.equal(OPERATIONAL_HEARTBEAT_INTERVAL_MS, 15_000);
   const source = fs.readFileSync(new URL("../src/App.jsx", import.meta.url), "utf8");
-  assert.match(source, /setInterval\(\(\) => \{\s*sendHeartbeat\(\);\s*\}, OPERATIONAL_HEARTBEAT_INTERVAL_MS\)/);
+  assert.match(source, /setInterval\(\(\) => \{\s*requestHeartbeat\(\);\s*\}, OPERATIONAL_HEARTBEAT_INTERVAL_MS\)/);
 });
 
 test("Android app version comes from PackageManager instead of a version string", () => {

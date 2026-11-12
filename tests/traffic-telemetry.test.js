@@ -214,7 +214,7 @@ test("UTC rollover preserves the crossing delta as measured but unattributed", (
 test("AA-AB: integration reuses the one heartbeat and does not write Firestore per playback", () => {
   const source = fs.readFileSync(new URL("../src/App.jsx", import.meta.url), "utf8");
   assert.match(source, /TotemDevice\.getNetworkStats\(\)/);
-  assert.match(source, /setInterval\(\(\) => \{\s*sendHeartbeat\(\);\s*\}, OPERATIONAL_HEARTBEAT_INTERVAL_MS\)/);
+  assert.match(source, /setInterval\(\(\) => \{\s*requestHeartbeat\(\);\s*\}, OPERATIONAL_HEARTBEAT_INTERVAL_MS\)/);
   assert.doesNotMatch(source, /recordLocalPlaybackComplete[\s\S]{0,300}(updateDoc|setDoc)\(/);
   assert.match(source, /createTelemetryHistory/);
   assert.match(source, /trafficTelemetryRef\.current\.dailySnapshot\(\)/);

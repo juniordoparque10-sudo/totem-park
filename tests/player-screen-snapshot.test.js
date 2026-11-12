@@ -53,7 +53,7 @@ test("snapshot confirmado substitui o cache e pode ser lido pelo heartbeat", () 
 test("heartbeat reutiliza o snapshot do listener sem leitura equivalente", () => {
   const source = fs.readFileSync(new URL("../src/App.jsx", import.meta.url), "utf8");
   const start = source.indexOf("async function sendHeartbeat()");
-  const end = source.indexOf("sendHeartbeat();", start);
+  const end = source.indexOf("const heartbeatRunner", start);
   const heartbeat = source.slice(start, end);
 
   assert.ok(start >= 0 && end > start, "função de heartbeat deve existir");
