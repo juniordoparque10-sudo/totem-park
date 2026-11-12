@@ -1,3 +1,5 @@
+import { safeSetStorageItem } from "./safe-storage.js";
+
 const STORAGE_KEY = "totempark-transition-diagnostics-v21";
 const MAX_EVENTS = 160;
 const REMOTE_EVENTS = 120;
@@ -23,7 +25,7 @@ export function createTransitionDiagnostics({ identity = {}, storage = globalThi
   let events = Array.isArray(stored?.events) ? stored.events.slice(-MAX_EVENTS) : [];
   let dirty = false;
 
-  const persist = () => storage?.setItem(STORAGE_KEY, JSON.stringify({ sessionId, sequence, events }));
+  const persist = () => safeSetStorageItem(storage, STORAGE_KEY, JSON.stringify({ sessionId, sequence, events }));
   return {
     configure(value) { enabled = value === true; return enabled; },
     isEnabled: () => enabled,

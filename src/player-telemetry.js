@@ -1,4 +1,5 @@
 import { OPERATIONAL_TELEMETRY_SCHEMA_VERSION, normalizeOperationalMediaSource } from "./operational-telemetry.js";
+import { safeSetStorageItem } from "./safe-storage.js";
 
 const STORAGE_KEY = "totempark-player-telemetry-operational-v1";
 const MAX_OUTBOX = 12;
@@ -58,7 +59,7 @@ function load(storage, identity, nowMs, monotonicMs) {
   return state;
 }
 
-function save(state, storage) { getStorage(storage).setItem(STORAGE_KEY, JSON.stringify(state)); }
+function save(state, storage) { return safeSetStorageItem(getStorage(storage), STORAGE_KEY, JSON.stringify(state)); }
 
 export function createPlayerTelemetry({ identity = {}, storage, now = () => Date.now(), monotonicNow = () => globalThis.performance?.now?.() ?? Date.now(), alwaysEnabled = false } = {}) {
   let state = load(storage, identity, now(), monotonicNow());

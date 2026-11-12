@@ -23,3 +23,12 @@ test("Player mounts the component only for the existing maintenance state", () =
   assert.match(app, /if \(blackoutMode\)/);
   assert.match(app, /if \(takeoverMessage\)/);
 });
+
+test("maintenance uses one rotatable canvas so 9:16 preserves the approved 16:9 composition", () => {
+  const component = fs.readFileSync(new URL("../src/player/MaintenanceScreen.jsx", import.meta.url), "utf8");
+  const css = fs.readFileSync(new URL("../src/player/maintenance-screen.css", import.meta.url), "utf8");
+  assert.match(component, /maintenance-screen__canvas/);
+  assert.match(css, /\.maintenance-screen__canvas\{[^}]*position:absolute[^}]*width:100%[^}]*height:100%/);
+  assert.match(css, /\.maintenance-screen--portrait-mode \.maintenance-screen__canvas\{[^}]*width:100vh[^}]*height:100vw[^}]*rotate\(90deg\)/);
+  assert.match(css, /\.maintenance-screen--landscape-mode \.maintenance-screen__canvas/);
+});

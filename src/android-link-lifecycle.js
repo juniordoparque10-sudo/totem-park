@@ -1,3 +1,5 @@
+import { safeSetStorageItem } from "./safe-storage.js";
+
 export const TV_CONNECTION_STORAGE_KEY = "totempark-tv-connection";
 
 export const LINK_STATES = Object.freeze({
@@ -51,8 +53,14 @@ export function readTvConnection(storage = globalThis.localStorage) {
 export function persistTvConnection(connection, storage = globalThis.localStorage) {
   const normalized = normalizeTvConnection(connection);
   if (!normalized) return null;
-  storage?.setItem(TV_CONNECTION_STORAGE_KEY, JSON.stringify(normalized));
-  return normalized;
+  const persisted = safeSetStorageItem(storage, TV_CONNECTION_STORAGE_KEY, JSON.stringify(normalized), {
+    onError:(error, details) => logLinkEvent(LINK_STATES.VALIDATION_ERROR, {
+      stage:"local-write",
+      message:error?.message || String(error),
+      quotaExceeded:details.quotaExceeded,
+    }),
+  });
+  return persisted ? normalized : null;
 }
 
 export function updateTvConnectionScreenId(screenId, storage = globalThis.localStorage) {

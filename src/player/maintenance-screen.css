@@ -1,4 +1,7 @@
 .maintenance-screen{position:relative;box-sizing:border-box;width:100%;height:100%;min-height:100%;overflow:hidden;background:#020817}
+.maintenance-screen__canvas{position:absolute;left:50%;top:50%;width:100%;height:100%;transform:translate(-50%,-50%);transform-origin:center}
+.maintenance-screen--landscape-mode .maintenance-screen__canvas{width:100%;height:100%;transform:translate(-50%,-50%)}
+.maintenance-screen--portrait-mode .maintenance-screen__canvas{width:100vh;height:100vw;transform:translate(-50%,-50%) rotate(90deg)}
 .maintenance-screen__artwork{display:block;width:100%;height:100%;object-fit:cover;object-position:center}
 .maintenance-screen__ring-cleanup{position:absolute;left:43.1%;top:35.2%;width:13.8%;aspect-ratio:1;border-radius:50%;background:radial-gradient(circle at 48% 42%,#082552 0,#061d43 46%,#07173a 74%,#081433 100%);box-shadow:0 0 1.2vw .65vw rgba(5,24,59,.88);pointer-events:none}
 .maintenance-screen__motion-stage{position:absolute;left:43.75%;top:36.34%;width:12.5%;aspect-ratio:1;overflow:hidden;border-radius:50%;pointer-events:none}

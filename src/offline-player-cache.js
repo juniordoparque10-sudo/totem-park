@@ -22,6 +22,7 @@ import { isRemoteDownloadSource } from "./android-media-source.js";
 import { getNativeCacheJournalEntry, updateNativeCacheJournal } from "./native-cache-journal.js";
 import { promoteNativeCachePartial } from "./native-cache-transaction.js";
 import { getCacheFailureCode } from "./cache-failure-diagnostics.js";
+import { safeSetStorageItem } from "./safe-storage.js";
 
 const MEDIA_CACHE_NAME = "totempark-player-media-v1";
 const MEDIA_CACHE_META_KEY = "totempark-player-media-cache-meta";
@@ -54,7 +55,7 @@ function getMetaStore() {
 
 function saveMetaStore(meta) {
   if (typeof localStorage === "undefined") return;
-  localStorage.setItem(MEDIA_CACHE_META_KEY, JSON.stringify(meta));
+  safeSetStorageItem(localStorage, MEDIA_CACHE_META_KEY, JSON.stringify(meta));
 }
 
 function getTimestampVersion(value) {
@@ -851,8 +852,8 @@ export async function cacheOfflineAssets(urls, scope, storageKey, options = {}) 
   // V39 keeps every unclassified legacy URL and file. Absence from the current
   // aliases is not proof that a historical cache entry is invalid.
 
-  localStorage.setItem(storageKey, JSON.stringify(rawMap));
-  localStorage.setItem(getNativeIdentityCacheStorageKey(storageKey), JSON.stringify(identityRecords));
+  safeSetStorageItem(localStorage, storageKey, JSON.stringify(rawMap));
+  safeSetStorageItem(localStorage, getNativeIdentityCacheStorageKey(storageKey), JSON.stringify(identityRecords));
 
   const urlMap = Object.fromEntries(Object.entries(rawMap).map(([remoteUrl,fileUri]) => [remoteUrl,Capacitor.convertFileSrc(fileUri)]));
   Object.values(identityRecords).forEach((record) => {

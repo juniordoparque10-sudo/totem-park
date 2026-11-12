@@ -1,3 +1,5 @@
+import { safeSetStorageItem } from "./safe-storage.js";
+
 export const V20_TRANSITION_DIAGNOSTIC_STORAGE_KEY = "totempark-transition-diagnostics-v20";
 export const V21_TRANSITION_DIAGNOSTIC_RESCUE_KEY = "totempark-transition-diagnostics-rescue-v21";
 export const V20_DIAGNOSTIC_VERSION = "1.0.0-v20-transition-diagnostic";
@@ -32,7 +34,7 @@ export function captureV20TransitionDiagnosticBuffer(storage = globalThis.localS
       events: source.events,
     },
   };
-  storage?.setItem(V21_TRANSITION_DIAGNOSTIC_RESCUE_KEY, JSON.stringify(rescue));
+  safeSetStorageItem(storage, V21_TRANSITION_DIAGNOSTIC_RESCUE_KEY, JSON.stringify(rescue));
   return rescue;
 }
 
@@ -49,6 +51,6 @@ export function markV20TransitionDiagnosticRescueUploaded(storage = globalThis.l
     uploadedAt: new Date(now()).toISOString(),
     confirmation,
   };
-  storage?.setItem(V21_TRANSITION_DIAGNOSTIC_RESCUE_KEY, JSON.stringify(updated));
+  safeSetStorageItem(storage, V21_TRANSITION_DIAGNOSTIC_RESCUE_KEY, JSON.stringify(updated));
   return updated;
 }

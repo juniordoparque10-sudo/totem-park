@@ -1,3 +1,5 @@
+import { safeSetStorageItem } from "./safe-storage.js";
+
 const APP_MODE = import.meta.env.VITE_APP_MODE;
 const LAB_MODE = APP_MODE === "playerLab";
 const CANARY_MODE = APP_MODE === "playerCanary";
@@ -70,7 +72,7 @@ function save(report) {
   while (report.events.length > MAX_EVENTS) report.events.shift();
   let json = JSON.stringify(report);
   while (json.length > MAX_STORAGE_BYTES && report.events.length > 1) { report.events.shift(); json = JSON.stringify(report); }
-  localStorage.setItem(STORAGE_KEY, json);
+  safeSetStorageItem(localStorage, STORAGE_KEY, json);
   window.dispatchEvent(new CustomEvent("totempark-lab-diagnostic"));
 }
 function emitOperationalEvent(type, data = {}) {

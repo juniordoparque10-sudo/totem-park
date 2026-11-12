@@ -1,3 +1,5 @@
+import { safeSetStorageItem } from "./safe-storage.js";
+
 export const TRAFFIC_TELEMETRY_SCHEMA_VERSION = 4;
 export const TRAFFIC_TELEMETRY_STORAGE_KEY = "totempark-player-traffic-v3";
 
@@ -103,7 +105,7 @@ export function createTrafficTelemetry({ storage = globalThis.localStorage, now 
     const nowIso = rotateDaily(nowMs);
     session.lastUpdatedAt = nowIso;
     daily.lastUpdatedAt = nowIso;
-    storage?.setItem?.(TRAFFIC_TELEMETRY_STORAGE_KEY, JSON.stringify({ version: 1, daily }));
+    safeSetStorageItem(storage, TRAFFIC_TELEMETRY_STORAGE_KEY, JSON.stringify({ version: 1, daily }));
   }
 
   function markOnce(key) {

@@ -1,3 +1,5 @@
+import { safeSetStorageItem } from "./safe-storage.js";
+
 export const TELEMETRY_HISTORY_SCHEMA_VERSION = 1;
 export const TELEMETRY_HISTORY_STORAGE_KEY = "totempark-player-telemetry-history-v1";
 export const TELEMETRY_EVENT_RETENTION_DAYS = 180;
@@ -83,7 +85,7 @@ export function createTelemetryHistory({ storage = globalThis.localStorage, now 
     currentSessionId:String(stored.currentSessionId || ""),
   };
   const processed = new Set(state.processedEventIds);
-  const persist = () => storage?.setItem?.(TELEMETRY_HISTORY_STORAGE_KEY, JSON.stringify(state));
+  const persist = () => safeSetStorageItem(storage, TELEMETRY_HISTORY_STORAGE_KEY, JSON.stringify(state));
   const ensureDay = (key) => {
     if (!state.days[key]) state.days[key] = emptyDay(key, state.identity);
     else Object.assign(state.days[key], state.identity);

@@ -1,3 +1,5 @@
+import { safeSetStorageItem } from "./safe-storage.js";
+
 const JOURNAL_SUFFIX = "-journal-v1";
 const JOURNAL_STATES = new Set(["pending","downloading","downloaded","validated","committed"]);
 
@@ -18,7 +20,7 @@ export function readNativeCacheJournal(storageKey, storage = globalThis.localSto
 }
 
 export function writeNativeCacheJournal(storageKey, journal, storage = globalThis.localStorage) {
-  storage.setItem(getNativeCacheJournalStorageKey(storageKey),JSON.stringify(journal));
+  safeSetStorageItem(storage, getNativeCacheJournalStorageKey(storageKey), JSON.stringify(journal));
   return journal;
 }
 

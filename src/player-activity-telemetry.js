@@ -1,3 +1,5 @@
+import { safeSetStorageItem } from "./safe-storage.js";
+
 const STORAGE_KEY = "totempark-player-activity-v2a";
 export const PLAYER_ACTIVITY_SYNC_ENABLED = true;
 
@@ -21,7 +23,7 @@ export function createPlayerActivityTelemetry({ storage = globalThis.localStorag
     playback: stored?.playback?.status === "ACTIVE" ? stored.playback : { status: "IDLE", mediaId: "", mediaType: "" },
     events: Array.isArray(stored?.events) ? stored.events.slice(-maxEvents) : [],
   };
-  const persist = () => storage?.setItem?.(STORAGE_KEY, JSON.stringify({ ...state, sequence }));
+  const persist = () => safeSetStorageItem(storage, STORAGE_KEY, JSON.stringify({ ...state, sequence }));
   const emit = (type, activityState, item = {}, reason = "", domain = "playback") => {
     sequence += 1;
     const media = normalizeItem(item);
