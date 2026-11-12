@@ -1,5 +1,6 @@
 import test from "node:test";
 import assert from "node:assert/strict";
+import fs from "node:fs";
 import { createPlayerActivityTelemetry } from "../src/player-activity-telemetry.js";
 import { createPlayerTelemetry } from "../src/player-telemetry.js";
 import { createTelemetryHistory } from "../src/telemetry-history.js";
@@ -47,4 +48,20 @@ test("falha ao persistir novo vínculo não apaga nem finge substituir o víncul
   const result = persistTvConnection({ clientId: "client-new", code: "NEW123", deviceId: "device-new" }, storage);
   assert.equal(result, null);
   assert.equal(storage.raw(TV_CONNECTION_STORAGE_KEY), previous);
+});
+
+test("fluxos obrigatórios não navegam nem validam quando o vínculo local não persiste", () => {
+  const source = fs.readFileSync(new URL("../src/App.jsx", import.meta.url), "utf8");
+  const connectStart = source.indexOf("function finishConnection");
+  const connectEnd = source.indexOf("async function handleConnect", connectStart);
+  const connectBody = source.slice(connectStart, connectEnd);
+  assert.match(connectBody, /if \(!persistedConnection\)/);
+  assert.ok(connectBody.indexOf("if (!persistedConnection)") < connectBody.indexOf("navigate("));
+
+  const validationStart = source.indexOf("const persistedConnection = persistTvConnection", connectEnd);
+  const validationEnd = source.indexOf("setLinkValidationState(LINK_STATES.VALIDATED)", validationStart);
+  const validationBody = source.slice(validationStart, validationEnd);
+  assert.match(validationBody, /setLinkValidationState\(LINK_STATES\.VALIDATION_ERROR\)/);
+  assert.match(validationBody, /screenStage\.failure\(storageError\)/);
+  assert.match(validationBody, /return;/);
 });

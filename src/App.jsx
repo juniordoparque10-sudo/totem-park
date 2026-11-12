@@ -15611,9 +15611,14 @@ function TVConnectPage({ playerOnly = false }) {
   const [screenInUse, setScreenInUse] = useState(null);
 
   function finishConnection(clientId, code, deviceId, screenId = "") {
-    persistTvConnection({ clientId, code, deviceId, screenId });
+    const persistedConnection = persistTvConnection({ clientId, code, deviceId, screenId });
+    if (!persistedConnection) {
+      alert("Não foi possível salvar o vínculo neste dispositivo. Libere espaço de armazenamento e tente novamente.");
+      return false;
+    }
 
     navigate(`/player/${clientId}/${code}`);
+    return true;
   }
 
   async function handleConnect() {
@@ -17600,12 +17605,20 @@ function PlayerPage() {
         return;
       }
 
-      persistTvConnection({
+      const persistedConnection = persistTvConnection({
         clientId,
         code: codigo,
         deviceId: localDeviceId,
         screenId: screenDoc.id,
       });
+      if (!persistedConnection) {
+        const storageError = new Error("Não foi possível persistir o vínculo local da tela.");
+        setLinkValidationState(LINK_STATES.VALIDATION_ERROR);
+        logLinkEvent(LINK_STATES.VALIDATION_ERROR, { stage:"local-write", screenId:screenDoc.id });
+        setLoading(false);
+        screenStage.failure(storageError);
+        return;
+      }
       setLinkValidationState(LINK_STATES.VALIDATED);
       logLinkEvent(LINK_STATES.VALIDATED, { screenId: screenDoc.id, source:resolvedSource });
       setScreen(screenData);

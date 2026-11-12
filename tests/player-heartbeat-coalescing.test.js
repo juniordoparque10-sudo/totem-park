@@ -39,3 +39,23 @@ test("dispose impede replay e novos heartbeats após desmontagem", async () => {
   await runner.request();
   assert.equal(calls, 1);
 });
+
+test("rejeição da execução ativa não descarta o replay já solicitado", async () => {
+  let release;
+  let calls = 0;
+  const firstRun = new Promise((resolve) => { release = resolve; });
+  const runner = createCoalescedAsyncRunner(async () => {
+    calls += 1;
+    if (calls === 1) {
+      await firstRun;
+      throw new Error("network failed");
+    }
+  });
+
+  const initial = runner.request();
+  runner.request();
+  release();
+
+  await assert.rejects(initial, /network failed/);
+  assert.equal(calls, 2);
+});

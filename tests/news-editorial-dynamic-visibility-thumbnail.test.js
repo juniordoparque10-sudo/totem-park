@@ -6,13 +6,14 @@ import { getTemplateV2Definition } from "../src/templates-v2/registry.js";
 
 test("Notícias Dinâmica expõe somente controles de visibilidade aplicáveis", () => {
   assert.deepEqual(getTemplateV2Definition(NEWS_EDITORIAL_DYNAMIC_TYPE).visibilityControls, [
-    "showLogo", "showContent", "showHeadline", "showSubtitle", "showServices",
+    "showLogo", "showName", "showContent", "showHeadline", "showSubtitle", "showServices",
   ]);
 });
 
 test("renderer aplica logo, conteúdo, headline, subtítulo e cards ao preview", () => {
   const renderer = fs.readFileSync(new URL("../src/templates-v2/news-editorial-dynamic/NewsEditorialDynamicRenderer.jsx", import.meta.url), "utf8");
   assert.match(renderer, /visibility\.showLogo/);
+  assert.match(renderer, /visibility\.showName/);
   assert.match(renderer, /visibility\.showContent/);
   assert.match(renderer, /visibility\.showHeadline/);
   assert.match(renderer, /visibility\.showSubtitle/);
@@ -22,7 +23,7 @@ test("renderer aplica logo, conteúdo, headline, subtítulo e cards ao preview",
 
 test("visibilidade persiste ao salvar e reabrir a configuração", () => {
   const saved = createTemplateV2Draft(NEWS_EDITORIAL_DYNAMIC_TYPE, {
-    visibility:{ showLogo:false, showContent:true, showHeadline:false, showSubtitle:true, showServices:false },
+    visibility:{ showLogo:false, showName:true, showContent:true, showHeadline:false, showSubtitle:true, showServices:false },
   });
   const reopened = createTemplateV2Draft(NEWS_EDITORIAL_DYNAMIC_TYPE, saved);
   assert.deepEqual(reopened.visibility, saved.visibility);

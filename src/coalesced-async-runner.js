@@ -4,10 +4,16 @@ export function createCoalescedAsyncRunner(task) {
   let disposed = false;
 
   async function drain() {
+    let firstError = null;
     do {
       replayRequested = false;
-      await task();
+      try {
+        await task();
+      } catch (error) {
+        firstError ||= error;
+      }
     } while (replayRequested && !disposed);
+    if (firstError) throw firstError;
   }
 
   return {
