@@ -1,7 +1,7 @@
 import assert from 'node:assert/strict';
 import {
   getFirestoreTabMode,
-  usePersistentFirestoreCache as persistent,
+  shouldUsePersistentFirestoreCache as persistent,
 } from '../src/firestore-cache-policy.js';
 assert.equal(persistent(),false);
 assert.equal(persistent({pathname:'/'}),false);

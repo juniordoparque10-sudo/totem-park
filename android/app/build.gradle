@@ -68,8 +68,8 @@ android {
         }
         playerRc {
             dimension "appMode"
-            versionCode 71
-            versionName "1.0.0-v71-candidate"
+            versionCode 72
+            versionName "1.0.0-v71-firestore-quota-hotfix"
             manifestPlaceholders = [
                 appLabel: "Totem Park Player",
                 tvLauncherEnabled: "true"

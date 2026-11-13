@@ -1,5 +1,5 @@
 import { Capacitor } from "@capacitor/core";
-import { getFirestoreTabMode, usePersistentFirestoreCache } from "./firestore-cache-policy";
+import { getFirestoreTabMode, shouldUsePersistentFirestoreCache } from "./firestore-cache-policy";
 import { initializeApp } from "firebase/app";
 
 import { browserLocalPersistence, connectAuthEmulator, getAuth, setPersistence } from "firebase/auth";
@@ -39,7 +39,7 @@ export const authPersistenceReady = setPersistence(auth, browserLocalPersistence
 });
 const nativePlatform = Capacitor.isNativePlatform();
 const appMode = import.meta.env.VITE_APP_MODE;
-const persistentFirestoreCache = usePersistentFirestoreCache({
+const persistentFirestoreCache = shouldUsePersistentFirestoreCache({
   native: nativePlatform,
   mode: appMode,
   pathname: typeof window !== "undefined" ? window.location.pathname : "/",
