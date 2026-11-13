@@ -48,6 +48,7 @@ import { createPlayerScreenSnapshotStore, getPlayerScreenScopeKey } from "./play
 import { createPlayerCapabilitySyncState } from "./player-capability-sync-state";
 import { createNowPlayingSyncGuard } from "./player-now-playing-sync";
 import { createCoalescedAsyncRunner } from "./coalesced-async-runner";
+import { recoverLegacyFirestoreCoordination } from "./firestore-multitab-recovery";
 import { localizeOfflineAssetFields } from "./offline-asset-localization";
 import { linkedAtForScreen, telemetryStatus } from "./telemetry-v1";
 import { createTransitionDiagnostics } from "./transition-diagnostics";
@@ -132,6 +133,7 @@ import {
   runTransaction,
   deleteField,
   writeBatch,
+  waitForPendingWrites,
 } from "firebase/firestore";
 
 import firebaseApp, { auth, authPersistenceReady, db } from "./firebase";
@@ -17945,7 +17947,7 @@ function PlayerPage() {
     playerScreenSnapshotRef.current.activate(screenScope);
 
     async function sendHeartbeat() {
-      if (exitingTvRef.current) return;
+      if (exitingTvRef.current) return false;
 
       try {
         if (isNativeApp() && IS_OPERATIONAL_TELEMETRY_BUILD) {
@@ -18121,15 +18123,66 @@ function PlayerPage() {
           );
           transitionDiagnosticsRef.current.acknowledge(pendingTransitionDiagnostic.sequence);
         }
+        return true;
       } catch (error) {
         console.log(error);
+        return false;
       }
     }
 
     const heartbeatRunner = createCoalescedAsyncRunner(sendHeartbeat);
     const requestHeartbeat = () => heartbeatRunner.request();
+    let recoveryRetryTimer = null;
+    let recoveryInFlight = null;
+    let recoveryStopped = false;
+    let recoveryNeedsHeartbeat = false;
+
+    function scheduleFirestoreRecoveryRetry() {
+      if (recoveryStopped || recoveryRetryTimer !== null) return;
+      recoveryRetryTimer = window.setTimeout(() => {
+        recoveryRetryTimer = null;
+        attemptFirestoreRecovery();
+      }, 60000);
+    }
+
+    function attemptFirestoreRecovery() {
+      if (!isNativeApp() || recoveryStopped || recoveryInFlight) return recoveryInFlight;
+      if (recoveryNeedsHeartbeat) {
+        recoveryInFlight = requestHeartbeat().then((onlineConfirmed) => {
+          if (onlineConfirmed === true) {
+            recoveryNeedsHeartbeat = false;
+            recoveryStopped = true;
+          } else {
+            scheduleFirestoreRecoveryRetry();
+          }
+          return onlineConfirmed;
+        }).finally(() => {
+          recoveryInFlight = null;
+        });
+        return recoveryInFlight;
+      }
+      recoveryInFlight = recoverLegacyFirestoreCoordination({
+        storage:globalThis.localStorage,
+        online:globalThis.navigator?.onLine !== false,
+        waitForPendingWrites:() => waitForPendingWrites(db),
+        requestHeartbeat:async () => {
+          const onlineConfirmed = await requestHeartbeat();
+          if (onlineConfirmed !== true) throw new Error("Firestore heartbeat was not confirmed after recovery");
+        },
+        scheduleRetry:scheduleFirestoreRecoveryRetry,
+        onError:(error) => console.warn("FIRESTORE_MULTITAB_RECOVERY_DEFERRED", error),
+      }).then((result) => {
+        if (result.status === "recovered" || result.status === "not-needed") recoveryStopped = true;
+        if (result.status === "recovered-heartbeat-error") recoveryNeedsHeartbeat = true;
+        return result;
+      }).finally(() => {
+        recoveryInFlight = null;
+      });
+      return recoveryInFlight;
+    }
 
     requestHeartbeat();
+    attemptFirestoreRecovery();
 
     const interval = setInterval(() => {
       requestHeartbeat();
@@ -18141,11 +18194,14 @@ function PlayerPage() {
     const onOnline = () => {
       capabilitySyncRef.current.onReconnect();
       requestHeartbeat();
+      attemptFirestoreRecovery();
     };
     window.addEventListener("online", onOnline);
     document.addEventListener("visibilitychange", onVisible);
 
     return () => {
+      recoveryStopped = true;
+      if (recoveryRetryTimer !== null) window.clearTimeout(recoveryRetryTimer);
       heartbeatRunner.dispose();
       clearInterval(interval);
       window.removeEventListener("online", onOnline);

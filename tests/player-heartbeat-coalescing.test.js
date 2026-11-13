@@ -59,3 +59,15 @@ test("rejeição da execução ativa não descarta o replay já solicitado", asy
   await assert.rejects(initial, /network failed/);
   assert.equal(calls, 2);
 });
+
+test("resultado expõe se o último heartbeat consolidado confirmou o estado online", async () => {
+  let calls = 0;
+  const runner = createCoalescedAsyncRunner(async () => {
+    calls += 1;
+    return calls > 1;
+  });
+
+  const result = await runner.request();
+
+  assert.equal(result, false);
+});

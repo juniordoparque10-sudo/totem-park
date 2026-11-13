@@ -5,15 +5,17 @@ export function createCoalescedAsyncRunner(task) {
 
   async function drain() {
     let firstError = null;
+    let lastResult;
     do {
       replayRequested = false;
       try {
-        await task();
+        lastResult = await task();
       } catch (error) {
         firstError ||= error;
       }
     } while (replayRequested && !disposed);
     if (firstError) throw firstError;
+    return lastResult;
   }
 
   return {
