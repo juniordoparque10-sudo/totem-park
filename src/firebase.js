@@ -1,5 +1,5 @@
 import { Capacitor } from "@capacitor/core";
-import { usePersistentFirestoreCache } from "./firestore-cache-policy";
+import { getFirestoreTabMode, usePersistentFirestoreCache } from "./firestore-cache-policy";
 import { initializeApp } from "firebase/app";
 
 import { browserLocalPersistence, connectAuthEmulator, getAuth, setPersistence } from "firebase/auth";
@@ -10,6 +10,7 @@ import {
   memoryLocalCache,
   persistentLocalCache,
   persistentMultipleTabManager,
+  persistentSingleTabManager,
 } from "firebase/firestore";
 
 import { getStorage } from "firebase/storage";
@@ -36,14 +37,21 @@ export const authPersistenceReady = setPersistence(auth, browserLocalPersistence
   console.error("Nao foi possivel configurar a persistencia local do login:", error);
   throw error;
 });
+const nativePlatform = Capacitor.isNativePlatform();
+const appMode = import.meta.env.VITE_APP_MODE;
+const persistentFirestoreCache = usePersistentFirestoreCache({
+  native: nativePlatform,
+  mode: appMode,
+  pathname: typeof window !== "undefined" ? window.location.pathname : "/",
+});
+const firestoreTabManager = getFirestoreTabMode({ native: nativePlatform, mode: appMode }) === "single"
+  ? persistentSingleTabManager()
+  : persistentMultipleTabManager();
+
 export const db = initializeFirestore(app, {
   experimentalAutoDetectLongPolling: true,
-  localCache: usePersistentFirestoreCache({
-    native: Capacitor.isNativePlatform(),
-    mode: import.meta.env.VITE_APP_MODE,
-    pathname: typeof window !== "undefined" ? window.location.pathname : "/",
-  }) ? persistentLocalCache({
-    tabManager: persistentMultipleTabManager(),
+  localCache: persistentFirestoreCache ? persistentLocalCache({
+    tabManager: firestoreTabManager,
   }) : memoryLocalCache(),
 });
 if (useFirebaseEmulators) connectFirestoreEmulator(db, "127.0.0.1", 8189);
