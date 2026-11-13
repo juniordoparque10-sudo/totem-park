@@ -57,15 +57,20 @@ test("sync compacts once to the 150 newest unique events when 200 would overflow
     ...events[0], id:`s1:${201 + index}:1`, atMs:201 + index, sessionId:"session",
   }));
   let payload;
+  const concurrent = { ...events[0], id:"s1:204:1", atMs:204, sessionId:"session", domain:"playback" };
   const result = await syncPlayerActivityBatch({
     screenRef:{}, existingEvents:prior, events:next, arrayUnion,
-    updateDoc:async (_ref, value) => { payload = value; },
+    runTransaction:async (operation) => operation({
+      get:async () => ({ data:() => ({ telemetry:{ activity:{ events:[...prior, concurrent] } } }) }),
+      update:(_ref, value) => { payload = value; },
+    }),
+    updateDoc:async () => assert.fail("overflow compaction must use a transaction"),
   });
 
   assert.equal(result.status, "synced");
   assert.equal(payload["telemetry.activity"].events.length, 150);
-  assert.equal(payload["telemetry.activity"].events[0].id, "s1:54:1");
-  assert.equal(payload["telemetry.activity"].events.at(-1).id, "s1:203:1");
+  assert.equal(payload["telemetry.activity"].events[0].id, "s1:55:1");
+  assert.equal(payload["telemetry.activity"].events.at(-1).id, "s1:204:1");
   assert.deepEqual(result.acknowledgedIds, next.map((event) => event.id));
 });
 

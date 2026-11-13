@@ -18051,6 +18051,7 @@ function PlayerPage() {
                   existingEvents:screenData.telemetry?.activity?.events || [],
                   events:activityEvents,
                   arrayUnion,
+                  runTransaction:(operation) => runTransaction(db, operation),
                   updateDoc,
                 });
             if (activityResult.status === "synced") activityTelemetryRef.current.acknowledge(activityResult.acknowledgedIds);

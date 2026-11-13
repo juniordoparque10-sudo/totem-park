@@ -194,7 +194,7 @@ export async function syncPlayerActivityBatchDocuments({ clientId, screenId, dev
   }
 }
 
-export async function syncPlayerActivityBatch({ screenRef, existingEvents = [], events = [], arrayUnion, updateDoc } = {}) {
+export async function syncPlayerActivityBatch({ screenRef, existingEvents = [], events = [], arrayUnion, runTransaction, updateDoc } = {}) {
   const batch = events.slice(0, 20).map(sanitizeActivityEvent).filter((event) => event.id && event.screenId && event.atMs > 0);
   if (batch.length === 0) return { status:"synced", acknowledgedIds:[] };
   const acknowledgedIds = batch.map((event) => event.id);
@@ -204,19 +204,31 @@ export async function syncPlayerActivityBatch({ screenRef, existingEvents = [], 
   batch.filter((event) => !existingById.has(event.id)).forEach((event) => newById.set(event.id, event));
   const newEvents = [...newById.values()].sort((left, right) => left.atMs - right.atMs || left.id.localeCompare(right.id));
   if (newEvents.length === 0) return { status:"synced", acknowledgedIds };
-  if (typeof arrayUnion !== "function" || typeof updateDoc !== "function") return { status:"blocked", acknowledgedIds:[] };
 
   const combinedById = new Map(existingById);
   newEvents.forEach((event) => combinedById.set(event.id, event));
   const combined = [...combinedById.values()].sort((left, right) => left.atMs - right.atMs || left.id.localeCompare(right.id));
-  const payload = combined.length > PLAYER_ACTIVITY_MAX_EVENTS
-    ? { "telemetry.activity":{ schemaVersion:1, events:combined.slice(-PLAYER_ACTIVITY_COMPACTED_EVENTS) } }
-    : {
+  try {
+    if (combined.length > PLAYER_ACTIVITY_MAX_EVENTS) {
+      if (typeof runTransaction !== "function") return { status:"blocked", acknowledgedIds:[] };
+      await runTransaction(async (transaction) => {
+        const snapshot = await transaction.get(screenRef);
+        const currentById = new Map();
+        const currentEvents = snapshot.data()?.telemetry?.activity?.events || [];
+        [...currentEvents, ...batch].map(sanitizeActivityEvent).filter((event) => event.id && event.screenId)
+          .forEach((event) => currentById.set(event.id, event));
+        const compacted = [...currentById.values()]
+          .sort((left, right) => left.atMs - right.atMs || left.id.localeCompare(right.id))
+          .slice(-PLAYER_ACTIVITY_COMPACTED_EVENTS);
+        transaction.update(screenRef, { "telemetry.activity":{ schemaVersion:1, events:compacted } });
+      });
+    } else {
+      if (typeof arrayUnion !== "function" || typeof updateDoc !== "function") return { status:"blocked", acknowledgedIds:[] };
+      await updateDoc(screenRef, {
         "telemetry.activity.schemaVersion":1,
         "telemetry.activity.events":arrayUnion(...newEvents),
-      };
-  try {
-    await updateDoc(screenRef, payload);
+      });
+    }
     return { status:"synced", acknowledgedIds };
   } catch (error) {
     const status = String(error?.code || "").includes("permission-denied") ? "blocked" : "retry";
