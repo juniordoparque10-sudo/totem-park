@@ -10,6 +10,7 @@ import {
 } from "../src/player-activity-telemetry.js";
 
 const events = [{ id:"s1:1:1", screenId:"s1", type:"PLAYBACK_START", state:"ACTIVE", atMs:1, mediaId:"m1", mediaType:"video", reason:"" }];
+const arrayUnion = (...values) => ({ operation:"arrayUnion", values });
 
 test("production sync is enabled only with the bound Rules contract", () => {
   assert.equal(PLAYER_ACTIVITY_SYNC_ENABLED, true);
@@ -22,26 +23,70 @@ test("empty outbox performs no write", async () => {
   assert.equal(writes, 0);
 });
 
-test("bounded batch writes only sanitized activity and acknowledges confirmed ids", async () => {
+test("bounded batch sends only sanitized new events through arrayUnion", async () => {
   let payload;
-  const result = await syncPlayerActivityBatch({ screenRef:{ path:"screen" }, events, updateDoc:async (_ref, value) => { payload = value; } });
+  const result = await syncPlayerActivityBatch({ screenRef:{ path:"screen" }, events, arrayUnion, updateDoc:async (_ref, value) => { payload = value; } });
   assert.equal(result.status, "synced");
   assert.deepEqual(result.acknowledgedIds, ["s1:1:1"]);
-  assert.deepEqual(payload["telemetry.activity"].events, events.map((event) => ({ ...event, sessionId:"", domain:"playback" })));
-  assert.equal(payload["telemetry.activity"].schemaVersion, 1);
+  assert.deepEqual(payload["telemetry.activity.events"], {
+    operation:"arrayUnion",
+    values:events.map((event) => ({ ...event, sessionId:"", domain:"playback" })),
+  });
+  assert.equal(payload["telemetry.activity.schemaVersion"], 1);
+  assert.equal("telemetry.activity" in payload, false);
 });
 
-test("sync preserves prior server history while acknowledging only the local outbox", async () => {
+test("sync excludes existing ids and acknowledges a retried event without another write", async () => {
   let payload;
-  const prior = [{ ...events[0], id:"s1:0:1", atMs:0 }];
-  const result = await syncPlayerActivityBatch({ screenRef:{}, existingEvents:prior, events, updateDoc:async (_ref, value) => { payload = value; } });
-  assert.deepEqual(payload["telemetry.activity"].events.map((event) => event.id), ["s1:0:1", "s1:1:1"]);
+  let writes = 0;
+  const prior = [{ ...events[0], sessionId:"", domain:"playback" }];
+  const result = await syncPlayerActivityBatch({
+    screenRef:{}, existingEvents:prior, events, arrayUnion,
+    updateDoc:async (_ref, value) => { writes += 1; payload = value; },
+  });
+  assert.equal(payload, undefined);
+  assert.equal(writes, 0);
   assert.deepEqual(result.acknowledgedIds, ["s1:1:1"]);
+});
+
+test("sync compacts once to the 150 newest unique events when 200 would overflow", async () => {
+  const prior = Array.from({ length:200 }, (_, index) => ({
+    ...events[0], id:`s1:${index + 1}:1`, atMs:index + 1, sessionId:"session", domain:"playback",
+  }));
+  const next = Array.from({ length:3 }, (_, index) => ({
+    ...events[0], id:`s1:${201 + index}:1`, atMs:201 + index, sessionId:"session",
+  }));
+  let payload;
+  const result = await syncPlayerActivityBatch({
+    screenRef:{}, existingEvents:prior, events:next, arrayUnion,
+    updateDoc:async (_ref, value) => { payload = value; },
+  });
+
+  assert.equal(result.status, "synced");
+  assert.equal(payload["telemetry.activity"].events.length, 150);
+  assert.equal(payload["telemetry.activity"].events[0].id, "s1:54:1");
+  assert.equal(payload["telemetry.activity"].events.at(-1).id, "s1:203:1");
+  assert.deepEqual(result.acknowledgedIds, next.map((event) => event.id));
+});
+
+test("sync resumes delta writes after compaction instead of resending the compacted history", async () => {
+  const prior = Array.from({ length:150 }, (_, index) => ({
+    ...events[0], id:`s1:${index + 54}:1`, atMs:index + 54, sessionId:"session", domain:"playback",
+  }));
+  const next = [{ ...events[0], id:"s1:204:1", atMs:204, sessionId:"session" }];
+  let payload;
+  await syncPlayerActivityBatch({
+    screenRef:{}, existingEvents:prior, events:next, arrayUnion,
+    updateDoc:async (_ref, value) => { payload = value; },
+  });
+
+  assert.equal("telemetry.activity" in payload, false);
+  assert.deepEqual(payload["telemetry.activity.events"].values.map((event) => event.id), ["s1:204:1"]);
 });
 
 test("network failure retries while permission denial blocks without acknowledgement", async () => {
-  const retry = await syncPlayerActivityBatch({ screenRef:{}, events, updateDoc:async () => { throw { code:"unavailable" }; } });
-  const blocked = await syncPlayerActivityBatch({ screenRef:{}, events, updateDoc:async () => { throw { code:"permission-denied" }; } });
+  const retry = await syncPlayerActivityBatch({ screenRef:{}, events, arrayUnion, updateDoc:async () => { throw { code:"unavailable" }; } });
+  const blocked = await syncPlayerActivityBatch({ screenRef:{}, events, arrayUnion, updateDoc:async () => { throw { code:"permission-denied" }; } });
   assert.deepEqual(retry, { status:"retry", acknowledgedIds:[] });
   assert.deepEqual(blocked, { status:"blocked", acknowledgedIds:[] });
 });

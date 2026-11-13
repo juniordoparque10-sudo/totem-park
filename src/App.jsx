@@ -132,6 +132,7 @@ import {
   getDocs,
   getDocsFromServer,
   runTransaction,
+  arrayUnion,
   deleteField,
   writeBatch,
   waitForPendingWrites,
@@ -18049,6 +18050,7 @@ function PlayerPage() {
                   screenRef:screenDocRef,
                   existingEvents:screenData.telemetry?.activity?.events || [],
                   events:activityEvents,
+                  arrayUnion,
                   updateDoc,
                 });
             if (activityResult.status === "synced") activityTelemetryRef.current.acknowledge(activityResult.acknowledgedIds);
