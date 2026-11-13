@@ -1,4 +1,4 @@
-const FIRESTORE_PERSISTENCE_KEY = "firestore/[DEFAULT]/totem-park/main";
+const FIRESTORE_PERSISTENCE_KEY = "firestore/[DEFAULT]/totem-park/";
 
 export const FIRESTORE_COORDINATION_PREFIX = Object.freeze({
   clients: `firestore_clients_${FIRESTORE_PERSISTENCE_KEY}_`,
@@ -35,7 +35,7 @@ export function listLegacyFirestoreCoordinationKeys(storage = globalThis.localSt
   return keys;
 }
 
-function waitWithTimeout(promise, timeoutMs) {
+function waitWithTimeout(promise, timeoutMs, code, message) {
   let timer = null;
   return Promise.race([
     Promise.resolve(promise).finally(() => {
@@ -43,8 +43,8 @@ function waitWithTimeout(promise, timeoutMs) {
     }),
     new Promise((_, reject) => {
       timer = setTimeout(() => {
-        const error = new Error("Firestore pending writes recovery timed out");
-        error.code = "firestore-recovery-timeout";
+        const error = new Error(message);
+        error.code = code;
         reject(error);
       }, timeoutMs);
     }),
@@ -59,6 +59,7 @@ export async function recoverLegacyFirestoreCoordination({
   scheduleRetry = () => {},
   onError = () => {},
   timeoutMs = 15000,
+  heartbeatTimeoutMs = 15000,
 } = {}) {
   if (!online) {
     scheduleRetry();
@@ -70,7 +71,12 @@ export async function recoverLegacyFirestoreCoordination({
   }
 
   try {
-    await waitWithTimeout(waitForPendingWrites(), timeoutMs);
+    await waitWithTimeout(
+      waitForPendingWrites(),
+      timeoutMs,
+      "firestore-recovery-timeout",
+      "Firestore pending writes recovery timed out",
+    );
   } catch (error) {
     onError(error);
     scheduleRetry();
@@ -85,11 +91,108 @@ export async function recoverLegacyFirestoreCoordination({
   for (const key of removed) storage.removeItem(key);
 
   try {
-    await requestHeartbeat();
+    await waitWithTimeout(
+      requestHeartbeat(),
+      heartbeatTimeoutMs,
+      "firestore-heartbeat-timeout",
+      "Firestore heartbeat recovery timed out",
+    );
     return { status:"recovered", removed };
   } catch (error) {
     onError(error);
     scheduleRetry();
-    return { status:"recovered-heartbeat-error", removed, error };
+    return {
+      status:error?.code === "firestore-heartbeat-timeout"
+        ? "recovered-heartbeat-timeout"
+        : "recovered-heartbeat-error",
+      removed,
+      error,
+    };
   }
+}
+
+export function createFirestoreRecoveryController({
+  storage = globalThis.localStorage,
+  isOnline = () => globalThis.navigator?.onLine !== false,
+  waitForPendingWrites,
+  requestHeartbeat,
+  onError = () => {},
+  retryDelayMs = 60000,
+  pendingWritesTimeoutMs = 15000,
+  heartbeatTimeoutMs = 15000,
+  scheduleDelay = (callback, delay) => setTimeout(callback, delay),
+  clearDelay = (timer) => clearTimeout(timer),
+} = {}) {
+  let stopped = false;
+  let inFlight = null;
+  let retryTimer = null;
+  let needsHeartbeat = false;
+
+  function scheduleRetry() {
+    if (stopped || retryTimer !== null) return;
+    retryTimer = scheduleDelay(() => {
+      retryTimer = null;
+      attempt();
+    }, retryDelayMs);
+  }
+
+  function verifyHeartbeat() {
+    return waitWithTimeout(
+      Promise.resolve(requestHeartbeat()).then((confirmed) => {
+        if (confirmed !== true) throw new Error("Firestore heartbeat was not confirmed after recovery");
+        return true;
+      }),
+      heartbeatTimeoutMs,
+      "firestore-heartbeat-timeout",
+      "Firestore heartbeat recovery timed out",
+    );
+  }
+
+  function attempt() {
+    if (stopped) return Promise.resolve(null);
+    if (inFlight) return inFlight;
+
+    const operation = needsHeartbeat
+      ? verifyHeartbeat()
+      : recoverLegacyFirestoreCoordination({
+          storage,
+          online:isOnline(),
+          waitForPendingWrites,
+          requestHeartbeat:verifyHeartbeat,
+          scheduleRetry,
+          onError,
+          timeoutMs:pendingWritesTimeoutMs,
+          heartbeatTimeoutMs,
+        });
+
+    inFlight = Promise.resolve(operation).then((result) => {
+      if (needsHeartbeat) {
+        needsHeartbeat = false;
+        stopped = true;
+        return { status:"heartbeat-recovered", removed:[] };
+      }
+      if (result.status === "recovered" || result.status === "not-needed") stopped = true;
+      if (result.status === "recovered-heartbeat-error" || result.status === "recovered-heartbeat-timeout") {
+        needsHeartbeat = true;
+      }
+      return result;
+    }).catch((error) => {
+      onError(error);
+      scheduleRetry();
+      return { status:"heartbeat-retry-deferred", removed:[], error };
+    }).finally(() => {
+      inFlight = null;
+    });
+    return inFlight;
+  }
+
+  return {
+    attempt,
+    stop() {
+      stopped = true;
+      if (retryTimer !== null) clearDelay(retryTimer);
+      retryTimer = null;
+    },
+    state:() => ({ stopped, needsHeartbeat, retryScheduled:retryTimer !== null }),
+  };
 }

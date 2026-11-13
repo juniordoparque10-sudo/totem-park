@@ -14,4 +14,5 @@ assert.equal(getFirestoreTabMode({native:true,mode:'player'}),'single');
 assert.equal(getFirestoreTabMode({native:true,mode:'web'}),'multiple');
 assert.equal(getFirestoreTabMode({native:false,mode:'playerRc'}),'multiple');
 assert.equal(getFirestoreTabMode({native:false,mode:'web'}),'multiple');
+assert.equal(getFirestoreTabMode({native:true,mode:'web'}) === 'single',false);
 console.log('PASS: web manager starts fresh; native manager and TV/player retain persistence');
