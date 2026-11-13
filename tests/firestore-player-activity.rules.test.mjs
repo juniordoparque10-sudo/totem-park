@@ -2,7 +2,7 @@ import fs from "node:fs/promises";
 import assert from "node:assert/strict";
 import test, { after, before } from "node:test";
 import { assertFails, assertSucceeds, initializeTestEnvironment } from "@firebase/rules-unit-testing";
-import { deleteField, doc, getDoc, setDoc, updateDoc } from "firebase/firestore";
+import { arrayUnion, deleteField, doc, getDoc, setDoc, updateDoc } from "firebase/firestore";
 import { buildOperationalTelemetryUpdate } from "../src/player-telemetry.js";
 import { createTelemetryHistory } from "../src/telemetry-history.js";
 import { syncTelemetryHistory } from "../src/telemetry-history-sync.js";
@@ -31,6 +31,17 @@ after(async () => env?.cleanup());
 test("active bound player can append its own activity batch", async () => {
   const db = env.authenticatedContext("player-a").firestore();
   await assertSucceeds(updateDoc(doc(db, screenPath()), { "telemetry.activity":activity("screen-a", 2) }));
+});
+
+test("active bound player can append only new activity events with arrayUnion", async () => {
+  const db = env.authenticatedContext("player-a").firestore();
+  const next = activity("screen-a", 3).events[0];
+  await assertSucceeds(updateDoc(doc(db, screenPath()), {
+    "telemetry.activity.schemaVersion":1,
+    "telemetry.activity.events":arrayUnion(next),
+  }));
+  const stored = (await getDoc(doc(db, screenPath()))).data().telemetry.activity.events;
+  assert.deepEqual(stored.map((event) => event.id), ["screen-a:2:1", "screen-a:3:1"]);
 });
 
 test("activity writes require the active binding for the exact screen", async () => {
