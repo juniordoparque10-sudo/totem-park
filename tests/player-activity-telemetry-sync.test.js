@@ -89,6 +89,92 @@ test("sync resumes delta writes after compaction instead of resending the compac
   assert.deepEqual(payload["telemetry.activity.events"].values.map((event) => event.id), ["s1:204:1"]);
 });
 
+test("199 plus one stays incremental while 200 plus one compacts", async () => {
+  const history = Array.from({ length:200 }, (_, index) => ({
+    ...events[0], id:`s1:${index + 1}:1`, atMs:index + 1, sessionId:"session", domain:"playback",
+  }));
+  const next = [{ ...events[0], id:"s1:201:1", atMs:201, sessionId:"session" }];
+  let incrementalPayload;
+  let transactionCalls = 0;
+
+  await syncPlayerActivityBatch({
+    screenRef:{}, existingEvents:history.slice(0, 199), events:[history[199]], arrayUnion,
+    runTransaction:async () => { transactionCalls += 1; },
+    updateDoc:async (_ref, value) => { incrementalPayload = value; },
+  });
+  assert.deepEqual(incrementalPayload["telemetry.activity.events"].values.map((event) => event.id), ["s1:200:1"]);
+  assert.equal(transactionCalls, 0);
+
+  await syncPlayerActivityBatch({
+    screenRef:{}, existingEvents:history, events:next, arrayUnion,
+    runTransaction:async (operation) => {
+      transactionCalls += 1;
+      return operation({
+        get:async () => ({ data:() => ({ telemetry:{ activity:{ events:history } } }) }),
+        update:() => {},
+      });
+    },
+    updateDoc:async () => assert.fail("200 plus one must compact"),
+  });
+  assert.equal(transactionCalls, 1);
+});
+
+test("ambiguous retry with a stale snapshot keeps one structural event", async () => {
+  const serverEvents = [];
+  const applyTransform = async (_ref, payload) => {
+    for (const event of payload["telemetry.activity.events"].values) {
+      if (!serverEvents.some((stored) => JSON.stringify(stored) === JSON.stringify(event))) serverEvents.push(event);
+    }
+  };
+  const attempt = () => syncPlayerActivityBatch({
+    screenRef:{}, existingEvents:[], events, arrayUnion, updateDoc:applyTransform,
+  });
+
+  const first = await attempt();
+  const retry = await attempt();
+
+  assert.deepEqual(first.acknowledgedIds, ["s1:1:1"]);
+  assert.deepEqual(retry.acknowledgedIds, ["s1:1:1"]);
+  assert.deepEqual(serverEvents.map((event) => event.id), ["s1:1:1"]);
+});
+
+test("a complete compaction cycle returns to delta writes on the resulting server state", async () => {
+  let serverEvents = Array.from({ length:200 }, (_, index) => ({
+    ...events[0], id:`s1:${index + 1}:1`, atMs:index + 1, sessionId:"session", domain:"playback",
+  }));
+  let transactionCalls = 0;
+  let deltaCalls = 0;
+  const compactingEvent = [{ ...events[0], id:"s1:201:1", atMs:201, sessionId:"session" }];
+
+  await syncPlayerActivityBatch({
+    screenRef:{}, existingEvents:serverEvents, events:compactingEvent, arrayUnion,
+    runTransaction:async (operation) => {
+      transactionCalls += 1;
+      return operation({
+        get:async () => ({ data:() => ({ telemetry:{ activity:{ events:serverEvents } } }) }),
+        update:(_ref, payload) => { serverEvents = payload["telemetry.activity"].events; },
+      });
+    },
+    updateDoc:async () => assert.fail("overflow must compact"),
+  });
+  assert.equal(serverEvents.length, 150);
+
+  const afterCompaction = [{ ...events[0], id:"s1:202:1", atMs:202, sessionId:"session" }];
+  await syncPlayerActivityBatch({
+    screenRef:{}, existingEvents:serverEvents, events:afterCompaction, arrayUnion,
+    runTransaction:async () => { transactionCalls += 1; },
+    updateDoc:async (_ref, payload) => {
+      deltaCalls += 1;
+      serverEvents.push(...payload["telemetry.activity.events"].values);
+    },
+  });
+
+  assert.equal(transactionCalls, 1);
+  assert.equal(deltaCalls, 1);
+  assert.equal(serverEvents.length, 151);
+  assert.deepEqual(serverEvents.slice(-2).map((event) => event.id), ["s1:201:1", "s1:202:1"]);
+});
+
 test("network failure retries while permission denial blocks without acknowledgement", async () => {
   const retry = await syncPlayerActivityBatch({ screenRef:{}, events, arrayUnion, updateDoc:async () => { throw { code:"unavailable" }; } });
   const blocked = await syncPlayerActivityBatch({ screenRef:{}, events, arrayUnion, updateDoc:async () => { throw { code:"permission-denied" }; } });
