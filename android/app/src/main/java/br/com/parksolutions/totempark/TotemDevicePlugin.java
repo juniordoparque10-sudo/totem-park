@@ -31,6 +31,8 @@ public class TotemDevicePlugin extends Plugin {
             result.put("packageName", packageName);
             result.put("versionCode", versionCode);
             result.put("versionName", packageInfo.versionName == null ? "" : packageInfo.versionName);
+            result.put("buildId", BuildConfig.TOTEM_BUILD_ID);
+            result.put("buildTimestamp", BuildConfig.TOTEM_BUILD_TIMESTAMP);
             call.resolve(result);
         } catch (PackageManager.NameNotFoundException error) {
             call.reject("Unable to read installed application metadata", error);

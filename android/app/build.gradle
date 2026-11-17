@@ -1,5 +1,26 @@
 apply plugin: 'com.android.application'
 
+def readTotemBuildId = {
+    def configured = System.getenv('TOTEM_BUILD_ID')?.trim()
+    if (configured) return configured
+    try {
+        def output = new ByteArrayOutputStream()
+        exec {
+            commandLine 'git', 'rev-parse', '--short=12', 'HEAD'
+            standardOutput = output
+            errorOutput = new ByteArrayOutputStream()
+            ignoreExitValue = true
+        }
+        return output.toString('UTF-8').trim() ?: 'unknown'
+    } catch (Exception ignored) {
+        return 'unknown'
+    }
+}
+
+def escapeBuildConfigString = { value -> String.valueOf(value).replace('\\', '\\\\').replace('"', '\\"') }
+def totemBuildId = escapeBuildConfigString(readTotemBuildId())
+def totemBuildTimestamp = escapeBuildConfigString(System.getenv('TOTEM_BUILD_TIMESTAMP')?.trim() ?: java.time.Instant.now().toString())
+
 android {
     namespace = "br.com.parksolutions.totempark"
     compileSdk = rootProject.ext.compileSdkVersion
@@ -9,6 +30,8 @@ android {
         targetSdkVersion rootProject.ext.targetSdkVersion
         versionCode 1
         versionName "1.0"
+        buildConfigField "String", "TOTEM_BUILD_ID", "\"${totemBuildId}\""
+        buildConfigField "String", "TOTEM_BUILD_TIMESTAMP", "\"${totemBuildTimestamp}\""
         testInstrumentationRunner "androidx.test.runner.AndroidJUnitRunner"
         aaptOptions {
              // Files and dirs to omit from the packaged assets dir, modified to accommodate modern web apps.
