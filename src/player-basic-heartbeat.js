@@ -1,3 +1,13 @@
+import { buildBasicTelemetryUpdate } from "./basic-player-telemetry.js";
+
+export function buildBasicScreenHeartbeatUpdate({ presence = {}, snapshot, telemetryUpdatedAt } = {}) {
+  return {
+    ...presence,
+    ...buildBasicTelemetryUpdate(snapshot),
+    telemetryUpdatedAt,
+  };
+}
+
 export function getPlayerTelemetryProfile(appBuildMode = "") {
   return appBuildMode === "playerRc" ? "BASIC" : "ADVANCED";
 }

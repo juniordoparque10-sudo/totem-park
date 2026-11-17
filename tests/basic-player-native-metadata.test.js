@@ -6,7 +6,7 @@ const gradle = fs.readFileSync(new URL("../android/app/build.gradle", import.met
 const plugin = fs.readFileSync(new URL("../android/app/src/main/java/br/com/parksolutions/totempark/TotemDevicePlugin.java", import.meta.url), "utf8");
 
 test("build Android incorpora identificação e data da compilação no BuildConfig", () => {
-  assert.match(gradle, /TOTEM_BUILD_ID/);
+  assert.match(gradle, /buildFeatures\s*\{[\s\S]*buildConfig\s*=\s*true[\s\S]*\}/);
   assert.match(gradle, /TOTEM_BUILD_TIMESTAMP/);
   assert.match(gradle, /TOTEM_BUILD_ID/);
   assert.match(gradle, /commandLine\s+['"]git['"],\s*['"]rev-parse['"],\s*['"]--short=12['"],\s*['"]HEAD['"]/);

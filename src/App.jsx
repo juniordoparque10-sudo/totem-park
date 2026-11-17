@@ -215,9 +215,10 @@ import {
 import { buildOperationalTelemetryUpdate, createPlayerTelemetry, readPlayerTelemetryReport, TELEMETRY_DEFAULT_CONFIG } from "./player-telemetry";
 import { PLAYER_ACTIVITY_SYNC_ENABLED, createPlayerActivityTelemetry, syncPlayerActivityBatch, syncPlayerActivityBatchDocuments } from "./player-activity-telemetry";
 import { buildOperationalSnapshot, normalizeNativeAppInfo, normalizeOperationalMediaSource, OPERATIONAL_HEARTBEAT_INTERVAL_MS } from "./operational-telemetry";
-import { buildBasicTelemetryUpdate, createBasicPlayerTelemetry } from "./basic-player-telemetry";
+import { createBasicPlayerTelemetry, hasValidBasicAppInfo } from "./basic-player-telemetry";
 import {
   buildBasicPlaybackState,
+  buildBasicScreenHeartbeatUpdate,
   createDisabledActivityTelemetry,
   createDisabledTelemetryHistory,
   createDisabledTrafficTelemetry,
@@ -18031,7 +18032,7 @@ function PlayerPage() {
           && binding.clientId === clientId
           && binding.screenId === screen.id
           && binding.deviceId === localDeviceId;
-        const canSyncBasicTelemetry = basicTelemetrySnapshot
+        const canSyncBasicTelemetry = hasValidBasicAppInfo(basicTelemetrySnapshot)
           && binding?.status === "ACTIVE"
           && binding.clientId === clientId
           && binding.screenId === screen.id
@@ -18059,8 +18060,10 @@ function PlayerPage() {
         }
 
         if (canSyncBasicTelemetry) {
-          Object.assign(heartbeatPayload, buildBasicTelemetryUpdate(basicTelemetrySnapshot));
-          heartbeatPayload.telemetryUpdatedAt = serverTimestamp();
+          Object.assign(heartbeatPayload, buildBasicScreenHeartbeatUpdate({
+            snapshot:basicTelemetrySnapshot,
+            telemetryUpdatedAt:serverTimestamp(),
+          }));
         } else if (canSyncTelemetry) {
           Object.assign(heartbeatPayload, buildOperationalTelemetryUpdate(telemetrySnapshot));
           heartbeatPayload.telemetryUpdatedAt = serverTimestamp();

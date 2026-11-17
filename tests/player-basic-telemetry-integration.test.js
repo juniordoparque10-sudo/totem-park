@@ -2,10 +2,27 @@ import test from "node:test";
 import assert from "node:assert/strict";
 import fs from "node:fs";
 import {
+  buildBasicScreenHeartbeatUpdate,
   buildBasicPlaybackState,
   getPlayerTelemetryProfile,
   shouldCollectAdvancedTelemetry,
 } from "../src/player-basic-heartbeat.js";
+
+test("publicação BASIC compõe presença e telemetria em uma única atualização", () => {
+  const snapshot = { schemaVersion:5, profile:"BASIC", session:{ sessionId:"session-1" } };
+  const update = buildBasicScreenHeartbeatUpdate({
+    presence:{ status:"online", connectedDeviceId:"device-1" },
+    snapshot,
+    telemetryUpdatedAt:"server-time",
+  });
+
+  assert.deepEqual(update, {
+    status:"online",
+    connectedDeviceId:"device-1",
+    telemetry:snapshot,
+    telemetryUpdatedAt:"server-time",
+  });
+});
 
 test("playerRc seleciona BASIC e congela coleta avançada sem afetar flavor histórico", () => {
   assert.equal(getPlayerTelemetryProfile("playerRc"), "BASIC");
@@ -42,7 +59,7 @@ test("estado básico identifica playlist ou template ativo sem métricas de cach
 test("Player RC publica envelope BASIC inteiro e não consulta TrafficStats", () => {
   const source = fs.readFileSync(new URL("../src/App.jsx", import.meta.url), "utf8");
   assert.match(source, /IS_BASIC_TELEMETRY_BUILD/);
-  assert.match(source, /Object\.assign\(heartbeatPayload, buildBasicTelemetryUpdate\(basicTelemetrySnapshot\)\)/);
+  assert.match(source, /Object\.assign\(heartbeatPayload, buildBasicScreenHeartbeatUpdate\(\{/);
   assert.match(source, /if \(isNativeApp\(\) && SHOULD_COLLECT_ADVANCED_TELEMETRY\)/);
   assert.match(source, /onSnapshot\(screenDocRef, async \(snapshot\)/);
   assert.match(source, /startScheduleRuntime\(/);

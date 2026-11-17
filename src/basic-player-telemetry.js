@@ -17,13 +17,29 @@ function readInstallation(storage) {
 }
 
 function normalizeAppInfo(value = {}) {
+  const hasVersionCode = value.versionCode !== null
+    && value.versionCode !== undefined
+    && String(value.versionCode).trim() !== "";
+  const versionCode = hasVersionCode ? Number(value.versionCode) : null;
   return {
     packageName:String(value.packageName || "").trim(),
-    versionCode:Number.isFinite(Number(value.versionCode)) ? Number(value.versionCode) : null,
+    versionCode:Number.isInteger(versionCode) && versionCode > 0 ? versionCode : null,
     versionName:String(value.versionName || "").trim(),
     buildId:String(value.buildId || "").trim(),
     buildTimestamp:String(value.buildTimestamp || "").trim(),
   };
+}
+
+export function hasValidBasicAppInfo(snapshot) {
+  const app = snapshot?.installation || {};
+  return Boolean(
+    app.packageName
+    && Number.isInteger(app.versionCode)
+    && app.versionCode > 0
+    && app.versionName
+    && app.buildId
+    && app.buildTimestamp
+  );
 }
 
 function appFingerprint(app) {

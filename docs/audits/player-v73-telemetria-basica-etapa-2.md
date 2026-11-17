@@ -56,7 +56,7 @@ Não houve alteração em CSS, componentes visuais, regras publicadas, Firebase 
 
 | Verificação | Resultado |
 | --- | --- |
-| Testes focados BASIC + heartbeat + compatibilidade avançada | 24/24 passaram |
+| Testes focados BASIC + heartbeat + compatibilidade avançada | 26/26 passaram |
 | Identidade, vínculo local e telemetria operacional legada | 21/21 passaram |
 | Regras de identidade no emulador Firestore | 19/19 passaram |
 | Funções de vínculo nos emuladores Auth/Firestore/Functions | 3/3 passaram |
@@ -64,6 +64,7 @@ Não houve alteração em CSS, componentes visuais, regras publicadas, Firebase 
 | Integração financeira no emulador Firestore | 6/6 passaram |
 | Cache offline de templates após `npm ci` | passou |
 | Build Vite `playerRc` | passou (1967 módulos; apenas avisos de chunks) |
+| Gradle `:app:generatePlayerRcDebugBuildConfig` com JDK 21 | passou; nenhum APK gerado |
 | ESLint dos novos módulos e testes | passou |
 | ESLint completo do repositório | interrompido: varre grandes bundles/artefatos versionados e já reporta dívida histórica em `App.jsx` |
 

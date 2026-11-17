@@ -24,6 +24,9 @@ def totemBuildTimestamp = escapeBuildConfigString(System.getenv('TOTEM_BUILD_TIM
 android {
     namespace = "br.com.parksolutions.totempark"
     compileSdk = rootProject.ext.compileSdkVersion
+    buildFeatures {
+        buildConfig = true
+    }
     defaultConfig {
         applicationId "br.com.parksolutions.totempark"
         minSdkVersion rootProject.ext.minSdkVersion

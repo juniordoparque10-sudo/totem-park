@@ -4,6 +4,7 @@ import {
   BASIC_TELEMETRY_SCHEMA_VERSION,
   buildBasicTelemetryUpdate,
   createBasicPlayerTelemetry,
+  hasValidBasicAppInfo,
 } from "../src/basic-player-telemetry.js";
 
 function createStorage() {
@@ -102,4 +103,15 @@ test("documento legado não é mesclado no envelope BASIC", () => {
   assert.equal(update.telemetry.schemaVersion, 5);
   assert.equal(Object.hasOwn(update.telemetry, "traffic"), false);
   assert.equal(Object.hasOwn(update.telemetry, "cache"), false);
+});
+
+test("metadado ausente não inventa versionCode zero nem autoriza publicação", () => {
+  const telemetry = createBasicPlayerTelemetry({ randomId:(() => { const ids=["install-1","session-1"]; return () => ids.shift(); })() });
+  const initial = telemetry.snapshot();
+
+  assert.equal(initial.installation.versionCode, null);
+  assert.equal(hasValidBasicAppInfo(initial), false);
+
+  telemetry.setAppInfo(appV73);
+  assert.equal(hasValidBasicAppInfo(telemetry.snapshot()), true);
 });
