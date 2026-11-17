@@ -1,8 +1,10 @@
 # Totem Park Player V73 — relatório da Etapa 2
 
-Data: 2026-11-17  
-Branch isolada: `codex/player-v73-telemetria-simples-prep`  
-Base aprovada: `544b90c7`  
+Data: 2026-11-17
+
+Branch isolada: `codex/player-v73-telemetria-simples-prep`
+
+Base aprovada: `544b90c7`
 Escopo Android: flavor `playerRc` (V73)
 
 ## Resultado implementado
