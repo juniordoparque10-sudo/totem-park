@@ -54,4 +54,3 @@ Executar em bancada, nunca em cliente, após autorização específica:
 8. Registrar vídeo/fotos, logs, hashes de mídia, contadores de bytes e latências p50/p95.
 
 Critério de avanço: nenhuma perda funcional, nenhum campo avançado antigo apresentado como atual, comandos dentro da latência de referência da V73 e medição comparativa reproduzível. Não há autorização implícita para build, instalação, deploy, Portal ou produção.
-

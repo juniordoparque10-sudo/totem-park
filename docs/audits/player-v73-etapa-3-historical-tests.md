@@ -11,4 +11,3 @@ Execução focada: **15 testes; 10 passaram e 5 falharam**. Nenhuma das cinco di
 | `src/telemetry-history.test` | assert obsoleto | desde `768cac2e`, RX/TX incompletos viram `null` para não inventar cobertura; o teste preservou semântica anterior de `0f90f128`. |
 
 Não se propõe alterar os motores nem restaurar fixtures históricas. Se esses testes forem saneados futuramente, devem separar contratos arquivais imutáveis de configurações mutáveis e validar comportamento, não uma linha exata da implementação.
-

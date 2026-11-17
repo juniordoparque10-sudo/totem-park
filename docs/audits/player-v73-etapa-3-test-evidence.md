@@ -44,4 +44,3 @@ Não foram executados nesta etapa:
 - medição de tráfego por UID Android.
 
 Esses itens permanecem para homologação física; não são declarados aprovados integralmente.
-

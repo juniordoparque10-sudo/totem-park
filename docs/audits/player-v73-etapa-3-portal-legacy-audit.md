@@ -42,4 +42,3 @@ Centralizar um classificador de perfil e uma função de validade de sessão. Qu
 - nunca recorrer a campos avançados de topo ou de sessão/epoch anterior.
 
 Para preservar histórico anterior ao BASIC seria necessário um limite temporal persistido na migração. `installationEpoch` isolado não contém a data desse corte. Sem esse limite, a opção segura é não agregar histórico avançado para uma sessão BASIC atual.
-

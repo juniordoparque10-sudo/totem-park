@@ -39,4 +39,3 @@ Executar somente após autorização para build/homologação física:
 | Comandos | timestamps de envio/ack e bytes durante janelas sem mídia nova |
 
 Relatar bytes recebidos/enviados, total, média horária, p95 de latência de comando e variação entre repetições. Só afirmar economia se as rodadas forem equivalentes e a diferença superar a variação observada.
-
