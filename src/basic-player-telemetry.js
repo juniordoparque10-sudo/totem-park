@@ -67,7 +67,8 @@ export function createBasicPlayerTelemetry({
   }
 
   function snapshot() {
-    const { appFingerprint:ignored, ...publicInstallation } = installation;
+    const publicInstallation = { ...installation };
+    delete publicInstallation.appFingerprint;
     return clone({
       schemaVersion:BASIC_TELEMETRY_SCHEMA_VERSION,
       profile:BASIC_TELEMETRY_PROFILE,
