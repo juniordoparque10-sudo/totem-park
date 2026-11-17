@@ -8,7 +8,9 @@ Base da etapa: `fea33f2a`
 
 ## Conclusão
 
-A regressão automatizada disponível não encontrou falha operacional introduzida pela telemetria BASIC. A aprovação permanece **condicional**, porque decoder, rede, armazenamento e orientação físicos não podem ser comprovados sem APK/dispositivo, ambos proibidos nesta etapa.
+A regressão automatizada disponível não encontrou falha operacional introduzida pela telemetria BASIC. A regressão operacional recebe aprovação **condicional**, porque decoder, rede, armazenamento e orientação físicos não podem ser comprovados sem APK/dispositivo, ambos proibidos nesta etapa.
+
+A compatibilidade com o Portal atual está **reprovada e bloqueada** para homologação: há caminhos concretos que continuam lendo `currentMediaSource`, cache e now-playing antigos de topo sem validar o perfil BASIC. A correção lógica depende de autorização futura e não foi implementada nesta etapa.
 
 Nenhum motor operacional, arquivo do Portal, CSS, componente visual, regra publicada ou serviço real foi alterado. Nenhum APK foi gerado.
 
@@ -18,20 +20,20 @@ Nenhum motor operacional, arquivo do Portal, CSS, componente visual, regra publi
 - testes focados BASIC/heartbeat/comandos: passaram;
 - regras Firestore no emulador: 19/19;
 - funções de vínculo em emuladores: 3/3;
-- build Vite `playerRc`: deve permanecer como verificação de compilação web, sem APK;
+- build Vite `playerRc`: passou como verificação de compilação web, sem APK;
 - geração isolada do `BuildConfig`: passou com JDK 21 e validou metadados Android sem montar APK;
 - históricos: 10/15 passaram; cinco asserts/fixtures foram classificados como obsoletos, não como regressões BASIC.
 
 ## BASIC e comunicação
 
-Foram validados metadados do pacote instalado, build, instalação, nova sessão, upgrade/downgrade, publicação atômica, substituição de documento legado, ausência de métricas avançadas e separação do listener de comandos.
+Foram validados o contrato estrutural de leitura via `PackageManager`, a geração do `BuildConfig`, instalação lógica, nova sessão, upgrade/downgrade, publicação atômica, substituição de documento legado, ausência de métricas avançadas e separação do listener de comandos. A leitura efetiva de um APK instalado pelo `PackageManager` permanece pendente para homologação física.
 
 O heartbeat continua em 15 segundos: quatro escritas por minuto e 240 por hora. O envelope `telemetry` representativo mede 867 bytes em JSON. Esse número não inclui overhead Firestore/rede e não é usado para afirmar economia.
 
 ## Riscos
 
-1. O Portal atual possui leitores `schemaVersion >= 3/4` que podem interpretar schema 5 BASIC como avançado.
-2. Campos avançados antigos de topo podem sobreviver no documento da tela e reaparecer em cards/PDF/detalhes.
+1. O Portal atual possui leitores `schemaVersion >= 3/4` que interpretam indevidamente schema 5 BASIC como avançado em caminhos identificados pela auditoria.
+2. Campos avançados antigos de topo sobrevivem à substituição apenas do envelope `telemetry` e podem reaparecer em cards/PDF/detalhes; este é um bloqueio conhecido de compatibilidade.
 3. Histórico avançado não possui limite temporal automático na migração para BASIC.
 4. Testes automatizados não substituem codecs, GPU, filesystem, rede e rotação reais.
 5. O repositório não possui um único script hermético para toda a matriz; a seleção foi executada por grupos explícitos.
