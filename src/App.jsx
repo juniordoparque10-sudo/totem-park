@@ -215,6 +215,15 @@ import {
 import { buildOperationalTelemetryUpdate, createPlayerTelemetry, readPlayerTelemetryReport, TELEMETRY_DEFAULT_CONFIG } from "./player-telemetry";
 import { PLAYER_ACTIVITY_SYNC_ENABLED, createPlayerActivityTelemetry, syncPlayerActivityBatch, syncPlayerActivityBatchDocuments } from "./player-activity-telemetry";
 import { buildOperationalSnapshot, normalizeNativeAppInfo, normalizeOperationalMediaSource, OPERATIONAL_HEARTBEAT_INTERVAL_MS } from "./operational-telemetry";
+import { buildBasicTelemetryUpdate, createBasicPlayerTelemetry } from "./basic-player-telemetry";
+import {
+  buildBasicPlaybackState,
+  createDisabledActivityTelemetry,
+  createDisabledTelemetryHistory,
+  createDisabledTrafficTelemetry,
+  getPlayerTelemetryProfile,
+  shouldCollectAdvancedTelemetry,
+} from "./player-basic-heartbeat";
 import { createTrafficTelemetry } from "./traffic-telemetry";
 import { createTelemetryHistory } from "./telemetry-history";
 import { nextTelemetryHistorySyncState, shouldAttemptTelemetryHistorySync, syncTelemetryHistory } from "./telemetry-history-sync";
@@ -3806,6 +3815,8 @@ function logTemplatesV2Diagnostic(event, payload = {}) {
 }
 const IS_PLAYER_TELEMETRY_BUILD = APP_BUILD_MODE === "playerTelemetry";
 const IS_OPERATIONAL_TELEMETRY_BUILD = IS_PLAYER_RC_BUILD || IS_PLAYER_TELEMETRY_BUILD;
+const IS_BASIC_TELEMETRY_BUILD = getPlayerTelemetryProfile(APP_BUILD_MODE) === "BASIC";
+const SHOULD_COLLECT_ADVANCED_TELEMETRY = shouldCollectAdvancedTelemetry(APP_BUILD_MODE);
 const IS_V69_OPERATIONAL_TELEMETRY_BUILD = import.meta.env.VITE_PLAYER_OPERATIONAL_TELEMETRY === "1";
 const IS_SECURE_LINK_SPLASH_BUILD = import.meta.env.VITE_PLAYER_SECURE_LINK_SPLASH === "1";
 const IS_STRICT_PLAYLIST_EXPERIMENT = import.meta.env.VITE_PLAYER_STRICT_PLAYLIST === "1";
@@ -16008,6 +16019,7 @@ function PlayerPage() {
   const exitingTvRef = useRef(false);
   const playerSessionStartedAtRef = useRef(Date.now());
   const telemetryRef = useRef(null);
+  const basicTelemetryRef = useRef(null);
   const activityTelemetryRef = useRef(null);
   const trafficTelemetryRef = useRef(null);
   const telemetryHistoryRef = useRef(null);
@@ -16038,8 +16050,11 @@ function PlayerPage() {
         deviceId: getTotemDeviceId(),
         platform: isNativeApp() ? "ANDROID" : "WEB",
       },
-      alwaysEnabled:IS_V69_OPERATIONAL_TELEMETRY_BUILD,
+      alwaysEnabled:SHOULD_COLLECT_ADVANCED_TELEMETRY && IS_V69_OPERATIONAL_TELEMETRY_BUILD,
     });
+  }
+  if (!basicTelemetryRef.current) {
+    basicTelemetryRef.current = createBasicPlayerTelemetry();
   }
   if (!playerScreenSnapshotRef.current) {
     playerScreenSnapshotRef.current = createPlayerScreenSnapshotStore();
@@ -16053,17 +16068,21 @@ function PlayerPage() {
     nowPlayingSyncRef.current = createNowPlayingSyncGuard();
   }
   if (!activityTelemetryRef.current) {
-    activityTelemetryRef.current = createPlayerActivityTelemetry({
-      identity: { clientId, deviceId: getTotemDeviceId(), sessionId:telemetryRef.current.getReport().session.sessionId },
-    });
+    activityTelemetryRef.current = SHOULD_COLLECT_ADVANCED_TELEMETRY
+      ? createPlayerActivityTelemetry({
+          identity: { clientId, deviceId: getTotemDeviceId(), sessionId:telemetryRef.current.getReport().session.sessionId },
+        })
+      : createDisabledActivityTelemetry();
   }
   if (!trafficTelemetryRef.current) {
-    trafficTelemetryRef.current = createTrafficTelemetry();
+    trafficTelemetryRef.current = SHOULD_COLLECT_ADVANCED_TELEMETRY
+      ? createTrafficTelemetry()
+      : createDisabledTrafficTelemetry();
   }
   if (!telemetryHistoryRef.current) {
-    telemetryHistoryRef.current = createTelemetryHistory({
-      identity:{ clientId, deviceId:getTotemDeviceId() },
-    });
+    telemetryHistoryRef.current = SHOULD_COLLECT_ADVANCED_TELEMETRY
+      ? createTelemetryHistory({ identity:{ clientId, deviceId:getTotemDeviceId() } })
+      : createDisabledTelemetryHistory();
   }
   if (!transitionDiagnosticsRef.current) {
     transitionDiagnosticRescueRef.current = captureV20TransitionDiagnosticBuffer();
@@ -16119,9 +16138,12 @@ function PlayerPage() {
   }, [clientId, screen?.id, screen?.templatesV2TestMode]);
 
   useEffect(() => {
-    const sessionId = telemetryRef.current.getReport().session.sessionId;
-    activityTelemetryRef.current.updateIdentity({ clientId, screenId: screen?.id || "", deviceId: getTotemDeviceId(), sessionId });
-    telemetryHistoryRef.current.updateIdentity({ clientId, screenId:screen?.id || "", deviceId:getTotemDeviceId() });
+    basicTelemetryRef.current.setIdentity({ clientId, screenId:screen?.id || "", deviceId:getTotemDeviceId() });
+    if (SHOULD_COLLECT_ADVANCED_TELEMETRY) {
+      const sessionId = telemetryRef.current.getReport().session.sessionId;
+      activityTelemetryRef.current.updateIdentity({ clientId, screenId: screen?.id || "", deviceId: getTotemDeviceId(), sessionId });
+      telemetryHistoryRef.current.updateIdentity({ clientId, screenId:screen?.id || "", deviceId:getTotemDeviceId() });
+    }
   }, [clientId, screen?.id]);
 
   useEffect(() => {
@@ -16133,21 +16155,26 @@ function PlayerPage() {
   useEffect(() => {
     if (!IS_OPERATIONAL_TELEMETRY_BUILD || !screen?.id || !clientId) return undefined;
     const telemetry = telemetryRef.current;
-    telemetry.updateIdentity({ clientId, screenId: screen.id, deviceId: getTotemDeviceId() });
-    const unsubscribe = onSnapshot(
-      doc(db, "settings", "telemetry2a2c"),
-      (snapshot) => telemetry.configure(snapshot.exists() ? snapshot.data() : TELEMETRY_DEFAULT_CONFIG),
-      () => telemetry.configure(TELEMETRY_DEFAULT_CONFIG)
-    );
+    basicTelemetryRef.current.setIdentity({ clientId, screenId:screen.id, deviceId:getTotemDeviceId() });
+    if (SHOULD_COLLECT_ADVANCED_TELEMETRY) telemetry.updateIdentity({ clientId, screenId: screen.id, deviceId: getTotemDeviceId() });
+    const unsubscribe = SHOULD_COLLECT_ADVANCED_TELEMETRY
+      ? onSnapshot(
+          doc(db, "settings", "telemetry2a2c"),
+          (snapshot) => telemetry.configure(snapshot.exists() ? snapshot.data() : TELEMETRY_DEFAULT_CONFIG),
+          () => telemetry.configure(TELEMETRY_DEFAULT_CONFIG)
+        )
+      : () => {};
     const online = () => {
-      telemetry.setConnection("ONLINE");
+      basicTelemetryRef.current.setConnection("ONLINE");
+      if (SHOULD_COLLECT_ADVANCED_TELEMETRY) telemetry.setConnection("ONLINE");
       activityTelemetryRef.current.setConnection("ONLINE");
     };
     const offline = () => {
-      telemetry.setConnection("OFFLINE");
+      basicTelemetryRef.current.setConnection("OFFLINE");
+      if (SHOULD_COLLECT_ADVANCED_TELEMETRY) telemetry.setConnection("OFFLINE");
       activityTelemetryRef.current.setConnection("OFFLINE");
     };
-    if (navigator.onLine === false) activityTelemetryRef.current.setConnection("OFFLINE");
+    if (navigator.onLine === false) offline();
     window.addEventListener("online", online);
     window.addEventListener("offline", offline);
     return () => {
@@ -16158,6 +16185,7 @@ function PlayerPage() {
   }, [screen?.id, clientId]);
 
   useEffect(() => {
+    if (!SHOULD_COLLECT_ADVANCED_TELEMETRY) return undefined;
     const telemetry = telemetryRef.current;
     const onOperationalEvent = ({ detail = {} }) => {
       const mapping = {
@@ -16187,12 +16215,15 @@ function PlayerPage() {
   useEffect(() => {
     if (!isNativeApp()) return;
     TotemDevice.getAppInfo()
-      .then((value) => setOperationalAppInfo(normalizeNativeAppInfo(value)))
+      .then((value) => {
+        setOperationalAppInfo(normalizeNativeAppInfo(value));
+        basicTelemetryRef.current.setAppInfo(value);
+      })
       .catch((error) => console.log("Não foi possível obter a versão nativa do Player:", error));
   }, []);
 
   useEffect(() => {
-    if (!isNativeApp() || !IS_OPERATIONAL_TELEMETRY_BUILD) return;
+    if (!isNativeApp() || !SHOULD_COLLECT_ADVANCED_TELEMETRY) return;
     TotemDevice.getNetworkStats()
       .then((stats) => trafficTelemetryRef.current.recordNetworkStats(stats))
       .catch(() => trafficTelemetryRef.current.recordNetworkStats({ supported:false }));
@@ -17952,7 +17983,7 @@ function PlayerPage() {
       if (exitingTvRef.current) return false;
 
       try {
-        if (isNativeApp() && IS_OPERATIONAL_TELEMETRY_BUILD) {
+        if (isNativeApp() && SHOULD_COLLECT_ADVANCED_TELEMETRY) {
           try {
             trafficTelemetryRef.current.recordNetworkStats(await TotemDevice.getNetworkStats());
           } catch {
@@ -17960,16 +17991,32 @@ function PlayerPage() {
           }
         }
         const localDeviceId = getTotemDeviceId();
-        telemetryRef.current.updateOperational(operationalSnapshotRef.current || {});
-        if (isNativeApp()) telemetryRef.current.updateTraffic(trafficTelemetryRef.current.snapshot());
-        const telemetryHeartbeat = telemetryRef.current.heartbeat();
-        const telemetrySnapshot = telemetryHeartbeat?.snapshot;
-        const activityEvents = activityTelemetryRef.current.drainBatch(20);
-        telemetryHistoryRef.current.recordEvents(activityEvents);
-        telemetryHistoryRef.current.checkpoint({
-          trafficDaily:trafficTelemetryRef.current.dailySnapshot(),
-          operational:telemetrySnapshot || telemetryRef.current.getReport(),
-        });
+        let telemetryHeartbeat = null;
+        let telemetrySnapshot = null;
+        let basicTelemetrySnapshot = null;
+        let activityEvents = [];
+        if (IS_BASIC_TELEMETRY_BUILD) {
+          basicTelemetryRef.current.setIdentity({ clientId, screenId:screen.id, deviceId:localDeviceId });
+          basicTelemetryRef.current.setConnection(navigator.onLine === false ? "OFFLINE" : "ONLINE");
+          basicTelemetryRef.current.setPlayback(buildBasicPlaybackState({
+            operational:operationalSnapshotRef.current || {},
+            activePlaylist,
+            activeTemplate,
+            activeMode,
+          }));
+          basicTelemetrySnapshot = basicTelemetryRef.current.heartbeat();
+        } else if (SHOULD_COLLECT_ADVANCED_TELEMETRY) {
+          telemetryRef.current.updateOperational(operationalSnapshotRef.current || {});
+          if (isNativeApp()) telemetryRef.current.updateTraffic(trafficTelemetryRef.current.snapshot());
+          telemetryHeartbeat = telemetryRef.current.heartbeat();
+          telemetrySnapshot = telemetryHeartbeat?.snapshot;
+          activityEvents = activityTelemetryRef.current.drainBatch(20);
+          telemetryHistoryRef.current.recordEvents(activityEvents);
+          telemetryHistoryRef.current.checkpoint({
+            trafficDaily:trafficTelemetryRef.current.dailySnapshot(),
+            operational:telemetrySnapshot || telemetryRef.current.getReport(),
+          });
+        }
         const currentScreenSnapshot = playerScreenSnapshotRef.current.read(screenScope);
         const screenData = currentScreenSnapshot?.data || {};
 
@@ -17980,6 +18027,11 @@ function PlayerPage() {
 
         const binding = playerBindingRef.current;
         const canSyncTelemetry = telemetrySnapshot
+          && binding?.status === "ACTIVE"
+          && binding.clientId === clientId
+          && binding.screenId === screen.id
+          && binding.deviceId === localDeviceId;
+        const canSyncBasicTelemetry = basicTelemetrySnapshot
           && binding?.status === "ACTIVE"
           && binding.clientId === clientId
           && binding.screenId === screen.id
@@ -18006,7 +18058,10 @@ function PlayerPage() {
             : getWebPlayerV2Capabilities(localDeviceId);
         }
 
-        if (canSyncTelemetry) {
+        if (canSyncBasicTelemetry) {
+          Object.assign(heartbeatPayload, buildBasicTelemetryUpdate(basicTelemetrySnapshot));
+          heartbeatPayload.telemetryUpdatedAt = serverTimestamp();
+        } else if (canSyncTelemetry) {
           Object.assign(heartbeatPayload, buildOperationalTelemetryUpdate(telemetrySnapshot));
           heartbeatPayload.telemetryUpdatedAt = serverTimestamp();
         }
@@ -18027,7 +18082,7 @@ function PlayerPage() {
           }
         }
 
-        if (PLAYER_ACTIVITY_SYNC_ENABLED
+        if (PLAYER_ACTIVITY_SYNC_ENABLED && SHOULD_COLLECT_ADVANCED_TELEMETRY
           && binding?.status === "ACTIVE"
           && binding.clientId === clientId
           && binding.screenId === screen.id
@@ -18076,7 +18131,7 @@ function PlayerPage() {
           now:historySyncNow,
           nextAttemptAt:nextTelemetryHistorySyncAtRef.current,
           hasPending:historyHasPendingRecords,
-        })) {
+        }) && SHOULD_COLLECT_ADVANCED_TELEMETRY) {
           const historyResult = await syncTelemetryHistory({
             history:telemetryHistoryRef.current,
             refs:{
@@ -18173,7 +18228,7 @@ function PlayerPage() {
       window.removeEventListener("online", onOnline);
       document.removeEventListener("visibilitychange", onVisible);
     };
-  }, [screen?.id, screen?.templatesV2TestMode, clientId, maintenanceMode, blackoutMode, takeoverMessage, operationalAppInfo]);
+  }, [screen?.id, screen?.templatesV2TestMode, clientId, maintenanceMode, blackoutMode, takeoverMessage, operationalAppInfo, activePlaylist?.id, activePlaylist?.name, activeTemplate?.id, activeTemplate?.name, activeMode]);
 
   useEffect(() => {
     if (!screen?.id || !clientId) return;
