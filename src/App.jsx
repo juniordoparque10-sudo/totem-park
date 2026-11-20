@@ -18121,7 +18121,7 @@ function PlayerPage() {
           }
         }
 
-        const pendingTransitionDiagnostic = transitionDiagnosticsRef.current.pending();
+        const pendingTransitionDiagnostic = !IS_BASIC_TELEMETRY_BUILD && transitionDiagnosticsRef.current.pending();
         const canSyncTransitionDiagnostic = pendingTransitionDiagnostic
           && binding?.status === "ACTIVE"
           && binding.clientId === clientId
