@@ -2,7 +2,15 @@ import { useEffect, useMemo, useState } from "react";
 import { collection, doc, onSnapshot, serverTimestamp, setDoc } from "firebase/firestore";
 import { db } from "./firebase";
 import { bindingForScreen, linkedAtForScreen, measured, screenStatus, telemetryStatus, timestampMs } from "./telemetry-v1";
+import { isBasicTelemetry, isBasicIdentityValid } from "./portal-basic-telemetry";
 
+const isBasic = screen => isBasicTelemetry(screen?.telemetry);
+const sessionVersion = screen => isBasic(screen)
+  ? isBasicIdentityValid(screen) ? `${screen.telemetry.installation.versionName} (${screen.telemetry.installation.versionCode})` : null
+  : screen.telemetry?.session?.appVersion || null;
+const currentConnection = screen => isBasic(screen)
+  ? isBasicIdentityValid(screen) ? screen.telemetry.connection?.state || "—" : "—"
+  : Number(screen.telemetry?.schemaVersion) >= 3 ? screen.telemetry?.current?.connectionStatus : "—";
 const emptyConfig = { enabled: false, clientIds: [], screenIds: [], deviceIds: [], syncIntervalMs: 300000 };
 const dateText = (value) => { const ms = timestampMs(value); return ms === null ? "—" : new Date(ms).toLocaleString("pt-BR"); };
 const durationText = (value) => {
@@ -19,7 +27,7 @@ const elapsedText = (value) => {
 const periodStart = (period) => period === "today" ? new Date().setHours(0, 0, 0, 0)
   : Date.now() - (period === "7d" ? 7 : 30) * 86400000;
 const sumKnown = (rows, key) => {
-  const values = rows.map((row) => row.telemetry?.counters?.[key]).filter(measured);
+  const values = rows.filter((row) => !isBasic(row)).map((row) => row.telemetry?.counters?.[key]).filter(measured);
   return values.length ? values.reduce((sum, value) => sum + Number(value), 0) : null;
 };
 function Field({ label, children }) { return <p><b>{label}</b>{children ?? "—"}</p>; }
@@ -82,11 +90,11 @@ export default function TelemetryDashboardV1({ focusScreen }) {
     finally { setConfigSaving(false); }
   }
 
-  const versions = useMemo(() => [...new Set(screens.map((item) => item.telemetry?.session?.appVersion).filter(Boolean))].sort(), [screens]);
+  const versions = useMemo(() => [...new Set(screens.map(sessionVersion).filter(Boolean))].sort(), [screens]);
   const filtered = screens.filter((item) => (clientId === "all" || item.clientId === clientId)
     && (screenId === "all" || item.id === screenId)
     && (status === "all" || screenStatus(item) === status)
-    && (version === "all" || item.telemetry?.session?.appVersion === version))
+    && (version === "all" || sessionVersion(item) === version))
     .sort((a, b) => String(a.clientName || "").localeCompare(String(b.clientName || ""), "pt-BR")
       || String(a.name || "").localeCompare(String(b.name || ""), "pt-BR"));
   const selected = screens.find((item) => `${item.clientId}/${item.id}` === selectedKey);
@@ -97,8 +105,8 @@ export default function TelemetryDashboardV1({ focusScreen }) {
   const offline = filtered.length - online - attention;
   const activeTelemetry = count((item) => telemetryStatus(item, config) === "ATIVA");
   const awaitingSignal = count((item) => telemetryStatus(item, config) === "AGUARDANDO PRIMEIRO SINAL");
-  const versionCounts = [...new Map(filtered.map((item) => item.telemetry?.session?.appVersion).filter(Boolean)
-    .map((appVersion) => [appVersion, filtered.filter((item) => item.telemetry?.session?.appVersion === appVersion).length])).entries()];
+  const versionCounts = [...new Map(filtered.map(sessionVersion).filter(Boolean)
+    .map((appVersion) => [appVersion, filtered.filter((item) => sessionVersion(item) === appVersion).length])).entries()];
 
   if (loading) return <section className="telemetry-page"><div className="telemetry-state">Carregando telemetria…</div></section>;
   if (error) return <section className="telemetry-page"><div className="telemetry-state error">ERRO DE LEITURA: {error}</div></section>;
@@ -120,7 +128,7 @@ export default function TelemetryDashboardV1({ focusScreen }) {
       <article><span>Telas offline</span><strong>{offline}</strong></article>
       <article><span>Telemetria ativa</span><strong>{activeTelemetry}</strong></article>
       <article><span>Aguardando sinal</span><strong>{awaitingSignal}</strong></article>
-      <article><span>Tempo ativo</span><strong>{durationText(sumKnown(inPeriod.filter((item) => item.telemetry?.schemaVersion >= 3), "activeTimeMs"))}</strong><small>sessões disponíveis no período</small></article>
+      <article><span>Tempo ativo</span><strong>{durationText(sumKnown(inPeriod.filter((item) => !isBasic(item) && item.telemetry?.schemaVersion >= 3), "activeTimeMs"))}</strong><small>sessões disponíveis no período</small></article>
     </div>
     <div className="telemetry-visuals" aria-label="Gráficos de telemetria">
       <section className="telemetry-chart"><h2>Status das telas</h2><div className="telemetry-status-bars" aria-label={`${online} online, ${attention} em atenção, ${offline} offline`}><span className="online" style={{ width: `${online * 100 / Math.max(1, filtered.length)}%` }} /><span className="attention" style={{ width: `${attention * 100 / Math.max(1, filtered.length)}%` }} /><span className="offline" style={{ width: `${offline * 100 / Math.max(1, filtered.length)}%` }} /></div><p>{online} online <i>·</i> {attention} atenção <i>·</i> {offline} offline</p></section>
@@ -131,10 +139,10 @@ export default function TelemetryDashboardV1({ focusScreen }) {
       <section className="telemetry-chart"><h2>Transferências</h2><p className="telemetry-chart-empty">Não instrumentado</p></section>
     </div>
     {!inPeriod.length && <div className="telemetry-state"><strong>SEM DADOS NO PERÍODO</strong><span>As telas continuam listadas. Dados ausentes não são exibidos como zero.</span></div>}
-    <div className="telemetry-table telemetry-v1-table"><div className="head"><span>Tela</span><span>Status da tela</span><span>Telemetria</span><span>Origem</span><span>Tempo ativo</span><span>Último sinal</span><span>Vinculada desde</span><span>Erros</span></div>{filtered.map((item) => <button key={`${item.clientId}/${item.id}`} onClick={() => setSelectedKey(`${item.clientId}/${item.id}`)}><span><strong>{item.name || item.code || item.id}</strong><small>{item.clientName}</small></span><span className={`status ${screenStatus(item).toLowerCase()}`}>{screenStatus(item)}</span><span className="telemetry-flag" title={telemetryStatus(item, config)}>{telemetryStatus(item, config)}</span><span title="Origem não instrumentada">—</span><span>{durationText(item.telemetry?.schemaVersion >= 3 ? item.telemetry?.counters?.activeTimeMs : null)}</span><span>{elapsedText(item.telemetry?.schemaVersion >= 3 ? item.telemetryUpdatedAt : item.lastSeenAt)}</span><span>{dateText(linkedAtForScreen(item, bindings))}</span><span title="Erros de mídia não instrumentados">—</span></button>)}</div>
+    <div className="telemetry-table telemetry-v1-table"><div className="head"><span>Tela</span><span>Status da tela</span><span>Telemetria</span><span>Origem</span><span>Tempo ativo</span><span>Último sinal</span><span>Vinculada desde</span><span>Erros</span></div>{filtered.map((item) => <button key={`${item.clientId}/${item.id}`} onClick={() => setSelectedKey(`${item.clientId}/${item.id}`)}><span><strong>{item.name || item.code || item.id}</strong><small>{item.clientName}</small></span><span className={`status ${screenStatus(item).toLowerCase()}`}>{screenStatus(item)}</span><span className="telemetry-flag" title={telemetryStatus(item, config)}>{telemetryStatus(item, config)}</span><span title="Origem não instrumentada">—</span><span>{durationText(!isBasic(item) && item.telemetry?.schemaVersion >= 3 ? item.telemetry?.counters?.activeTimeMs : null)}</span><span>{elapsedText(!isBasic(item) && item.telemetry?.schemaVersion >= 3 ? item.telemetryUpdatedAt : item.lastSeenAt)}</span><span>{dateText(linkedAtForScreen(item, bindings))}</span><span title="Erros de mídia não instrumentados">—</span></button>)}</div>
     {selected && <div className="telemetry-detail" role="dialog" aria-label="Detalhe da tela"><button className="close" onClick={() => setSelectedKey(null)}>Fechar</button><span>{selected.clientName}</span><h2>{selected.name || selected.code || selected.id}</h2>
-      <h3>Identificação</h3><div className="detail-grid"><Field label="screenId">{selected.id}</Field><Field label="deviceId">{bindingForScreen(selected, bindings)?.deviceId || selected.connectedDeviceId || "—"}</Field><Field label="Vínculo">{bindingForScreen(selected, bindings) ? "ACTIVE" : "Sem vínculo ativo confirmado"}</Field><Field label="Versão do app">{selected.telemetry?.session?.appVersion || "—"}</Field><Field label="Tela vinculada desde">{dateText(linkedAtForScreen(selected, bindings))}</Field></div>
-      <h3>Status</h3><div className="detail-grid"><Field label="Tela">{screenStatus(selected)}</Field><Field label="Conectividade">{selected.telemetry?.schemaVersion >= 3 ? selected.telemetry?.current?.connectionStatus : "—"}</Field><Field label="Última comunicação">{dateText(selected.telemetry?.schemaVersion >= 3 ? selected.telemetryUpdatedAt : selected.lastSeenAt)}</Field><Field label="Último sinal">{dateText(selected.telemetry?.schemaVersion >= 3 ? selected.telemetry?.current?.lastSignalAt : null)}</Field><Field label="Sessão">{selected.telemetry?.session?.sessionId || "—"}</Field><Field label="Início da sessão">{dateText(selected.telemetry?.session?.startedAt)}</Field><Field label="Tempo ativo">{durationText(selected.telemetry?.schemaVersion >= 3 ? selected.telemetry?.counters?.activeTimeMs : null)}</Field></div>
+      <h3>Identificação</h3><div className="detail-grid"><Field label="screenId">{selected.id}</Field><Field label="deviceId">{bindingForScreen(selected, bindings)?.deviceId || selected.connectedDeviceId || "—"}</Field><Field label="Vínculo">{bindingForScreen(selected, bindings) ? "ACTIVE" : "Sem vínculo ativo confirmado"}</Field><Field label="Versão do app">{sessionVersion(selected) || "—"}</Field><Field label="Tela vinculada desde">{dateText(linkedAtForScreen(selected, bindings))}</Field></div>
+      <h3>Status</h3><div className="detail-grid"><Field label="Tela">{screenStatus(selected)}</Field><Field label="Conectividade">{currentConnection(selected)}</Field><Field label="Última comunicação">{dateText(selected.telemetry?.schemaVersion >= 3 ? selected.telemetryUpdatedAt : selected.lastSeenAt)}</Field><Field label="Último sinal">{dateText(!isBasic(selected) && selected.telemetry?.schemaVersion >= 3 ? selected.telemetry?.current?.lastSignalAt : null)}</Field><Field label="Sessão">{selected.telemetry?.session?.sessionId || "—"}</Field><Field label="Início da sessão">{dateText(selected.telemetry?.session?.startedAt)}</Field><Field label="Tempo ativo">{durationText(!isBasic(selected) && selected.telemetry?.schemaVersion >= 3 ? selected.telemetry?.counters?.activeTimeMs : null)}</Field></div>
       <h3>Reprodução</h3><div className="detail-grid">{["Origem", "Playing", "Waiting / stalled", "Erros", "Último erro", "Cache hit", "Tráfego evitado"].map((label) => <Field key={label} label={label}>Não instrumentado</Field>)}</div>
       <h3>Telemetria</h3><div className="detail-grid"><Field label="Status">{telemetryStatus(selected, config)}</Field><Field label="Último checkpoint">{dateText(selected.telemetryUpdatedAt)}</Field><Field label="Sessão de telemetria">{selected.telemetry?.session?.sessionId || "—"}</Field></div>
       <h3>Telemetria avançada</h3><div className="detail-grid">{["Cache Hit Rate", "Tráfego consumido", "Tráfego evitado", "Downloads", "Falhas de cache", "Cache parcial", "Economia estimada"].map((label) => <Field key={label} label={label}>Não instrumentado</Field>)}</div>
