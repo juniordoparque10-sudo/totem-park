@@ -1,3 +1,5 @@
+import { isBasicTelemetry, isBasicFresh, basicHeartbeatMs } from "./portal-basic-telemetry.js";
+
 export const SCREEN_HEARTBEAT_INTERVAL_MS = 15_000;
 export const SCREEN_ONLINE_THRESHOLD_MS = 45_000;
 export const SCREEN_ATTENTION_THRESHOLD_MS = 90_000;
@@ -28,6 +30,7 @@ export function getPortalLastSignalMs(screen = {}) {
     timestampMs(screen?.lastMediaUpdateAt)
   );
   const telemetry = screen?.telemetry;
+  if (isBasicTelemetry(telemetry)) return basicHeartbeatMs(screen);
   const session = telemetry?.session;
   const operationalHeartbeat = timestampMs(session?.lastHeartbeatAt);
   const trustedV5 = Number(telemetry?.schemaVersion) >= 3
@@ -42,6 +45,7 @@ export function getPortalLastSignalMs(screen = {}) {
 
 export function getPortalScreenStatus(screen, now = Date.now()) {
   if (!screen?.connectedDeviceId && !screen?.activeDeviceId) return "OFFLINE";
+  if (isBasicTelemetry(screen?.telemetry) && !basicHeartbeatMs(screen)) return "OFFLINE";
   const lastSeenAt = getPortalLastSignalMs(screen);
   if (!lastSeenAt) return "OFFLINE";
   const age = Math.max(0, now - lastSeenAt);
@@ -148,8 +152,8 @@ export function compareTelemetryOperationalScreens(left = {}, right = {}) {
   const rightOnline = right?.portalStatus === "ONLINE";
   if (leftOnline !== rightOnline) return leftOnline ? -1 : 1;
   if (leftOnline) {
-    const leftUptime = Number(left?.telemetry?.session?.uptimeSeconds);
-    const rightUptime = Number(right?.telemetry?.session?.uptimeSeconds);
+    const leftUptime = isBasicTelemetry(left?.telemetry) ? NaN : Number(left?.telemetry?.session?.uptimeSeconds);
+    const rightUptime = isBasicTelemetry(right?.telemetry) ? NaN : Number(right?.telemetry?.session?.uptimeSeconds);
     const leftMeasured = Number.isFinite(leftUptime) && leftUptime >= 0;
     const rightMeasured = Number.isFinite(rightUptime) && rightUptime >= 0;
     if (leftMeasured !== rightMeasured) return leftMeasured ? -1 : 1;
@@ -181,7 +185,8 @@ export function getTelemetryVisualState({ config, screen, now = Date.now(), read
   if (readError) return "READ_ERROR";
   if (!isTelemetryEnabledForScreen(config, screen)) return "DISABLED";
   if (!screen?.telemetry || !timestampMs(screen.telemetryUpdatedAt)) return "WAITING_FIRST_SIGNAL";
-  if (Number(screen.telemetry.schemaVersion) >= 3) {
+  if (isBasicTelemetry(screen.telemetry) && !isBasicFresh(screen, now)) return "STALE";
+  if (!isBasicTelemetry(screen.telemetry) && Number(screen.telemetry.schemaVersion) >= 3) {
     const heartbeatAt = timestampMs(screen.telemetry?.session?.lastHeartbeatAt);
     if (!heartbeatAt || now - heartbeatAt >= SCREEN_ONLINE_THRESHOLD_MS) return "STALE";
   }

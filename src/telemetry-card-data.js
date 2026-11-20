@@ -1,4 +1,5 @@
 import { isOperationalHeartbeatFresh } from "./operational-telemetry.js";
+import { isBasicTelemetry, isBasicFresh } from "./portal-basic-telemetry.js";
 
 const SOURCE_GROUPS = Object.freeze({
   LOCAL:{ key:"local", label:"Local (cache)", className:"local" },
@@ -20,6 +21,10 @@ export function formatSessionStartedAt(value) {
 
 function nativeVersion(screen = {}, now = Date.now()) {
   screen = screen || {};
+  if (isBasicTelemetry(screen.telemetry)) {
+    if (!isBasicFresh(screen, now)) return { versionName:null, versionCode:null };
+    return { versionName:String(screen.telemetry.installation.versionName), versionCode:Number(screen.telemetry.installation.versionCode) };
+  }
   const telemetryVersionName = screen?.telemetry?.app?.versionName || null;
   const telemetryVersionCode = screen?.telemetry?.app?.versionCode;
   const hasTelemetryVersion = Boolean(telemetryVersionName) || numeric(telemetryVersionCode);
@@ -73,7 +78,7 @@ export const reportedAppVersion = (screen = {}, now = Date.now()) => {
 };
 
 export function isSchema4Traffic(screen = {}) {
-  return Number(screen?.telemetry?.schemaVersion) >= 4 && Boolean(screen?.telemetry?.traffic);
+  return Number(screen?.telemetry?.schemaVersion) === 4 && Boolean(screen?.telemetry?.traffic);
 }
 
 export function isCurrentTelemetryScreen(screen = {}) {
@@ -81,7 +86,7 @@ export function isCurrentTelemetryScreen(screen = {}) {
 }
 
 export function getCurrentSourceGroup(screen = {}) {
-  if (!isCurrentTelemetryScreen(screen)) return SOURCE_GROUPS.UNKNOWN;
+  if (!isCurrentTelemetryScreen(screen) || isBasicTelemetry(screen?.telemetry)) return SOURCE_GROUPS.UNKNOWN;
   const value = String(screen?.currentMediaSource || screen?.telemetry?.current?.currentMediaSource || "UNKNOWN").toUpperCase();
   return SOURCE_GROUPS[value] || SOURCE_GROUPS.UNKNOWN;
 }
@@ -141,25 +146,25 @@ export function getTelemetryCardData(screens = [], now = Date.now()) {
 
   for (const screen of screens) {
     const active = Number(screen?.telemetry?.session?.uptimeSeconds) * 1000;
-    if (Number(screen?.telemetry?.schemaVersion) >= 3 && screen?.telemetry?.session?.uptimeSeconds != null && Number.isFinite(active)
+    if (!isBasicTelemetry(screen?.telemetry) && Number(screen?.telemetry?.schemaVersion) >= 3 && screen?.telemetry?.session?.uptimeSeconds != null && Number.isFinite(active)
       && isCurrentTelemetryScreen(screen) && isOperationalHeartbeatFresh(screen.telemetry, now)) {
       activeTimeMs += Math.max(0, active); activeScreens += 1;
     }
     const cacheStatus = String(screen?.cacheStatus || "").toLowerCase();
     const cached = Number(screen?.cachedItems);
-    if (["pronto", "preparando", "parcial", "erro"].includes(cacheStatus) && screen?.cachedItems != null && Number.isFinite(cached)) {
+    if (!isBasicTelemetry(screen?.telemetry) && ["pronto", "preparando", "parcial", "erro"].includes(cacheStatus) && screen?.cachedItems != null && Number.isFinite(cached)) {
       cacheItems += Math.max(0, cached); cacheScreens += 1;
       if (!isCurrentTelemetryScreen(screen)) cacheOfflineScreens += 1;
     }
-    const version = reportedAppVersion(screen);
+    const version = reportedAppVersion(screen, now);
     if (version) {
       versionCounts.set(version, (versionCounts.get(version) || 0) + 1);
-      if (!latestVersionScreen || compareVersionInfo(nativeVersion(screen), nativeVersion(latestVersionScreen)) > 0) latestVersionScreen = screen;
+      if (!latestVersionScreen || compareVersionInfo(nativeVersion(screen, now), nativeVersion(latestVersionScreen, now)) > 0) latestVersionScreen = screen;
     }
   }
 
   const installed = [...versionCounts.entries()].sort((left, right) => right[1] - left[1] || left[0].localeCompare(right[0], "pt-BR", { numeric:true }))[0] || null;
-  const latestVersion = reportedAppVersion(latestVersionScreen);
+  const latestVersion = reportedAppVersion(latestVersionScreen, now);
   return {
     activeTimeMs, activeScreens, cacheItems, cacheScreens, cacheOfflineScreens, latestVersionScreen,
     versionCount:latestVersion ? versionCounts.get(latestVersion) || 0 : 0,
