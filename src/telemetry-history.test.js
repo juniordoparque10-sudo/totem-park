@@ -11,9 +11,9 @@ test("builds today, rolling and custom ranges in UTC", () => {
 
 test("normalizes partial legacy documents without inventing measurements", () => {
   const row = normalizeHistoricalDaily({ dateKey:"2026-10-28", internetRxBytes:12, internetTxBytes:null, failureCount:-1 });
-  assert.equal(row.internetRxBytes, 12);
-  assert.equal(row.internetTxBytes, 0);
-  assert.equal(row.failureCount, 0);
+  assert.equal(row.networkMeasurementSupported, false);
+  assert.equal(row.internetTxBytes, null);
+  assert.equal(row.failureCount, null);
   assert.equal(row.cacheHitRate, null);
 });
 
