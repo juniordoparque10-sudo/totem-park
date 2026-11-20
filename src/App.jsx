@@ -230,6 +230,7 @@ import { createTelemetryHistory } from "./telemetry-history";
 import { nextTelemetryHistorySyncState, shouldAttemptTelemetryHistorySync, syncTelemetryHistory } from "./telemetry-history-sync";
 import { createPortalScreenOrderTracker, getPortalLastSignalMs, getPortalScreenPage, getPortalScreenStatus, sortClientsAlphabetically } from "./portal-status";
 import { reportedAppVersion } from "./telemetry-card-data";
+import { isBasicTelemetry, isBasicIdentityValid } from "./portal-basic-telemetry";
 import {
   claimPlayerBinding,
   classifyPlayerBindingClaimFailure,
@@ -2566,6 +2567,7 @@ function formatStorageSize(bytes, fractionDigits = 2) {
 }
 
 function getCacheStatusLabel(screen = {}) {
+  if (isBasicTelemetry(screen.telemetry)) return "Não instrumentado";
   const status = screen.cacheStatus || "";
   const cached = Number(screen.cachedItems || 0);
   const total = Number(screen.totalCacheableItems || 0);
@@ -2588,6 +2590,7 @@ function getMediaSourceLabel(source) {
 }
 
 function getCacheSyncLabel(screen = {}) {
+  if (isBasicTelemetry(screen.telemetry)) return "";
   const downloaded = Number(screen.cacheDownloadedItems || 0);
   const removed = Number(screen.cacheRemovedItems || 0);
   const downloadedBytes = Number(screen.lastMediaDownloadBytes || 0);
@@ -5642,16 +5645,16 @@ function Dashboard({ onNavigate, onOpenTelemetry }) {
                     <div className="realtime-screen-section">
                       <span className="realtime-screen-section-title">Operação</span>
                       <div className="realtime-screen-now-playing">
-                        <small title={screen.currentPlaylistName || "Playlist não informada"}>{screen.currentPlaylistName || "Playlist não informada"}</small>
-                        <strong title={screen.nowPlayingTitle || "Aguardando mídia"}>{screen.nowPlayingTitle || "Aguardando mídia"}</strong>
+                        <small title={isBasicTelemetry(screen.telemetry) ? (isBasicIdentityValid(screen) ? screen.telemetry.playback?.activeName || "Playlist não informada" : "Playlist não informada") : screen.currentPlaylistName || "Playlist não informada"}>{isBasicTelemetry(screen.telemetry) ? (isBasicIdentityValid(screen) ? screen.telemetry.playback?.activeName || "Playlist não informada" : "Playlist não informada") : screen.currentPlaylistName || "Playlist não informada"}</small>
+                        <strong title={isBasicTelemetry(screen.telemetry) ? (isBasicIdentityValid(screen) ? screen.telemetry.playback?.itemId || screen.telemetry.playback?.activeName || "Aguardando mídia" : "Aguardando mídia") : screen.nowPlayingTitle || "Aguardando mídia"}>{isBasicTelemetry(screen.telemetry) ? (isBasicIdentityValid(screen) ? screen.telemetry.playback?.itemId || screen.telemetry.playback?.activeName || "Aguardando mídia" : "Aguardando mídia") : screen.nowPlayingTitle || "Aguardando mídia"}</strong>
                       </div>
                       <div className="realtime-screen-facts">
-                        <span>Cache: {getCacheStatusLabel(screen)} • {getMediaSourceLabel(screen.currentMediaSource)}</span>
+                        <span>Cache: {getCacheStatusLabel(screen)} • {isBasicTelemetry(screen.telemetry) ? "Origem da reprodução não informada" : getMediaSourceLabel(screen.currentMediaSource)}</span>
                         {getCacheSyncLabel(screen) && <span>{getCacheSyncLabel(screen)}</span>}
                         <span title={reportedAppVersion(screen) || "—"}>App: {reportedAppVersion(screen) || "—"}</span>
-                        <span>Tempo ativo: {screen.telemetry?.schemaVersion >= 3 && Number.isFinite(Number(screen.telemetry?.session?.uptimeSeconds)) ? `${Math.floor(Number(screen.telemetry.session.uptimeSeconds) / 60)} min` : "—"}</span>
+                        <span>Tempo ativo: {!isBasicTelemetry(screen.telemetry) && screen.telemetry?.schemaVersion >= 3 && Number.isFinite(Number(screen.telemetry?.session?.uptimeSeconds)) ? `${Math.floor(Number(screen.telemetry.session.uptimeSeconds) / 60)} min` : "—"}</span>
                         <span>Local: {deviceLocation.city}</span>
-                        <span>Item: {screen.nowPlayingIndex && screen.nowPlayingTotal
+                        <span>Item: {!isBasicTelemetry(screen.telemetry) && screen.nowPlayingIndex && screen.nowPlayingTotal
                           ? `${screen.nowPlayingIndex}/${screen.nowPlayingTotal}`
                           : "--"}</span>
                       </div>
@@ -7580,14 +7583,16 @@ function ClientDashboard({ client, access = getClientPlanAccess(client), isMaste
       lastSeen: formatScreenConnectionDate(connection.lastSeenDate),
       playlist: screen.currentPlaylistName || active.playlist?.name || "Sem playlist",
       mode: screen.currentPlaylistMode || active.mode || "default",
-      nowPlaying: screen.nowPlayingTitle || "Aguardando conteudo",
-      itemProgress: screen.nowPlayingIndex && screen.nowPlayingTotal
+      nowPlaying: isBasicTelemetry(screen.telemetry)
+        ? (isBasicIdentityValid(screen) ? screen.telemetry.playback?.itemId || screen.telemetry.playback?.activeName || "Aguardando conteudo" : "Aguardando conteudo")
+        : screen.nowPlayingTitle || "Aguardando conteudo",
+      itemProgress: !isBasicTelemetry(screen.telemetry) && screen.nowPlayingIndex && screen.nowPlayingTotal
         ? `${screen.nowPlayingIndex}/${screen.nowPlayingTotal}`
         : "--",
-      cache: screen.cacheStatus
+      cache: isBasicTelemetry(screen.telemetry) ? "Não instrumentado" : screen.cacheStatus
         ? `${screen.cacheStatus} ${Number(screen.cachedItems || 0)}/${Number(screen.totalCacheableItems || 0)}`
         : "Sem cache informado",
-      mediaSource: screen.currentMediaSource || "remote",
+      mediaSource: isBasicTelemetry(screen.telemetry) ? "unknown" : screen.currentMediaSource || "remote",
     };
   });
   const loggedScreensCount = screenReports.filter((report) => report.deviceId).length;
