@@ -7,7 +7,11 @@ test("shared V56 logo preserves aspect ratio and has a safe missing state", () =
   const css = fs.readFileSync(new URL("../src/templates-v2/template-logo.css", import.meta.url), "utf8");
   assert.match(component, /export default function TemplateLogo/);
   assert.match(component, /src,\s*alt\s*=\s*"",\s*className\s*=\s*"",\s*maxWidth\s*=\s*"100%",\s*maxHeight\s*=\s*"100%"/);
-  assert.match(component, /if \(!src\) return null/);
+  assert.match(component, /const logo = src/);
+  assert.match(component, /: fallback;/);
+  assert.match(component, /if \(\(!showLogo \|\| !logo\) && \(!showName \|\| !name\)\) return null/);
+  assert.match(component, /\{showLogo && logo &&/);
+  assert.match(component, /\{showName && name &&/);
   assert.match(css, /\.tpv2-template-logo__image[\s\S]*?object-fit:\s*contain/);
   assert.match(css, /max-width:\s*var\(--tpv2-logo-max-width/);
   assert.doesNotMatch(css, /market-(?:featured|list)|secondary\s+img|background|news.*img/);

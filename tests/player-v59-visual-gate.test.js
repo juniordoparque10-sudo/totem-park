@@ -57,13 +57,9 @@ test("manutenção usa a arte oficial e mantém o mesmo estado funcional", () =>
   assert.doesNotMatch(component, /gear-glow|progress-glow/);
 });
 
-test("gate visual renderiza os componentes reais sem atraso de produção", () => {
-  assert.ok(exists("../visual-validation-v59.html"), "página de validação V59 ausente");
-  assert.ok(exists("../src/player/visual-validation-v59.jsx"), "entrada de validação V59 ausente");
-  const html = text("../visual-validation-v59.html");
-  const entry = text("../src/player/visual-validation-v59.jsx");
-  assert.match(html, /visual-validation-v59\.jsx/);
-  assert.match(entry, /<PlayerStartupSplash/);
-  assert.match(entry, /<MaintenanceScreen/);
-  assert.doesNotMatch(entry, /setTimeout|delay|sleep/i);
+test("gate visual preserva componentes oficiais sem artefatos historicos", () => {
+  assert.equal(exists("../visual-validation-v59.html"), false);
+  assert.equal(exists("../src/player/visual-validation-v59.jsx"), false);
+  assert.ok(exists("../src/player/PlayerStartupSplash.jsx"));
+  assert.ok(exists("../src/player/MaintenanceScreen.jsx"));
 });
