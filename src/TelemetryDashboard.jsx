@@ -6,7 +6,7 @@ import { compareTelemetryScreens, createPortalScreenOrderTracker, formatRelative
 import { bindingForScreen, linkedAtForScreen, measured } from "./telemetry-v1";
 import { aggregateCurrentPlaybackOrigins, aggregateSchema4Traffic, formatSessionStartedAt, getCurrentSourceGroup, getTelemetryCardData, reportedAppVersion } from "./telemetry-card-data";
 import { renderTelemetryPdfReport } from "./telemetry-pdf-report";
-import { buildTelemetryActivityPeriods, normalizeTelemetryActivityEvents, summarizeTelemetryActivity } from "./telemetry-activity-history";
+import { buildTelemetryActivityPeriods, resolveTelemetryActivityEvents, summarizeTelemetryActivity } from "./telemetry-activity-history";
 import { historicalDateRange } from "./telemetry-history-dashboard";
 import { readTelemetryActivityHistory, readTelemetryHistory } from "./telemetry-history-reader";
 import { formatBytes } from "./format-bytes";
@@ -200,9 +200,7 @@ export default function TelemetryDashboard({ focusScreen }) {
     .filter((item) => activityScreenId === "all" || item.id === activityScreenId)
     .flatMap((item) => {
       const remote = activityHistory.reads.find((entry) => entry.clientId === item.clientId && entry.screenId === item.id)?.events || [];
-      const events = remote.length
-        ? normalizeTelemetryActivityEvents({ id:item.id, telemetry:{ activity:{ events:remote } } }, activityRange)
-        : normalizeTelemetryActivityEvents(item, activityRange);
+      const events = resolveTelemetryActivityEvents(item, remote, activityRange);
       return buildTelemetryActivityPeriods(events, activityRange);
     })
     .sort((left, right) => left.startMs - right.startMs || left.id.localeCompare(right.id)), [activityScreens, activityScreenId, activityRange, activityHistory]);

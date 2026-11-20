@@ -1,3 +1,5 @@
+import { isBasicTelemetry } from "./portal-basic-telemetry.js";
+
 const ACTIVITY_STATES = new Set(["ACTIVE", "ONLINE", "OFFLINE", "ATTENTION", "IDLE", "INTERRUPTED", "RECOVERED"]);
 const ACTIVE_STATES = new Set(["ACTIVE", "RECOVERED"]);
 const OFFLINE_STATES = new Set(["OFFLINE", "INTERRUPTED"]);
@@ -18,6 +20,18 @@ function validRange(range = {}) {
   return Number.isFinite(startMs) && Number.isFinite(endMs) && endMs >= startMs
     ? { startMs, endMs }
     : { startMs: Number.NEGATIVE_INFINITY, endMs: Number.POSITIVE_INFINITY };
+}
+
+// Eventos remotos persistidos sao historicos legitimos. A lista embutida no
+// snapshot BASIC pode, porem, ser resquicio de uma instalacao anterior.
+export function resolveTelemetryActivityEvents(screen = {}, remoteEvents = [], range = {}) {
+  if (Array.isArray(remoteEvents) && remoteEvents.length) {
+    return normalizeTelemetryActivityEvents({
+      id:screen.id || screen.screenId,
+      telemetry:{ activity:{ events:remoteEvents } },
+    }, range);
+  }
+  return isBasicTelemetry(screen?.telemetry) ? [] : normalizeTelemetryActivityEvents(screen, range);
 }
 
 export function normalizeTelemetryActivityEvents(screen = {}, range = {}) {

@@ -45,7 +45,7 @@ export function getPortalLastSignalMs(screen = {}) {
 
 export function getPortalScreenStatus(screen, now = Date.now()) {
   if (!screen?.connectedDeviceId && !screen?.activeDeviceId) return "OFFLINE";
-  if (isBasicTelemetry(screen?.telemetry) && !basicHeartbeatMs(screen)) return "OFFLINE";
+  if (isBasicTelemetry(screen?.telemetry) && (!basicHeartbeatMs(screen) || screen.telemetry.connection?.state !== "ONLINE")) return "OFFLINE";
   const lastSeenAt = getPortalLastSignalMs(screen);
   if (!lastSeenAt) return "OFFLINE";
   const age = Math.max(0, now - lastSeenAt);

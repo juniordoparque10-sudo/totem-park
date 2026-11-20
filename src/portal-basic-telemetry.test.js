@@ -51,3 +51,10 @@ test("schema legado não recebe classificação BASIC",()=>{
   assert.equal(isSchema4Traffic(s),true);
   assert.equal(reportedAppVersion(s,now),"v73-antiga (73)");
 });
+
+test("BASIC declara desconexao: heartbeat fresco nao pode manter tela online",()=>{
+  const s=screen();
+  s.telemetry.connection.state="OFFLINE";
+  assert.equal(getPortalScreenStatus(s,now),"OFFLINE");
+  assert.equal(isBasicFresh(s,now),false);
+});
