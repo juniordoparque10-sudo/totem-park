@@ -92,6 +92,17 @@ android {
                 tvLauncherEnabled: "true"
             ]
         }
+        playerBasicHom {
+            dimension "appMode"
+            applicationIdSuffix ".player.basichom"
+            versionCode 1
+            versionName "1.0.0-basic-v5-hom"
+            signingConfig signingConfigs.debug
+            manifestPlaceholders = [
+                appLabel: "Totem Park BASIC HOM",
+                tvLauncherEnabled: "false"
+            ]
+        }
         playerRc {
             dimension "appMode"
             versionCode 73
