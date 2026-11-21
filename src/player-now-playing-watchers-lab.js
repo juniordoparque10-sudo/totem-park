@@ -3,7 +3,7 @@ import { useEffect, useState } from 'react';
 import { observePlayerWatchers } from '../experiments/now-playing-demand-v2/watcher-bridge-firestore';
 
 export const isPlayerWatchersV2Lab = () => import.meta.env.VITE_USE_FIREBASE_EMULATORS === 'true'
-  && import.meta.env.VITE_BASIC_V5_DIAG === 'true'
+  && (import.meta.env.VITE_BASIC_V5_DIAG === 'true' || import.meta.env.VITE_BASIC_V5_INTEGRATED_LAB === 'true')
   && import.meta.env.VITE_NOW_PLAYING_DEMAND_LAB === 'true'
   && import.meta.env.VITE_NOW_PLAYING_WATCHERS_V2_LAB === 'true';
 

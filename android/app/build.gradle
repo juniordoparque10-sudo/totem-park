@@ -124,6 +124,17 @@ android {
                 tvLauncherEnabled: "false"
             ]
         }
+        playerBasicIntegratedLab {
+            dimension "appMode"
+            applicationIdSuffix ".player.basicv5integrated"
+            versionCode 1
+            versionName "1.0.0-basic-v5-integrated-lab"
+            signingConfig signingConfigs.debug
+            manifestPlaceholders = [
+                appLabel: "Totem Park BASIC V5 INTEGRADO",
+                tvLauncherEnabled: "false"
+            ]
+        }
         playerRc {
             dimension "appMode"
             versionCode 73

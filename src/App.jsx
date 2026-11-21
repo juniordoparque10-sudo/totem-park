@@ -18595,7 +18595,7 @@ function PlayerPage() {
       "screens",
       screen.id
     );
-    const demandLab = import.meta.env.VITE_BASIC_V5_DIAG === "true" && import.meta.env.VITE_NOW_PLAYING_DEMAND_LAB === "true" && import.meta.env.VITE_USE_FIREBASE_EMULATORS === "true";
+    const demandLab = (import.meta.env.VITE_BASIC_V5_DIAG === "true" || import.meta.env.VITE_BASIC_V5_INTEGRATED_LAB === "true") && import.meta.env.VITE_NOW_PLAYING_DEMAND_LAB === "true" && import.meta.env.VITE_USE_FIREBASE_EMULATORS === "true";
     const demandViewers = isPlayerWatchersV2Lab()
       ? (v2WatcherIds ? v2WatcherIds.split("|") : [])
       : demandLab ? activeNowPlayingViewers(screen?.nowPlayingDemandViewers, Date.now()) : [];

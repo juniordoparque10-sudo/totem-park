@@ -2,13 +2,39 @@ const { onCall, HttpsError } = require("firebase-functions/v2/https");
 const { onSchedule } = require("firebase-functions/v2/scheduler");
 const { defineSecret } = require("firebase-functions/params");
 const { initializeApp } = require("firebase-admin/app");
+const { getAuth } = require("firebase-admin/auth");
 const { getFirestore, FieldValue, FieldPath, Timestamp } = require("firebase-admin/firestore");
 const { validateRescueRequest } = require("./transition-diagnostic-rescue");
 const { REBIND_AUTHORIZATION_TTL_MS, evaluateRebindAuthorization, canRebindKnownDevice } = require("./player-rebind");
+const { isBasicV5LabProject, buildPlayerLabClaims, stripPlayerLabClaims } = require("./basic-v5-lab-claims");
 
 initializeApp();
 const db = getFirestore();
 const billingPreviewSecret = defineSecret("BILLING_PREVIEW_SECRET");
+
+function runtimeProjectId() {
+  if (process.env.GCLOUD_PROJECT) return process.env.GCLOUD_PROJECT;
+  try { return JSON.parse(process.env.FIREBASE_CONFIG || "{}").projectId || ""; } catch { return ""; }
+}
+
+async function setPlayerLabClaims(uid, identity) {
+  if (!isBasicV5LabProject(runtimeProjectId())) return;
+  try {
+    const adminAuth = getAuth();
+    const user = await adminAuth.getUser(uid);
+    await adminAuth.setCustomUserClaims(uid, buildPlayerLabClaims(user.customClaims, identity));
+  } catch (error) {
+    console.error('[BASIC_V5_LAB] Player claim grant failed', { code:error?.code || 'unknown', message:error?.message || 'unknown' });
+    throw error;
+  }
+}
+
+async function clearPlayerLabClaims(uid) {
+  if (!uid || !isBasicV5LabProject(runtimeProjectId())) return;
+  const adminAuth = getAuth();
+  const user = await adminAuth.getUser(uid);
+  await adminAuth.setCustomUserClaims(uid, stripPlayerLabClaims(user.customClaims));
+}
 
 const SPORTSDB_API_BASE = "https://www.thesportsdb.com/api/v1/json/123";
 const SPORTS_V2_COMPETITIONS = Object.freeze({
@@ -206,7 +232,7 @@ exports.releasePlayerBindingForScreen = onCall(async (request) => {
 
   const screenRef = db.doc(`clients/${clientId}/screens/${screenId}`);
   const authorizationRef = playerRebindAuthorizationRef(clientId, screenId);
-  return db.runTransaction(async (transaction) => {
+  const result = await db.runTransaction(async (transaction) => {
     const [screenSnapshot, authorizationSnapshot] = await Promise.all([
       transaction.get(screenRef),
       transaction.get(authorizationRef),
@@ -263,8 +289,11 @@ exports.releasePlayerBindingForScreen = onCall(async (request) => {
       }
     }
 
-    return { status: alreadyReleased ? "ALREADY_RELEASED" : "RELEASED", clientId, screenId };
+    return { status: alreadyReleased ? "ALREADY_RELEASED" : "RELEASED", clientId, screenId, releasedUid:connectedUid };
   });
+  await clearPlayerLabClaims(result.releasedUid);
+  const { releasedUid, ...publicResult } = result;
+  return publicResult;
 });
 
 exports.claimPlayerBinding = onCall(async (request) => {
@@ -274,7 +303,7 @@ exports.claimPlayerBinding = onCall(async (request) => {
   const appVersion = clean(request.data?.appVersion, 80);
   if (!code || !deviceId) throw new HttpsError("invalid-argument", "Code and deviceId are required.");
 
-  return db.runTransaction(async (transaction) => {
+  const result = await db.runTransaction(async (transaction) => {
     const codeRef = db.doc(`tv_codes/${code}`);
     const codeSnapshot = await transaction.get(codeRef);
     if (!codeSnapshot.exists) throw new HttpsError("not-found", "Pairing code was not found.");
@@ -300,6 +329,7 @@ exports.claimPlayerBinding = onCall(async (request) => {
     const screen = screenSnapshot.data() || {};
     const previousConnectedUid = clean(screen.connectedAuthUid);
     const isUidConflict = Boolean(previousConnectedUid && previousConnectedUid !== uid);
+    let replacedUid = "";
     if (isUidConflict) {
       const authorization = evaluateRebindAuthorization({
         authorization: authorizationSnapshot.data(),
@@ -317,6 +347,7 @@ exports.claimPlayerBinding = onCall(async (request) => {
       const previousBindingRef = db.doc(`playerDeviceBindings/${previousConnectedUid}`);
       const previousBindingSnapshot = await transaction.get(previousBindingRef);
       if (previousBindingSnapshot.exists) {
+        replacedUid = previousConnectedUid;
         transaction.update(previousBindingRef, {
           status: "REVOKED",
           revokedAt: FieldValue.serverTimestamp(),
@@ -363,8 +394,12 @@ exports.claimPlayerBinding = onCall(async (request) => {
       status: "online",
       lastSeenAt: now,
     });
-    return { status: "ACTIVE", clientId, screenId, deviceId };
+    return { status: "ACTIVE", clientId, screenId, deviceId, replacedUid };
   });
+  await setPlayerLabClaims(uid, result);
+  await clearPlayerLabClaims(result.replacedUid);
+  const { replacedUid, ...publicResult } = result;
+  return publicResult;
 });
 
 exports.validatePlayerBinding = onCall(async (request) => {
@@ -374,7 +409,9 @@ exports.validatePlayerBinding = onCall(async (request) => {
     throw new HttpsError("permission-denied", "Player binding is not active.");
   }
   const binding = snapshot.data();
-  return { status: binding.status, clientId: binding.clientId, screenId: binding.screenId, deviceId: binding.deviceId };
+  const result = { status: binding.status, clientId: binding.clientId, screenId: binding.screenId, deviceId: binding.deviceId };
+  await setPlayerLabClaims(uid, result);
+  return result;
 });
 
 exports.revokePlayerBinding = onCall(async (request) => {
@@ -384,7 +421,7 @@ exports.revokePlayerBinding = onCall(async (request) => {
     throw new HttpsError("permission-denied", "Only a master can revoke another player.");
   }
   const bindingRef = db.doc(`playerDeviceBindings/${requestedUid}`);
-  return db.runTransaction(async (transaction) => {
+  const result = await db.runTransaction(async (transaction) => {
     const bindingSnapshot = await transaction.get(bindingRef);
     if (!bindingSnapshot.exists) return { status: "NOT_FOUND" };
     const binding = bindingSnapshot.data();
@@ -406,6 +443,8 @@ exports.revokePlayerBinding = onCall(async (request) => {
     }
     return { status: "REVOKED" };
   });
+  if (result.status === "REVOKED") await clearPlayerLabClaims(requestedUid);
+  return result;
 });
 
 exports.uploadTransitionDiagnosticRescue = onCall(async (request) => {

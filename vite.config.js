@@ -43,12 +43,28 @@ export default defineConfig(({ mode }) => {
     }
   }
 
+  if (mode === 'playerBasicIntegratedLab' || mode === 'basicV5PortalLab') {
+    const expectedHost = mode === 'playerBasicIntegratedLab' ? '10.0.2.2' : '127.0.0.1'
+    if (
+      env.VITE_BASIC_HOM !== 'true' ||
+      env.VITE_BASIC_V5_INTEGRATED_LAB !== 'true' ||
+      env.VITE_USE_FIREBASE_EMULATORS !== 'true' ||
+      env.VITE_EMULATOR_PROJECT_ID !== 'demo-totem-basic-hom' ||
+      env.VITE_EMULATOR_HOST !== expectedHost ||
+      env.VITE_NOW_PLAYING_DEMAND_LAB !== 'true' ||
+      env.VITE_NOW_PLAYING_WATCHERS_V2_LAB !== 'true'
+    ) {
+      throw new Error('BASIC V5 integrado bloqueado: parametros LAB invalidos.')
+    }
+  }
+
   return {
     plugins: [react()],
     resolve: [
       'playerRc',
       'playerBasicHom',
       'playerBasicDiag',
+      'playerBasicIntegratedLab',
       'playerRcSecureLinkExperiment',
       'playerConsolidatedExperimental',
     ].includes(mode) ? {

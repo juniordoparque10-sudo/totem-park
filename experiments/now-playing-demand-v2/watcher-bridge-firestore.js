@@ -12,7 +12,7 @@ const path = (clientId, screenId) => {
 };
 const enforceLab = () => {
   if (import.meta.env.VITE_USE_FIREBASE_EMULATORS !== 'true'
-    || import.meta.env.VITE_BASIC_V5_DIAG !== 'true'
+    || (import.meta.env.VITE_BASIC_V5_DIAG !== 'true' && import.meta.env.VITE_BASIC_V5_INTEGRATED_LAB !== 'true')
     || import.meta.env.VITE_NOW_PLAYING_DEMAND_LAB !== 'true') {
     throw new Error('BASIC V5 watcher bridge is emulator-only');
   }

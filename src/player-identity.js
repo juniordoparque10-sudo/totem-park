@@ -1,5 +1,8 @@
 import { onAuthStateChanged, signInAnonymously } from "firebase/auth";
 import { getFunctions, httpsCallable } from "firebase/functions";
+import { refreshIntegratedLabIdToken } from "./basic-v5-integrated-lab.js";
+
+const IS_BASIC_V5_INTEGRATED_LAB = import.meta.env?.VITE_BASIC_V5_INTEGRATED_LAB === "true";
 
 export const PLAYER_IDENTITY_STATES = Object.freeze({
   UNAVAILABLE: "UNAVAILABLE",
@@ -56,6 +59,7 @@ export async function claimPlayerBinding({ app, auth, code, deviceId, appVersion
   const user = await ensurePlayerAuth(auth);
   const claim = httpsCallable(getFunctions(app), "claimPlayerBinding");
   const result = await claim({ code, deviceId, appVersion });
+  await refreshIntegratedLabIdToken({ enabled:IS_BASIC_V5_INTEGRATED_LAB, user });
   return { uid: user.uid, ...result.data };
 }
 
@@ -63,6 +67,7 @@ export async function validatePlayerBinding({ app, auth }) {
   const user = await ensurePlayerAuth(auth);
   const validate = httpsCallable(getFunctions(app), "validatePlayerBinding");
   const result = await validate({});
+  await refreshIntegratedLabIdToken({ enabled:IS_BASIC_V5_INTEGRATED_LAB, user });
   return { uid: user.uid, ...result.data };
 }
 
@@ -70,6 +75,7 @@ export async function revokeOwnPlayerBinding({ app, auth, reason = "PLAYER_RELEA
   const user = await ensurePlayerAuth(auth);
   const revoke = httpsCallable(getFunctions(app), "revokePlayerBinding");
   const result = await revoke({ uid: user.uid, reason });
+  await refreshIntegratedLabIdToken({ enabled:IS_BASIC_V5_INTEGRATED_LAB, user });
   return result.data;
 }
 
