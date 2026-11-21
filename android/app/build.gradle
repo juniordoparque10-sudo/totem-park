@@ -92,6 +92,16 @@ android {
                 tvLauncherEnabled: "true"
             ]
         }
+        playerBasicMedicao {
+            dimension "appMode"
+            applicationIdSuffix ".player.basicmedicao"
+            versionCode 1
+            versionName "1.0.0-basic-v5-medicao"
+            manifestPlaceholders = [
+                appLabel: "Totem Park MEDICAO",
+                tvLauncherEnabled: "false"
+            ]
+        }
         playerBasicHom {
             dimension "appMode"
             applicationIdSuffix ".player.basichom"
@@ -100,6 +110,17 @@ android {
             signingConfig signingConfigs.debug
             manifestPlaceholders = [
                 appLabel: "Totem Park BASIC HOM",
+                tvLauncherEnabled: "true"
+            ]
+        }
+        playerBasicDiag {
+            dimension "appMode"
+            applicationIdSuffix ".player.basicv5diag"
+            versionCode 1
+            versionName "1.0.0-basic-v5-diagnostic"
+            signingConfig signingConfigs.debug
+            manifestPlaceholders = [
+                appLabel: "Totem Park BASIC V5 DIAG",
                 tvLauncherEnabled: "false"
             ]
         }

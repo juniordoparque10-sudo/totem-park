@@ -30,6 +30,8 @@ public class MainActivity extends BridgeActivity {
             }
         }
         super.onCreate(savedInstanceState);
+        installBasicBackHandler();
+
 
         getWindow().addFlags(WindowManager.LayoutParams.FLAG_KEEP_SCREEN_ON);
         getWindow().addFlags(WindowManager.LayoutParams.FLAG_FULLSCREEN);
@@ -60,6 +62,119 @@ public class MainActivity extends BridgeActivity {
         }
     }
 
+    // BASIC_V5_BACK_CALLBACK
+    // Saida voluntaria exclusiva do BASIC V5 experimental.
+    private static final String BASIC_V5_PACKAGE =
+        "br.com.parksolutions.totempark.player.basichom";
+
+    private boolean basicExitDialogVisible = false;
+    private android.app.AlertDialog basicExitDialog;
+    private android.window.OnBackInvokedCallback basicBackCallback;
+
+    private boolean isBasicV5() {
+        return BASIC_V5_PACKAGE.equals(getPackageName());
+    }
+
+    private void installBasicBackHandler() {
+        if (!isBasicV5()) return;
+
+        if (android.os.Build.VERSION.SDK_INT >= 33) {
+            basicBackCallback = () -> showBasicExitDialog();
+
+            getOnBackInvokedDispatcher().registerOnBackInvokedCallback(
+                android.window.OnBackInvokedDispatcher.PRIORITY_DEFAULT,
+                basicBackCallback
+            );
+        }
+    }
+
+    private void showBasicExitDialog() {
+        if (!isBasicV5() ||
+            basicExitDialogVisible ||
+            isFinishing() ||
+            isDestroyed()) {
+            return;
+        }
+
+        basicExitDialogVisible = true;
+
+        basicExitDialog = new android.app.AlertDialog.Builder(this)
+            .setTitle("Sair do Totem Park?")
+            .setMessage(
+                "Deseja fechar o aplicativo? " +
+                "O vinculo da TV e as midias armazenadas serao preservados. " +
+                "O Totem Park iniciara novamente ao reiniciar o Android."
+            )
+            .setNegativeButton(
+                "Cancelar",
+                (dialog, which) -> dialog.dismiss()
+            )
+            .setPositiveButton(
+                "Sair",
+                (dialog, which) -> {
+                    basicExitDialog = null;
+                    finishAndRemoveTask();
+                }
+            )
+            .setOnDismissListener(dialog -> {
+                basicExitDialogVisible = false;
+                basicExitDialog = null;
+            })
+            .create();
+
+        basicExitDialog.show();
+    }
+
+    @Override
+    public boolean dispatchKeyEvent(android.view.KeyEvent event) {
+        if (isBasicV5()) {
+            int key = event.getKeyCode();
+
+            if (key == android.view.KeyEvent.KEYCODE_BACK ||
+                key == android.view.KeyEvent.KEYCODE_ESCAPE) {
+
+                if (event.getAction() ==
+                    android.view.KeyEvent.ACTION_UP &&
+                    !event.isCanceled()) {
+                    showBasicExitDialog();
+                }
+
+                return true;
+            }
+        }
+
+        return super.dispatchKeyEvent(event);
+    }
+
+    @Override
+    public void onBackPressed() {
+        if (isBasicV5()) {
+            showBasicExitDialog();
+            return;
+        }
+
+        super.onBackPressed();
+    }
+
+    @Override
+    public void onDestroy() {
+        if (basicExitDialog != null) {
+            basicExitDialog.dismiss();
+            basicExitDialog = null;
+        }
+
+        if (basicBackCallback != null &&
+            android.os.Build.VERSION.SDK_INT >= 33) {
+
+            getOnBackInvokedDispatcher().unregisterOnBackInvokedCallback(
+                basicBackCallback
+            );
+
+            basicBackCallback = null;
+        }
+
+        super.onDestroy();
+    }
     private void enableFullscreenMode() {
         View decorView = getWindow().getDecorView();
 

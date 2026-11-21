@@ -24,6 +24,8 @@
     "build:player-lab": "vite build --mode playerLab",
     "build:player-canary": "vite build --mode playerCanary",
     "build:player-rc": "vite build --mode playerRc",
+    "build:player-basic-diag": "vite build --mode playerBasicDiag --outDir dist-player-basic-diag",
+    "prepare:player-basic-diag": "node scripts/prepare-player-basic-diag-assets.mjs",
     "build:player-rc-secure-link": "vite build --mode playerRcSecureLinkExperiment --outDir dist-player-rc-secure-link",
     "prepare:player-rc-secure-link": "node scripts/prepare-player-rc-secure-link-assets.mjs",
     "build:player-consolidated": "vite build --mode playerConsolidatedExperimental --outDir dist-player-consolidated",

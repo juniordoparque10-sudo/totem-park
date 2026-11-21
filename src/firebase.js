@@ -42,7 +42,7 @@ const firebaseConfig = isBasicHom ? {
 } : {
   apiKey: "AIzaSyBk775KTH959oIIEqnWiJRFW7Fo-1AX5AY",
   authDomain: "totem-park.firebaseapp.com",
-  projectId: useFirebaseEmulators ? "demo-totem-billing-ux" : "totem-park",
+  projectId: useFirebaseEmulators ? (import.meta.env.VITE_FIREBASE_EMULATOR_PROJECT_ID || "demo-totem-billing-ux") : "totem-park",
   storageBucket: "totem-park.firebasestorage.app",
   messagingSenderId: "442546117681",
   appId: "1:442546117681:web:10106346df8cd91d198910",

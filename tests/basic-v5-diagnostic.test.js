@@ -72,7 +72,8 @@ test("logger deduplica eventos recorrentes e permanece inerte quando desabilitad
   diagnostic.changed("binding", { bindingActive:true });
 
   assert.equal(records.length, 3);
-  assert.equal(records.every(([prefix]) => prefix.startsWith("[BASIC_V5_DIAG]")), true);
+  assert.equal(records.every(([message]) => message.startsWith("[BASIC_V5_DIAG]")), true);
+  assert.match(records[0][0], /"profile":"BASIC"/);
 });
 
 test("erro de heartbeat remove URLs e segredos antes do Logcat", () => {

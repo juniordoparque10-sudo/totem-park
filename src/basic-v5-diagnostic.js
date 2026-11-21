@@ -42,7 +42,7 @@ export function sanitizeDiagnosticError(error = {}) {
   const code = String(error?.code || error?.name || "unknown").slice(0, 80);
   const message = String(error?.message || "unknown error")
     .replace(/https?:\/\/\S+/gi, "[redacted-url]")
-    .replace(/\b(?:token|apiKey|bindingCode|code)\s*[=:]\s*[^\s,;]+/gi, "$1=[redacted]")
+    .replace(/\b(token|apiKey|bindingCode|code)\s*[=:]\s*[^\s,;]+/gi, "$1=[redacted]")
     .slice(0, 240);
   return { code, message };
 }
@@ -52,7 +52,7 @@ export function createBasicV5Diagnostic({ enabled = false, log = console.info } 
   const changedValues = new Map();
   const emit = (event, detail) => {
     if (!enabled) return false;
-    log(`${PREFIX} ${event}`, detail);
+    log(`${PREFIX} ${event} ${JSON.stringify(detail)}`);
     return true;
   };
   return {

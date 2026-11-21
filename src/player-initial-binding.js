@@ -11,14 +11,14 @@ export function shouldClaimInitialPlayerBinding(appBuildMode) {
   return INITIAL_SECURE_BINDING_MODES.has(appBuildMode);
 }
 
-export async function attemptInitialSecureBinding({ appBuildMode, claimBinding }) {
+export async function attemptInitialSecureBinding({ appBuildMode, claimBinding, allowLegacyFallback = true }) {
   if (!shouldClaimInitialPlayerBinding(appBuildMode)) return null;
   try {
     return await claimBinding();
   } catch (error) {
     const code = String(error?.code || "").toLowerCase();
     const temporary = TEMPORARY_CLAIM_ERROR_MARKERS.some((marker) => code.includes(marker));
-    if (appBuildMode === "playerRc" && temporary) return null;
+    if (appBuildMode === "playerRc" && temporary && allowLegacyFallback) return null;
     throw error;
   }
 }

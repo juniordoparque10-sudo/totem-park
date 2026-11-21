@@ -1,0 +1,726 @@
+rules_version = '2';
+
+service cloud.firestore {
+  match /databases/{database}/documents {
+    function signedIn() {
+      return request.auth != null;
+    }
+
+    function isMaster() {
+      return signedIn()
+        && request.auth.token.get("email", "") != ""
+        && (
+          (
+            exists(/databases/$(database)/documents/settings/masterAccess)
+            && request.auth.token.get("email", "") in get(/databases/$(database)/documents/settings/masterAccess).data.emails
+          )
+          || (
+            !exists(/databases/$(database)/documents/settings/masterAccess)
+            && request.auth.token.get("email", "") in [
+              "admin@parksolutions.com",
+              "juniordoparque10@gmail.com"
+            ]
+          )
+        );
+    }
+
+    function clientDoc(clientId) {
+      return get(/databases/$(database)/documents/clients/$(clientId));
+    }
+
+    function isClientOwner(clientId) {
+      return signedIn()
+        && (
+          clientDoc(clientId).data.get("uid", "") == request.auth.uid
+          || clientDoc(clientId).data.get("email", "") == request.auth.token.get("email", "missing-email")
+        )
+        && clientDoc(clientId).data.get("accountStatus", "active") != "pending_commercial_validation";
+    }
+
+    function isClientOperational(clientId) {
+      return !clientDoc(clientId).data.keys().hasAny(["lifecycleStatus"])
+        || (clientDoc(clientId).data.lifecycleStatus != "deletion_pending"
+          && clientDoc(clientId).data.lifecycleStatus != "permanently_deleted");
+    }
+
+    function changesFinancialSummary() {
+      return request.resource.data.diff(resource.data).affectedKeys().hasAny([
+        "financialModelVersion",
+        "financialMode",
+        "activeContractId",
+        "financialStatus",
+        "financialRestriction",
+        "financialDaysOverdue",
+        "financialReferenceInvoiceId",
+        "financialUpdatedAt",
+        "financialRevision",
+        "dueDate",
+        "billing",
+        "plan",
+        "status",
+        "suspensionReason",
+        "suspendedAt",
+        "graceUnlockUntil",
+        "accountStatus",
+        "lifecycleStatus",
+        "accessDisabled",
+        "deletionOperationId",
+        "deletedAt",
+        "deletedByUid",
+        "deletedIdentityUidHash",
+        "deletedIdentityEmailHash"
+      ]);
+    }
+
+    function isFinancialSubcollection(name) {
+      return name in [
+        "contracts",
+        "invoices",
+        "financialNotifications",
+        "financialAudit",
+        "financialEmailDeliveries"
+      ];
+    }
+
+    function isOwnAccountRequest() {
+      return signedIn()
+        && resource.data.email == request.auth.token.email;
+    }
+
+    function isValidPublicAccountRequestCreate() {
+      return request.resource.data.accountStatus == "pending_commercial_validation"
+        && request.resource.data.status == "Nova solicitação"
+        && request.resource.data.keys().hasAll([
+          "responsibleName",
+          "email",
+          "whatsapp",
+          "role",
+          "companyName",
+          "segment",
+          "city",
+          "state",
+          "screensEstimate",
+          "intendedUse",
+          "accountStatus",
+          "status",
+          "createdAt",
+          "updatedAt"
+        ]);
+    }
+
+    function isAllowedPublicScreenUpdate() {
+      return request.resource.data.diff(resource.data).affectedKeys().hasOnly([
+        "activeDeviceId",
+        "activePlaylistWeightBytes",
+        "cacheSizeBytes",
+        "cacheManifestItems",
+        "cacheManifestKey",
+        "cacheManifestSizeBytes",
+        "cacheDownloadedItems",
+        "cacheRemovedItems",
+        "cacheStatus",
+        "cacheUpdatedAt",
+        "cachedItems",
+        "commandStatus",
+        "connectedDeviceId",
+        "currentMediaSource",
+        "currentPlaylistId",
+        "currentPlaylistMode",
+        "currentPlaylistName",
+        "deviceLocation",
+        "deviceLocationCity",
+        "deviceLocationUpdatedAt",
+        "failedCacheItems",
+        "estimatedMonthlyTrafficBytes",
+        "lastCommandExecuted",
+        "lastCommandExecutedAt",
+        "lastCommandSent",
+        "lastConnection",
+        "lastMediaDownloadAt",
+        "lastMediaDownloadBytes",
+        "lastMediaUpdateAt",
+        "lastSeenAt",
+        "nowPlayingAspectRatio",
+        "nowPlayingDuration",
+        "nowPlayingHeight",
+        "nowPlayingIndex",
+        "nowPlayingItemType",
+        "nowPlayingOrientation",
+        "nowPlayingPreview",
+        "nowPlayingSound",
+        "nowPlayingTemplateType",
+        "nowPlayingTitle",
+        "nowPlayingTotal",
+        "nowPlayingType",
+        "nowPlayingWidth",
+        "remoteCommand",
+        "status",
+        "totalCacheableItems"
+      ]);
+    }
+
+    function cacheFailureDiagnosticsChanged() {
+      return request.resource.data.diff(resource.data).affectedKeys().hasAny([
+        "cacheFailureMode",
+        "cacheFailureCount",
+        "cacheFailureCodes"
+      ]);
+    }
+
+    function isValidCacheFailureCodeAt(codes, index) {
+      return codes.size() <= index
+        || (codes[index] is string
+          && codes[index].size() > 0
+          && codes[index].size() <= 64
+          && codes[index].matches("^[A-Z0-9_]+$"));
+    }
+
+    function hasValidCacheFailureDiagnostics() {
+      let mode = request.resource.data.cacheFailureMode;
+      let count = request.resource.data.cacheFailureCount;
+      let codes = request.resource.data.cacheFailureCodes;
+      let total = request.resource.data.totalCacheableItems;
+      return mode is string
+        && mode in ["none", "item", "pipeline"]
+        && count is int
+        && count >= 0
+        && total is int
+        && total >= 0
+        && count <= total
+        && codes is list
+        && codes.size() <= 5
+        && isValidCacheFailureCodeAt(codes, 0)
+        && isValidCacheFailureCodeAt(codes, 1)
+        && isValidCacheFailureCodeAt(codes, 2)
+        && isValidCacheFailureCodeAt(codes, 3)
+        && isValidCacheFailureCodeAt(codes, 4)
+        && ((mode == "none" && count == 0 && codes.size() == 0)
+          || (mode in ["item", "pipeline"] && count > 0 && codes.size() > 0));
+    }
+
+    function isAllowedPlayerCacheDiagnosticUpdate(clientId, screenId) {
+      return hasActivePlayerBinding(clientId, screenId)
+        && resource.data.get("connectedDeviceId", "") == playerBinding().data.deviceId
+        && request.resource.data.diff(resource.data).affectedKeys().hasOnly([
+          "activePlaylistWeightBytes",
+          "cacheDownloadedItems",
+          "cacheFailureCodes",
+          "cacheFailureCount",
+          "cacheFailureMode",
+          "cacheManifestItems",
+          "cacheManifestKey",
+          "cacheManifestSizeBytes",
+          "cacheRemovedItems",
+          "cacheSizeBytes",
+          "cacheStatus",
+          "cacheUpdatedAt",
+          "cachedItems",
+          "estimatedMonthlyTrafficBytes",
+          "failedCacheItems",
+          "lastMediaDownloadAt",
+          "lastMediaDownloadBytes",
+          "totalCacheableItems"
+        ])
+        && hasValidCacheFailureDiagnostics();
+    }
+
+    function playerBinding() {
+      return get(/databases/$(database)/documents/playerDeviceBindings/$(request.auth.uid));
+    }
+
+    function hasActivePlayerBinding(clientId, screenId) {
+      return signedIn()
+        && exists(/databases/$(database)/documents/playerDeviceBindings/$(request.auth.uid))
+        && playerBinding().data.uid == request.auth.uid
+        && playerBinding().data.status == "ACTIVE"
+        && playerBinding().data.clientId == clientId
+        && playerBinding().data.screenId == screenId;
+    }
+
+    function telemetryIdentityMatches(clientId, screenId, telemetry) {
+      return (
+        telemetry.get("schemaVersion", 0) == 5
+        && telemetry.get("profile", "") == "BASIC"
+        && telemetry.get("identity", {}) is map
+        && telemetry.get("session", {}) is map
+        && telemetry.identity.get("clientId", "") == clientId
+        && telemetry.identity.get("screenId", "") == screenId
+        && telemetry.identity.get("deviceId", "") == playerBinding().data.deviceId
+      ) || (
+        telemetry.get("schemaVersion", 0) != 5
+        && telemetry.get("session", {}) is map
+        && telemetry.session.get("clientId", "") == clientId
+        && telemetry.session.get("screenId", "") == screenId
+        && telemetry.session.get("deviceId", "") == playerBinding().data.deviceId
+      );
+    }
+
+    function historyIdentityMatches(clientId, screenId, payload) {
+      return payload.clientId == clientId
+        && payload.screenId == screenId
+        && payload.deviceId == playerBinding().data.deviceId;
+    }
+
+    function validTelemetryDayId(dayId) {
+      return dayId.matches('^(?:(?:[0-9]{4})-(?:(?:01|03|05|07|08|10|12)-(?:0[1-9]|[12][0-9]|3[01])|(?:04|06|09|11)-(?:0[1-9]|[12][0-9]|30)|02-(?:0[1-9]|1[0-9]|2[0-8]))|(?:[0-9]{2}(?:0[48]|[2468][048]|[13579][26])|(?:[02468][048]|[13579][26])00)-02-29)$');
+    }
+
+    function validDailyTelemetryTypes(payload) {
+      return payload.schemaVersion is int
+        && payload.dateKey is string
+        && payload.clientId is string
+        && payload.screenId is string
+        && payload.deviceId is string
+        && payload.sequence is int
+        && payload.internetRxBytes is int
+        && payload.internetTxBytes is int
+        && payload.mediaDownloadedBytes is int
+        && payload.cacheReusedBytes is int
+        && payload.trafficAvoidedBytes is int
+        && payload.cachePlaybackHits is int
+        && payload.remotePlaybackCount is int
+        && payload.fallbackPlaybackCount is int
+        && payload.cacheablePlaybackCount is int
+        && (payload.cacheHitRate == null || payload.cacheHitRate is number)
+        && payload.observedUptimeSeconds is number
+        && payload.provedPlaybackSeconds is number
+        && payload.provedOnlineSeconds is number
+        && payload.provedOfflineSeconds is number
+        && payload.sessionIds is list
+        && payload.sessionCount is int
+        && payload.restartCount is int
+        && payload.failureCount is int
+        && payload.unknownInterruptionCount is int
+        && payload.packageName is string
+        && (payload.versionCode == null || payload.versionCode is int)
+        && payload.versionName is string
+        && payload.lastCommunicationAt is string
+        && (!("networkMeasurementSupported" in payload) || payload.networkMeasurementSupported is bool)
+        && (!("networkMeasurementSource" in payload) || payload.networkMeasurementSource is string)
+        && (!("networkMeasuredAt" in payload) || payload.networkMeasuredAt == null || payload.networkMeasuredAt is string)
+        && (!("measurementCoverageStartedAt" in payload) || payload.measurementCoverageStartedAt == null || payload.measurementCoverageStartedAt is string)
+        && (!("measurementCoverageEndedAt" in payload) || payload.measurementCoverageEndedAt == null || payload.measurementCoverageEndedAt is string)
+        && (!("unattributedBoundaryRxBytes" in payload) || payload.unattributedBoundaryRxBytes is int)
+        && (!("unattributedBoundaryTxBytes" in payload) || payload.unattributedBoundaryTxBytes is int);
+    }
+
+    function validDailyTelemetryValues(payload) {
+      return payload.schemaVersion == 1
+        && payload.sequence >= 1
+        && payload.internetRxBytes >= 0
+        && payload.internetTxBytes >= 0
+        && payload.mediaDownloadedBytes >= 0
+        && payload.cacheReusedBytes >= 0
+        && payload.trafficAvoidedBytes >= 0
+        && payload.cachePlaybackHits >= 0
+        && payload.remotePlaybackCount >= 0
+        && payload.fallbackPlaybackCount >= 0
+        && payload.cacheablePlaybackCount == payload.cachePlaybackHits + payload.remotePlaybackCount + payload.fallbackPlaybackCount
+        && ((payload.cacheablePlaybackCount == 0 && payload.cacheHitRate == null)
+          || (payload.cacheablePlaybackCount > 0 && payload.cacheHitRate >= 0 && payload.cacheHitRate <= 1))
+        && payload.observedUptimeSeconds >= 0
+        && payload.provedPlaybackSeconds >= 0
+        && payload.provedOnlineSeconds >= 0
+        && payload.provedOfflineSeconds >= 0
+        && payload.sessionCount == payload.sessionIds.size()
+        && payload.restartCount >= 0
+        && payload.failureCount >= 0
+        && payload.unknownInterruptionCount >= 0
+        && (!("unattributedBoundaryRxBytes" in payload) || payload.unattributedBoundaryRxBytes >= 0)
+        && (!("unattributedBoundaryTxBytes" in payload) || payload.unattributedBoundaryTxBytes >= 0)
+        && (payload.versionCode == null || payload.versionCode >= 0);
+    }
+
+    function validDailyTelemetry(clientId, screenId, dayId, payload) {
+      return isClientOperational(clientId)
+        && hasActivePlayerBinding(clientId, screenId)
+        && historyIdentityMatches(clientId, screenId, payload)
+        && payload.keys().hasOnly([
+          "schemaVersion", "dateKey", "clientId", "screenId", "deviceId", "sequence",
+          "internetRxBytes", "internetTxBytes", "mediaDownloadedBytes", "cacheReusedBytes",
+          "trafficAvoidedBytes", "cachePlaybackHits", "remotePlaybackCount", "fallbackPlaybackCount",
+          "cacheablePlaybackCount", "cacheHitRate", "observedUptimeSeconds", "provedPlaybackSeconds",
+          "provedOnlineSeconds", "provedOfflineSeconds", "sessionIds", "sessionCount", "restartCount",
+          "failureCount", "unknownInterruptionCount", "packageName", "versionCode", "versionName",
+          "lastCommunicationAt", "networkMeasurementSupported", "networkMeasurementSource",
+          "networkMeasuredAt", "measurementCoverageStartedAt", "measurementCoverageEndedAt",
+          "unattributedBoundaryRxBytes", "unattributedBoundaryTxBytes"
+        ])
+        && validDailyTelemetryTypes(payload)
+        && validDailyTelemetryValues(payload)
+        && validTelemetryDayId(dayId)
+        && payload.dateKey == dayId;
+    }
+
+    function dailyTelemetryIsMonotonic(previous, next) {
+      return next.sequence > previous.sequence
+        && next.internetRxBytes >= previous.internetRxBytes
+        && next.internetTxBytes >= previous.internetTxBytes
+        && (!("unattributedBoundaryRxBytes" in previous) || next.unattributedBoundaryRxBytes >= previous.unattributedBoundaryRxBytes)
+        && (!("unattributedBoundaryTxBytes" in previous) || next.unattributedBoundaryTxBytes >= previous.unattributedBoundaryTxBytes)
+        && next.mediaDownloadedBytes >= previous.mediaDownloadedBytes
+        && next.cacheReusedBytes >= previous.cacheReusedBytes
+        && next.trafficAvoidedBytes >= previous.trafficAvoidedBytes
+        && next.cachePlaybackHits >= previous.cachePlaybackHits
+        && next.remotePlaybackCount >= previous.remotePlaybackCount
+        && next.fallbackPlaybackCount >= previous.fallbackPlaybackCount
+        && next.cacheablePlaybackCount >= previous.cacheablePlaybackCount
+        && next.observedUptimeSeconds >= previous.observedUptimeSeconds
+        && next.provedPlaybackSeconds >= previous.provedPlaybackSeconds
+        && next.provedOnlineSeconds >= previous.provedOnlineSeconds
+        && next.provedOfflineSeconds >= previous.provedOfflineSeconds
+        && next.sessionCount >= previous.sessionCount
+        && next.restartCount >= previous.restartCount
+        && next.failureCount >= previous.failureCount
+        && next.unknownInterruptionCount >= previous.unknownInterruptionCount;
+    }
+
+    function validTelemetryEvent(clientId, screenId, eventId, payload) {
+      return isClientOperational(clientId)
+        && hasActivePlayerBinding(clientId, screenId)
+        && historyIdentityMatches(clientId, screenId, payload)
+        && payload.keys().hasOnly([
+          "schemaVersion", "id", "clientId", "screenId", "deviceId", "sessionId", "type", "state",
+          "domain", "atMs", "mediaId", "mediaType", "reason", "expiresAtMs", "expiresAt"
+        ])
+        && payload.schemaVersion == 1
+        && payload.id is string
+        && payload.clientId is string
+        && payload.screenId is string
+        && payload.deviceId is string
+        && payload.id == eventId
+        && payload.sessionId is string
+        && payload.type is string
+        && payload.state is string
+        && payload.mediaId is string
+        && payload.mediaType is string
+        && payload.reason is string
+        && payload.domain in ["playback", "connection"]
+        && payload.atMs is int
+        && payload.atMs >= 0
+        && payload.expiresAtMs is int
+        && payload.expiresAtMs == payload.atMs + 15552000000
+        && payload.expiresAt is timestamp
+        && payload.expiresAt == timestamp.value(payload.expiresAtMs);
+    }
+
+    function playerActivityChanged() {
+      return request.resource.data.get("telemetry", {}).get("activity", {}) != resource.data.get("telemetry", {}).get("activity", {});
+    }
+
+    function isAllowedPlayerActivityUpdate(clientId, screenId) {
+      let activity = request.resource.data.telemetry.activity;
+      return hasActivePlayerBinding(clientId, screenId)
+        && request.resource.data.diff(resource.data).affectedKeys().hasOnly(["telemetry"])
+        && request.resource.data.telemetry.diff(resource.data.telemetry).affectedKeys().hasOnly(["activity"])
+        && activity is map
+        && activity.keys().hasOnly(["schemaVersion", "events"])
+        && activity.schemaVersion == 1
+        && activity.events is list
+        && activity.events.size() > 0
+        && activity.events.size() <= 200
+        && activity.events[0].screenId == screenId
+        && activity.events[activity.events.size() - 1].screenId == screenId;
+    }
+
+    function isAllowedPlayerTelemetryUpdate(clientId, screenId) {
+      return hasActivePlayerBinding(clientId, screenId)
+        && request.resource.data.diff(resource.data).affectedKeys().hasOnly([
+          "activeDeviceId",
+          "connectedDeviceId",
+          "lastConnection",
+          "lastSeenAt",
+          "status",
+          "telemetry",
+          "telemetryUpdatedAt"
+        ])
+        && request.resource.data.connectedDeviceId == playerBinding().data.deviceId
+        && telemetryIdentityMatches(clientId, screenId, request.resource.data.telemetry);
+    }
+
+    function isAllowedPlayerCapabilityUpdate(clientId, screenId) {
+      return hasActivePlayerBinding(clientId, screenId)
+        && request.resource.data.diff(resource.data).affectedKeys().hasOnly([
+          "activeDeviceId",
+          "capabilities",
+          "connectedDeviceId",
+          "lastConnection",
+          "lastSeenAt",
+          "status"
+        ])
+        && request.resource.data.connectedDeviceId == playerBinding().data.deviceId
+        && request.resource.data.status == "online"
+        && request.resource.data.capabilities is map
+        && ((request.resource.data.capabilities.platform == "WEB" && (
+          request.resource.data.capabilities.keys().hasOnly([
+            "deviceId",
+            "platform",
+            "playlistItemNavigation"
+          ])
+          || (
+            request.resource.data.capabilities.keys().hasOnly([
+              "deviceId",
+              "platform",
+              "playlistItemNavigation",
+              "templatesV2",
+              "templatesV2DynamicPhase1"
+            ])
+            && request.resource.data.capabilities.keys().hasAll([
+              "templatesV2",
+              "templatesV2DynamicPhase1"
+            ])
+            && request.resource.data.capabilities.templatesV2 == true
+            && request.resource.data.capabilities.templatesV2DynamicPhase1 == true
+          )
+        )) || (request.resource.data.capabilities.platform == "ANDROID"
+          && request.resource.data.capabilities.keys().hasOnly([
+            "deviceId",
+            "platform",
+            "packageName",
+            "versionCode",
+            "playlistItemNavigation",
+            "templatesV2",
+            "templatesV2DynamicPhase1"
+          ])
+          && (
+            (request.resource.data.capabilities.packageName == "br.com.parksolutions.totempark.player.rcsecurelink"
+              && request.resource.data.capabilities.versionCode in [58, 59, 60, 61, 62, 63, 64, 65, 66, 67, 68, 69, 70])
+            || (request.resource.data.capabilities.packageName == "br.com.parksolutions.totempark"
+              && request.resource.data.capabilities.versionCode == 70)
+            || (request.resource.data.capabilities.packageName == "br.com.parksolutions.totempark.player.basichom"
+              && request.resource.data.capabilities.versionCode == 1)
+          )
+          && request.resource.data.capabilities.templatesV2 == true
+          && request.resource.data.capabilities.templatesV2DynamicPhase1 == true
+        ))
+        && request.resource.data.capabilities.deviceId == playerBinding().data.deviceId
+        && request.resource.data.capabilities.playlistItemNavigation == true;
+    }
+
+    // BASIC V5 LAB: somente o titular da conta modifica sua propria lease.
+    // Esta condicao e aplicada a TODAS as alternativas de update da TV.
+    function validNowPlayingDemandLeaseUpdate(clientId) {
+      let affected = request.resource.data.diff(resource.data).affectedKeys();
+      let previous = resource.data.get("nowPlayingDemandViewers", {});
+      let next = request.resource.data.get("nowPlayingDemandViewers", {});
+      return !affected.hasAny(["nowPlayingDemandViewers"])
+        || (signedIn()
+          && (isMaster() || isClientOwner(clientId))
+          && affected.hasOnly(["nowPlayingDemandViewers"])
+          && previous is map
+          && next is map
+          && next.size() <= 64
+          && next.diff(previous).affectedKeys().hasOnly([request.auth.uid])
+          && (!(request.auth.uid in next)
+            || (next[request.auth.uid] is int
+              && next[request.auth.uid] > request.time.toMillis()
+              && next[request.auth.uid] <= request.time.toMillis() + 85000)));
+    }
+
+    match /clients/{clientId} {
+      allow read: if true;
+      allow create: if isMaster();
+      allow update: if (isMaster() || isClientOwner(clientId)) && !changesFinancialSummary();
+      allow delete: if isMaster();
+
+      match /contracts/{contractId} {
+        allow read: if isMaster() || isClientOwner(clientId);
+        allow write: if false;
+      }
+
+      match /invoices/{invoiceId} {
+        allow read: if isMaster() || isClientOwner(clientId);
+        allow write: if false;
+      }
+
+      match /financialNotifications/{notificationId} {
+        allow read: if isMaster() || isClientOwner(clientId);
+        allow write: if false;
+      }
+
+      match /financialAudit/{auditId} {
+        allow read: if isMaster();
+        allow write: if false;
+      }
+
+      match /financialEmailDeliveries/{deliveryId} {
+        allow read: if isMaster();
+        allow write: if false;
+      }
+
+      match /screens/{screenId} {
+        allow read: if isClientOperational(clientId);
+        allow create, delete: if isMaster() || (isClientOperational(clientId) && isClientOwner(clientId));
+        // Filtrar pedidos de Now Playing ANTES das condicoes extensas de permissao.
+        // Uma negacao por lease invalida nao deve atingir o limite de expressoes.
+        allow update: if validNowPlayingDemandLeaseUpdate(clientId) && (isMaster()
+          || (isClientOperational(clientId) && (
+            isAllowedPlayerCacheDiagnosticUpdate(clientId, screenId)
+            || (!cacheFailureDiagnosticsChanged() && (isClientOwner(clientId)
+              || isAllowedPublicScreenUpdate()
+              || isAllowedPlayerTelemetryUpdate(clientId, screenId)
+              || isAllowedPlayerCapabilityUpdate(clientId, screenId)
+              || isAllowedPlayerActivityUpdate(clientId, screenId)))
+          )
+            && (!playerActivityChanged() || isAllowedPlayerActivityUpdate(clientId, screenId))
+            && !request.resource.data.diff(resource.data).affectedKeys().hasAny([
+              "templatesV2TestMode",
+              "templatesV2TestModeUpdatedAt",
+              "templatesV2TestModeUpdatedBy"
+            ])));
+
+        match /telemetrySessions/{sessionId} {
+          allow read: if isMaster() || isClientOwner(clientId);
+          allow create: if isClientOperational(clientId)
+            && hasActivePlayerBinding(clientId, screenId)
+            && telemetryIdentityMatches(clientId, screenId, request.resource.data)
+            && request.resource.data.session.sessionId == sessionId
+            && request.resource.data.sequence is int;
+          allow update: if isClientOperational(clientId)
+            && hasActivePlayerBinding(clientId, screenId)
+            && telemetryIdentityMatches(clientId, screenId, request.resource.data)
+            && request.resource.data.session.sessionId == sessionId
+            && request.resource.data.sequence is int
+            && request.resource.data.sequence >= resource.data.sequence;
+          allow delete: if isMaster();
+        }
+
+        match /telemetryDaily/{dayId} {
+          allow read: if isMaster() || (isClientOperational(clientId) && isClientOwner(clientId));
+          allow create: if validDailyTelemetry(clientId, screenId, dayId, request.resource.data);
+          allow update: if validDailyTelemetry(clientId, screenId, dayId, request.resource.data)
+            && (request.resource.data == resource.data
+              || dailyTelemetryIsMonotonic(resource.data, request.resource.data));
+          allow delete: if isMaster();
+        }
+
+        match /telemetryEvents/{eventId} {
+          allow read: if isMaster() || (isClientOperational(clientId) && isClientOwner(clientId));
+          allow create: if validTelemetryEvent(clientId, screenId, eventId, request.resource.data);
+          allow update: if validTelemetryEvent(clientId, screenId, eventId, request.resource.data)
+            && request.resource.data == resource.data;
+          allow delete: if isMaster();
+        }
+
+        match /system/{systemDocument} {
+          allow read, write: if false;
+        }
+      }
+
+      match /media/{mediaId} {
+        allow read: if isClientOperational(clientId);
+        allow create: if isMaster() || (isClientOperational(clientId) && isClientOwner(clientId));
+        allow update: if isMaster() || (isClientOperational(clientId) && isClientOwner(clientId));
+        allow delete: if isMaster() || (isClientOperational(clientId) && isClientOwner(clientId));
+      }
+
+      match /playlists/{playlistId} {
+        allow read: if isClientOperational(clientId);
+        allow create, delete: if isMaster() || (isClientOperational(clientId) && isClientOwner(clientId));
+        allow update: if isMaster() || (isClientOperational(clientId) && isClientOwner(clientId));
+      }
+
+      match /{subcollection}/{documentId} {
+        allow read: if !isFinancialSubcollection(subcollection) && isClientOperational(clientId);
+        allow write: if !isFinancialSubcollection(subcollection)
+          && subcollection != "screens"
+          && (isMaster() || (isClientOperational(clientId) && isClientOwner(clientId)));
+      }
+    }
+
+    match /tv_codes/{code} {
+      allow get: if true;
+      allow list: if false;
+      allow create: if isMaster()
+        || (isClientOperational(request.resource.data.clientId)
+          && isClientOwner(request.resource.data.clientId));
+      allow update: if isMaster()
+        || (
+          request.resource.data.clientId == resource.data.clientId
+          && isClientOperational(resource.data.clientId)
+          && isClientOwner(resource.data.clientId)
+        );
+      allow delete: if isMaster()
+        || (isClientOperational(resource.data.clientId)
+          && isClientOwner(resource.data.clientId));
+    }
+
+    match /settings/{settingId} {
+      allow read: if true;
+      allow write: if isMaster();
+    }
+
+    match /playerDeviceBindings/{uid} {
+      allow get: if signedIn() && request.auth.uid == uid;
+      allow list: if isMaster();
+      allow create, update, delete: if isMaster();
+    }
+
+    match /playerRebindAuthorizations/{authorizationId} {
+      allow read, write: if false;
+    }
+
+    match /account_requests/{requestId} {
+      allow create: if isValidPublicAccountRequestCreate();
+      allow get: if isMaster() || isOwnAccountRequest();
+      allow list, update, delete: if isMaster();
+    }
+
+    match /{collection}/{document=**} {
+      allow read: if isMaster();
+      allow write: if collection != "clients" && isMaster();
+    }
+
+    // BEGIN BASIC V5 LAB: regra experimental, NAO publicar.
+    function v5Lab_signedIn() { return request.auth != null; }
+    function v5Lab_portalAccess(clientId) {
+      return v5Lab_signedIn()
+        && request.auth.token.get('clientId', '') == clientId
+        && request.auth.token.get('role', '') in ['clientOwner', 'master'];
+    }
+    function v5Lab_playerAccess(clientId, screenId) {
+      return v5Lab_signedIn()
+        && request.auth.token.get('role', '') == 'player'
+        && request.auth.token.get('clientId', '') == clientId
+        && request.auth.token.get('screenId', '') == screenId;
+    }
+    function v5Lab_masterAccess(clientId) {
+      return v5Lab_portalAccess(clientId)
+        && request.auth.token.get('role', '') == 'master';
+    }
+    match /clients/{clientId}/screens/{screenId}/nowPlayingWatchers/{ownerUid}/tabs/{tabId} {
+      function ownsPath() {
+        return v5Lab_signedIn() && ownerUid == request.auth.uid;
+      }
+      function portalAccess() {
+        return v5Lab_portalAccess(clientId);
+      }
+      function validLease() {
+        return request.resource.data.keys().hasOnly(['ownerUid','tabId','expiresAtMs','clientId','screenId'])
+          && request.resource.data.keys().hasAll(['ownerUid','tabId','expiresAtMs','clientId','screenId'])
+          && request.resource.data.ownerUid == ownerUid
+          && request.resource.data.tabId == tabId
+          && request.resource.data.clientId == clientId
+          && request.resource.data.screenId == screenId
+          && tabId.matches('^[A-Za-z0-9_-]{8,64}$')
+          && request.resource.data.expiresAtMs is int
+          && request.resource.data.expiresAtMs > request.time.toMillis()
+          && request.resource.data.expiresAtMs <= request.time.toMillis() + 150000;
+      }
+      allow get: if (ownsPath() && portalAccess()) || v5Lab_playerAccess(clientId, screenId);
+      allow list: if v5Lab_playerAccess(clientId, screenId) || v5Lab_masterAccess(clientId);
+      allow create, update: if ownsPath() && validLease() && portalAccess();
+      allow delete: if ownsPath() && portalAccess();
+    }
+    match /{watcherPath=**}/tabs/{tabId} {
+      allow list: if v5Lab_signedIn() && (
+        (request.auth.token.get('role', '') == 'player'
+          && resource.data.get('clientId', '') == request.auth.token.get('clientId', '')
+          && resource.data.get('screenId', '') == request.auth.token.get('screenId', ''))
+        || (request.auth.token.get('role', '') == 'master'
+          && resource.data.get('clientId', '') == request.auth.token.get('clientId', ''))
+      );
+    }
+    // END BASIC V5 LAB
+  }
+}

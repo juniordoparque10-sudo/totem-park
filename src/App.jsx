@@ -1,3 +1,4 @@
+import { usePlayerNowPlayingWatchersLab, isPlayerWatchersV2Lab } from './player-now-playing-watchers-lab';
 import UploadLimitDialog from "./UploadLimitDialog";
 import { uploadLimitBytes, uploadSizeNotice } from "./upload-plan-policy";
 import TelemetryDashboard from "./TelemetryDashboard";
@@ -47,6 +48,8 @@ import { createCacheFailureDiagnostic } from "./cache-failure-diagnostics";
 import { createPlayerScreenSnapshotStore, getPlayerScreenScopeKey } from "./player-screen-snapshot";
 import { createPlayerCapabilitySyncState } from "./player-capability-sync-state";
 import { createNowPlayingSyncGuard } from "./player-now-playing-sync";
+import { activeNowPlayingViewers } from "./now-playing-demand";
+import { useNowPlayingDemandTargets } from "./now-playing-demand-switch";
 import { createCoalescedAsyncRunner } from "./coalesced-async-runner";
 import { createFirestoreRecoveryController } from "./firestore-multitab-recovery";
 import { getFirestoreTabMode } from "./firestore-cache-policy";
@@ -216,6 +219,13 @@ import { buildOperationalTelemetryUpdate, createPlayerTelemetry, readPlayerTelem
 import { PLAYER_ACTIVITY_SYNC_ENABLED, createPlayerActivityTelemetry, syncPlayerActivityBatch, syncPlayerActivityBatchDocuments } from "./player-activity-telemetry";
 import { buildOperationalSnapshot, normalizeNativeAppInfo, normalizeOperationalMediaSource, OPERATIONAL_HEARTBEAT_INTERVAL_MS } from "./operational-telemetry";
 import { createBasicPlayerTelemetry, hasValidBasicAppInfo } from "./basic-player-telemetry";
+import {
+  createBasicV5Diagnostic,
+  getBasicAppInfoValidation,
+  getBasicBindingConditions,
+  getHeartbeatKeySummary,
+  sanitizeDiagnosticError,
+} from "./basic-v5-diagnostic";
 import {
   buildBasicPlaybackState,
   buildBasicScreenHeartbeatUpdate,
@@ -3800,6 +3810,8 @@ const firebaseConfig = {
 };
 
 const APP_BUILD_MODE = import.meta.env.VITE_APP_MODE || "web";
+const IS_BASIC_V5_DIAG_BUILD = import.meta.env.VITE_BASIC_V5_DIAG === "true";
+const basicV5Diagnostic = createBasicV5Diagnostic({ enabled:IS_BASIC_V5_DIAG_BUILD });
 const PLAYER_CAPABILITY_RETRY_INTERVAL_MS = 5 * 60 * 1000;
 const TELEMETRY_HISTORY_REMOTE_SYNC_ENABLED = false;
 const IS_PLAYER_BUILD = ["player", "playerLab", "playerCanary", "playerRc", "playerPhaseB", "playerLinkFix", "playerLoopAudit", "playerTelemetry", "playerJumpDiag", "playerDecoderExperiment"].includes(APP_BUILD_MODE);
@@ -3820,6 +3832,25 @@ function logTemplatesV2Diagnostic(event, payload = {}) {
 const IS_PLAYER_TELEMETRY_BUILD = APP_BUILD_MODE === "playerTelemetry";
 const IS_OPERATIONAL_TELEMETRY_BUILD = IS_PLAYER_RC_BUILD || IS_PLAYER_TELEMETRY_BUILD;
 const IS_BASIC_TELEMETRY_BUILD = getPlayerTelemetryProfile(APP_BUILD_MODE) === "BASIC";
+basicV5Diagnostic.once("build_profile", {
+  appBuildMode:APP_BUILD_MODE,
+  profile:getPlayerTelemetryProfile(APP_BUILD_MODE),
+  isNativeApp:isNativeApp(),
+});
+if (IS_BASIC_V5_DIAG_BUILD && isNativeApp()) {
+  TotemDevice.getAppInfo()
+    .then((value) => {
+      basicV5Diagnostic.once("app_info_result", {
+        packageName:value?.packageName ?? null,
+        versionCode:value?.versionCode ?? null,
+        versionName:value?.versionName ?? null,
+        buildId:value?.buildId ?? null,
+        buildTimestamp:value?.buildTimestamp ?? null,
+      });
+      basicV5Diagnostic.once("app_info_validation", getBasicAppInfoValidation({ installation:value }));
+    })
+    .catch((error) => basicV5Diagnostic.once("app_info_error", sanitizeDiagnosticError(error)));
+}
 const SHOULD_COLLECT_ADVANCED_TELEMETRY = shouldCollectAdvancedTelemetry(APP_BUILD_MODE);
 const IS_V69_OPERATIONAL_TELEMETRY_BUILD = import.meta.env.VITE_PLAYER_OPERATIONAL_TELEMETRY === "1";
 const IS_SECURE_LINK_SPLASH_BUILD = import.meta.env.VITE_PLAYER_SECURE_LINK_SPLASH === "1";
@@ -7429,6 +7460,9 @@ function ClientDashboard({ client, access = getClientPlanAccess(client), isMaste
   const [financialInvoiceState, setFinancialInvoiceState] = useState({ clientId: null, items: [] });
   const [now, setNow] = useState(new Date());
   const [showSummaryCards, setShowSummaryCards] = useState(() => shouldShowClientDashboardCardsInitially(isMasterAccess));
+  const [watchedScreenId, setWatchedScreenId] = useState(null);
+  const demandLabEnabled = import.meta.env.VITE_NOW_PLAYING_DEMAND_LAB === "true" && import.meta.env.VITE_USE_FIREBASE_EMULATORS === "true";
+  useNowPlayingDemandTargets(watchedScreenId ? [`${client.id}/${watchedScreenId}`] : [], demandLabEnabled, true);
 
   useEffect(() => {
     const interval = setInterval(() => {
@@ -7737,7 +7771,7 @@ function ClientDashboard({ client, access = getClientPlanAccess(client), isMaste
               const currentIndex = getPlaylistPreviewIndex(activePlaylist, now, screen);
               const reportedIndex = Math.max(0, Number(screen.nowPlayingIndex || 1) - 1);
               const activeItem = activePlaylist?.items?.[currentIndex] || activePlaylist?.items?.[0];
-              const canUseLivePreview = screen.nowPlayingPreview && reportedIndex === currentIndex;
+              const canUseLivePreview = (!demandLabEnabled || (watchedScreenId === screen.id && getTimestampMs(screen.lastMediaUpdateAt) > Date.now() - 20_000)) && screen.nowPlayingPreview && reportedIndex === currentIndex;
               const previewMedia = canUseLivePreview
                 ? {
                     ...activeItem,
@@ -7798,7 +7832,8 @@ function ClientDashboard({ client, access = getClientPlanAccess(client), isMaste
                     <h4>{screen.currentPlaylistName || activePlaylist?.name || "Nenhuma playlist ativa"}</h4>
 
                     <div className="now-playing-box">
-                      <small>Passando agora</small>
+                      <small>{demandLabEnabled && watchedScreenId !== screen.id ? "Prévia da programação" : "Passando agora"}</small>
+                      {demandLabEnabled && <button type="button" className="client-action" onClick={() => setWatchedScreenId(watchedScreenId === screen.id ? null : screen.id)}>{watchedScreenId === screen.id ? "Encerrar acompanhamento" : "Acompanhar esta TV"}</button>}
                       <strong>{previewMedia?.title || previewMedia?.name || screen.nowPlayingTitle || "Aguardando mídia"}</strong>
                       <span>
                         {previewIndexLabel && (screen.nowPlayingTotal || activePlaylist?.items?.length)
@@ -10203,6 +10238,9 @@ function ClientScreensPage({ client, access = getClientPlanAccess(client), isAdm
   const [exitTvTarget, setExitTvTarget] = useState(null);
   const [exitTvSending, setExitTvSending] = useState(false);
   const [screenSuccessNotice, setScreenSuccessNotice] = useState("");
+  const [watchedScreenId, setWatchedScreenId] = useState(null);
+  const demandLabEnabled = import.meta.env.VITE_NOW_PLAYING_DEMAND_LAB === "true" && import.meta.env.VITE_USE_FIREBASE_EMULATORS === "true";
+  useNowPlayingDemandTargets(watchedScreenId ? [`${client.id}/${watchedScreenId}`] : [], demandLabEnabled, true);
   const screenEditorRef = useRef(null);
   const remoteNavigationPendingRef = useRef(new Set());
 
@@ -10755,7 +10793,7 @@ function ClientScreensPage({ client, access = getClientPlanAccess(client), isAdm
             const currentIndex = getPlaylistPreviewIndex(activePlaylist, now, screen);
             const reportedIndex = Math.max(0, Number(screen.nowPlayingIndex || 1) - 1);
             const activeItem = activePlaylist?.items?.[currentIndex] || activePlaylist?.items?.[0];
-            const canUseLivePreview = screen.nowPlayingPreview && reportedIndex === currentIndex;
+            const canUseLivePreview = (!demandLabEnabled || (watchedScreenId === screen.id && getTimestampMs(screen.lastMediaUpdateAt) > Date.now() - 20_000)) && screen.nowPlayingPreview && reportedIndex === currentIndex;
             const previewMedia = canUseLivePreview
               ? {
                   ...activeItem,
@@ -10813,7 +10851,8 @@ function ClientScreensPage({ client, access = getClientPlanAccess(client), isAdm
                     </span>
 
                     <div className="screen-now-playing">
-                      <small>Mídia atual</small>
+                      <small>{demandLabEnabled && watchedScreenId !== screen.id ? "Prévia da programação" : "Mídia atual"}</small>
+                      {demandLabEnabled && <button type="button" className="client-action" onClick={() => setWatchedScreenId(watchedScreenId === screen.id ? null : screen.id)}>{watchedScreenId === screen.id ? "Encerrar acompanhamento" : "Acompanhar esta TV"}</button>}
                       <strong>{previewMedia?.title || previewMedia?.name || screen.nowPlayingTitle || "Aguardando mídia"}</strong>
                       <span>
                         {previewIndexLabel && (screen.nowPlayingTotal || activePlaylist?.items?.length)
@@ -15659,6 +15698,7 @@ function TVConnectPage({ playerOnly = false }) {
         try {
           binding = await attemptInitialSecureBinding({
             appBuildMode: APP_BUILD_MODE,
+            allowLegacyFallback: import.meta.env.VITE_BASIC_HOM !== "true",
             claimBinding: () => claimPlayerBinding({
               app: firebaseApp,
               auth,
@@ -16223,9 +16263,20 @@ function PlayerPage() {
     TotemDevice.getAppInfo()
       .then((value) => {
         setOperationalAppInfo(normalizeNativeAppInfo(value));
-        basicTelemetryRef.current.setAppInfo(value);
+        const snapshot = basicTelemetryRef.current.setAppInfo(value);
+        basicV5Diagnostic.once("app_info_result", {
+          packageName:value?.packageName ?? null,
+          versionCode:value?.versionCode ?? null,
+          versionName:value?.versionName ?? null,
+          buildId:value?.buildId ?? null,
+          buildTimestamp:value?.buildTimestamp ?? null,
+        });
+        basicV5Diagnostic.once("app_info_validation", getBasicAppInfoValidation(snapshot));
       })
-      .catch((error) => console.log("Não foi possível obter a versão nativa do Player:", error));
+      .catch((error) => {
+        basicV5Diagnostic.once("app_info_error", sanitizeDiagnosticError(error));
+        console.log("Não foi possível obter a versão nativa do Player:", error);
+      });
   }, []);
 
   useEffect(() => {
@@ -18042,6 +18093,16 @@ function PlayerPage() {
           && binding.clientId === clientId
           && binding.screenId === screen.id
           && binding.deviceId === localDeviceId;
+        if (IS_BASIC_V5_DIAG_BUILD) {
+          basicV5Diagnostic.changed("app_info_validation", getBasicAppInfoValidation(basicTelemetrySnapshot));
+          basicV5Diagnostic.changed("basic_sync_conditions", getBasicBindingConditions({
+            snapshot:basicTelemetrySnapshot,
+            binding,
+            clientId,
+            screenId:screen.id,
+            deviceId:localDeviceId,
+          }));
+        }
         const canSyncTelemetryHistory = binding?.status === "ACTIVE"
           && binding.clientId === clientId
           && binding.screenId === screen.id
@@ -18074,7 +18135,14 @@ function PlayerPage() {
           heartbeatPayload.telemetryUpdatedAt = serverTimestamp();
         }
 
-        await updateDoc(screenDocRef, heartbeatPayload);
+        basicV5Diagnostic.changed("heartbeat_payload_keys", getHeartbeatKeySummary(heartbeatPayload));
+        try {
+          await updateDoc(screenDocRef, heartbeatPayload);
+          basicV5Diagnostic.changed("heartbeat_write_success", getHeartbeatKeySummary(heartbeatPayload));
+        } catch (error) {
+          basicV5Diagnostic.changed("heartbeat_write_error", sanitizeDiagnosticError(error));
+          throw error;
+        }
 
         if (capabilities) {
           const capabilitySync = capabilitySyncRef.current;
@@ -18216,7 +18284,7 @@ function PlayerPage() {
 
     const interval = setInterval(() => {
       requestHeartbeat();
-    }, OPERATIONAL_HEARTBEAT_INTERVAL_MS);
+    }, import.meta.env.VITE_BASIC_V5_DIAG === "true" ? 25_000 : OPERATIONAL_HEARTBEAT_INTERVAL_MS);
 
     const onVisible = () => {
       if (document.visibilityState === "visible") requestHeartbeat();
@@ -18268,6 +18336,27 @@ function PlayerPage() {
     try {
       exitingTvRef.current = true;
       clearTimeout(returnToTvTimerRef.current);
+
+      // Somente BASIC V5 Portal: sair deve revogar o vinculo seguro.
+      if (import.meta.env.VITE_BASIC_PORTAL_HOM === "true") {
+        if (playerBindingRef.current?.status !== "ACTIVE") {
+          exitingTvRef.current = false;
+          return false;
+        }
+        const result = await revokeOwnPlayerBinding({
+          app: firebaseApp,
+          auth,
+          reason: "PLAYER_RELEASE",
+        });
+        if (result?.status !== "REVOKED") {
+          exitingTvRef.current = false;
+          return false;
+        }
+        playerBindingRef.current = null;
+        playerIdentityStateRef.current = PLAYER_IDENTITY_STATES.REVOKED;
+        return true;
+      }
+
       if (shouldRevokeSecureBindingOnRelease({
         isPlayerTelemetryBuild: IS_PLAYER_TELEMETRY_BUILD,
         isSecureLinkExperiment: IS_SECURE_LINK_SPLASH_BUILD,
@@ -18488,6 +18577,8 @@ function PlayerPage() {
   }, [screen?.id, clientId]);
 
 
+  const v2WatcherIds = usePlayerNowPlayingWatchersLab(clientId, screen?.id);
+
   useEffect(() => {
     if (!screen?.id || !clientId || !activePlaylist) return;
 
@@ -18504,7 +18595,12 @@ function PlayerPage() {
       "screens",
       screen.id
     );
-    const nowPlayingScope = getPlayerScreenScopeKey(clientId, screen.id);
+    const demandLab = import.meta.env.VITE_BASIC_V5_DIAG === "true" && import.meta.env.VITE_NOW_PLAYING_DEMAND_LAB === "true" && import.meta.env.VITE_USE_FIREBASE_EMULATORS === "true";
+    const demandViewers = isPlayerWatchersV2Lab()
+      ? (v2WatcherIds ? v2WatcherIds.split("|") : [])
+      : demandLab ? activeNowPlayingViewers(screen?.nowPlayingDemandViewers, Date.now()) : [];
+    if (demandLab && demandViewers.length === 0) return;
+    const nowPlayingScope = `${getPlayerScreenScopeKey(clientId, screen.id)}${demandLab ? `:demand:${demandViewers.join(",")}` : ""}`;
     const nowPlayingPayload = {
       nowPlayingTitle: currentItem.title || currentItem.name || "",
       nowPlayingType:
@@ -18546,7 +18642,7 @@ function PlayerPage() {
     }
 
     updateNowPlaying();
-  }, [screen?.id, clientId, activePlaylist?.id, activeMode, mediaIndex, activeItemsKey, mediaCacheReadyKey]);
+  }, [screen?.id, screen?.nowPlayingDemandViewers, clientId, activePlaylist?.id, activeMode, mediaIndex, activeItemsKey, mediaCacheReadyKey, v2WatcherIds]);
 
   useEffect(() => {
     if (!clientId) return;
@@ -19121,10 +19217,13 @@ function PlayerPage() {
 
         <button
           className="tv-player-exit-button"
-          onClick={() => {
-            releaseCurrentScreen().finally(() => {
+          onClick={async () => {
+            const released = await releaseCurrentScreen();
+            if (shouldClearTvConnectionAfterRelease(released)) {
               clearTvConnectionAndShowCode("operator-exit-button");
-            });
+            } else {
+              alert("Nao foi possivel liberar o vinculo no servidor. A tela permanece vinculada.");
+            }
           }}
         >
           Sair da TV
@@ -19418,14 +19517,17 @@ function PlayerPage() {
     recordSourceAssigned(source, diagnosticMedia);
     return (
       <img
-        ref={!isNativeApp() && String(item.preview).startsWith("blob:") ? (image) => {
-          // A retained previous layer can become current without another load event.
+        ref={(IS_BASIC_TELEMETRY_BUILD || (!isNativeApp() && String(item.preview).startsWith("blob:"))) ? (image) => {
+          // BASIC V5: imagens reutilizadas podem estar prontas sem novo onLoad.
           if (
-            isCurrent && image?.complete && image.naturalWidth > 0 &&
+            isCurrent &&
+            image?.complete &&
+            image.naturalWidth > 0 &&
             image.naturalHeight > 0 &&
-            readyMediaKey !== getPlaybackReadyKey(item, index, currentPlaybackExecutionIdRef.current)
+            isCurrentPlaybackExecution(executionId, currentPlaybackExecutionIdRef.current) &&
+            readyMediaKey !== getPlaybackReadyKey(item, index, executionId)
           ) {
-            markCurrentMediaReady(item, index);
+            markCurrentMediaReady(item, index, executionId);
           }
         } : undefined}
         src={resolvedSource.src}

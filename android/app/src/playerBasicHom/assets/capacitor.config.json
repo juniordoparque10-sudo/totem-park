@@ -1,0 +1,9 @@
+{
+    "appId":  "br.com.parksolutions.totempark",
+    "webDir":  "dist",
+    "appName":  "Totem Park TV",
+    "server":  {
+                   "androidScheme":  "http",
+                   "hostname":  "localhost"
+               }
+}

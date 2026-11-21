@@ -8,14 +8,15 @@ service cloud.firestore {
 
     function isMaster() {
       return signedIn()
+        && request.auth.token.get("email", "") != ""
         && (
           (
             exists(/databases/$(database)/documents/settings/masterAccess)
-            && request.auth.token.email in get(/databases/$(database)/documents/settings/masterAccess).data.emails
+            && request.auth.token.get("email", "") in get(/databases/$(database)/documents/settings/masterAccess).data.emails
           )
           || (
             !exists(/databases/$(database)/documents/settings/masterAccess)
-            && request.auth.token.email in [
+            && request.auth.token.get("email", "") in [
               "admin@parksolutions.com",
               "juniordoparque10@gmail.com"
             ]
@@ -237,9 +238,21 @@ service cloud.firestore {
     }
 
     function telemetryIdentityMatches(clientId, screenId, telemetry) {
-      return telemetry.session.clientId == clientId
-        && telemetry.session.screenId == screenId
-        && telemetry.session.deviceId == playerBinding().data.deviceId;
+      return (
+        telemetry.get("schemaVersion", 0) == 5
+        && telemetry.get("profile", "") == "BASIC"
+        && telemetry.get("identity", {}) is map
+        && telemetry.get("session", {}) is map
+        && telemetry.identity.get("clientId", "") == clientId
+        && telemetry.identity.get("screenId", "") == screenId
+        && telemetry.identity.get("deviceId", "") == playerBinding().data.deviceId
+      ) || (
+        telemetry.get("schemaVersion", 0) != 5
+        && telemetry.get("session", {}) is map
+        && telemetry.session.get("clientId", "") == clientId
+        && telemetry.session.get("screenId", "") == screenId
+        && telemetry.session.get("deviceId", "") == playerBinding().data.deviceId
+      );
     }
 
     function historyIdentityMatches(clientId, screenId, payload) {
@@ -474,12 +487,34 @@ service cloud.firestore {
               && request.resource.data.capabilities.versionCode in [58, 59, 60, 61, 62, 63, 64, 65, 66, 67, 68, 69, 70])
             || (request.resource.data.capabilities.packageName == "br.com.parksolutions.totempark"
               && request.resource.data.capabilities.versionCode == 70)
+            || (request.resource.data.capabilities.packageName == "br.com.parksolutions.totempark.player.basichom"
+              && request.resource.data.capabilities.versionCode == 1)
           )
           && request.resource.data.capabilities.templatesV2 == true
           && request.resource.data.capabilities.templatesV2DynamicPhase1 == true
         ))
         && request.resource.data.capabilities.deviceId == playerBinding().data.deviceId
         && request.resource.data.capabilities.playlistItemNavigation == true;
+    }
+
+    // BASIC V5 LAB: somente o titular da conta modifica sua propria lease.
+    // Esta condicao e aplicada a TODAS as alternativas de update da TV.
+    function validNowPlayingDemandLeaseUpdate(clientId) {
+      let affected = request.resource.data.diff(resource.data).affectedKeys();
+      let previous = resource.data.get("nowPlayingDemandViewers", {});
+      let next = request.resource.data.get("nowPlayingDemandViewers", {});
+      return !affected.hasAny(["nowPlayingDemandViewers"])
+        || (signedIn()
+          && (isMaster() || isClientOwner(clientId))
+          && affected.hasOnly(["nowPlayingDemandViewers"])
+          && previous is map
+          && next is map
+          && next.size() <= 64
+          && next.diff(previous).affectedKeys().hasOnly([request.auth.uid])
+          && (!(request.auth.uid in next)
+            || (next[request.auth.uid] is int
+              && next[request.auth.uid] > request.time.toMillis()
+              && next[request.auth.uid] <= request.time.toMillis() + 85000)));
     }
 
     match /clients/{clientId} {
@@ -516,7 +551,9 @@ service cloud.firestore {
       match /screens/{screenId} {
         allow read: if isClientOperational(clientId);
         allow create, delete: if isMaster() || (isClientOperational(clientId) && isClientOwner(clientId));
-        allow update: if isMaster()
+        // Filtrar pedidos de Now Playing ANTES das condicoes extensas de permissao.
+        // Uma negacao por lease invalida nao deve atingir o limite de expressoes.
+        allow update: if validNowPlayingDemandLeaseUpdate(clientId) && (isMaster()
           || (isClientOperational(clientId) && (
             isAllowedPlayerCacheDiagnosticUpdate(clientId, screenId)
             || (!cacheFailureDiagnosticsChanged() && (isClientOwner(clientId)
@@ -530,7 +567,7 @@ service cloud.firestore {
               "templatesV2TestMode",
               "templatesV2TestModeUpdatedAt",
               "templatesV2TestModeUpdatedBy"
-            ]));
+            ])));
 
         match /telemetrySessions/{sessionId} {
           allow read: if isMaster() || isClientOwner(clientId);
@@ -631,7 +668,7 @@ service cloud.firestore {
 
     match /{collection}/{document=**} {
       allow read: if isMaster();
-      allow write: if isMaster() && collection != "clients";
+      allow write: if collection != "clients" && isMaster();
     }
   }
 }
