@@ -329,7 +329,7 @@ exports.claimPlayerBinding = onCall(async (request) => {
     const screen = screenSnapshot.data() || {};
     const previousConnectedUid = clean(screen.connectedAuthUid);
     const isUidConflict = Boolean(previousConnectedUid && previousConnectedUid !== uid);
-    let replacedUid = "";
+    let replacedUid = isUidConflict ? previousConnectedUid : "";
     if (isUidConflict) {
       const authorization = evaluateRebindAuthorization({
         authorization: authorizationSnapshot.data(),
@@ -347,7 +347,6 @@ exports.claimPlayerBinding = onCall(async (request) => {
       const previousBindingRef = db.doc(`playerDeviceBindings/${previousConnectedUid}`);
       const previousBindingSnapshot = await transaction.get(previousBindingRef);
       if (previousBindingSnapshot.exists) {
-        replacedUid = previousConnectedUid;
         transaction.update(previousBindingRef, {
           status: "REVOKED",
           revokedAt: FieldValue.serverTimestamp(),
@@ -443,7 +442,7 @@ exports.revokePlayerBinding = onCall(async (request) => {
     }
     return { status: "REVOKED" };
   });
-  if (result.status === "REVOKED") await clearPlayerLabClaims(requestedUid);
+  await clearPlayerLabClaims(requestedUid);
   return result;
 });
 

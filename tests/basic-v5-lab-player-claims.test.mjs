@@ -1,5 +1,6 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
+import fs from 'node:fs';
 import { buildPlayerLabClaims, isBasicV5LabProject, stripPlayerLabClaims } from '../functions/basic-v5-lab-claims.js';
 
 test('claims are allowed only for the exact BASIC V5 Emulator project', () => {
@@ -23,4 +24,10 @@ test('release removes only player binding claims', () => {
 test('invalid claim identity is rejected', () => {
   assert.throws(() => buildPlayerLabClaims({}, { clientId:'', screenId:'s' }), /identity/i);
   assert.throws(() => buildPlayerLabClaims({}, { clientId:'c', screenId:'bad/path' }), /identity/i);
+});
+
+test('rebind and revoke cannot leave stale Player claims behind', () => {
+  const source = fs.readFileSync(new URL('../functions/index.js', import.meta.url), 'utf8');
+  assert.match(source, /let replacedUid = isUidConflict \? previousConnectedUid : "";/);
+  assert.match(source, /await clearPlayerLabClaims\(requestedUid\);\s*return result;/);
 });
