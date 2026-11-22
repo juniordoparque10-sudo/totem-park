@@ -145,92 +145,256 @@ public class MainActivity extends BridgeActivity {
 
     private void showBasicUniversalExitDialog() {
         basicExitDialogVisible = true;
-        int density = Math.round(getResources().getDisplayMetrics().density);
-        int padding = 24 * density;
+        final float scale = getResources().getDisplayMetrics().density;
+        final int pad = (int) (24 * scale);
 
         android.app.Dialog dialog = new android.app.Dialog(this);
+
+        android.graphics.drawable.GradientDrawable border =
+            new android.graphics.drawable.GradientDrawable(
+                android.graphics.drawable.GradientDrawable.Orientation.TL_BR,
+                new int[] { 0xFF19C8F4, 0xFF7851EA, 0xFFAA4DF2 }
+            );
+        border.setCornerRadius(23 * scale);
+
+        android.widget.LinearLayout frame = new android.widget.LinearLayout(this);
+        frame.setOrientation(android.widget.LinearLayout.VERTICAL);
+        frame.setClipChildren(false);
+        frame.setClipToPadding(false);
+        frame.setPadding((int)(2 * scale), (int)(2 * scale),
+                         (int)(2 * scale), (int)(2 * scale));
+        try (java.io.InputStream pngInput = getAssets().open("public/exit_card_navy.png")) {
+            android.graphics.Bitmap image = android.graphics.BitmapFactory.decodeStream(pngInput);
+            if (image == null) {
+                throw new java.io.IOException("PNG da janela nao decodificado");
+            }
+            android.graphics.drawable.BitmapDrawable glass =
+                new android.graphics.drawable.BitmapDrawable(getResources(), image);
+            glass.setGravity(android.view.Gravity.FILL);
+            frame.setBackground(glass);
+        } catch (java.io.IOException error) {
+            android.util.Log.w("TotemBasicUniversal", "Fundo da janela indisponivel", error);
+            frame.setBackground(border);
+        }
+
         android.widget.LinearLayout card = new android.widget.LinearLayout(this);
         card.setOrientation(android.widget.LinearLayout.VERTICAL);
-        card.setPadding(padding, padding, padding, padding);
+        card.setGravity(android.view.Gravity.CENTER_HORIZONTAL);
+        card.setClipChildren(false);
+        card.setClipToPadding(false);
+        card.setPadding((int)(12 * scale), (int)(10 * scale), (int)(12 * scale), (int)(10 * scale));
 
-        android.graphics.drawable.GradientDrawable background = new android.graphics.drawable.GradientDrawable(
-            android.graphics.drawable.GradientDrawable.Orientation.TL_BR,
-            new int[] { 0xFF111827, 0xFF17122B }
-        );
-        background.setCornerRadius(18 * density);
-        background.setStroke(2 * density, 0xFF6366F1);
-        card.setBackground(background);
+        android.graphics.drawable.GradientDrawable bg =
+            new android.graphics.drawable.GradientDrawable(
+                android.graphics.drawable.GradientDrawable.Orientation.TL_BR,
+                new int[] { 0x900A2748, 0x99071732 }
+            );
+        bg.setCornerRadius(21 * scale);
+        card.setBackgroundColor(android.graphics.Color.TRANSPARENT);
+        frame.addView(card);
 
-        android.widget.TextView brand = new android.widget.TextView(this);
-        brand.setText("TOTEM PARK");
-        brand.setTextColor(0xFF818CF8);
-        brand.setTextSize(13);
-        card.addView(brand);
+        android.widget.ImageView logo = new android.widget.ImageView(this);
+        logo.setScaleType(android.widget.ImageView.ScaleType.FIT_CENTER);
+        try (java.io.InputStream input = getAssets().open("public/logo.png")) {
+            logo.setImageBitmap(android.graphics.BitmapFactory.decodeStream(input));
+        } catch (java.io.IOException error) {
+            android.util.Log.w("TotemBasicUniversal", "Logo indisponivel", error);
+        }
+        card.addView(logo, new android.widget.LinearLayout.LayoutParams(
+            (int)(140 * scale), (int)(38 * scale)));
+
+        android.widget.TextView brandName = new android.widget.TextView(this);
+        brandName.setText("TOTEM PARK");
+        brandName.setTextColor(0xFFF4F7FF);
+        brandName.setTextSize(15);
+        brandName.setTypeface(null, android.graphics.Typeface.BOLD);
+        brandName.setGravity(android.view.Gravity.CENTER);
+        brandName.setLetterSpacing(0.025f);
+        card.addView(brandName);
+
+        android.widget.TextView tagline = new android.widget.TextView(this);
+        tagline.setText("TELAS QUE CONECTAM");
+        tagline.setTextColor(0xFF91A5C8);
+        tagline.setTextSize(9);
+        tagline.setLetterSpacing(0.20f);
+        tagline.setGravity(android.view.Gravity.CENTER);
+        card.addView(tagline);
+
+        android.view.View divider = new android.view.View(this);
+        divider.setBackgroundColor(0xFF354567);
+        android.widget.LinearLayout.LayoutParams dividerParams =
+            new android.widget.LinearLayout.LayoutParams(
+                android.widget.LinearLayout.LayoutParams.MATCH_PARENT,
+                Math.max(1, (int)scale));
+        dividerParams.setMargins(0, (int)(6 * scale), 0, (int)(7 * scale));
+        card.addView(divider, dividerParams);
+
 
         android.widget.TextView title = new android.widget.TextView(this);
-        title.setText("Sair do Player?");
+        android.text.SpannableString titleText =
+            new android.text.SpannableString("Sair do Player?");
+        titleText.setSpan(
+            new android.text.style.ForegroundColorSpan(0xFFAA81FF),
+            8, titleText.length(),
+            android.text.Spanned.SPAN_EXCLUSIVE_EXCLUSIVE
+        );
+        title.setText(titleText);
+        title.setTextSize(21);
         title.setTextColor(0xFFFFFFFF);
-        title.setTextSize(24);
-        title.setPadding(0, 8 * density, 0, 8 * density);
+        title.setTypeface(null, android.graphics.Typeface.BOLD);
+        title.setGravity(android.view.Gravity.CENTER);
         card.addView(title);
 
         android.widget.TextView message = new android.widget.TextView(this);
-        message.setText("A reprodução será encerrada nesta tela.");
-        message.setTextColor(0xFFD1D5DB);
-        message.setTextSize(16);
+        message.setText("A reprodu\u00e7\u00e3o ser\u00e1 encerrada nesta tela.");
+        message.setTextColor(0xFFB8C6DF);
+        message.setTextSize(12);
+        message.setGravity(android.view.Gravity.CENTER);
+        message.setPadding(0, (int)(4 * scale), 0, (int)(9 * scale));
         card.addView(message);
 
         android.widget.LinearLayout actions = new android.widget.LinearLayout(this);
         actions.setOrientation(android.widget.LinearLayout.HORIZONTAL);
-        actions.setGravity(android.view.Gravity.END);
-        actions.setPadding(0, 20 * density, 0, 0);
+        actions.setClipChildren(false);
+        actions.setClipToPadding(false);
+        actions.setPadding(
+            (int)(3 * scale),
+            (int)(5 * scale),
+            (int)(3 * scale),
+            (int)(5 * scale)
+        );
 
-        android.widget.Button continueButton = new android.widget.Button(this);
+        android.widget.TextView continueButton = new android.widget.TextView(this);
         continueButton.setText("Continuar");
+        continueButton.setTextColor(0xFFFFFFFF);
+        continueButton.setTextSize(12);
+        continueButton.setGravity(android.view.Gravity.CENTER);
         continueButton.setFocusable(true);
-        continueButton.setOnClickListener(view -> dialog.dismiss());
-        actions.addView(continueButton);
+        continueButton.setClickable(true);
+        continueButton.setPadding((int)(8 * scale), (int)(11 * scale), (int)(8 * scale), (int)(11 * scale));
 
-        android.widget.Button exitButton = new android.widget.Button(this);
+        android.graphics.drawable.GradientDrawable continueBg =
+            new android.graphics.drawable.GradientDrawable();
+        continueBg.setColor(0xFF12375D);
+        continueBg.setCornerRadius(11 * scale);
+        continueBg.setStroke(Math.max(1, (int)scale), 0xFF4389D8);
+                android.graphics.drawable.GradientDrawable continueFocused =
+            new android.graphics.drawable.GradientDrawable(
+                android.graphics.drawable.GradientDrawable.Orientation.LEFT_RIGHT,
+                new int[] { 0xFF0878CD, 0xFF235AE8 }
+            );
+        continueFocused.setCornerRadius(11 * scale);
+        continueFocused.setStroke(Math.max(2, (int)(3 * scale)), 0xFFB8F4FF);
+
+        android.graphics.drawable.StateListDrawable continueStates =
+            new android.graphics.drawable.StateListDrawable();
+        continueStates.addState(
+            new int[] { android.R.attr.state_focused }, continueFocused);
+        continueStates.addState(new int[] {}, continueBg);
+
+        continueButton.setBackground(continueStates);
+        continueButton.setOnFocusChangeListener((view, focused) -> {
+            view.setScaleX(1.0f);
+            view.setScaleY(1.0f);
+        });
+        continueButton.setOnClickListener(view -> dialog.dismiss());
+
+        android.widget.TextView exitButton = new android.widget.TextView(this);
         exitButton.setText("Sair do aplicativo");
+        exitButton.setTextColor(0xFFFFFFFF);
+        exitButton.setTextSize(12);
+        exitButton.setGravity(android.view.Gravity.CENTER);
         exitButton.setFocusable(true);
+        exitButton.setClickable(true);
+        exitButton.setPadding((int)(8 * scale), (int)(11 * scale), (int)(8 * scale), (int)(11 * scale));
+
+        android.graphics.drawable.GradientDrawable exitBg =
+            new android.graphics.drawable.GradientDrawable(
+                android.graphics.drawable.GradientDrawable.Orientation.LEFT_RIGHT,
+                new int[] { 0xFF1599E9, 0xFF8547E5 }
+            );
+        exitBg.setCornerRadius(11 * scale);
+                android.graphics.drawable.GradientDrawable exitFocused =
+            new android.graphics.drawable.GradientDrawable(
+                android.graphics.drawable.GradientDrawable.Orientation.LEFT_RIGHT,
+                new int[] { 0xFF2568ED, 0xFFAB44F7 }
+            );
+        exitFocused.setCornerRadius(11 * scale);
+        exitFocused.setStroke(Math.max(2, (int)(3 * scale)), 0xFFFFFFFF);
+
+        android.graphics.drawable.StateListDrawable exitStates =
+            new android.graphics.drawable.StateListDrawable();
+        exitStates.addState(
+            new int[] { android.R.attr.state_focused }, exitFocused);
+        exitStates.addState(new int[] {}, exitBg);
+
+        exitButton.setBackground(exitStates);
+        exitButton.setOnFocusChangeListener((view, focused) -> {
+            view.setScaleX(1.0f);
+            view.setScaleY(1.0f);
+        });
         exitButton.setOnClickListener(view -> {
-            basicExitDialog = null;
             dialog.dismiss();
             finishAndRemoveTask();
         });
-        actions.addView(exitButton);
-        card.addView(actions);
 
-        dialog.setContentView(card);
+        android.widget.LinearLayout.LayoutParams left =
+            new android.widget.LinearLayout.LayoutParams(0, -2, 1);
+        left.setMargins(0, 0, (int)(8 * scale), 0);
+        actions.addView(continueButton, left);
+
+        android.widget.LinearLayout.LayoutParams right =
+            new android.widget.LinearLayout.LayoutParams(0, -2, 1.2f);
+        actions.addView(exitButton, right);
+
+                continueButton.setId(android.view.View.generateViewId());
+        exitButton.setId(android.view.View.generateViewId());
+
+        continueButton.setNextFocusRightId(exitButton.getId());
+        continueButton.setNextFocusLeftId(exitButton.getId());
+
+        exitButton.setNextFocusLeftId(continueButton.getId());
+        exitButton.setNextFocusRightId(continueButton.getId());
+
+        card.addView(actions);
+        dialog.setContentView(frame);
         dialog.setCanceledOnTouchOutside(false);
-        dialog.setOnKeyListener((currentDialog, keyCode, event) -> {
-            if (keyCode == android.view.KeyEvent.KEYCODE_BACK && event.getAction() == android.view.KeyEvent.ACTION_UP) {
-                currentDialog.dismiss();
+
+        dialog.setOnDismissListener(d -> {
+            basicExitDialogVisible = false;
+            basicExitDialog = null;
+        });
+
+        dialog.setOnShowListener(d -> { continueButton.requestFocus(); });
+
+        dialog.setOnKeyListener((d, keyCode, event) -> {
+            if (keyCode == android.view.KeyEvent.KEYCODE_BACK &&
+                event.getAction() == android.view.KeyEvent.ACTION_UP) {
+                dialog.dismiss();
                 return true;
             }
             return false;
         });
-        dialog.setOnDismissListener(currentDialog -> {
-            basicExitDialogVisible = false;
-            basicExitDialog = null;
-        });
-        dialog.setOnShowListener(currentDialog -> continueButton.requestFocus());
 
         android.view.Window window = dialog.getWindow();
         if (window != null) {
-            window.setBackgroundDrawable(new android.graphics.drawable.ColorDrawable(android.graphics.Color.TRANSPARENT));
-            window.addFlags(WindowManager.LayoutParams.FLAG_DIM_BEHIND);
-            WindowManager.LayoutParams attributes = window.getAttributes();
-            attributes.dimAmount = 0.78f;
-            window.setAttributes(attributes);
-            window.setLayout(Math.min(460 * density, getResources().getDisplayMetrics().widthPixels - 48 * density), WindowManager.LayoutParams.WRAP_CONTENT);
+            window.setBackgroundDrawable(
+                new android.graphics.drawable.ColorDrawable(
+                    android.graphics.Color.TRANSPARENT));
+            window.clearFlags(WindowManager.LayoutParams.FLAG_DIM_BEHIND);
+            window.addFlags(WindowManager.LayoutParams.FLAG_NOT_TOUCH_MODAL);
         }
 
         basicExitDialog = dialog;
         dialog.show();
+
         if (window != null) {
-            window.setLayout(Math.min(460 * density, getResources().getDisplayMetrics().widthPixels - 48 * density), WindowManager.LayoutParams.WRAP_CONTENT);
+            window.clearFlags(WindowManager.LayoutParams.FLAG_DIM_BEHIND);
+            window.setLayout(
+                Math.min((int)(285 * scale),
+                    getResources().getDisplayMetrics().widthPixels - (int)(40 * scale)),
+                WindowManager.LayoutParams.WRAP_CONTENT
+            );
         }
     }
 

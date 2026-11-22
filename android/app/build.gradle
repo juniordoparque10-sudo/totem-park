@@ -138,8 +138,8 @@ android {
         playerBasicUniversal {
             dimension "appMode"
             applicationIdSuffix ".player.basicv5"
-            versionCode 6
-            versionName "5.0.0-basic-v5-final-candidate"
+            versionCode 14
+            versionName "5.0.0-basic-v5-build14-navy-opaco"
             signingConfig signingConfigs.debug
             manifestPlaceholders = [
                 appLabel: "Totem Park Player",
