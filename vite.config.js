@@ -58,6 +58,22 @@ export default defineConfig(({ mode }) => {
     }
   }
 
+  if (mode === 'playerBasicUniversal') {
+    if (
+      env.VITE_APP_MODE !== 'playerRc' ||
+      env.VITE_BASIC_V5_UNIVERSAL !== 'true' ||
+      env.VITE_OPERATIONAL_HEARTBEAT_SECONDS !== '25' ||
+      env.VITE_USE_FIREBASE_EMULATORS === 'true' ||
+      env.VITE_BASIC_HOM === 'true' ||
+      env.VITE_BASIC_V5_DIAG === 'true' ||
+      env.VITE_BASIC_V5_INTEGRATED_LAB === 'true' ||
+      env.VITE_EMULATOR_HOST ||
+      env.VITE_EMULATOR_PROJECT_ID
+    ) {
+      throw new Error('Build BASIC V5 universal bloqueado: exige servicos normais e heartbeat ECO de 25 segundos.')
+    }
+  }
+
   return {
     plugins: [react()],
     resolve: [
@@ -65,6 +81,7 @@ export default defineConfig(({ mode }) => {
       'playerBasicHom',
       'playerBasicDiag',
       'playerBasicIntegratedLab',
+      'playerBasicUniversal',
       'playerRcSecureLinkExperiment',
       'playerConsolidatedExperimental',
     ].includes(mode) ? {

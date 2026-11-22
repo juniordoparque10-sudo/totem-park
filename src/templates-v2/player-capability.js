@@ -33,12 +33,15 @@ const SUPPORTED_EXPERIMENTAL_VERSION_CODES = new Set([58, 59, 60, 61, 62, 63, 64
 
 export const BASIC_V5_HOM_PACKAGE = "br.com.parksolutions.totempark.player.basichom";
 export const BASIC_V5_HOM_VERSION_CODE = 1;
+export const BASIC_V5_UNIVERSAL_PACKAGE = "br.com.parksolutions.totempark.player.basicv5";
+export const BASIC_V5_UNIVERSAL_VERSION_CODE = 5;
 
 export function isApprovedAndroidNavigationPlayer(packageName, versionCode) {
   const code = Number(versionCode);
   return (packageName === V58_EXPERIMENTAL_PACKAGE && SUPPORTED_EXPERIMENTAL_VERSION_CODES.has(code))
     || (packageName === V70_OFFICIAL_PACKAGE && code === 70)
-    || (packageName === BASIC_V5_HOM_PACKAGE && code === BASIC_V5_HOM_VERSION_CODE);
+    || (packageName === BASIC_V5_HOM_PACKAGE && code === BASIC_V5_HOM_VERSION_CODE)
+    || (packageName === BASIC_V5_UNIVERSAL_PACKAGE && code === BASIC_V5_UNIVERSAL_VERSION_CODE);
 }
 
 export function getAndroidPlayerV2Capabilities(deviceId = "", appInfo = {}) {

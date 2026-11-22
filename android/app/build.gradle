@@ -135,6 +135,17 @@ android {
                 tvLauncherEnabled: "false"
             ]
         }
+        playerBasicUniversal {
+            dimension "appMode"
+            applicationIdSuffix ".player.basicv5"
+            versionCode 5
+            versionName "5.0.0-basic-v5-universal-test"
+            signingConfig signingConfigs.debug
+            manifestPlaceholders = [
+                appLabel: "Totem Park BASIC V5",
+                tvLauncherEnabled: "false"
+            ]
+        }
         playerRc {
             dimension "appMode"
             versionCode 73

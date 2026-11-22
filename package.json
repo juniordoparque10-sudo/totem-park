@@ -27,6 +27,8 @@
     "build:player-rc": "vite build --mode playerRc",
     "build:player-basic-diag": "vite build --mode playerBasicDiag --outDir dist-player-basic-diag",
     "build:player-basic-integrated-lab": "vite build --mode playerBasicIntegratedLab --outDir dist-player-basic-integrated-lab",
+    "build:player-basic-universal": "vite build --mode playerBasicUniversal --outDir dist-player-basic-universal",
+    "prepare:player-basic-universal": "node scripts/prepare-player-basic-universal-assets.mjs",
     "prepare:player-basic-integrated-lab": "node scripts/prepare-player-basic-integrated-lab-assets.mjs",
     "setup:basic-v5-integrated-lab": "node scripts/setup-basic-v5-integrated-lab.mjs",
     "build:basic-v5-portal-lab": "vite build --mode basicV5PortalLab --outDir dist-basic-v5-portal-lab",

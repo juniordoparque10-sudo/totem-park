@@ -66,13 +66,20 @@ public class MainActivity extends BridgeActivity {
     // Saida voluntaria exclusiva do BASIC V5 experimental.
     private static final String BASIC_V5_PACKAGE =
         "br.com.parksolutions.totempark.player.basichom";
+    private static final String BASIC_V5_UNIVERSAL_PACKAGE =
+        "br.com.parksolutions.totempark.player.basicv5";
 
     private boolean basicExitDialogVisible = false;
     private android.app.AlertDialog basicExitDialog;
     private android.window.OnBackInvokedCallback basicBackCallback;
 
     private boolean isBasicV5() {
-        return BASIC_V5_PACKAGE.equals(getPackageName());
+        return BASIC_V5_PACKAGE.equals(getPackageName())
+            || BASIC_V5_UNIVERSAL_PACKAGE.equals(getPackageName());
+    }
+
+    private boolean isBasicUniversal() {
+        return BASIC_V5_UNIVERSAL_PACKAGE.equals(getPackageName());
     }
 
     private void installBasicBackHandler() {
@@ -98,7 +105,7 @@ public class MainActivity extends BridgeActivity {
 
         basicExitDialogVisible = true;
 
-        basicExitDialog = new android.app.AlertDialog.Builder(this)
+        android.app.AlertDialog.Builder builder = new android.app.AlertDialog.Builder(this)
             .setTitle("Sair do Totem Park?")
             .setMessage(
                 "Deseja fechar o aplicativo? " +
@@ -115,7 +122,18 @@ public class MainActivity extends BridgeActivity {
                     basicExitDialog = null;
                     finishAndRemoveTask();
                 }
-            )
+            );
+
+        if (isBasicUniversal()) {
+            builder.setNeutralButton(
+                "Configurações",
+                (dialog, which) -> startActivity(
+                    new Intent(this, BasicUniversalSettingsActivity.class)
+                )
+            );
+        }
+
+        basicExitDialog = builder
             .setOnDismissListener(dialog -> {
                 basicExitDialogVisible = false;
                 basicExitDialog = null;
@@ -255,6 +273,7 @@ public class MainActivity extends BridgeActivity {
             || "br.com.parksolutions.totempark.playertest".equals(getPackageName())
             || "br.com.parksolutions.totempark.player.lab".equals(getPackageName())
             || "br.com.parksolutions.totempark.player.linkfix".equals(getPackageName())
-            || "br.com.parksolutions.totempark.player.loopaudit".equals(getPackageName());
+            || "br.com.parksolutions.totempark.player.loopaudit".equals(getPackageName())
+            || BASIC_V5_UNIVERSAL_PACKAGE.equals(getPackageName());
     }
 }

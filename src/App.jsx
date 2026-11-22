@@ -3811,6 +3811,7 @@ const firebaseConfig = {
 
 const APP_BUILD_MODE = import.meta.env.VITE_APP_MODE || "web";
 const IS_BASIC_V5_DIAG_BUILD = import.meta.env.VITE_BASIC_V5_DIAG === "true";
+const IS_BASIC_V5_UNIVERSAL_BUILD = import.meta.env.VITE_BASIC_V5_UNIVERSAL === "true";
 const basicV5Diagnostic = createBasicV5Diagnostic({ enabled:IS_BASIC_V5_DIAG_BUILD });
 const PLAYER_CAPABILITY_RETRY_INTERVAL_MS = 5 * 60 * 1000;
 const TELEMETRY_HISTORY_REMOTE_SYNC_ENABLED = false;
@@ -18284,7 +18285,7 @@ function PlayerPage() {
 
     const interval = setInterval(() => {
       requestHeartbeat();
-    }, import.meta.env.VITE_BASIC_V5_DIAG === "true" ? 25_000 : OPERATIONAL_HEARTBEAT_INTERVAL_MS);
+    }, IS_BASIC_V5_UNIVERSAL_BUILD ? 25_000 : (import.meta.env.VITE_BASIC_V5_DIAG === "true" ? 25_000 : OPERATIONAL_HEARTBEAT_INTERVAL_MS));
 
     const onVisible = () => {
       if (document.visibilityState === "visible") requestHeartbeat();
