@@ -17,19 +17,26 @@ function subscribeClock(listener) {
 }
 const getClockSnapshot = () => clockSnapshot;
 const TemplateVisualReadyContext = createContext(null);
+const TemplateTimeZoneContext = createContext("UTC");
 
 export function TemplateV2VisualReadyProvider({ value, children }) {
   return <TemplateVisualReadyContext.Provider value={value}>{children}</TemplateVisualReadyContext.Provider>;
 }
 
+export function TemplateTimeZoneProvider({ value = "UTC", children }) {
+  return <TemplateTimeZoneContext.Provider value={value}>{children}</TemplateTimeZoneContext.Provider>;
+}
+
 export function TemplateClock({ format = "24h", large = false }) {
   const snapshot = useSyncExternalStore(subscribeClock, getClockSnapshot, getClockSnapshot);
-  return <strong className={large ? "tpv2-clock-large" : ""}><Clock3 /> {new Date(snapshot).toLocaleTimeString("pt-BR", { hour:"2-digit", minute:"2-digit", hour12:format === "12h" })}</strong>;
+  const timeZone = useContext(TemplateTimeZoneContext);
+  return <strong className={large ? "tpv2-clock-large" : ""}><Clock3 /> {new Date(snapshot).toLocaleTimeString("pt-BR", { timeZone, hour:"2-digit", minute:"2-digit", hour12:format === "12h" })}</strong>;
 }
 
 export function TemplateDate() {
   const snapshot = useSyncExternalStore(subscribeClock, getClockSnapshot, getClockSnapshot);
-  const value = new Date(snapshot).toLocaleDateString("pt-BR", { weekday:"long", day:"2-digit", month:"long" });
+  const timeZone = useContext(TemplateTimeZoneContext);
+  const value = new Date(snapshot).toLocaleDateString("pt-BR", { timeZone, weekday:"long", day:"2-digit", month:"long" });
   return <span className="tpv2-date">{value.charAt(0).toUpperCase() + value.slice(1)}</span>;
 }
 

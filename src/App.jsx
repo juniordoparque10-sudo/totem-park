@@ -171,7 +171,7 @@ import {
   recordVideoEvent,
   registerVideoElement,
 } from "./jump-diagnostics";
-import { isVideoToVideoTransition, releaseVideoElement } from "./decoder-lifecycle";
+import { isVideoToVideoTransition, releaseVideoElement, shouldUseSingleDecoderTransition } from "./decoder-lifecycle";
 import {
   isAndroidLocalMediaSource,
   resolveAndroidMediaSource,
@@ -273,6 +273,7 @@ import {
 } from "./media-content-version";
 import TemplateV2Editor from "./templates-v2/editor/TemplateV2Editor";
 import TemplateV2Renderer from "./templates-v2/TemplateV2Renderer";
+import { TemplateTimeZoneProvider } from "./templates-v2/TemplateV2Modules";
 import TemplateV2DynamicStage from "./templates-v2/editor/TemplateV2DynamicStage";
 import TemplateScaledStage from "./TemplateScaledStage";
 import PortalModal from "./PortalModal";
@@ -286,6 +287,7 @@ import { normalizeRssText } from "./rss-text";
 import { buildRssProxyUrl } from "./rss-endpoint";
 import { getAndroidPlayerV2Capabilities, getTemplatesV2ScreenCapability, getWebPlayerV2Capabilities } from "./templates-v2/player-capability";
 import { attachActivePlayerBindings, getDynamicPlaylistCapability } from "./templates-v2/playlist-capability";
+import { formatTemplateClockParts, resolveTemplateTimeZone } from "./template-timezone";
 import { createPlaylistEditSnapshot, hasPlaylistEditChanges, isPlaylistEditSnapshotFor } from "./playlist-editor-state";
 import logo from "./assets/logo.png";
 import isotipo from "./assets/isotipo.png";
@@ -717,6 +719,7 @@ async function fetchIpScreenLocation() {
       cityLabel: [city, regionCode].filter(Boolean).join("/"),
       latitude: data?.latitude || data?.lat || null,
       longitude: data?.longitude || data?.lon || null,
+      timeZone: data?.timezone || data?.time_zone || "",
       capturedAt: new Date().toISOString(),
     };
   } catch (error) {
@@ -2324,23 +2327,8 @@ function getTemplateBackgroundTheme(template = {}) {
     : "neon_gradient";
 }
 
-function getTemplateClockParts(template, referenceDate = new Date()) {
-  const now = referenceDate;
-  const use12h = template?.timeFormat === "12h";
-
-  return {
-    time: now.toLocaleTimeString("pt-BR", {
-      hour: "2-digit",
-      minute: "2-digit",
-      hour12: use12h,
-    }),
-    weekday: now.toLocaleDateString("pt-BR", { weekday: "long" }),
-    date: now.toLocaleDateString("pt-BR", {
-      day: "2-digit",
-      month: "long",
-      year: "numeric",
-    }),
-  };
+function getTemplateClockParts(template, referenceDate = new Date(), timeZone = "UTC") {
+  return formatTemplateClockParts(referenceDate, { timeZone, timeFormat:template?.timeFormat });
 }
 
 const TEMPLATE_VISIBILITY_OPTIONS = [
@@ -3863,7 +3851,11 @@ const IS_PLAYER_DECODER_EXPERIMENT_BUILD = APP_BUILD_MODE === "playerDecoderExpe
 const IS_TEMPLATE_DATA_FRESHNESS_EXPERIMENT = IS_PLAYER_RC_BUILD || APP_BUILD_MODE === "playerDecoderExperiment";
 const IS_TEMPLATE_ASSET_CACHE_EXPERIMENT = IS_PLAYER_RC_BUILD || (IS_PLAYER_DECODER_EXPERIMENT_BUILD && import.meta.env.VITE_TEMPLATE_ASSET_CACHE_EXPERIMENT === "1");
 const templateAssetCacheOptions = IS_TEMPLATE_ASSET_CACHE_EXPERIMENT ? { cachePolicyEnabled: true } : {};
-const IS_PLAYER_DECODER_LIFECYCLE_BUILD = IS_PLAYER_RC_BUILD || IS_PLAYER_DECODER_EXPERIMENT_BUILD;
+const IS_PLAYER_DECODER_LIFECYCLE_BUILD = shouldUseSingleDecoderTransition({
+  playerRc:IS_PLAYER_RC_BUILD,
+  decoderExperiment:IS_PLAYER_DECODER_EXPERIMENT_BUILD,
+  basicUniversal:IS_BASIC_V5_UNIVERSAL_BUILD,
+});
 const IS_PLAYER_PHASE_B_BUILD = APP_BUILD_MODE === "playerPhaseB";
 const IS_PLAYER_LINK_FIX_BUILD = APP_BUILD_MODE === "playerLinkFix";
 const runtimeDiagnostics = IS_PLAYER_RC_BUILD
@@ -14275,7 +14267,7 @@ function releaseRetiredTemplateAssetUrlsAfterPaint(localUrls) {
   });
 }
 
-function TemplateVisualPreview({ template, compact = false, tv = false, playbackExecutionId = null, onVisualEvent = null, offlineContext = null }) {
+function TemplateVisualPreview({ template, compact = false, tv = false, playbackExecutionId = null, onVisualEvent = null, offlineContext = null, screenTimeZone = "UTC" }) {
   const templateId = template.id || template.templateId || template.identity?.templateId || "";
   const nativeAssetCache = { isNativePlatform:isNativeApp };
   const preserveRemoteOnMiss = !shouldUsePersistentTemplateAssetCache(nativeAssetCache);
@@ -14313,10 +14305,10 @@ function TemplateVisualPreview({ template, compact = false, tv = false, playback
   }, [assetKey, templateId]);
   const renderTemplate = selectTemplateAssetRenderSource(template, offlineTemplate, nativeAssetCache);
   if (isTemplateV2(template)) {
-    return <TemplateV2LivePreview template={renderTemplate} sourceTemplate={template} compact={compact} tv={tv} playbackExecutionId={playbackExecutionId} onVisualEvent={onVisualEvent} offlineContext={offlineContext} />;
+    return <TemplateV2LivePreview template={renderTemplate} sourceTemplate={template} compact={compact} tv={tv} playbackExecutionId={playbackExecutionId} onVisualEvent={onVisualEvent} offlineContext={offlineContext} screenTimeZone={screenTimeZone} />;
   }
 
-  return <LegacyTemplateVisualPreview template={renderTemplate} sourceTemplate={template} compact={compact} tv={tv} offlineContext={offlineContext} />;
+  return <LegacyTemplateVisualPreview template={renderTemplate} sourceTemplate={template} compact={compact} tv={tv} offlineContext={offlineContext} screenTimeZone={screenTimeZone} />;
 }
 
 function ScaledTemplatePortalPreview({ template, playlistThumbnail = false }) {
@@ -14354,7 +14346,7 @@ function logTemplateOffline(event, payload = {}) {
   if (import.meta.env.DEV) console.debug(`[${event}]`, payload);
 }
 
-function TemplateV2LivePreview({ template, sourceTemplate = template, compact = false, tv = false, playbackExecutionId = null, onVisualEvent = null, offlineContext = null }) {
+function TemplateV2LivePreview({ template, sourceTemplate = template, compact = false, tv = false, playbackExecutionId = null, onVisualEvent = null, offlineContext = null, screenTimeZone = "UTC" }) {
   const templateId = template.id || template.templateId || template.identity?.templateId || "";
   const scope = { clientId:offlineContext?.clientId || "", screenId:offlineContext?.screenId || "", templateId };
   const originalConfig = sourceTemplate.published;
@@ -14498,10 +14490,10 @@ function TemplateV2LivePreview({ template, sourceTemplate = template, compact = 
 
   const reportVisualEvent = (event, details = {}) => onVisualEvent?.(event, details);
 
-  return <TemplateV2Renderer template={template} config={config} orientation={config?.display?.defaultOrientation || template.orientation || "Paisagem"} compact={compact} tv={tv} dynamicData={dynamicData} playbackExecutionId={playbackExecutionId} effectiveDurationSeconds={Number(template.duration || config?.display?.duration || 15)} onVisualEvent={reportVisualEvent} />;
+  return <TemplateTimeZoneProvider value={screenTimeZone}><TemplateV2Renderer template={template} config={config} orientation={config?.display?.defaultOrientation || template.orientation || "Paisagem"} compact={compact} tv={tv} dynamicData={dynamicData} playbackExecutionId={playbackExecutionId} effectiveDurationSeconds={Number(template.duration || config?.display?.duration || 15)} onVisualEvent={reportVisualEvent} /></TemplateTimeZoneProvider>;
 }
 
-function LegacyTemplateVisualPreview({ template, sourceTemplate = template, compact = false, tv = false, offlineContext = null }) {
+function LegacyTemplateVisualPreview({ template, sourceTemplate = template, compact = false, tv = false, offlineContext = null, screenTimeZone = "UTC" }) {
   const [locationRotationTick, setLocationRotationTick] = useState(Date.now());
   const activeTemplate = (template.templateType || template.type) === "clima_premium_v2"
     ? {
@@ -14628,7 +14620,7 @@ function LegacyTemplateVisualPreview({ template, sourceTemplate = template, comp
     ? (realTideForecast || getTideForecastForTemplate(activeTemplate))
     : null;
   const weatherReferenceDate = getWeatherReferenceDate(weather);
-  const clockParts = getTemplateClockParts(template, clockTick);
+  const clockParts = getTemplateClockParts(template, clockTick, screenTimeZone);
   const tickerSpeed = getTemplateTickerSpeed(template.tickerSpeed);
   const isLiveCompactTemplate = ["clima", "noticias", "jornal_premium", "clima_premium_v2", "hora_certa_premium", "receitas_fitness_premium", "tendencia_beleza_premium", "fofocas_premium", "tela_corporativa_personalizada"].includes(realTemplateType);
   const isTemplateVisible = (field) => template[field] !== false;
@@ -19152,6 +19144,7 @@ function PlayerPage() {
   const hasRealCacheWork = finalizedPlayerCacheStatus.cacheStatus === "preparando"
     && Number(finalizedPlayerCacheStatus.cachedItems || 0) + Number(finalizedPlayerCacheStatus.failedCacheItems || 0) < Number(finalizedPlayerCacheStatus.totalCacheableItems || 0);
   const visibleOfflineCacheStatus = offlineCacheStatus === "downloading" && !hasRealCacheWork ? "" : offlineCacheStatus;
+  const playerTemplateTimeZone = resolveTemplateTimeZone({ screen, template:activeTemplate || {} });
 
   if (loading || clientLoading) {
     return <PlayerOnlySplash />;
@@ -19210,6 +19203,7 @@ function PlayerPage() {
           template={applyOfflineAssetUrls(activeTemplate, offlineAssetMap)}
           tv
           offlineContext={{ clientId, screenId:screen?.id || "" }}
+          screenTimeZone={playerTemplateTimeZone}
         />
 
         {visibleOfflineCacheStatus && (
@@ -19350,7 +19344,7 @@ function PlayerPage() {
           activityTelemetryRef.current.startPlayback({ id:item.templateId || item.id || "", type:"template" });
         }
       } : null;
-      return <TemplateVisualPreview template={renderItem} tv playbackExecutionId={executionId} onVisualEvent={onVisualEvent} offlineContext={{ clientId, screenId:screen?.id || "" }} />;
+      return <TemplateVisualPreview template={renderItem} tv playbackExecutionId={executionId} onVisualEvent={onVisualEvent} offlineContext={{ clientId, screenId:screen?.id || "" }} screenTimeZone={resolveTemplateTimeZone({ screen, template:renderItem })} />;
     }
 
     if (item.type === "Vídeo") {

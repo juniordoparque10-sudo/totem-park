@@ -2,9 +2,7 @@ import { isApprovedAndroidNavigationPlayer } from "./templates-v2/player-capabil
 export function getPlaylistNavigationCapability(screen = {}) {
   const capability = screen.capabilities;
   const supportedAndroid = capability?.platform === "ANDROID"
-    && isApprovedAndroidNavigationPlayer(capability?.packageName, capability?.versionCode)
-    && capability?.templatesV2 === true
-    && capability?.templatesV2DynamicPhase1 === true;
+    && isApprovedAndroidNavigationPlayer(capability?.packageName, capability?.versionCode);
   const supported = capability?.playlistItemNavigation === true
     && (capability.platform === "WEB" || supportedAndroid)
     && Boolean(screen.connectedDeviceId)

@@ -5,6 +5,10 @@ export function isVideoToVideoTransition(items = [], currentIndex = 0, targetInd
   return items[safeIndex]?.type === "Vídeo" && items[nextIndex]?.type === "Vídeo";
 }
 
+export function shouldUseSingleDecoderTransition({ playerRc = false, decoderExperiment = false, basicUniversal = false } = {}) {
+  return (playerRc || decoderExperiment) && !basicUniversal;
+}
+
 export function releaseVideoElement(video) {
   if (!video) return { found: false, paused: false, sourceCleared: false, loadCalled: false };
 

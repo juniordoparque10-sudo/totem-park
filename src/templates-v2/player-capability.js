@@ -34,7 +34,7 @@ const SUPPORTED_EXPERIMENTAL_VERSION_CODES = new Set([58, 59, 60, 61, 62, 63, 64
 export const BASIC_V5_HOM_PACKAGE = "br.com.parksolutions.totempark.player.basichom";
 export const BASIC_V5_HOM_VERSION_CODE = 1;
 export const BASIC_V5_UNIVERSAL_PACKAGE = "br.com.parksolutions.totempark.player.basicv5";
-export const BASIC_V5_UNIVERSAL_VERSION_CODE = 5;
+export const BASIC_V5_UNIVERSAL_VERSION_CODE = 6;
 
 export function isApprovedAndroidNavigationPlayer(packageName, versionCode) {
   const code = Number(versionCode);
