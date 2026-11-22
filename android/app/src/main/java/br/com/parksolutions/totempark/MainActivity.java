@@ -104,13 +104,17 @@ public class MainActivity extends BridgeActivity {
         }
 
         basicExitDialogVisible = true;
+        String autoStartMessage = "O Totem Park iniciara novamente ao reiniciar o Android.";
+        if (isBasicUniversal() && !BasicUniversalPreferences.isAutoStartEnabled(this)) {
+            autoStartMessage = "A inicialização automática está desativada.";
+        }
 
         android.app.AlertDialog.Builder builder = new android.app.AlertDialog.Builder(this)
             .setTitle("Sair do Totem Park?")
             .setMessage(
                 "Deseja fechar o aplicativo? " +
                 "O vinculo da TV e as midias armazenadas serao preservados. " +
-                "O Totem Park iniciara novamente ao reiniciar o Android."
+                autoStartMessage
             )
             .setNegativeButton(
                 "Cancelar",

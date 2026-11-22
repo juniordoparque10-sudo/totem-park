@@ -14,6 +14,8 @@ test('universal exit dialog opens isolated settings activity', () => {
   assert.match(main, /setNeutralButton\([\s\S]*"Configurações"/);
   assert.match(main, /new Intent\(this, BasicUniversalSettingsActivity\.class\)/);
   assert.match(main, /if \(isBasicUniversal\(\)\)/);
+  assert.match(main, /BasicUniversalPreferences\.isAutoStartEnabled\(this\)/);
+  assert.match(main, /A inicialização automática está desativada/);
 });
 
 test('settings activity is not exposed to non-universal packages', () => {
