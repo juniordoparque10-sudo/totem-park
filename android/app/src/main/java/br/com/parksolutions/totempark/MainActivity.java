@@ -70,7 +70,7 @@ public class MainActivity extends BridgeActivity {
         "br.com.parksolutions.totempark.player.basicv5";
 
     private boolean basicExitDialogVisible = false;
-    private android.app.AlertDialog basicExitDialog;
+    private android.app.Dialog basicExitDialog;
     private android.window.OnBackInvokedCallback basicBackCallback;
 
     private boolean isBasicV5() {
@@ -103,6 +103,11 @@ public class MainActivity extends BridgeActivity {
             return;
         }
 
+        if (isBasicUniversal()) {
+            showBasicUniversalExitDialog();
+            return;
+        }
+
         basicExitDialogVisible = true;
         String autoStartMessage = "O Totem Park iniciara novamente ao reiniciar o Android.";
         if (isBasicUniversal() && !BasicUniversalPreferences.isAutoStartEnabled(this)) {
@@ -128,15 +133,6 @@ public class MainActivity extends BridgeActivity {
                 }
             );
 
-        if (isBasicUniversal()) {
-            builder.setNeutralButton(
-                "Configurações",
-                (dialog, which) -> startActivity(
-                    new Intent(this, BasicUniversalSettingsActivity.class)
-                )
-            );
-        }
-
         basicExitDialog = builder
             .setOnDismissListener(dialog -> {
                 basicExitDialogVisible = false;
@@ -147,10 +143,106 @@ public class MainActivity extends BridgeActivity {
         basicExitDialog.show();
     }
 
+    private void showBasicUniversalExitDialog() {
+        basicExitDialogVisible = true;
+        int density = Math.round(getResources().getDisplayMetrics().density);
+        int padding = 24 * density;
+
+        android.app.Dialog dialog = new android.app.Dialog(this);
+        android.widget.LinearLayout card = new android.widget.LinearLayout(this);
+        card.setOrientation(android.widget.LinearLayout.VERTICAL);
+        card.setPadding(padding, padding, padding, padding);
+
+        android.graphics.drawable.GradientDrawable background = new android.graphics.drawable.GradientDrawable(
+            android.graphics.drawable.GradientDrawable.Orientation.TL_BR,
+            new int[] { 0xFF111827, 0xFF17122B }
+        );
+        background.setCornerRadius(18 * density);
+        background.setStroke(2 * density, 0xFF6366F1);
+        card.setBackground(background);
+
+        android.widget.TextView brand = new android.widget.TextView(this);
+        brand.setText("TOTEM PARK");
+        brand.setTextColor(0xFF818CF8);
+        brand.setTextSize(13);
+        card.addView(brand);
+
+        android.widget.TextView title = new android.widget.TextView(this);
+        title.setText("Sair do Player?");
+        title.setTextColor(0xFFFFFFFF);
+        title.setTextSize(24);
+        title.setPadding(0, 8 * density, 0, 8 * density);
+        card.addView(title);
+
+        android.widget.TextView message = new android.widget.TextView(this);
+        message.setText("A reprodução será encerrada nesta tela.");
+        message.setTextColor(0xFFD1D5DB);
+        message.setTextSize(16);
+        card.addView(message);
+
+        android.widget.LinearLayout actions = new android.widget.LinearLayout(this);
+        actions.setOrientation(android.widget.LinearLayout.HORIZONTAL);
+        actions.setGravity(android.view.Gravity.END);
+        actions.setPadding(0, 20 * density, 0, 0);
+
+        android.widget.Button continueButton = new android.widget.Button(this);
+        continueButton.setText("Continuar");
+        continueButton.setFocusable(true);
+        continueButton.setOnClickListener(view -> dialog.dismiss());
+        actions.addView(continueButton);
+
+        android.widget.Button exitButton = new android.widget.Button(this);
+        exitButton.setText("Sair do aplicativo");
+        exitButton.setFocusable(true);
+        exitButton.setOnClickListener(view -> {
+            basicExitDialog = null;
+            dialog.dismiss();
+            finishAndRemoveTask();
+        });
+        actions.addView(exitButton);
+        card.addView(actions);
+
+        dialog.setContentView(card);
+        dialog.setCanceledOnTouchOutside(false);
+        dialog.setOnKeyListener((currentDialog, keyCode, event) -> {
+            if (keyCode == android.view.KeyEvent.KEYCODE_BACK && event.getAction() == android.view.KeyEvent.ACTION_UP) {
+                currentDialog.dismiss();
+                return true;
+            }
+            return false;
+        });
+        dialog.setOnDismissListener(currentDialog -> {
+            basicExitDialogVisible = false;
+            basicExitDialog = null;
+        });
+        dialog.setOnShowListener(currentDialog -> continueButton.requestFocus());
+
+        android.view.Window window = dialog.getWindow();
+        if (window != null) {
+            window.setBackgroundDrawable(new android.graphics.drawable.ColorDrawable(android.graphics.Color.TRANSPARENT));
+            window.addFlags(WindowManager.LayoutParams.FLAG_DIM_BEHIND);
+            WindowManager.LayoutParams attributes = window.getAttributes();
+            attributes.dimAmount = 0.78f;
+            window.setAttributes(attributes);
+            window.setLayout(Math.min(460 * density, getResources().getDisplayMetrics().widthPixels - 48 * density), WindowManager.LayoutParams.WRAP_CONTENT);
+        }
+
+        basicExitDialog = dialog;
+        dialog.show();
+        if (window != null) {
+            window.setLayout(Math.min(460 * density, getResources().getDisplayMetrics().widthPixels - 48 * density), WindowManager.LayoutParams.WRAP_CONTENT);
+        }
+    }
+
     @Override
     public boolean dispatchKeyEvent(android.view.KeyEvent event) {
         if (isBasicV5()) {
             int key = event.getKeyCode();
+
+            if (isBasicUniversal() && key == android.view.KeyEvent.KEYCODE_MENU && event.getAction() == android.view.KeyEvent.ACTION_UP) {
+                startActivity(new Intent(this, BasicUniversalSettingsActivity.class));
+                return true;
+            }
 
             if (key == android.view.KeyEvent.KEYCODE_BACK ||
                 key == android.view.KeyEvent.KEYCODE_ESCAPE) {

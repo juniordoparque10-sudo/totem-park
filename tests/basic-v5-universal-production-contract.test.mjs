@@ -29,8 +29,8 @@ test('normal secure pairing accepts runtime code and contains no synthetic unive
 });
 
 test('universal APK metadata is approved for existing remote navigation capability', () => {
-  assert.equal(isApprovedAndroidNavigationPlayer('br.com.parksolutions.totempark.player.basicv5', 5), true);
-  assert.equal(isApprovedAndroidNavigationPlayer('br.com.parksolutions.totempark.player.basicv5', 4), false);
+  assert.equal(isApprovedAndroidNavigationPlayer('br.com.parksolutions.totempark.player.basicv5', 6), true);
+  assert.equal(isApprovedAndroidNavigationPlayer('br.com.parksolutions.totempark.player.basicv5', 5), false);
   const plugin = read('android/app/src/main/java/br/com/parksolutions/totempark/TotemDevicePlugin.java');
   for (const field of ['packageName', 'versionCode', 'versionName', 'buildId', 'buildTimestamp']) {
     assert.match(plugin, new RegExp(`put\\("${field}"`));

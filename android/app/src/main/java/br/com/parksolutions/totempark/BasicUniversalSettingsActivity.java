@@ -1,6 +1,8 @@
 package br.com.parksolutions.totempark;
 
 import android.app.Activity;
+import android.content.pm.PackageInfo;
+import android.os.Build;
 import android.os.Bundle;
 import android.view.ViewGroup;
 import android.widget.Button;
@@ -33,6 +35,25 @@ public class BasicUniversalSettingsActivity extends Activity {
         TextView note = new TextView(this);
         note.setText("A abertura após o boot depende das permissões e restrições do fabricante do aparelho.");
         layout.addView(note);
+
+        TextView buildInfo = new TextView(this);
+        try {
+            PackageInfo packageInfo = getPackageManager().getPackageInfo(getPackageName(), 0);
+            long versionCode = Build.VERSION.SDK_INT >= Build.VERSION_CODES.P
+                ? packageInfo.getLongVersionCode()
+                : packageInfo.versionCode;
+            buildInfo.setText(
+                "Perfil: BASIC V5\n" +
+                "Pacote: " + getPackageName() + "\n" +
+                "VersionName: " + packageInfo.versionName + "\n" +
+                "VersionCode: " + versionCode + "\n" +
+                "Build ID: " + BuildConfig.TOTEM_BUILD_ID + "\n" +
+                "Compilado em: " + BuildConfig.TOTEM_BUILD_TIMESTAMP
+            );
+        } catch (Exception error) {
+            buildInfo.setText("Perfil: BASIC V5\nPacote: " + getPackageName());
+        }
+        layout.addView(buildInfo);
 
         Button close = new Button(this);
         close.setText("Voltar ao Player");

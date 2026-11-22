@@ -8,8 +8,9 @@ test('universal flavor has a unique production package and version', () => {
   const gradle = read('android/app/build.gradle');
   const block = gradle.match(/playerBasicUniversal\s*\{([\s\S]*?)\n\s*\}/)?.[1] || '';
   assert.match(block, /applicationIdSuffix\s+"\.player\.basicv5"/);
-  assert.match(block, /versionCode\s+5/);
-  assert.match(block, /versionName\s+"5\.0\.0-basic-v5-universal-test"/);
+  assert.match(block, /versionCode\s+6/);
+  assert.match(block, /versionName\s+"5\.0\.0-basic-v5-final-candidate"/);
+  assert.match(block, /appLabel:\s*"Totem Park Player"/);
   assert.match(block, /tvLauncherEnabled:\s*"false"/);
 });
 
