@@ -249,9 +249,11 @@ import {
   PLAYER_BINDING_CLAIM_FAILURES,
   PLAYER_IDENTITY_STATES,
   releasePlayerBindingForScreen,
+  resolveExistingOrClaimPlayerBinding,
   revokeOwnPlayerBinding,
   shouldRevokeSecureBindingOnRelease,
   uploadTransitionDiagnosticRescue,
+  validatePlayerBinding,
 } from "./player-identity";
 import { attemptInitialSecureBinding } from "./player-initial-binding";
 import MaintenanceScreen from "./player/MaintenanceScreen";
@@ -16145,17 +16147,23 @@ function PlayerPage() {
   const isAndroidSmartTv = isNativeApp() && isAndroidTv === true;
 
   useEffect(() => {
-    if (!(IS_OPERATIONAL_TELEMETRY_BUILD || IS_TEMPLATES_V2_DIAGNOSTIC_BUILD || !isNativeApp()) || !clientId || !codigo) return undefined;
+    if (!(IS_OPERATIONAL_TELEMETRY_BUILD || IS_TEMPLATES_V2_DIAGNOSTIC_BUILD || !isNativeApp()) || !screen?.id || !clientId || !codigo) return undefined;
     let cancelled = false;
     const establishIdentity = async () => {
       const bindingStage = runtimeDiagnostics.startStage("PLAYER_IDENTITY_BINDING", { clientId, codePresent:Boolean(codigo) });
       try {
-        const binding = await claimPlayerBinding({
-          app: firebaseApp,
-          auth,
-          code: codigo,
-          deviceId: getTotemDeviceId(),
-          appVersion: operationalAppInfo.versionName,
+        const binding = await resolveExistingOrClaimPlayerBinding({
+          clientId,
+          screenId:screen.id,
+          deviceId:getTotemDeviceId(),
+          validateBinding:() => validatePlayerBinding({ app:firebaseApp, auth }),
+          claimBinding:() => claimPlayerBinding({
+            app:firebaseApp,
+            auth,
+            code:codigo,
+            deviceId:getTotemDeviceId(),
+            appVersion:operationalAppInfo.versionName,
+          }),
         });
         if (cancelled) return;
         playerBindingRef.current = binding;
@@ -16175,7 +16183,7 @@ function PlayerPage() {
       cancelled = true;
       window.removeEventListener("online", establishIdentity);
     };
-  }, [clientId, codigo, operationalAppInfo.versionName]);
+  }, [clientId, codigo, screen?.id, operationalAppInfo.versionName]);
 
   useEffect(() => {
     const diagnostic = transitionDiagnosticsRef.current;

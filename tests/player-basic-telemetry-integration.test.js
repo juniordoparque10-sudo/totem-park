@@ -63,6 +63,9 @@ test("Player RC publica envelope BASIC inteiro e não consulta TrafficStats", ()
   assert.match(source, /if \(isNativeApp\(\) && SHOULD_COLLECT_ADVANCED_TELEMETRY\)/);
   assert.match(source, /onSnapshot\(screenDocRef, async \(snapshot\)/);
   assert.match(source, /startScheduleRuntime\(/);
+  assert.match(source, /resolveExistingOrClaimPlayerBinding\(\{/);
+  assert.match(source, /validateBinding:\(\) => validatePlayerBinding\(\{ app:firebaseApp, auth \}\)/);
+  assert.match(source, /\|\| !screen\?\.id \|\| !clientId \|\| !codigo\) return undefined/);
 });
 
 test("publicação BASIC não inclui tráfego atividade cache ou histórico", () => {

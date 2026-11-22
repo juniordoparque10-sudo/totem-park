@@ -48,11 +48,40 @@ function waitForAuth(auth) {
   });
 }
 
-export async function ensurePlayerAuth(auth) {
+export async function ensurePlayerAuth(auth, { signIn = signInAnonymously } = {}) {
+  await auth.authStateReady?.();
   const existing = auth.currentUser || await waitForAuth(auth);
   if (existing) return existing;
-  const credential = await signInAnonymously(auth);
+  const credential = await signIn(auth);
   return credential.user;
+}
+
+export async function resolveExistingOrClaimPlayerBinding({
+  clientId,
+  screenId,
+  deviceId,
+  validateBinding,
+  claimBinding,
+}) {
+  try {
+    const existing = await validateBinding();
+    const matches = existing?.status === "ACTIVE"
+      && existing.clientId === clientId
+      && existing.screenId === screenId
+      && existing.deviceId === deviceId;
+    if (matches) return { ...existing, source:"VALIDATED" };
+    if (existing?.status === "ACTIVE") {
+      const conflict = new Error("Authenticated player binding belongs to another device or screen.");
+      conflict.code = "player/binding-conflict";
+      throw conflict;
+    }
+  } catch (error) {
+    const code = String(error?.code || "").toLowerCase();
+    const missing = code.includes("permission-denied") || code.includes("not-found");
+    if (!missing) throw error;
+  }
+
+  return { ...(await claimBinding()), source:"CLAIMED" };
 }
 
 export async function claimPlayerBinding({ app, auth, code, deviceId, appVersion }) {
